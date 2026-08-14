@@ -1,0 +1,53 @@
+# Autofilled by tools/new_project_layout/probe_disc.py from your legal dump.
+# Review before shipping. Runtime quirks / overlay seeds still need hand work.
+
+[game]
+name = "Wipeout 3 Special Edition"
+id = "SCES-02845"
+players = 2
+exe = "disc/SCES_028.45"
+disc = "disc/WipEout 3 - Special Edition (Europe) (En,Fr,De,Es,It).cue"
+load_address = "0x80010000"
+entry_pc = "0x80162474"
+text_size = "0x0016C000"
+stack_base = "0x801FFFF0"
+
+# Digests are for data Track 01 (first BINARY FILE / TRACK 01).
+[prepare_disc]
+out_dir = "disc"
+bin_name = "WipEout 3 - Special Edition (Europe) (En,Fr,De,Es,It) (Track 01).bin"
+cue_name = "WipEout 3 - Special Edition (Europe) (En,Fr,De,Es,It).cue"
+boot_exe = "SCES_028.45"
+known_sizes = [94660944]
+known_md5 = [
+  "b9d48f139544051893f45eed62780e42",
+]
+known_sha1 = [
+  "a7bb5cdafdf97ba1cd99cc832439f57ce0c39a8a",
+]
+known_crc32 = [
+  "a0e9e5c2",
+]
+
+[recompiler]
+seeds = "seeds/ghidra_funcs.txt"
+out_dir = "generated"
+strict = true
+
+[runtime]
+window_title = "Wipeout 3 Special Edition Recompiled"
+memcard_dir = "saves"
+
+[video]
+renderer = "opengl"
+aspect_ratio = "4:3"
+
+[controller]
+default_mode = "digital"
+
+# Online mount gate: digests + track count + optional TOC fingerprint
+# (see docs/NETPLAY.md).
+[netplay]
+require_cue = true
+required_tracks = 14
+required_disc_fp = "a8a369bf31c63906bfcf91d1a0a87d93bde7984d82f02edc5e79727d1e325339"

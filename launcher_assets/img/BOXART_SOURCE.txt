@@ -1,0 +1,5 @@
+Box art sourced from libretro-thumbnails (Named_Boxarts).
+Matched name: WipEout 3 - Special Edition (Europe) (En,Fr,De,Es,It)
+URL: https://thumbnails.libretro.com/Sony%20-%20PlayStation/Named_Boxarts/WipEout%203%20-%20Special%20Edition%20(Europe)%20(En%2CFr%2CDe%2CEs%2CIt).png
+https://github.com/libretro-thumbnails/libretro-thumbnails
+Convert: PNG → 32-bit TGA for recomp-ui LAUNCHER_BOXART.

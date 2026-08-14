@@ -1,0 +1,46 @@
+{
+  "format_version": 1,
+  "game": {
+    "name": "Wipeout 3 Special Edition",
+    "id": "SCES-02845",
+    "boot_exe": "SCES_028.45"
+  },
+  "marketing": {
+    "description": "Wipeout 3 is a racing game that retains the same basic elements of its predecessors, and introduces players to the F7200 Anti-Gravity Race League. Set in 2116, players control futuristic anti-gravity ships owned by racing corporations and pilot them on eight circuits (plus four hidden prototype tracks).",
+    "publisher": "Psygnosis",
+    "year": "2000",
+    "region": "USA",
+    "players": 2
+  },
+  "rom_identity": {
+    "cue_name": "WipEout 3 - Special Edition (Europe) (En,Fr,De,Es,It).cue",
+    "bin_name": "WipEout 3 - Special Edition (Europe) (En,Fr,De,Es,It) (Track 01).bin",
+    "track_counts": [
+      14
+    ],
+    "require_cue": true,
+    "data_track": {
+      "size": 94660944,
+      "md5": "b9d48f139544051893f45eed62780e42",
+      "sha1": "a7bb5cdafdf97ba1cd99cc832439f57ce0c39a8a",
+      "crc32": "a0e9e5c2"
+    },
+    "disc_fp": "a8a369bf31c63906bfcf91d1a0a87d93bde7984d82f02edc5e79727d1e325339"
+  },
+  "exe": {
+    "load_address": "0x80010000",
+    "entry_pc": "0x80162474",
+    "text_size": "0x0016C000",
+    "stack_base": "0x801FFFF0"
+  },
+  "seeds": {
+    "count": 1053,
+    "source": "boot_exe_jal"
+  },
+  "warnings": [],
+  "notes": [
+    "entry_pc/load_address/text_size/stack_base taken from PS-X EXE header.",
+    "seeds are first-pass boot-EXE JAL targets (+ entry); expect to grow as overlays / runtime paths are discovered.",
+    "required_disc_fp is psxrecomp-toc-v1 (matches runtime DiscIdentity)."
+  ]
+}
