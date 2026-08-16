@@ -1,0 +1,55 @@
+format_version = 5
+id = "wipeout3.enhancement.widescreen"
+version = "1.0.0"
+name = "WipEout 3 Widescreen"
+author = "mstan"
+description = "Renders WipEout 3 Special Edition gameplay with adaptive native-wide projection, HUD correction, and cull widening."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SCES-02845"
+disc_sha256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
+
+[[feature]]
+id = "widescreen"
+name = "Widescreen (Experimental)"
+description = "Enable WipEout 3's experimental widescreen rendering and choose a fixed or resize-driven aspect."
+group = "Display"
+default_enabled = false
+
+[[option]]
+feature = "widescreen"
+id = "aspect"
+label = "Aspect ratio"
+description = "Adaptive follows the live window size from 4:3 through 21:9."
+group = "Display"
+type = "choice"
+default = "adaptive"
+
+[[option.choice]]
+value = "16:9"
+label = "16:9"
+
+[[option.choice]]
+value = "21:9"
+label = "21:9"
+
+[[option.choice]]
+value = "adaptive"
+label = "Adaptive"
+
+[[plugin]]
+feature = "widescreen"
+id = "wipeout3.widescreen.16-9"
+when = { aspect = "16:9" }
+
+[[plugin]]
+feature = "widescreen"
+id = "wipeout3.widescreen.21-9"
+when = { aspect = "21:9" }
+
+[[plugin]]
+feature = "widescreen"
+id = "wipeout3.widescreen.adaptive"
+when = { aspect = "adaptive" }

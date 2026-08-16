@@ -17,6 +17,9 @@ set(PSX_SETUP_WIZARD ON CACHE BOOL
     "Advertise first-run setup wizard + Generate & rebuild in recomp-ui" FORCE)
 include("${PSXRECOMP_ROOT}/runtime/runtime.cmake")
 
+file(GLOB WIPEOUT3_MOD_PLUGIN_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/mods/*.c")
+
 psxrecomp_add_game_runtime(psx-runtime
     ENABLE_NETPLAY_IF_PRESENT
     NETPLAY_LOBBY_URL "ws://netplay.retcomm.net:8765"
@@ -28,7 +31,9 @@ psxrecomp_add_game_runtime(psx-runtime
     APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/psxrecomp.ico"
     GEN_MARKER "generated/SCES_028.45_dispatch.c"
     GEN_FULL_GLOB "generated/SCES_028.45_full_*.c"
-    CODEGEN_SETUP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/codegen_setup.c"
+    CODEGEN_SETUP_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/codegen_setup.c"
+        ${WIPEOUT3_MOD_PLUGIN_SOURCES}
 )
 
 # Stage runtime configs next to the exe for direct build/ launches. Only copy
@@ -44,3 +49,14 @@ foreach(_PSX_RUNTIME_CONFIG game.toml game_options.toml)
     endif()
 endforeach()
 
+# Ship WipEout 3's trusted, game-owned mod catalog beside the runtime. Every
+# feature remains disabled until selected on the launcher's Mods page.
+set(WIPEOUT3_PRELOADED_MODS "${CMAKE_CURRENT_SOURCE_DIR}/mods/preloaded")
+if(EXISTS "${WIPEOUT3_PRELOADED_MODS}/packages")
+    add_custom_command(TARGET psx-runtime POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${WIPEOUT3_PRELOADED_MODS}"
+            "$<TARGET_FILE_DIR:psx-runtime>/mods"
+        COMMENT "Preloading the WipEout 3 mod catalog"
+        VERBATIM)
+endif()
