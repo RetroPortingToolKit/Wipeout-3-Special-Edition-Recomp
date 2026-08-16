@@ -40,6 +40,7 @@ memcard_dir = "saves"
 
 [video]
 renderer = "opengl"
+geometry_correction = true
 # Authentic 4:3 is the baseline. The Widescreen mod below activates WipEout
 # 3's game-specific native-wide hooks and chooses fixed/adaptive presentation.
 aspect_ratio = "4:3"
@@ -53,6 +54,7 @@ adaptive_view = true
 # WipEout 3 is a 3D racer; keep BIOS/FMV/2D-only frames authored at 4:3 and
 # engage wide gameplay presentation on GTE-active frames.
 gte_game_mode = true
+precise_nclip = true
 native_wide = false
 
 # Correct 4:3-authored HUD primitives for the live wide surface. Native-wide's
@@ -71,6 +73,27 @@ auto_screen_x = true
 screen_w_imms = ["0x200", "0x240"]
 screen_h_imms = ["0x100"]
 guard_pixels = 16
+nclip_keep_sites = [
+    "0x801711FC",
+    "0x80171DBC",
+    "0x80171F40",
+    "0x801720A0",
+    "0x8017220C",
+    "0x80172360",
+    "0x801724AC",
+    "0x801725DC",
+    "0x80172720",
+]
+branch_keep_sites = [
+    "0x80171D74",
+    "0x80171EE8",
+    "0x80172058",
+    "0x801721B4",
+    "0x80172314",
+    "0x80172450",
+    "0x80172590",
+    "0x801726C4",
+]
 
 [controller]
 default_mode = "digital"
