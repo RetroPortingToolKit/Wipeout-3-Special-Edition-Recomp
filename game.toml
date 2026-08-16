@@ -58,8 +58,8 @@ precise_nclip = true
 native_wide = false
 
 # Correct 4:3-authored HUD primitives for the live wide surface. Native-wide's
-# expanded render target exposes WipEout 3's per-window clears as vertical bands,
-# so keep this title on the legacy wide path and adjust the final HUD groups.
+# expanded render target exposes WipEout 3's aggressive per-track culling/void in
+# single player, so keep this title on the legacy wide path by default.
 auto_ui_squash = true
 nw_hud_corners = false
 nw_flat_backdrop = false
