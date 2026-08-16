@@ -103,6 +103,8 @@ p2_device = "gamepad"
 # (see docs/NETPLAY.md).
 multitap_analog = true
 [netplay]
+local_viewport = "vertical_split"
+local_viewport_aspect = "adaptive"
 require_cue = true
 required_tracks = 14
 required_disc_fp = "a8a369bf31c63906bfcf91d1a0a87d93bde7984d82f02edc5e79727d1e325339"
