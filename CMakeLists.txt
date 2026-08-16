@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
 project(Wipeout_3_Special_Edition_Recomp LANGUAGES C CXX)
 
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 set(PSXRECOMP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/psxrecomp" CACHE PATH
     "Path to psxrecomp")
 
