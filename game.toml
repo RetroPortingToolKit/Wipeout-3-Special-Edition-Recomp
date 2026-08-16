@@ -97,6 +97,7 @@ branch_keep_sites = [
 
 [controller]
 default_mode = "digital"
+p2_device = "gamepad"
 
 # Online mount gate: digests + track count + optional TOC fingerprint
 # (see docs/NETPLAY.md).
