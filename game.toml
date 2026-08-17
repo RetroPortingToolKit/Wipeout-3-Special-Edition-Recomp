@@ -39,6 +39,19 @@ mod_function_entry_funcs = ["0x800EDFC8"]
 [runtime]
 window_title = "Wipeout 3 Special Edition Recompiled"
 memcard_dir = "saves"
+# Record streamed/mod-patched code into overlay_captures.json and run it as
+# native shards instead of the dirty-RAM interpreter. Required here: the
+# framerate package patches the game's code on disc (target = "disc_user"),
+# so none of it matches the AOT image built from the stock SCES_028.45 and
+# it would otherwise interpret forever. See docs/COMPILING_OVERLAYS.md.
+overlay_cache = true
+# Background autocompile (gcc tier). Configuring this ALSO enables autocapture
+# on interp pressure — required to capture the ntscfull8 enhancement code the
+# game writes into the high 8 MB banks (0x781000+) and the runtime-dispatched
+# interior PCs in mod-patched text; neither is seen by the passive CD-DMA
+# capture path. The spawn itself runs on Windows only — on Linux/macOS run the
+# same command by hand after a play session (docs/COMPILING_OVERLAYS.md §1).
+overlay_autocompile_cmd = "python3 psxrecomp/tools/compile_overlays.py --captures build-release/overlay_captures.json --game-toml game.toml --recompiler build-recompiler/psxrecomp-game --runtime-include psxrecomp/runtime/include --out-dir build-release/cache --gcc /usr/bin/gcc --cps --jobs 8"
 
 [video]
 renderer = "opengl"
@@ -413,3 +426,62 @@ multitap_analog = true
 require_cue = true
 required_tracks = 14
 required_disc_fp = "a8a369bf31c63906bfcf91d1a0a87d93bde7984d82f02edc5e79727d1e325339"
+
+# 8 MB framerate mod (ntscfull8): the enhancement engine at 0x80780000+ is a
+# detour trampoline farm — patched text sites `j 0x8078xxxx` into stubs that
+# jump straight back. Detour labels are not callable-function boundaries, so
+# runtime dispatch evidence alone cannot seed them (OBSERVED_PC_ONLY); declare
+# them so compile_overlays.py roots each stub (TOML_DECLARED_ENTRY) and the
+# region compiles native instead of interpreting forever. Entries were
+# extracted from j-target scans of the captured patched-text regions.
+[[overlays]]
+load_addr = "0x80780000"
+bytes_crc = "0x8B994BAE"
+entries = [
+    "0x80780000",
+    "0x80780568",
+    "0x807805F0",
+    "0x80780610",
+    "0x80780634",
+    "0x80780648",
+    "0x8078065C",
+    "0x807806F8",
+    "0x8078070C",
+    "0x80780720",
+    "0x807807BC",
+    "0x807807D0",
+    "0x807807E4",
+    "0x80780880",
+    "0x80780894",
+    "0x807808A8",
+    "0x80780944",
+    "0x80780958",
+    "0x8078096C",
+    "0x80780A08",
+    "0x80780A1C",
+    "0x80780A30",
+    "0x80780ACC",
+    "0x80780AE0",
+    "0x80780AF4",
+    "0x80780B90",
+    "0x80780BA4",
+    "0x80780BB8",
+    "0x80780C54",
+    "0x80780C68",
+    "0x80780C7C",
+    "0x80780D18",
+    "0x80780D2C",
+    "0x80780D40",
+    "0x80780DDC",
+    "0x80780DF0",
+    "0x80780E04",
+    "0x80780EA0",
+    "0x80780EB4",
+    "0x80780EC8",
+    "0x80780F5C",
+    "0x80781004",
+    "0x80781464",
+    "0x80781A24",
+    "0x80781A44",
+    "0x80781A64"
+]
