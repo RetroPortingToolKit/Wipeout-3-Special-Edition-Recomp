@@ -9,3 +9,151 @@ name = "BootEntry"
 emit = false
 status = "guessed"
 note = "SYSTEM.CNF / EXE entry PC (probe seed)"
+
+[[func]]
+pc = 0x80170254
+name = "ProjectPackClipCodes"
+emit = false
+status = "guessed"
+note = "RTPS then pack LEFT/RIGHT/TOP/BOTTOM clip codes; widescreen keeps LEFT/RIGHT"
+
+[[func]]
+pc = 0x801704F0
+name = "ProjectPackClipCodesAlt"
+emit = false
+status = "guessed"
+note = "Sibling RTPS clip-code packer (same LEFT/RIGHT keep family)"
+
+[[func]]
+pc = 0x80171AFC
+name = "ProjectPackClipCodesTri"
+emit = false
+status = "guessed"
+note = "Triangle RTPS clip-code packer feeding SceneryPolySubmit"
+
+[[func]]
+pc = 0x80171D0C
+name = "SceneryPolySubmit"
+emit = false
+status = "guessed"
+note = "AND clip flags then slt sx,$s6; keep sites force packet builder while wide"
+
+[[func]]
+pc = 0x801727EC
+name = "ProjectPackClipCodesQuad"
+emit = false
+status = "guessed"
+note = "Quad RTPS clip-code packer feeding SceneryPolySubmit"
+
+[[func]]
+pc = 0x80172E3C
+name = "ProjectPackClipCodesFar"
+emit = false
+status = "guessed"
+note = "Far/scenery bbox RTPS + AND of 4 corner clip codes; not the 4:3 knife-cut"
+
+[[func]]
+pc = 0x8012268C
+name = "FrameDraw"
+emit = false
+status = "guessed"
+note = "Per-frame draw; copies DRAWENV w/h to 0x80173A9C/0x80173AA0"
+
+[[func]]
+pc = 0x8013535C
+name = "SetupFrustumClipBounds"
+emit = false
+status = "guessed"
+note = "Writes camera-space clip coeffs 0x801E2480/2484/2488/25CC from FOV tables"
+
+[[func]]
+pc = 0x80135B8C
+name = "SetupFrustumClipBoundsAlt"
+emit = false
+status = "guessed"
+note = "Twin of SetupFrustumClipBounds (same clip-coeff stores)"
+
+[[func]]
+pc = 0x801415F4
+name = "SceneObjectVisWalk"
+emit = false
+status = "guessed"
+note = "Walks section objects; jal ProjectPackClipCodesFar"
+
+[[func]]
+pc = 0x801422FC
+name = "SceneSectionDraw"
+emit = false
+status = "guessed"
+note = "Per-section face-list submit; no FOV test of its own"
+
+[[func]]
+pc = 0x80142634
+name = "SceneryFrustumClip"
+emit = false
+status = "confirmed"
+note = "Software clip vs 4:3 camera planes; widen blocked until gPrimCursor arena grows"
+
+[[site]]
+pc = 0x80142664
+name = "SceneryClipNxLoad"
+kind = "lw"
+status = "guessed"
+note = "lw 0x801E25CC (|n|); plane_nx candidate — disabled (packet overflow)"
+
+[[site]]
+pc = 0x80142690
+name = "SceneryClipNyNzLoad"
+kind = "lw"
+status = "guessed"
+note = "lw 0x801E2480 (Y nz); plane_nx candidate — disabled with NxLoad"
+
+[[func]]
+pc = 0x800EDFC8
+name = "SimVblankGate"
+emit = false
+status = "confirmed"
+note = "VBlank sim gate: counter vs gSimVblankSkip; skip path 0x800EE0F0"
+
+[[func]]
+pc = 0x800EED58
+name = "SetSimVblankSkip"
+emit = false
+status = "confirmed"
+note = "a0=new skip; returns previous; also queues pad slot invalidate"
+
+[[object]]
+addr = 0x8017F118
+name = "gSimVblankCounter"
+status = "confirmed"
+note = "SimVblankGate increments; reset on full sim (sw 0)"
+
+[[object]]
+addr = 0x8017F02C
+name = "gSimVblankSkip"
+status = "confirmed"
+note = "Sim every N vblanks (stock 2); lw/sw -4052 off 0x8018; framerate plugin"
+
+[[object]]
+addr = 0x801A8620
+name = "gPrimCursor"
+status = "confirmed"
+note = "GPU packet bump pointer (lw/sw -31200 off 0x801A); clipper +40 per emit"
+
+[[object]]
+addr = 0x801E2480
+name = "gClipNzY"
+status = "guessed"
+note = "Y-plane nz; 269/256 of (H>>9)"
+
+[[object]]
+addr = 0x801E2488
+name = "gClipNzX"
+status = "guessed"
+note = "X-plane nz"
+
+[[object]]
+addr = 0x801E25CC
+name = "gClipNCoord"
+status = "guessed"
+note = "Shared |n| for X and Y frustum planes"

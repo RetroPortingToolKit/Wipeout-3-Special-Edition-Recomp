@@ -33,6 +33,8 @@ known_crc32 = [
 seeds = "seeds/ghidra_funcs.txt"
 out_dir = "generated"
 strict = true
+# SimVblankGate: framerate package forces gSimVblankSkip=2 on entry (AOT cadence).
+mod_function_entry_funcs = ["0x800EDFC8"]
 
 [runtime]
 window_title = "Wipeout 3 Special Edition Recompiled"
@@ -73,27 +75,333 @@ auto_screen_x = true
 screen_w_imms = ["0x200", "0x240"]
 screen_h_imms = ["0x100"]
 guard_pixels = 16
-nclip_keep_sites = [
-    "0x801711FC",
-    "0x80171DBC",
-    "0x80171F40",
-    "0x801720A0",
-    "0x8017220C",
-    "0x80172360",
-    "0x801724AC",
-    "0x801725DC",
-    "0x80172720",
-]
-branch_keep_sites = [
-    "0x80171D74",
-    "0x80171EE8",
-    "0x80172058",
-    "0x801721B4",
-    "0x80172314",
-    "0x80172450",
-    "0x80172590",
-    "0x801726C4",
-]
+
+# SceneryFrustumClip (0x80142634) clips in CAMERA space before RTPS squash
+# (left/right: 2488*Z ± 25CC*X; top/bottom: 2480*Z ± 25CC*Y). That is the
+# 4:3 knife-cut on trackside buildings. plane_nx on the 25CC/2480 loads widens
+# it correctly, but every surviving poly advances the GPU packet cursor at
+# 0x801A8620 (+40B in the clipper alone). The stock arena has no headroom for
+# the extra FOV, so the cursor stomps racer state (start-grid ships snap
+# backwards and freeze). Do NOT re-enable plane_nx until that arena is
+# relocated/enlarged. Identity at 4:3 is not enough — wide must also be safe.
+# plane_nx_sites = ["0x80142664", "0x80142690"]  # DISABLED — packet overflow
+
+# Packer LEFT/RIGHT keeps (post-squash SXY) are no-ops for extra FOV after
+# squash maps 16:9 onto [0,width]; they stay identity at 4:3. Vertical packer
+# tests and NCLIP bltz stay vanilla.
+
+# Clip-code packers: sx < 0 (LEFT). result=0 => never LEFT while wide.
+[[widescreen.cull.keep]]
+address  = "0x8017032C"
+expected = "0x28850000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80170370"
+expected = "0x28850000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80170460"
+expected = "0x28850000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x801704A4"
+expected = "0x28850000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80170608"
+expected = "0x28850000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80170658"
+expected = "0x28850000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x801706A8"
+expected = "0x28850000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x801706F8"
+expected = "0x28850000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x8017073C"
+expected = "0x28850000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80171B50"
+expected = "0x296C0000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80171BAC"
+expected = "0x296C0000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80172900"
+expected = "0x296C0000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80172948"
+expected = "0x296C0000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x801730AC"
+expected = "0x28850000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x801730E0"
+expected = "0x28850000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80173114"
+expected = "0x28850000"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80173148"
+expected = "0x28850000"
+result   = 0
+
+# Clip-code packers: width < sx (RIGHT). result=0 => never RIGHT while wide.
+[[widescreen.cull.keep]]
+address  = "0x80170334"
+expected = "0x01C4202A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80170378"
+expected = "0x01C4202A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80170468"
+expected = "0x01C4202A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x801704AC"
+expected = "0x01C4202A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80170610"
+expected = "0x01C4202A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80170660"
+expected = "0x01C4202A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x801706B0"
+expected = "0x01C4202A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80170700"
+expected = "0x01C4202A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80170744"
+expected = "0x01C4202A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80171B58"
+expected = "0x004B582A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80171BB4"
+expected = "0x004B582A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80172908"
+expected = "0x004B582A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80172950"
+expected = "0x004B582A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x801730B4"
+expected = "0x02E4202A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x801730E8"
+expected = "0x02E4202A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x8017311C"
+expected = "0x02E4202A"
+result   = 0
+
+[[widescreen.cull.keep]]
+address  = "0x80173150"
+expected = "0x02E4202A"
+result   = 0
+
+# Scenery submitter (PSX_FN_SceneryPolySubmit): slt sx, $s6. result=1 => packet builder.
+[[widescreen.cull.keep]]
+address  = "0x80171D84"
+expected = "0x03F6202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171D88"
+expected = "0x0396282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171D98"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171F0C"
+expected = "0x0096202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171F10"
+expected = "0x00B6282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171F14"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171F18"
+expected = "0x00F6382A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172068"
+expected = "0x03F6202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x8017206C"
+expected = "0x0396282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x8017207C"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801721D8"
+expected = "0x0096202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801721DC"
+expected = "0x00B6282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801721E0"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801721E4"
+expected = "0x00F6382A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172324"
+expected = "0x03F6202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172328"
+expected = "0x0396282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172338"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172474"
+expected = "0x0096202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172478"
+expected = "0x00B6282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x8017247C"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172480"
+expected = "0x00F6382A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801725A0"
+expected = "0x03F6202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801725A4"
+expected = "0x0396282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801725B4"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801726E8"
+expected = "0x0096202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801726EC"
+expected = "0x00B6282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801726F0"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801726F4"
+expected = "0x00F6382A"
+result   = 1
 
 [controller]
 default_mode = "digital"
