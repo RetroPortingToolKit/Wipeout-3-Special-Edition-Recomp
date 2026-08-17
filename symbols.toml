@@ -135,10 +135,17 @@ status = "confirmed"
 note = "Sim every N vblanks (stock 2); lw/sw -4052 off 0x8018; framerate plugin"
 
 [[object]]
-addr = 0x801A8620
+addr = 0x80198620
 name = "gPrimCursor"
 status = "confirmed"
-note = "GPU packet bump pointer (lw/sw -31200 off 0x801A); clipper +40 per emit"
+note = """GPU packet bump pointer; clipper +40 per emit (0x8017163C/0x80171E5C/0x801722A0).
+Address is lui 0x801A + offset -31200 = 0x801A0000 - 0x79E0. This was recorded as
+0x801A8620 (the immediate concatenated instead of subtracted); a full-EXE scan finds
+0 references to that address and 116 to this one (64 loads, 52 stores). Reset once per
+frame at 0x800EE6A8 from gPrimBufTable[bufIndex] (table at 0x801A4B60, index at
+0x80175CB0). Arena is 0x14000 = 81920 bytes, double-buffered (3 buffers in split view);
+size is the lui/ori constant at 0x800EE474. NO BOUNDS CHECK EXISTS at any of the 116
+sites, so overflow is silent."""
 
 [[object]]
 addr = 0x801E2480

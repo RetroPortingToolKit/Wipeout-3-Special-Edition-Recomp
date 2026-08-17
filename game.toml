@@ -93,10 +93,26 @@ guard_pixels = 16
 # (left/right: 2488*Z ± 25CC*X; top/bottom: 2480*Z ± 25CC*Y). That is the
 # 4:3 knife-cut on trackside buildings. plane_nx on the 25CC/2480 loads widens
 # it correctly, but every surviving poly advances the GPU packet cursor at
-# 0x801A8620 (+40B in the clipper alone). The stock arena has no headroom for
-# the extra FOV, so the cursor stomps racer state (start-grid ships snap
-# backwards and freeze). Do NOT re-enable plane_nx until that arena is
-# relocated/enlarged. Identity at 4:3 is not enough — wide must also be safe.
+# 0x80198620 (+40B in the clipper alone). The stock arena has no headroom for
+# the extra FOV, so the cursor overruns (start-grid ships snap backwards and
+# freeze). Do NOT re-enable plane_nx until that arena is relocated/enlarged.
+# Identity at 4:3 is not enough — wide must also be safe.
+#
+# Corrections (2026-08-16), from a full-EXE scan; the notes above predate them:
+#  - The cursor is 0x80198620, not 0x801A8620. lui 0x801A + offset -31200 =
+#    0x801A0000 - 0x79E0. The old address is referenced 0 times by the game.
+#  - "stomps racer state" is UNVERIFIED. The arena is two 0x14000 halves at
+#    0x801A5944/0x801B9944 ending 0x801CD944; overrunning half 0 runs into
+#    half 1 (the list being DMA'd), and past half 1 sits a VRAM staging cursor
+#    and render globals. No per-racer physics/AI array is adjacent either way.
+#    That accounts for pop-in and visual damage, not for inverted steering.
+#  - There are THREE unchecked cursors, not one. The tightest is 0x801E5668,
+#    a hard 750-slot 40-byte pool (bumped at 0x801701B0); 0x801E5664 walks 190
+#    32-byte slots. Guarding the 81920-byte arena alone would not be enough.
+#  - Widescreen does not WIDEN the horizontal reject at these sites, it DISABLES
+#    it: psx_ws_cull_keep_result consumes the margin as a boolean, so the
+#    admitted geometry is unbounded rather than +33% of the frustum. No finite
+#    arena enlargement is provably sufficient while that holds.
 # plane_nx_sites = ["0x80142664", "0x80142690"]  # DISABLED — packet overflow
 
 # Packer LEFT/RIGHT keeps (post-squash SXY) are no-ops for extra FOV after
