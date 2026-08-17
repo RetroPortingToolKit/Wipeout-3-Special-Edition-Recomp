@@ -28,6 +28,10 @@ type = "choice"
 default = "adaptive"
 
 [[option.choice]]
+value = "4:3"
+label = "4:3 (original)"
+
+[[option.choice]]
 value = "16:9"
 label = "16:9"
 
@@ -42,6 +46,11 @@ label = "32:9 (super-ultrawide)"
 [[option.choice]]
 value = "adaptive"
 label = "Adaptive"
+
+[[plugin]]
+feature = "widescreen"
+id = "wipeout3.widescreen.4-3"
+when = { aspect = "4:3" }
 
 [[plugin]]
 feature = "widescreen"
