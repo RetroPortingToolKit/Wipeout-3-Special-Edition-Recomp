@@ -65,6 +65,11 @@ pgxp_tolerance = 1.0
 pgxp_cpu_mode = true
 # PS1 affine texture mapping is very visible at high internal resolution.
 perspective_texturing = true
+# Beetle PSX HW-format HD texture pack from
+# <disc dir>/<disc stem>-texture-replacements/. princepeter64's Wip3out pack
+# drops straight in: tex_pack.h matches Beetle's hashing exactly (same CRC32
+# polynomial, same hashed byte range, same UV-limited sample rect).
+hd_textures = true
 # Authentic 4:3 is the baseline. The Widescreen mod below activates WipEout
 # 3's game-specific native-wide hooks and chooses fixed/adaptive presentation.
 aspect_ratio = "4:3"
