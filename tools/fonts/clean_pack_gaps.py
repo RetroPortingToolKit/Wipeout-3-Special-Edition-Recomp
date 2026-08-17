@@ -81,6 +81,18 @@ def clean(dump_dir, pack_dir, tex):
                         if ap[xx, yy] > 8:
                             ap[xx, yy] = 0
                             cleared += 1
+        # Rows work the same way and for the same reason: a source row that is
+        # blank right across separates one band from the next, and pack ink
+        # there bleeds a slice of the row above or below into the glyph the
+        # game asked for. Same safety argument, other axis.
+        blank_rows = [y for y in range(h)
+                      if not any(sp[x, y] > 8 for x in range(w))]
+        for y in blank_rows:
+            for yy in range(y * S, min((y + 1) * S, rep.height)):
+                for xx in range(rep.width):
+                    if ap[xx, yy] > 8:
+                        ap[xx, yy] = 0
+                        cleared += 1
         if cleared:
             rep.putalpha(alpha)
             rep.save(tpath)
