@@ -96,7 +96,13 @@ nw_phase_backdrop = false
 auto_screen_x = true
 screen_w_imms = ["0x200", "0x240"]
 screen_h_imms = ["0x100"]
-guard_pixels = 16
+# Slack beyond the exact reveal before a primitive is trivially rejected.
+# 16 put the reject edge essentially AT the revealed boundary (32:9 reveal is
+# 267px, so the margin was 283), which still dropped primitives straddling it
+# -- visible as occasional objects winking out at the extreme sides. 64 gives
+# real slack; the cost is a little more submitted geometry, and the arena sits
+# at 43% with the tightest pool at a third, so there is ample headroom.
+guard_pixels = 64
 
 # SceneryFrustumClip (0x80142634) clips in CAMERA space before RTPS squash
 # (left/right: 2488*Z ± 25CC*X; top/bottom: 2480*Z ± 25CC*Y). That is the

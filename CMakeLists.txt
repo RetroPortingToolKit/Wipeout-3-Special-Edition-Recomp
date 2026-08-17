@@ -19,6 +19,15 @@ if(EXISTS "${PSXRECOMP_ROOT}/lib/recomp-net/CMakeLists.txt")
 endif()
 set(PSX_SETUP_WIZARD ON CACHE BOOL
     "Advertise first-run setup wizard + Generate & rebuild in recomp-ui" FORCE)
+# WipEout 3 renders at up to 16x internal resolution, where the PS1's affine
+# texture mapping and integer vertex snapping are the dominant visual defect.
+# Without this the PGXP_LOAD/STORE/ALU/MULDIV/COP2 hooks the emitter writes
+# into every generated translation unit preprocess to ((void)0) — the "pgxp"
+# mod then rides on the legacy SWC2-only recorder, which covered 18.7% of
+# drawn vertices here. Building the <exe>_pgxp sibling (runtime.cmake's PGXP
+# option) is the framework's own mechanism for turning them on.
+set(PSX_PGXP_VARIANT ON CACHE BOOL
+    "Build the <exe>_pgxp precision-shadowing variant" FORCE)
 include("${PSXRECOMP_ROOT}/runtime/runtime.cmake")
 
 file(GLOB WIPEOUT3_MOD_PLUGIN_SOURCES CONFIGURE_DEPENDS
