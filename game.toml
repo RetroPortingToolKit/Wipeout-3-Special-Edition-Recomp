@@ -72,13 +72,12 @@ perspective_texturing = true
 # index and decode cleanly — 79 of them matched real draws in a single race
 # with zero decode failures.
 #
-# OFF because the runtime cannot yet USE them. tex_pack identifies replacement
-# textures but does not substitute them at draw time; the substitution path is
-# written and drew correctly, but corrupts the mask/stencil state the HUD
-# depends on, so it is parked (see the stashes on feat/ws-cull-widen). With
-# that outstanding, enabling this only pays the per-primitive hashing cost for
-# no visual change. Turn it on once substitution lands.
-hd_textures = false
+# Substitution is implemented and on. The four font atlases are held back via
+# exclude.txt in the pack directory: the game draws all of its text from them,
+# and they render invisibly through this path, so replacing them erases every
+# glyph in the game. Everything else in the pack is correct and visibly
+# sharper. See that file for the detail.
+hd_textures = true
 # Authentic 4:3 is the baseline. The Widescreen mod below activates WipEout
 # 3's game-specific native-wide hooks and chooses fixed/adaptive presentation.
 aspect_ratio = "4:3"
