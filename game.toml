@@ -56,6 +56,15 @@ overlay_autocompile_cmd = "python3 psxrecomp/tools/compile_overlays.py --capture
 [video]
 renderer = "opengl"
 geometry_correction = true
+# PGXP tuning, measured live at 8K internal on this title (2026-08-17).
+# tolerance 0.5 rejected ~92k candidates per 4s and landed only ~28k
+# dataflow hits; 1.0 takes rejections to ZERO and quadruples hits to ~112k.
+# 2.0/4.0/8.0 are flat against 1.0, so 1.0 is the knee -- anything looser
+# buys nothing and only widens what gets accepted.
+pgxp_tolerance = 1.0
+pgxp_cpu_mode = true
+# PS1 affine texture mapping is very visible at high internal resolution.
+perspective_texturing = true
 # Authentic 4:3 is the baseline. The Widescreen mod below activates WipEout
 # 3's game-specific native-wide hooks and chooses fixed/adaptive presentation.
 aspect_ratio = "4:3"
@@ -113,325 +122,210 @@ guard_pixels = 16
 #    it: psx_ws_cull_keep_result consumes the margin as a boolean, so the
 #    admitted geometry is unbounded rather than +33% of the frustum. No finite
 #    arena enlargement is provably sufficient while that holds.
-# plane_nx_sites = ["0x80142664", "0x80142690"]  # DISABLED — packet overflow
+# RE-ENABLED 2026-08-17: the packet-overflow rationale above is disproved.
+# Measured live, the arena peaks at 41.5% of 81920 B and the tightest pool at
+# 247/750 across 4:3, 16:9 and 21:9 -- it never approaches capacity. The
+# corruption blamed on overflow was the cull.keep PINS, now migrated to
+# cull.widen. Screen-space widening cannot reach this clip: it runs in CAMERA
+# space before RTPS, so raising x_margin (tested to 400) leaves the sides cut.
+plane_nx_sites = ["0x80142664", "0x80142690"]
 
-# Packer LEFT/RIGHT keeps (post-squash SXY) are no-ops for extra FOV after
-# squash maps 16:9 onto [0,width]; they stay identity at 4:3. Vertical packer
-# tests and NCLIP bltz stay vanilla.
+# Cohen-Sutherland outcode packers (post-squash SXY). These set bit0 RIGHT /
+# bit1 LEFT, which the submitters AND-accumulate across a primitive's vertices
+# and reject only when EVERY vertex is off the same edge -- a trivial reject,
+# not a subdivision. They previously used [[widescreen.cull.keep]], which pins
+# the verdict, i.e. deletes the horizontal trivial reject entirely and makes
+# the game submit unbounded off-screen geometry. Widening moves the BOUND with
+# the live reveal margin instead, so the reject stays honest and simply happens
+# at the revealed edge. Identity at 4:3 (margin 0) in every mode.
+#
+# The paired VERTICAL compares and the NCLIP bltz are deliberately absent and
+# stay vanilla -- only the horizontal field changes with aspect.
+#
+# REMOVED (2026-08-17): 28 further sites were listed here as cull.keep but are
+# not screen-coordinate culls at all -- they compare GTE SZ depth against a
+# near-Z constant (250 / 1700) held in s6, selecting a submitter path. Pinning
+# those changed submitter selection for reasons unrelated to aspect, so they
+# are back to vanilla. Encodings: 0x00D6302A, 0x0096202A, 0x00B6282A,
+# 0x00F6382A, 0x0396282A, 0x03F6202A.
 
-# Clip-code packers: sx < 0 (LEFT). result=0 => never LEFT while wide.
-[[widescreen.cull.keep]]
+# LEFT edge: vanilla `sx < 0`; widened `sx < 0 - m`, so the reject line moves
+# to more negative X and the revealed left margin is kept rather than voted
+# off. rs holds SX (sign-extended by the preceding lh of the GTE SXY word).
+[[widescreen.cull.widen]]
 address  = "0x8017032C"
 expected = "0x28850000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80170370"
 expected = "0x28850000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80170460"
 expected = "0x28850000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x801704A4"
 expected = "0x28850000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80170608"
 expected = "0x28850000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80170658"
 expected = "0x28850000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x801706A8"
 expected = "0x28850000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x801706F8"
 expected = "0x28850000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x8017073C"
 expected = "0x28850000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80171B50"
 expected = "0x296C0000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80171BAC"
 expected = "0x296C0000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80172900"
 expected = "0x296C0000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80172948"
 expected = "0x296C0000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x801730AC"
 expected = "0x28850000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x801730E0"
 expected = "0x28850000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80173114"
 expected = "0x28850000"
-result   = 0
+mode     = "imm_lower"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80173148"
 expected = "0x28850000"
-result   = 0
+mode     = "imm_lower"
 
-# Clip-code packers: width < sx (RIGHT). result=0 => never RIGHT while wide.
-[[widescreen.cull.keep]]
+# RIGHT edge: vanilla `bound < sx` where rs is the draw-window width; widened
+# `bound + m < sx`, i.e. the bound INCREASES so the predicate gets harder and
+# the revealed right margin is kept. `bound - m` would be the inversion.
+[[widescreen.cull.widen]]
 address  = "0x80170334"
 expected = "0x01C4202A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80170378"
 expected = "0x01C4202A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80170468"
 expected = "0x01C4202A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x801704AC"
 expected = "0x01C4202A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80170610"
 expected = "0x01C4202A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80170660"
 expected = "0x01C4202A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x801706B0"
 expected = "0x01C4202A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80170700"
 expected = "0x01C4202A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80170744"
 expected = "0x01C4202A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80171B58"
 expected = "0x004B582A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80171BB4"
 expected = "0x004B582A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80172908"
 expected = "0x004B582A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80172950"
 expected = "0x004B582A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x801730B4"
 expected = "0x02E4202A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x801730E8"
 expected = "0x02E4202A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x8017311C"
 expected = "0x02E4202A"
-result   = 0
+mode     = "bound_rs"
 
-[[widescreen.cull.keep]]
+[[widescreen.cull.widen]]
 address  = "0x80173150"
 expected = "0x02E4202A"
-result   = 0
+mode     = "bound_rs"
 
 # Scenery submitter (PSX_FN_SceneryPolySubmit): slt sx, $s6. result=1 => packet builder.
-[[widescreen.cull.keep]]
-address  = "0x80171D84"
-expected = "0x03F6202A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x80171D88"
-expected = "0x0396282A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x80171D98"
-expected = "0x00D6302A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x80171F0C"
-expected = "0x0096202A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x80171F10"
-expected = "0x00B6282A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x80171F14"
-expected = "0x00D6302A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x80171F18"
-expected = "0x00F6382A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x80172068"
-expected = "0x03F6202A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x8017206C"
-expected = "0x0396282A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x8017207C"
-expected = "0x00D6302A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x801721D8"
-expected = "0x0096202A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x801721DC"
-expected = "0x00B6282A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x801721E0"
-expected = "0x00D6302A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x801721E4"
-expected = "0x00F6382A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x80172324"
-expected = "0x03F6202A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x80172328"
-expected = "0x0396282A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x80172338"
-expected = "0x00D6302A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x80172474"
-expected = "0x0096202A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x80172478"
-expected = "0x00B6282A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x8017247C"
-expected = "0x00D6302A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x80172480"
-expected = "0x00F6382A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x801725A0"
-expected = "0x03F6202A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x801725A4"
-expected = "0x0396282A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x801725B4"
-expected = "0x00D6302A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x801726E8"
-expected = "0x0096202A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x801726EC"
-expected = "0x00B6282A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x801726F0"
-expected = "0x00D6302A"
-result   = 1
-
-[[widescreen.cull.keep]]
-address  = "0x801726F4"
-expected = "0x00F6382A"
-result   = 1
-
 [controller]
 default_mode = "digital"
 

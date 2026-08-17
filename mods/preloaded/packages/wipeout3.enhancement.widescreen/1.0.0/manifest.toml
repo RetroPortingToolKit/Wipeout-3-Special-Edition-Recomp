@@ -36,6 +36,10 @@ value = "21:9"
 label = "21:9"
 
 [[option.choice]]
+value = "32:9"
+label = "32:9 (super-ultrawide)"
+
+[[option.choice]]
 value = "adaptive"
 label = "Adaptive"
 
@@ -48,6 +52,11 @@ when = { aspect = "16:9" }
 feature = "widescreen"
 id = "wipeout3.widescreen.21-9"
 when = { aspect = "21:9" }
+
+[[plugin]]
+feature = "widescreen"
+id = "wipeout3.widescreen.32-9"
+when = { aspect = "32:9" }
 
 [[plugin]]
 feature = "widescreen"
