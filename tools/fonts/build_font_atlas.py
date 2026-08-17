@@ -92,10 +92,22 @@ def render_atlas(src_path, out_path, ttf_path, rows, band_h):
             out.alpha_composite(band, (0, y0 * SCALE))
             print("  band %d: %d symbol glyphs upscaled" % (bi, len(runs)))
             continue
-        if len(runs) != len(chars):
+        # A row may be part text, part symbols: the string covers the leading
+        # runs and anything past it (arrows, brackets) is upscaled from source,
+        # since a text typeface has no glyph for it.
+        if len(chars) > len(runs):
             raise SystemExit(
-                "band %d: %d ink runs but %d characters (%r)"
-                % (bi, len(runs), len(chars), chars))
+                "band %d: %d characters but only %d ink runs (%r)"
+                % (bi, len(chars), len(runs), chars))
+        if len(chars) < len(runs):
+            tail_x0 = ink_box(px, *runs[len(chars)], y0, y1)[0]
+            if tail_x0 is not None:
+                tail = src.crop((tail_x0, y0, w, y1)).resize(
+                    ((w - tail_x0) * SCALE, (y1 - y0) * SCALE), Image.LANCZOS)
+                out.alpha_composite(tail, (tail_x0 * SCALE, y0 * SCALE))
+            print("  band %d: %d trailing symbol glyphs upscaled"
+                  % (bi, len(runs) - len(chars)))
+            runs = runs[:len(chars)]
 
         # Scale + baseline from a reference glyph: pick the character whose
         # original ink height is the row's modal height, so a descender or a
