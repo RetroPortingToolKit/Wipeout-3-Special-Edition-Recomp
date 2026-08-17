@@ -9,10 +9,19 @@ Each variant's colour is taken from the pack's own existing replacement for
 that key, which already has it right. That also means we only emit variants the
 pack ships, so we never invent a key the game will not ask for.
 
+Those colours are cached in ink_colours.json and reused on every later run.
+That cache is not an optimisation, it is a correctness requirement: we OVERWRITE
+the file we would otherwise read the colour back from, so a second run would
+sample our own output. Alpha is meaning, not opacity — the shader reads >191 as
+STP-clear and anything less as STP-set — so re-deriving would apply the variant
+alpha a second time, flip 255 to 127 (opaque glyphs into the semi-transparency
+blend path), and halve again on every run until the font disappeared.
+
 Usage:
     python build_all.py <dump-dir> <pack-dir> <ttf> [--dry-run]
 """
 import collections
+import json
 import os
 import subprocess
 import sys
@@ -53,9 +62,37 @@ def ink_colour(path):
     return counts.most_common(1)[0][0] if counts else None
 
 
+INK_CACHE = os.path.join(HERE, "ink_colours.json")
+
+
+def load_ink_cache():
+    if os.path.exists(INK_CACHE):
+        return {k: tuple(v) for k, v in json.load(open(INK_CACHE)).items()}
+    return {}
+
+
+def cached_ink(cache, name, path):
+    """This variant's CLUT colour, sampled from the pack once and remembered.
+
+    Sampling `path` again after we have written to it would read our own output;
+    see the module docstring for why that is destructive rather than merely
+    redundant.
+    """
+    if name not in cache:
+        col = ink_colour(path)
+        if col is None:
+            return None
+        cache[name] = col
+        json.dump({k: list(v) for k, v in cache.items()},
+                  open(INK_CACHE, "w"), indent=2, sort_keys=True)
+        print("   %s: ink %s recorded in ink_colours.json" % (name, col))
+    return cache[name]
+
+
 def main():
     dump_dir, pack_dir, ttf = sys.argv[1], sys.argv[2], sys.argv[3]
     dry = "--dry-run" in sys.argv
+    cache = load_ink_cache()
 
     for tex, cfg in ATLASES.items():
         # Any dumped palette variant will do as the geometry source: the glyph
@@ -68,7 +105,6 @@ def main():
 
         base = os.path.join(HERE, "_gen_%s.png" % tex)
         cfg_path = os.path.join(HERE, "_gen_%s.json" % tex)
-        import json
         json.dump({"src": src, "out": base, "ttf": ttf,
                    "band_h": cfg["band_h"], "rows": cfg["rows"]},
                   open(cfg_path, "w"))
@@ -84,13 +120,15 @@ def main():
                          if f.startswith(tex + "-") and f.endswith(".png"))
         for t in targets:
             tpath = os.path.join(pack_dir, t)
-            col = ink_colour(tpath)
+            col = cached_ink(cache, t, tpath)
             if not col:
                 print("   %s: no ink found, skipped" % t)
                 continue
             tinted = Image.new("RGBA", glyphs.size, col[:3] + (0,))
             # Scale coverage by this variant's own alpha, so the CLUT's
             # semi-transparency bit survives exactly as the dumper encoded it.
+            # `alpha` is pure coverage (build_font_atlas leaves it that way), so
+            # this is the ONE place the variant alpha is applied.
             tinted.putalpha(alpha.point(lambda v: v * col[3] // 255))
             if dry:
                 print("   would write %s  ink=%s" % (t, col))
