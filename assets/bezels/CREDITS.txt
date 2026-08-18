@@ -1,0 +1,12 @@
+WipEout 3 team logos used as bezel artwork.
+
+Artwork: toolboxio — https://www.deviantart.com/toolboxio
+  Re-vectored from low-resolution in-game images and released publicly
+  ("enjoy, internet!"). No formal licence is attached; (c) toolboxio.
+Collected via: https://awesome-wipeout.github.io/
+
+Included: ag-systems, assegai, auricom, feisar, goteki-45, icaras,
+          piranha, qirex.
+
+Set [video] bezel in game.toml to a team name ("qirex"), to "random" for a
+team chosen once per launch, or to a path for your own image.

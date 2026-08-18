@@ -1,0 +1,18 @@
+# WipEout 3 SE data fixes applied through the VRAM-strip patch layer.
+#
+# Manor Top / TDR-wall face palette gap: exactly one track face references
+# CLUT (768,65), the single empty row between the streamed palette block
+# (rows 58-64) and the texture block (66+). Every texel of that face decodes
+# to opaque black, which paints a black panel over the wall and slices the
+# creature decal that overlaps it. The intended palette is by all appearances
+# the unclaimed grey ramp one row above. Verify keys keep this surgical: the
+# patch only fires while row 64 holds that exact ramp AND row 65 is still the
+# zero gap; any other content at those coords is left untouched.
+
+[[vram_patch]]
+x = 768
+y = 64
+w = 16
+h = 2
+src_hex = "00804208630ca514c618e71c4a296b2d8c3100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+en_hex  = "00804208630ca514c618e71c4a296b2d8c31000000000000000000000000000000804208630ca514c618e71c4a296b2d8c310000000000000000000000000000"
