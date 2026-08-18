@@ -40,6 +40,9 @@ strict = true
 mod_function_entry_funcs = ["0x800EDFC8"]
 
 [runtime]
+# Enables the translation/VRAM-patch layer (translations/*.toml). English
+# game; the layer only applies the surgical data fixes shipped in-repo.
+language = "en"
 window_title = "Wipeout 3 Special Edition Recompiled"
 memcard_dir = "saves"
 # Record streamed/mod-patched code into overlay_captures.json and run it as
@@ -84,7 +87,7 @@ pgxp_cpu_mode = true
 # depth clear that does not actually run every frame would do exactly that,
 # and a savestate A/B cannot see it because the defect needs sustained
 # gameplay to show up. Flip to true to test: pgxp_depth on=1 over the wire.
-pgxp_depth = false
+pgxp_depth = true
 
 # PS1 affine texture mapping is very visible at high internal resolution.
 perspective_texturing = true
@@ -127,7 +130,7 @@ hd_texture_dir = "C:/Users/Shokunin/Documents/ChatGPT/wipeout3se/disc"
 # scales the per-instruction cycle CHARGE down: more work per CRTC period,
 # while timers, SPU, CDROM and refresh keep their real rates.
 # hueponik's pal100full8 patch requires >900%.
-cpu_overclock = 500
+cpu_overclock = 900
 
 # Artwork drawn behind the frame, filling the letterbox/pillarbox margins
 # the way vertical shmups fill the dead space on a horizontal display.
@@ -473,3 +476,158 @@ entries = [
     "0x80781A44",
     "0x80781A64"
 ]
+
+# ---------------------------------------------------------------------------
+# Submitter-path STABILITY PINS (re-added 2026-08-18, deliberately).
+# These 28 sites compare GTE SZ depth against near-Z constants (250/1700) in
+# s6 to pick between the flat-textured and gouraud-textured track submitters.
+# Surfaces sitting near the threshold FLIP paths frame to frame (SZ fixed-
+# point jitter), which renders as shading flicker: attributed at prim level
+# on the slot-1 anchor — the same ceiling surface alternated 0x2C c=876f71
+# (bright flat) and 0x3C c=4f332f (dark gouraud) on successive content
+# frames. result = 1 pins the high-detail path: stable shading, maximum
+# detail, consistent with the maxed-everything remaster intent. The packet
+# arena has verified headroom (peaks 41.5% of 81920 B; tightest pool 247/750
+# across 4:3/16:9/21:9). These are NOT aspect fixes — they are an LOD/shading
+# stability enhancement and apply at every aspect.
+
+[[widescreen.cull.keep]]
+address  = "0x80171D84"
+expected = "0x03F6202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171D88"
+expected = "0x0396282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171D98"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171F0C"
+expected = "0x0096202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171F10"
+expected = "0x00B6282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171F14"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171F18"
+expected = "0x00F6382A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172068"
+expected = "0x03F6202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x8017206C"
+expected = "0x0396282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x8017207C"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801721D8"
+expected = "0x0096202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801721DC"
+expected = "0x00B6282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801721E0"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801721E4"
+expected = "0x00F6382A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172324"
+expected = "0x03F6202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172328"
+expected = "0x0396282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172338"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172474"
+expected = "0x0096202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172478"
+expected = "0x00B6282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x8017247C"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172480"
+expected = "0x00F6382A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801725A0"
+expected = "0x03F6202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801725A4"
+expected = "0x0396282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801725B4"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801726E8"
+expected = "0x0096202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801726EC"
+expected = "0x00B6282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801726F0"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801726F4"
+expected = "0x00F6382A"
+result   = 1
+
