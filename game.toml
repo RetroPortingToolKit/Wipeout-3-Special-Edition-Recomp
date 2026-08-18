@@ -101,6 +101,11 @@ perspective_texturing = true
 # glyph in the game. Everything else in the pack is correct and visibly
 # sharper. See that file for the detail.
 hd_textures = true
+# The pack (and the HD FONT — the F500 atlases are pack entries) lives in the
+# repo disc/ folder, NOT beside whatever cue is loaded. Without this, launching
+# from any other disc path silently loads a 0-entry pack: textures AND fonts
+# revert to low-res at once. That is exactly what happened.
+hd_texture_dir = "C:/Users/Shokunin/Documents/ChatGPT/wipeout3se/disc"
 
 # CPU overclock, percent of stock.
 #
@@ -122,7 +127,7 @@ hd_textures = true
 # scales the per-instruction cycle CHARGE down: more work per CRTC period,
 # while timers, SPU, CDROM and refresh keep their real rates.
 # hueponik's pal100full8 patch requires >900%.
-cpu_overclock = 900
+cpu_overclock = 500
 
 # Artwork drawn behind the frame, filling the letterbox/pillarbox margins
 # the way vertical shmups fill the dead space on a horizontal display.

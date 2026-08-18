@@ -71,4 +71,16 @@ if(EXISTS "${WIPEOUT3_PRELOADED_MODS}/packages")
             "$<TARGET_FILE_DIR:psx-runtime>/mods"
         COMMENT "Preloading the WipEout 3 mod catalog"
         VERBATIM)
+
+# Bezel artwork (margin wallpapers; toolboxio's team marks). The runtime loads
+# from <exe dir>/bezels, so it must be staged like the mod catalog -- it was
+# hand-copied after every build before this, and forgotten more than once.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/bezels")
+    add_custom_command(TARGET psx-runtime POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/bezels"
+            "$<TARGET_FILE_DIR:psx-runtime>/bezels"
+        COMMENT "Staging bezel artwork"
+        VERBATIM)
+endif()
 endif()
