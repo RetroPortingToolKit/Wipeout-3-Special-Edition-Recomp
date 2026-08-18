@@ -101,9 +101,11 @@ hd_textures = true
 
 # Artwork drawn behind the frame, filling the letterbox/pillarbox margins
 # the way vertical shmups fill the dead space on a horizontal display.
-# Relative to the disc directory. The WipEout team wallpapers by
-# MotorcycleEmptiness (awesome-wipeout.github.io) are ideal here.
-bezel = "bezel_test.png"
+# "random" picks one of the bundled team logos per launch and keeps it for
+# the session; a team name ("qirex", "feisar", ...) pins one; a path uses
+# your own image, relative to the disc directory; "off" disables it.
+# Logos by toolboxio (deviantart.com/toolboxio), via awesome-wipeout.github.io.
+bezel = "random"
 
 # Authentic 4:3 is the baseline. The Widescreen mod below activates WipEout
 # 3's game-specific native-wide hooks and chooses fixed/adaptive presentation.
