@@ -119,7 +119,7 @@ hd_textures = true
 # scales the per-instruction cycle CHARGE down: more work per CRTC period,
 # while timers, SPU, CDROM and refresh keep their real rates.
 # hueponik's pal100full8 patch requires >900%.
-cpu_overclock = 1000
+cpu_overclock = 900
 
 # Artwork drawn behind the frame, filling the letterbox/pillarbox margins
 # the way vertical shmups fill the dead space on a horizontal display.
