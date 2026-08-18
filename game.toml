@@ -87,7 +87,10 @@ geometry_correction = true
 # 2.0/4.0/8.0 are flat against 1.0, so 1.0 is the knee -- anything looser
 # buys nothing and only widens what gets accepted.
 pgxp_tolerance = 1.0
-pgxp_cpu_mode = true
+# false: the PGXP shadow engine is a per-instruction tax (psx_pgxp_alu at ~2%
+# of a stock FMV run) and correction is off by default anyway -- run the engine
+# only when someone actually enables the feature (launcher PGXP mod / settings).
+pgxp_cpu_mode = false
 # Depth-test polygons on PGXP's recovered per-vertex Z instead of relying
 # solely on the PS1 ordering table, whose one-bucket-per-primitive sort
 # cannot resolve intersecting or interpenetrating geometry.
