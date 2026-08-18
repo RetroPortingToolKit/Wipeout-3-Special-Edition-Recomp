@@ -60,8 +60,6 @@ label = "NTSC 30 fps enhanced (needs 8 MB RAM)"
 value = "ntscfull8"
 label = "NTSC 30 fps full (needs 8 MB RAM)"
 
-
-
 [[option.choice]]
 value = "pal"
 label = "PAL 25 fps (stock 2 MB)"
@@ -73,58 +71,6 @@ label = "PAL 25 fps enhanced (needs 8 MB RAM)"
 [[option.choice]]
 value = "palfull8"
 label = "PAL 25 fps full (needs 8 MB RAM)"
-
-
-[[option]]
-feature = "framerate"
-id = "draw_distance"
-label = "Draw distance (full tier)"
-description = "World draw-distance thresholds. Max = hueponik full (maxed); Enhanced = his enhanced-tier values."
-group = "Gameplay"
-type = "choice"
-default = "max"
-
-[[option.choice]]
-value = "max"
-label = "Maxed (full tier)"
-
-[[option.choice]]
-value = "enhanced"
-label = "Enhanced"
-
-[[option]]
-feature = "framerate"
-id = "ship_detail_distance"
-label = "Ship detail distance (full tier)"
-description = "Distance at which ships keep full model detail."
-group = "Gameplay"
-type = "choice"
-default = "max"
-
-[[option.choice]]
-value = "max"
-label = "Maxed (full tier)"
-
-[[option.choice]]
-value = "enhanced"
-label = "Enhanced"
-
-[[option]]
-feature = "framerate"
-id = "track_lod"
-label = "Track polygon/texture LOD (full tier)"
-description = "Track subdivision and LOD caps. Max = no custom LOD (full tier); Enhanced = enhanced-tier LOD."
-group = "Gameplay"
-type = "choice"
-default = "max"
-
-[[option.choice]]
-value = "max"
-label = "Maxed (full tier)"
-
-[[option.choice]]
-value = "enhanced"
-label = "Enhanced"
 
 [[overlay]]
 feature = "framerate"
@@ -13618,6 +13564,15 @@ when = { build = "ntscfull8" }
 [[overlay]]
 feature = "framerate"
 target = "disc_user"
+offset = 78333952
+file = "assets/ntscfull8/user_38249_05.overlay"
+sha256 = "d8770e0c97d86fe7f1106dc1abc6e930415e980a8f73c0193a1ac03bac9d3b0c"
+expected_sha256 = "b515a242ea1a98e9908f6166e6383fa587ee96471ba081a9360160a08d25da8b"
+when = { build = "ntscfull8" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
 offset = 78409728
 file = "assets/ntscfull8/user_38286_05.overlay"
 sha256 = "46bd76df7710bc09dabe951ca67d6e5669cf8eb9cb2351d301a6dc5daa88958a"
@@ -13789,6 +13744,15 @@ when = { build = "ntscfull8" }
 [[overlay]]
 feature = "framerate"
 target = "disc_user"
+offset = 78729216
+file = "assets/ntscfull8/user_38442_01.overlay"
+sha256 = "5c5e6546e9ecaa20aaa60b72da9b0f6c9063eb14bb570ab49901e017c04ed759"
+expected_sha256 = "f2f340965a195700d09fbcdac024113a3795bd6c35ff428c12fe58ab79bf3fe7"
+when = { build = "ntscfull8" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
 offset = 78743552
 file = "assets/ntscfull8/user_38449_01.overlay"
 sha256 = "c2085421c07729090b19fcf1c965fa87dd9305f8d076e01e2032005afdbfbf0a"
@@ -13856,6 +13820,15 @@ offset = 78839808
 file = "assets/ntscfull8/user_38496_01.overlay"
 sha256 = "bdc56ba81ff5bb2373359dd3db40489226c604b8da97dce8fd2e36b78f17be2e"
 expected_sha256 = "24d92eb3abc216b81e6545208f5f323377258b677107adf7479e0ad60bba82b3"
+when = { build = "ntscfull8" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78868480
+file = "assets/ntscfull8/user_38510_01.overlay"
+sha256 = "24bf08fc59ec0ea8c875b13d77866d6e656325aef31ed51b77426493d2a868b4"
+expected_sha256 = "547ce8c0aeac9ac3461ee82e6cfa918fd6f620ff7339766456b1f506172d325d"
 when = { build = "ntscfull8" }
 
 [[overlay]]
@@ -13955,6 +13928,15 @@ offset = 79022080
 file = "assets/ntscfull8/user_38585_01.overlay"
 sha256 = "51437b949d90b6c538727a70c266aa20d44d362aa61801c7bc920eb3458d06ca"
 expected_sha256 = "f8ecaf794dddcf2e7d54d7657e76ca430d97a62e84c58777f793d90ac875ee81"
+when = { build = "ntscfull8" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79036416
+file = "assets/ntscfull8/user_38592_01.overlay"
+sha256 = "3cf3fc5fcf671dfdb2aac76265b480b33005f1b1591fb525afde0d2b9728de38"
+expected_sha256 = "4e682a171f723de5b60a03c38e41b255bac6bd7f2365c13b778a99704c6772a8"
 when = { build = "ntscfull8" }
 
 [[patch]]
@@ -39447,183 +39429,4 @@ a4 03 29 25 28 00 0b 8e 00 00 00 00 ff ff 6b 39 24 58 4b 01 20 00 0a ae 24 00 0b
 08 00 e0 03
 """
 when = { build = "palfull8" }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-[[overlay]]
-feature = "framerate"
-target = "disc_user"
-offset = 78333952
-file = "assets/ntscfull8/user_38249_05.overlay"
-sha256 = "d8770e0c97d86fe7f1106dc1abc6e930415e980a8f73c0193a1ac03bac9d3b0c"
-expected_sha256 = "b515a242ea1a98e9908f6166e6383fa587ee96471ba081a9360160a08d25da8b"
-when = { build = "ntscfull8", draw_distance = "max" }
-
-[[overlay]]
-feature = "framerate"
-target = "disc_user"
-offset = 78333952
-file = "assets/knobs/user_38249_05.draw-enhanced.overlay"
-sha256 = "e95d8995ff58f125bcdd104cd9e6d25dc8096648aebf06c9ebde2b24497140e0"
-expected_sha256 = "b515a242ea1a98e9908f6166e6383fa587ee96471ba081a9360160a08d25da8b"
-when = { build = "ntscfull8", draw_distance = "enhanced" }
-
-[[overlay]]
-feature = "framerate"
-target = "disc_user"
-offset = 78729216
-file = "assets/ntscfull8/user_38442_01.overlay"
-sha256 = "5c5e6546e9ecaa20aaa60b72da9b0f6c9063eb14bb570ab49901e017c04ed759"
-expected_sha256 = "f2f340965a195700d09fbcdac024113a3795bd6c35ff428c12fe58ab79bf3fe7"
-when = { build = "ntscfull8", track_lod = "max", ship_detail_distance = "max" }
-
-[[overlay]]
-feature = "framerate"
-target = "disc_user"
-offset = 78729216
-file = "assets/knobs/user_38442_01.ship-enhanced.overlay"
-sha256 = "4ec5c55677262d1f8c044ccd2e2e1e24e2117e83fd2144f212f93f2c0720ea5b"
-expected_sha256 = "f2f340965a195700d09fbcdac024113a3795bd6c35ff428c12fe58ab79bf3fe7"
-when = { build = "ntscfull8", track_lod = "max", ship_detail_distance = "enhanced" }
-
-[[overlay]]
-feature = "framerate"
-target = "disc_user"
-offset = 78729216
-file = "assets/knobs/user_38442_01.lod-enhanced.overlay"
-sha256 = "f2cdd030ce64bc088a61788d62c3b63826f3a167531c0e844e5555b77a3acacc"
-expected_sha256 = "f2f340965a195700d09fbcdac024113a3795bd6c35ff428c12fe58ab79bf3fe7"
-when = { build = "ntscfull8", track_lod = "enhanced", ship_detail_distance = "max" }
-
-[[overlay]]
-feature = "framerate"
-target = "disc_user"
-offset = 78729216
-file = "assets/knobs/user_38442_01.lod-enhanced.ship-enhanced.overlay"
-sha256 = "1a9ae6aef5da3922852306ad7f7e7ca9fa6b7ab66b250c8c83adee736e095664"
-expected_sha256 = "f2f340965a195700d09fbcdac024113a3795bd6c35ff428c12fe58ab79bf3fe7"
-when = { build = "ntscfull8", track_lod = "enhanced", ship_detail_distance = "enhanced" }
-
-[[overlay]]
-feature = "framerate"
-target = "disc_user"
-offset = 78868480
-file = "assets/ntscfull8/user_38510_01.overlay"
-sha256 = "24bf08fc59ec0ea8c875b13d77866d6e656325aef31ed51b77426493d2a868b4"
-expected_sha256 = "547ce8c0aeac9ac3461ee82e6cfa918fd6f620ff7339766456b1f506172d325d"
-when = { build = "ntscfull8", track_lod = "max" }
-
-[[overlay]]
-feature = "framerate"
-target = "disc_user"
-offset = 78868480
-file = "assets/knobs/user_38510_01.lod-enhanced.overlay"
-sha256 = "7db6459fde8ae8dc11f43d763b59293606be212c83316641d9f19f2231020701"
-expected_sha256 = "547ce8c0aeac9ac3461ee82e6cfa918fd6f620ff7339766456b1f506172d325d"
-when = { build = "ntscfull8", track_lod = "enhanced" }
-
-[[overlay]]
-feature = "framerate"
-target = "disc_user"
-offset = 79036416
-file = "assets/ntscfull8/user_38592_01.overlay"
-sha256 = "3cf3fc5fcf671dfdb2aac76265b480b33005f1b1591fb525afde0d2b9728de38"
-expected_sha256 = "4e682a171f723de5b60a03c38e41b255bac6bd7f2365c13b778a99704c6772a8"
-when = { build = "ntscfull8", track_lod = "max" }
-
-[[overlay]]
-feature = "framerate"
-target = "disc_user"
-offset = 79036416
-file = "assets/knobs/user_38592_01.lod-enhanced.overlay"
-sha256 = "8158b0efb63cc07d5ce3bceaff8c84b368af010f6d606d900749eda8e09ad94b"
-expected_sha256 = "4e682a171f723de5b60a03c38e41b255bac6bd7f2365c13b778a99704c6772a8"
-when = { build = "ntscfull8", track_lod = "enhanced" }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

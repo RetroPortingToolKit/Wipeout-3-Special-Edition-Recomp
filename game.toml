@@ -21,12 +21,9 @@ boot_exe = "SCES_028.45"
 known_sizes = [94660944]
 known_md5 = [
   "b9d48f139544051893f45eed62780e42",
-  # hueponik ntscfull8_track01 applied (60 Hz, 8 MB, >=500% overclock)
-  "632816873a37163631b359dc5eba72c8",
 ]
 known_sha1 = [
   "a7bb5cdafdf97ba1cd99cc832439f57ce0c39a8a",
-  "9e74b6cf954ce968ec163014a89ce1ce5addd368",
 ]
 known_crc32 = [
   "a0e9e5c2",
@@ -57,7 +54,7 @@ overlay_cache = true
 # interior PCs in mod-patched text; neither is seen by the passive CD-DMA
 # capture path. The spawn itself runs on Windows only — on Linux/macOS run the
 # same command by hand after a play session (docs/COMPILING_OVERLAYS.md §1).
-overlay_autocompile_cmd = "C:/Users/Shokunin/AppData/Local/Programs/Python/Python312/python.exe psxrecomp/tools/compile_overlays.py --captures build-release/overlay_captures.json --game-toml game.toml --recompiler psxrecomp/recompiler/build/psxrecomp-game.exe --runtime-include psxrecomp/runtime/include --out-dir build-release/cache --gcc C:/Users/Shokunin/.local/share/retcomm/toolchains/cmake-clang-v1/latest/bin/gcc.exe --cps --jobs 8"
+overlay_autocompile_cmd = "python psxrecomp/tools/compile_overlays.py --captures build-release/overlay_captures.json --game-toml game.toml --recompiler psxrecomp/recompiler/build/psxrecomp-game.exe --runtime-include psxrecomp/runtime/include --out-dir build-release/cache --gcc gcc --cps --jobs 8"
 
 [video]
 renderer = "opengl"
@@ -87,7 +84,7 @@ pgxp_cpu_mode = true
 # depth clear that does not actually run every frame would do exactly that,
 # and a savestate A/B cannot see it because the defect needs sustained
 # gameplay to show up. Flip to true to test: pgxp_depth on=1 over the wire.
-pgxp_depth = true
+pgxp_depth = false
 
 # PS1 affine texture mapping is very visible at high internal resolution.
 perspective_texturing = true
@@ -130,7 +127,7 @@ hd_texture_dir = "C:/Users/Shokunin/Documents/ChatGPT/wipeout3se/disc"
 # scales the per-instruction cycle CHARGE down: more work per CRTC period,
 # while timers, SPU, CDROM and refresh keep their real rates.
 # hueponik's pal100full8 patch requires >900%.
-cpu_overclock = 900
+cpu_overclock = 100
 
 # Artwork drawn behind the frame, filling the letterbox/pillarbox margins
 # the way vertical shmups fill the dead space on a horizontal display.
