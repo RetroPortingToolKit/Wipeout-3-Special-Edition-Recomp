@@ -65,8 +65,12 @@ overlay_autocompile_cmd = "python3 psxrecomp/tools/compile_overlays.py --capture
 # "crossover" cross-wires the two in-process machines (Stage B dual-console) and
 # also requests them, so PSX_DUAL_CONSOLE=1 is no longer needed to get a pair.
 # Env PSX_SIO1_BACKEND / PSX_SIO1_LATENCY override this for A/B.
+# enabled=false: the crossover peer request activates DUAL CONSOLE -- two full
+# PSX machines on one core. Shipping that on meant every stock launch (menus,
+# FMV, single player) ran at half speed or worse (~17 fps measured). Link play
+# opts in with PSX_DUAL_CONSOLE=1 (or flip this to true for a link session).
 [runtime.link]
-enabled = true
+enabled = false
 backend = "crossover"
 latency_cycles = 0
 
