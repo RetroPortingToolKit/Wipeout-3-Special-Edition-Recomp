@@ -99,6 +99,12 @@ perspective_texturing = true
 # sharper. See that file for the detail.
 hd_textures = true
 
+# Artwork drawn behind the frame, filling the letterbox/pillarbox margins
+# the way vertical shmups fill the dead space on a horizontal display.
+# Relative to the disc directory. The WipEout team wallpapers by
+# MotorcycleEmptiness (awesome-wipeout.github.io) are ideal here.
+bezel = "bezel_test.png"
+
 # Authentic 4:3 is the baseline. The Widescreen mod below activates WipEout
 # 3's game-specific native-wide hooks and chooses fixed/adaptive presentation.
 aspect_ratio = "4:3"
