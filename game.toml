@@ -55,6 +55,10 @@ overlay_autocompile_cmd = "python3 psxrecomp/tools/compile_overlays.py --capture
 
 [video]
 renderer = "opengl"
+# Late swaps present immediately (tear) instead of stalling a full refresh —
+# removes the heavy-sim-vblank judder on the 30fps-sim variants. Driver
+# fallback to full vsync if EXT_swap_control_tear is unsupported.
+vsync = "adaptive"
 geometry_correction = true
 # PGXP tuning, measured live at 8K internal on this title (2026-08-17).
 # tolerance 0.5 rejected ~92k candidates per 4s and landed only ~28k
