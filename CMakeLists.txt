@@ -25,6 +25,14 @@ file(GLOB WIPEOUT3_MOD_PLUGIN_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mods/*.c")
 
 psxrecomp_add_game_runtime(psx-runtime
+    # PGXP is not optional for this title. WipEout 3 renders at up to 16x
+    # internal resolution, where the PS1's affine texture mapping and integer
+    # vertex snapping are the dominant visual defect. Without PSX_PGXP=1 the
+    # PGXP_LOAD/STORE/ALU/MULDIV/COP2 hooks the emitter writes into every
+    # generated translation unit preprocess to ((void)0), and the "pgxp" mod
+    # rides on the legacy SWC2-only recorder: 18.7% of drawn vertices got
+    # precise positions, against 99.4% with the hooks compiled in.
+    PGXP
     ENABLE_NETPLAY_IF_PRESENT
     NETPLAY_LOBBY_URL "ws://netplay.retcomm.net:8765"
     ENABLE_SETUP_WIZARD
@@ -63,4 +71,16 @@ if(EXISTS "${WIPEOUT3_PRELOADED_MODS}/packages")
             "$<TARGET_FILE_DIR:psx-runtime>/mods"
         COMMENT "Preloading the WipEout 3 mod catalog"
         VERBATIM)
+
+# Bezel artwork (margin wallpapers; toolboxio's team marks). The runtime loads
+# from <exe dir>/bezels, so it must be staged like the mod catalog -- it was
+# hand-copied after every build before this, and forgotten more than once.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/bezels")
+    add_custom_command(TARGET psx-runtime POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/bezels"
+            "$<TARGET_FILE_DIR:psx-runtime>/bezels"
+        COMMENT "Staging bezel artwork"
+        VERBATIM)
+endif()
 endif()
