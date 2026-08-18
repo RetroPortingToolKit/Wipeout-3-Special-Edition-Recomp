@@ -63,6 +63,17 @@ geometry_correction = true
 # buys nothing and only widens what gets accepted.
 pgxp_tolerance = 1.0
 pgxp_cpu_mode = true
+# Depth-test polygons on PGXP's recovered per-vertex Z instead of relying
+# solely on the PS1 ordering table, whose one-bucket-per-primitive sort
+# cannot resolve intersecting or interpenetrating geometry.
+#
+# Depth comes from the ABSOLUTE GTE screen Z, mapped reciprocally
+# (1 - 2*zn/z) rather than linearly: a linear map has to clamp past a chosen
+# far value and everything beyond collapses onto one plane, which is most of
+# a race track. Verified against two savestates at 6x internal: the ship
+# renders intact where the earlier linear mapping chopped its fuselage apart.
+pgxp_depth = true
+
 # PS1 affine texture mapping is very visible at high internal resolution.
 perspective_texturing = true
 # Beetle PSX HW-format HD texture pack from
