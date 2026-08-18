@@ -99,6 +99,12 @@ perspective_texturing = true
 # sharper. See that file for the detail.
 hd_textures = true
 
+# CPU overclock, percent of stock. The guest runs as native code, so this
+# scales the per-instruction cycle CHARGE down: more work per CRTC period,
+# while timers, SPU, CDROM and refresh keep their real rates.
+# hueponik's pal100full8 patch requires >900%.
+cpu_overclock = 1000
+
 # Artwork drawn behind the frame, filling the letterbox/pillarbox margins
 # the way vertical shmups fill the dead space on a horizontal display.
 # "random" picks one of the bundled team logos per launch and keeps it for
