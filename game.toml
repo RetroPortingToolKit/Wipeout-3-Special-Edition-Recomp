@@ -21,9 +21,12 @@ boot_exe = "SCES_028.45"
 known_sizes = [94660944]
 known_md5 = [
   "b9d48f139544051893f45eed62780e42",
+  # hueponik ntscfull8_track01 applied (60 Hz, 8 MB, >=500% overclock)
+  "632816873a37163631b359dc5eba72c8",
 ]
 known_sha1 = [
   "a7bb5cdafdf97ba1cd99cc832439f57ce0c39a8a",
+  "9e74b6cf954ce968ec163014a89ce1ce5addd368",
 ]
 known_crc32 = [
   "a0e9e5c2",
