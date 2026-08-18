@@ -72,7 +72,12 @@ pgxp_cpu_mode = true
 # far value and everything beyond collapses onto one plane, which is most of
 # a race track. Verified against two savestates at 6x internal: the ship
 # renders intact where the earlier linear mapping chopped its fuselage apart.
-pgxp_depth = true
+# DEFAULT OFF pending a fix: static frames verify correctly, but in MOTION
+# the track drops out and the ship clips through the floor. A per-frame
+# depth clear that does not actually run every frame would do exactly that,
+# and a savestate A/B cannot see it because the defect needs sustained
+# gameplay to show up. Flip to true to test: pgxp_depth on=1 over the wire.
+pgxp_depth = false
 
 # PS1 affine texture mapping is very visible at high internal resolution.
 perspective_texturing = true
