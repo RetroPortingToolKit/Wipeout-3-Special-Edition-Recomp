@@ -69,6 +69,11 @@ aspect_ratio = "4:3"
 offer = false
 offer_ultrawide = true
 adaptive_view = true
+# Fill the pillarbox margins of a 4:3-pinned present (2D menus, title, FMV-less
+# full-2D screens) with the frame's own edge columns instead of black. Opt-in
+# per title since it smears any content whose edge columns carry picture; kept
+# ON here — this is WipEout 3's authored look on very wide displays.
+menu_edge_fill = true
 
 # WipEout 3 is a 3D racer; keep BIOS/FMV/2D-only frames authored at 4:3 and
 # engage wide gameplay presentation on GTE-active frames.
