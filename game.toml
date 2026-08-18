@@ -99,7 +99,23 @@ perspective_texturing = true
 # sharper. See that file for the detail.
 hd_textures = true
 
-# CPU overclock, percent of stock. The guest runs as native code, so this
+# CPU overclock, percent of stock.
+#
+# REQUIRES A RETAIL BIOS above ~300%. Measured: with the recompiled OpenBIOS,
+# 400% and up run but never enable the display; with SCPH-1001 recompiled in,
+# 900% and 1000% boot fine. Same binary, same scaling, same mods -- only the
+# BIOS differs. OpenBIOS's boot path does not survive the CPU running ~10x
+# ahead of its devices; the retail kernel does.
+#
+# Switching BIOS is a REGENERATION, not a runtime flag -- this is a static
+# recompilation, so the kernel is compiled in. Passing --bios at runtime still
+# reports image=OPENBIOS. Use:
+#   python psxrecomp/psxrecomp_cli.py generate --config game.toml \
+#          --project-root . --disc <cue> --bios <SCPH1001.BIN>
+#   cmake -S . -B build-release      # re-globs the generated sources
+#   cmake --build build-release
+# Skipping the reconfigure fails with "Recompiled game code is MISSING", which
+# points nowhere near the BIOS. The guest runs as native code, so this
 # scales the per-instruction cycle CHARGE down: more work per CRTC period,
 # while timers, SPU, CDROM and refresh keep their real rates.
 # hueponik's pal100full8 patch requires >900%.
