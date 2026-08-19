@@ -154,6 +154,12 @@ hd_textures = true
 # from any other disc path silently loads a 0-entry pack: textures AND fonts
 # revert to low-res at once. That is exactly what happened.
 hd_texture_dir = "C:/Users/Shokunin/Documents/ChatGPT/wipeout3se/disc"
+# The four font atlases are NEVER substituted: the game draws all of its text
+# from them, and HD strokes are sub-texel under the game's two-pass shadow
+# draw (doubled glyph edges; historically invisible text). Config-owned so
+# regenerating the (gitignored) pack directory cannot silently lose the
+# exclusion the way the pack-local exclude.txt did.
+hd_texture_exclude = ["75f5e38b", "4cb2ec4e", "d20dee94", "861ad9f1"]
 
 # CPU overclock, percent of stock.
 #
