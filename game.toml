@@ -21,9 +21,12 @@ boot_exe = "SCES_028.45"
 known_sizes = [94660944]
 known_md5 = [
   "b9d48f139544051893f45eed62780e42",
+  # ntsc120full8 baked disc (tools/bake_disc_variant.py)
+  "e4ec81522bffbadca15bec85c79a8db4",
 ]
 known_sha1 = [
   "a7bb5cdafdf97ba1cd99cc832439f57ce0c39a8a",
+  "71d5db745243b7669b66e1d0b82bd94bbe36aa07",
 ]
 known_crc32 = [
   "a0e9e5c2",
@@ -172,7 +175,7 @@ hd_texture_dir = "C:/Users/Shokunin/Documents/ChatGPT/wipeout3se/disc"
 # scales the per-instruction cycle CHARGE down: more work per CRTC period,
 # while timers, SPU, CDROM and refresh keep their real rates.
 # hueponik's pal100full8 patch requires >900%.
-cpu_overclock = 100
+cpu_overclock = 900
 
 # Artwork drawn behind the frame, filling the letterbox/pillarbox margins
 # the way vertical shmups fill the dead space on a horizontal display.
