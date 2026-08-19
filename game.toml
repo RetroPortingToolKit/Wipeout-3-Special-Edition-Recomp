@@ -39,6 +39,48 @@ strict = true
 # 0x120 and detonates on the next CD DeliverEvent).
 mod_function_entry_funcs = ["0x800EDFC8", "0x8014AAD4"]
 
+# Billboard-cell renderer (0x8013A79C): of its four emit paths, three reject a
+# primitive when the RTPS projection errored — `FLAG & 0x80460000` (error
+# summary, IR3 sat, SZ3 sat, divide overflow; e.g. 0x8013AB10..AB18) — but the
+# type-4 path never reads FLAG at all: its only guard is `blez SZ3`. A cell
+# whose projection saturates (SX/SY rails at +/-1024) is emitted verbatim,
+# and its half-size math can underflow to 0, so the packet carries the raw
+# saturated corners: the huge gray wedge polygons revealed at wide aspects
+# (offscreen at 4:3, which is why retail never showed them). These four
+# replacements build the same masked test in dead/redundant slots — the nop
+# after RTPS, the redundant SZ3 reload (already in $t4 and staged to the
+# scratchpad record), and the branch's leading nop — and the unchanged
+# `blez v1, 0x8013B3D8` (same reject label the sibling paths use) now takes
+# exactly when (FLAG & 0x80460000) != 0. The mask's divide-overflow bit
+# subsumes the old SZ3==0 check.
+[[recompiler.patch]]
+id = "billboard-type4-flag-cull-read"
+address = "0x8013AD58"
+expected = "0x00000000"
+replacement = "0x484DF800"
+note = "cfc2 t5,FLAG — read the GTE error flags after the type-4 RTPS"
+
+[[recompiler.patch]]
+id = "billboard-type4-flag-cull-mask-hi"
+address = "0x8013AD6C"
+expected = "0x3C031F80"
+replacement = "0x3C038046"
+note = "lui v1,0x8046 — the sibling paths' reject mask (was scratchpad base for a redundant SZ3 reload)"
+
+[[recompiler.patch]]
+id = "billboard-type4-flag-cull-and"
+address = "0x8013AD70"
+expected = "0x8C630010"
+replacement = "0x01A36824"
+note = "and t5,t5,v1 — masked error bits (was the redundant SZ3 reload; SZ3 is live in t4 and staged at 0x1F800010)"
+
+[[recompiler.patch]]
+id = "billboard-type4-flag-cull-test"
+address = "0x8013AD74"
+expected = "0x00000000"
+replacement = "0x2DA30001"
+note = "sltiu v1,t5,1 — v1=0 iff any masked error; the unchanged blez v1 then rejects the cell"
+
 [runtime]
 # Enables the translation/VRAM-patch layer (translations/*.toml). English
 # game; the layer only applies the surgical data fixes shipped in-repo.
