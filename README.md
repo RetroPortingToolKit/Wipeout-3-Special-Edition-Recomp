@@ -1,5 +1,7 @@
 # Wipeout 3 Special Edition  Recompiled
 
+This project is still a work in progress, and release builds are not yet ready for general consumption
+
 <!-- retcomm-readme-metrics -->
 [![GitHub downloads (all assets, all releases)](https://img.shields.io/github/downloads/TechnicallyComputers/Wipeout-3-Special-Edition-Recomp/total)](https://github.com/TechnicallyComputers/Wipeout-3-Special-Edition-Recomp/releases)
 [![GitHub downloads (latest release)](https://img.shields.io/github/downloads/TechnicallyComputers/Wipeout-3-Special-Edition-Recomp/latest/total)](https://github.com/TechnicallyComputers/Wipeout-3-Special-Edition-Recomp/releases/latest)
