@@ -42,6 +42,15 @@ psxrecomp_add_game_runtime(psx-runtime
     LAUNCHER_BOXART "${CMAKE_CURRENT_SOURCE_DIR}/launcher_assets/img/boxart.tga"
     APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/psxrecomp.ico"
     GEN_MARKER "generated/SCES_028.45_dispatch.c"
+    # Statically-baked overlay coverage (docs/COMPILING_OVERLAYS.md §2): the
+    # framerate mod patches most of the game's text, and per-block DLL-shard
+    # dispatch measured ~841K dispatches/sec of pure overhead (0.2x at the
+    # 120 Hz sim target). Baking the captured set into the binary makes the
+    # patched code as cheap as AOT text. Regenerate with compile_overlays.py
+    # --static after accumulating new captures; absent file = layer inert.
+    # NOTE: must precede GEN_FULL_GLOB — that is a multi-value argument and
+    # swallows any unknown keyword that follows it into its value list.
+    GAME_OVERLAY_STATIC_C "${CMAKE_CURRENT_SOURCE_DIR}/generated/overlays_static.c"
     GEN_FULL_GLOB "generated/SCES_028.45_full_*.c"
     CODEGEN_SETUP_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/codegen_setup.c"
