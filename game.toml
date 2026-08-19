@@ -4,7 +4,7 @@
 [game]
 name = "Wipeout 3 Special Edition"
 id = "SCES-02845"
-players = 2
+players = 4
 exe = "disc/SCES_028.45"
 disc = "disc/WipEout 3 - Special Edition (Europe) (En,Fr,De,Es,It).cue"
 load_address = "0x80010000"
@@ -440,6 +440,10 @@ multitap_analog = true
 require_cue = true
 required_tracks = 14
 required_disc_fp = "a8a369bf31c63906bfcf91d1a0a87d93bde7984d82f02edc5e79727d1e325339"
+# PSX-Link lobby type: 4 seats over two serial-linked consoles (2 per console).
+# Each machine runs its own console visibly plus a headless follower for the
+# other; the cable is local shm, netplay carries only the 4 pad streams.
+link_lobby = true
 
 # 8 MB framerate mod (ntscfull8): the enhancement engine at 0x80780000+ is a
 # detour trampoline farm — patched text sites `j 0x8078xxxx` into stubs that

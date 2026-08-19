@@ -38,7 +38,7 @@ psxrecomp_add_game_runtime(psx-runtime
     ENABLE_SETUP_WIZARD
     WINDOW_TITLE "Wipeout 3 Special Edition  Recompiled"
     DEFAULT_GAME_CONFIG_PATH "game.toml"
-    MAX_PLAYERS 2
+    MAX_PLAYERS 4
     LAUNCHER_BOXART "${CMAKE_CURRENT_SOURCE_DIR}/launcher_assets/img/boxart.tga"
     APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/psxrecomp.ico"
     GEN_MARKER "generated/SCES_028.45_dispatch.c"
