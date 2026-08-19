@@ -1,0 +1,27 @@
+format_version = 5
+id = "wipeout3.fix.stability"
+version = "1.0.0"
+name = "WipEout 3 Stability Fixes"
+author = "psxrecomp"
+description = "Guards latent game bugs that corrupt kernel memory. Null-pool guard: the effect spawner at the race-teardown transition writes through a NULL pool pointer into the BIOS event table, crashing minutes later on the next CD event; the guard redirects the doomed spawn into a decoy arena."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SCES-02845"
+disc_sha256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
+
+[[feature]]
+id = "null-pool-guard"
+name = "Kernel-corruption guard"
+description = "Repair the effect spawner's NULL pool pointer at entry so race-teardown spawns cannot overwrite the BIOS event table (checkpoint-timeout crash)."
+group = "Stability"
+default_enabled = true
+
+[[plugin]]
+feature = "null-pool-guard"
+id = "wipeout3.fix.null-pool-guard-on"
+
+[[plugin]]
+feature = "null-pool-guard"
+id = "wipeout3.fix.null-pool-guard"
