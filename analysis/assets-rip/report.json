@@ -1,0 +1,822 @@
+{
+  "serial": "SCES-02845",
+  "volume": "WIPEOUT3",
+  "registry": "/home/alex/Documents/GitHub/psxrecomp/tools/psxasset/games/wipeout3-sces02845.toml",
+  "files": [
+    {
+      "path": "/CURLY44.STR",
+      "size": 3080192,
+      "skipped": "FMV stream (MDEC)"
+    },
+    {
+      "path": "/CURLY44B.STR",
+      "size": 3080192,
+      "skipped": "FMV stream (MDEC)"
+    },
+    {
+      "path": "/PSYG.STR",
+      "size": 4358144,
+      "skipped": "FMV stream (MDEC)"
+    },
+    {
+      "path": "/PSYGLEED.STR",
+      "size": 4128768,
+      "skipped": "FMV stream (MDEC)"
+    },
+    {
+      "path": "/SCES_028.45",
+      "size": 1492992
+    },
+    {
+      "path": "/SYSTEM.CNF",
+      "size": 69
+    },
+    {
+      "path": "/TRACK01.WAV",
+      "size": 37545984,
+      "skipped": "RIFF CD audio, already playable"
+    },
+    {
+      "path": "/TRACK02.WAV",
+      "size": 28350464,
+      "skipped": "RIFF CD audio, already playable"
+    },
+    {
+      "path": "/TRACK03.WAV",
+      "size": 39491584,
+      "skipped": "RIFF CD audio, already playable"
+    },
+    {
+      "path": "/TRACK04.WAV",
+      "size": 38432768,
+      "skipped": "RIFF CD audio, already playable"
+    },
+    {
+      "path": "/TRACK05.WAV",
+      "size": 38457344,
+      "skipped": "RIFF CD audio, already playable"
+    },
+    {
+      "path": "/TRACK06.WAV",
+      "size": 33910784,
+      "skipped": "RIFF CD audio, already playable"
+    },
+    {
+      "path": "/TRACK07.WAV",
+      "size": 33644544,
+      "skipped": "RIFF CD audio, already playable"
+    },
+    {
+      "path": "/TRACK08.WAV",
+      "size": 39233536,
+      "skipped": "RIFF CD audio, already playable"
+    },
+    {
+      "path": "/TRACK09.WAV",
+      "size": 38836224,
+      "skipped": "RIFF CD audio, already playable"
+    },
+    {
+      "path": "/TRACK10.WAV",
+      "size": 38969344,
+      "skipped": "RIFF CD audio, already playable"
+    },
+    {
+      "path": "/TRACK11.WAV",
+      "size": 33808384,
+      "skipped": "RIFF CD audio, already playable"
+    },
+    {
+      "path": "/TRACK12.WAV",
+      "size": 37060608,
+      "skipped": "RIFF CD audio, already playable"
+    },
+    {
+      "path": "/TRACK13.WAV",
+      "size": 37971968,
+      "skipped": "RIFF CD audio, already playable"
+    },
+    {
+      "path": "/WIPEOUT3/NFE.PB",
+      "size": 149580,
+      "container": "psyg_pb",
+      "entries": 6,
+      "stored": 2,
+      "packed": 4
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM01.PBP",
+      "size": 503140,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM02.PBP",
+      "size": 489960,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM03.PBP",
+      "size": 526724,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM04.PBP",
+      "size": 511468,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 23,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM05.PBP",
+      "size": 503824,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM06.PBP",
+      "size": 547940,
+      "container": "psyg_pb",
+      "entries": 60,
+      "stored": 25,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM07.PBP",
+      "size": 499224,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM08.PBP",
+      "size": 575112,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM0A.PBP",
+      "size": 234840,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM0B.PBP",
+      "size": 220464,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM0C.PBP",
+      "size": 242776,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM0D.PBP",
+      "size": 217356,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM0E.PBP",
+      "size": 562180,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 22,
+      "packed": 36
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM0G.PBP",
+      "size": 470052,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 23,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM0I.PBP",
+      "size": 545872,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 23,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM0L.PBP",
+      "size": 448132,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM0M.PBP",
+      "size": 483856,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 24,
+      "packed": 34
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM0O.PBP",
+      "size": 482684,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 23,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM0P.PBP",
+      "size": 450496,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM0Q.PBP",
+      "size": 470332,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM0X.PBP",
+      "size": 405488,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKM0Y.PBP",
+      "size": 354876,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS01.PBP",
+      "size": 537192,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS02.PBP",
+      "size": 547984,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS03.PBP",
+      "size": 581660,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS04.PBP",
+      "size": 582036,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 23,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS05.PBP",
+      "size": 584348,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 23,
+      "packed": 36
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS06.PBP",
+      "size": 601392,
+      "container": "psyg_pb",
+      "entries": 60,
+      "stored": 25,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS07.PBP",
+      "size": 591780,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS08.PBP",
+      "size": 589048,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 23,
+      "packed": 36
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS0A.PBP",
+      "size": 234840,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS0B.PBP",
+      "size": 220464,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS0C.PBP",
+      "size": 243080,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS0D.PBP",
+      "size": 217124,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS0E.PBP",
+      "size": 626268,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 22,
+      "packed": 36
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS0G.PBP",
+      "size": 521672,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 23,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS0I.PBP",
+      "size": 668156,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 22,
+      "packed": 36
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS0L.PBP",
+      "size": 530024,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS0M.PBP",
+      "size": 579600,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 24,
+      "packed": 34
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS0O.PBP",
+      "size": 532684,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 23,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS0P.PBP",
+      "size": 604524,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS0Q.PBP",
+      "size": 560828,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS0X.PBP",
+      "size": 416988,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUT3/TRACKS0Y.PBP",
+      "size": 383588,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM01.PBP",
+      "size": 448224,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM02.PBP",
+      "size": 435044,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM03.PBP",
+      "size": 471808,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM04.PBP",
+      "size": 456552,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 23,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM05.PBP",
+      "size": 448908,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM06.PBP",
+      "size": 493024,
+      "container": "psyg_pb",
+      "entries": 60,
+      "stored": 25,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM07.PBP",
+      "size": 444308,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM08.PBP",
+      "size": 520196,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM0A.PBP",
+      "size": 233140,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM0B.PBP",
+      "size": 218764,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM0C.PBP",
+      "size": 241076,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM0D.PBP",
+      "size": 215656,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM0E.PBP",
+      "size": 507264,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 22,
+      "packed": 36
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM0G.PBP",
+      "size": 415136,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 23,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM0I.PBP",
+      "size": 490956,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 23,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM0L.PBP",
+      "size": 393216,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM0M.PBP",
+      "size": 428940,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 24,
+      "packed": 34
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM0O.PBP",
+      "size": 427768,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 23,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM0P.PBP",
+      "size": 395580,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM0Q.PBP",
+      "size": 415416,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM0X.PBP",
+      "size": 372128,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKM0Y.PBP",
+      "size": 321516,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS01.PBP",
+      "size": 482276,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS02.PBP",
+      "size": 493068,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS03.PBP",
+      "size": 526744,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS04.PBP",
+      "size": 527120,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 23,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS05.PBP",
+      "size": 529432,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 23,
+      "packed": 36
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS06.PBP",
+      "size": 546476,
+      "container": "psyg_pb",
+      "entries": 60,
+      "stored": 25,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS07.PBP",
+      "size": 536864,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS08.PBP",
+      "size": 534132,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 23,
+      "packed": 36
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS0A.PBP",
+      "size": 233140,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS0B.PBP",
+      "size": 218764,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS0C.PBP",
+      "size": 241380,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS0D.PBP",
+      "size": 215424,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS0E.PBP",
+      "size": 571352,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 22,
+      "packed": 36
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS0G.PBP",
+      "size": 466756,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 23,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS0I.PBP",
+      "size": 613240,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 22,
+      "packed": 36
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS0L.PBP",
+      "size": 475108,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS0M.PBP",
+      "size": 524684,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 24,
+      "packed": 34
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS0O.PBP",
+      "size": 477768,
+      "container": "psyg_pb",
+      "entries": 58,
+      "stored": 23,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS0P.PBP",
+      "size": 549608,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS0Q.PBP",
+      "size": 505912,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS0X.PBP",
+      "size": 383628,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WIPEOUTC/TRACKS0Y.PBP",
+      "size": 350228,
+      "container": "psyg_pb",
+      "entries": 59,
+      "stored": 24,
+      "packed": 35
+    },
+    {
+      "path": "/WO3.STR",
+      "size": 26187776,
+      "skipped": "FMV stream (MDEC)"
+    }
+  ],
+  "decoded": {
+    "tim": 4,
+    "vag": 146
+  },
+  "packed_entries": 3090
+}

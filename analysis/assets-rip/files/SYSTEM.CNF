@@ -1,0 +1,5 @@
+BOOT = cdrom:\SCES_028.45;1
+TCB = 5
+EVENT = 16
+STACK = 801FFF00
+
