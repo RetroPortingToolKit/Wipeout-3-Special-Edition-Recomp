@@ -1,0 +1,8 @@
+# Font atlases held back from HD substitution (see game.toml [video] hd_textures).
+# The game draws all of its text from these four atlases; substituting them
+# breaks glyph rendering (historically: invisible text; 2026-08-19: doubled
+# stroke edges from sub-texel HD strokes under the game's two-pass shadow
+# draw). Texture hashes are palette-independent — one line excludes every
+# palette variant of the atlas.
+d20dee94
+861ad9f1

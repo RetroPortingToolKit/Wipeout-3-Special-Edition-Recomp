@@ -73,3 +73,9 @@ starvation_dump.jsonl
 /*.png
 !/catalog_identity.json
 !/disc_probe.json
+
+# The HD texture pack is small (~4MB) and hand-authored: TRACK it. Losing
+# pack files to regeneration has destroyed verified work repeatedly.
+!/disc/
+/disc/*
+!/disc/*-texture-replacements/

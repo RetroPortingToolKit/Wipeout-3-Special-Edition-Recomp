@@ -1,0 +1,5 @@
+
+# The HD texture pack is small (~4MB) and hand-authored: TRACK it. Losing
+# pack files to regeneration has destroyed verified work repeatedly.
+!disc/*-texture-replacements/
+!disc/*-texture-replacements/**
