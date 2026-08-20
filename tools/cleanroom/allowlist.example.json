@@ -1,0 +1,13 @@
+{
+  "format": "psxrecomp-cleanroom-allowlist-v1",
+  "source": [
+    {
+      "rule": "guest_address",
+      "path": "policy/verified_adapter.cpp",
+      "line": 17,
+      "match": "0x80010000",
+      "reason": "Reviewed game-policy boundary; this file is excluded from clean-aot."
+    }
+  ],
+  "link_map": []
+}
