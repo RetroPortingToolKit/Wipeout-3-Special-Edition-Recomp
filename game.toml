@@ -180,8 +180,8 @@ precise_nclip = true
 native_wide = false
 
 # Correct 4:3-authored HUD primitives for the live wide surface. Native-wide's
-# expanded render target exposes WipEout 3's per-window clears as vertical bands,
-# so keep this title on the legacy wide path and adjust the final HUD groups.
+# expanded render target exposes WipEout 3's aggressive per-track culling/void in
+# single player, so keep this title on the legacy wide path by default.
 auto_ui_squash = true
 nw_hud_corners = false
 nw_flat_backdrop = false
@@ -432,11 +432,14 @@ mode     = "bound_rs"
 # Scenery submitter (PSX_FN_SceneryPolySubmit): slt sx, $s6. result=1 => packet builder.
 [controller]
 default_mode = "digital"
+p2_device = "gamepad"
 
 # Online mount gate: digests + track count + optional TOC fingerprint
 # (see docs/NETPLAY.md).
 multitap_analog = true
 [netplay]
+local_viewport = "vertical_split"
+local_viewport_aspect = "16:9"
 require_cue = true
 required_tracks = 14
 required_disc_fp = "a8a369bf31c63906bfcf91d1a0a87d93bde7984d82f02edc5e79727d1e325339"
