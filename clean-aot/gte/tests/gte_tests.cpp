@@ -12,6 +12,9 @@ namespace {
 using clean_aot::gte::Command;
 using clean_aot::gte::ExecutionReceipt;
 using clean_aot::gte::Gte;
+using clean_aot::gte::RegisterBank;
+using clean_aot::gte::TimedWrite;
+using clean_aot::gte::TimedWriteEffect;
 
 constexpr std::uint32_t bit(unsigned index) {
     return std::uint32_t{1} << index;
@@ -210,8 +213,23 @@ void test_mvmva_selectors_and_saturation() {
     gte.write_control(37U, 0x7fffffffU);
     const ExecutionReceipt mac_overflow = gte.execute(
         command_word(Command::Mvmva, true, false, 0U, 0U, 0U));
-    require((mac_overflow.flag & bit(30U)) != 0U,
-            "MAC1 overflow checks the pre-shift accumulator");
+    require((mac_overflow.flag & bit(30U)) != 0U &&
+                signed_word(gte.read_data(9U)) == -32768,
+            "MAC1 wraps signed 44-bit transient before IR saturation");
+
+    gte.reset();
+    write_identity(gte, 32U);
+    write_vector(gte, 0U, 0, 0, 0);
+    gte.write_control(37U, 1000000U);
+    gte.execute(command_word(Command::Mvmva, false, false, 0U, 0U, 0U));
+    require(gte.read_data(25U) == 0xf4240000U &&
+                gte.snapshot().mac[1] == static_cast<std::int32_t>(-198967296),
+            "MAC1 persists as architectural S32 after wide MVMVA");
+    gte.write_data(8U, 0U);
+    gte.execute(command_word(Command::Gpl, false, false));
+    require(gte.read_data(25U) == 0xf4240000U &&
+                signed_word(gte.read_data(9U)) == -32768,
+            "GPL reads the architectural S32 MAC1 register");
 
     gte.reset();
     write_identity(gte, 32U);
@@ -268,13 +286,138 @@ void test_projection_and_reciprocal_edges() {
 
     gte.reset();
     write_identity(gte, 32U);
-    write_vector(gte, 0U, 32767, 0, 32767);
-    gte.write_control(36U, 0x7fffU);
+    write_vector(gte, 0U, 1, 0, 32767);
+    gte.write_control(39U, 32768U);
     gte.write_control(58U, 65535U);
     const ExecutionReceipt final_table = gte.execute(
-        command_word(Command::Rtps, false, false));
-    require((final_table.flag & bit(17U)) == 0U,
-            "reciprocal final table entry remains non-overflowing");
+        command_word(Command::Rtps, true, false));
+    require((final_table.flag & bit(17U)) == 0U &&
+                (gte.read_data(14U) & 0xffffU) == 0U &&
+                gte.read_data(19U) == 65535U,
+            "reciprocal final table entry changes observable SX without overflow");
+
+    gte.reset();
+    write_identity(gte, 32U);
+    write_vector(gte, 0U, 1, 0, 32767);
+    gte.write_control(39U, 32768U);
+    gte.write_control(58U, 65535U);
+    gte.write_control(56U, 0x7fffffffU);
+    const ExecutionReceipt mac0_overflow = gte.execute(
+        command_word(Command::Rtps, true, false));
+    require((mac0_overflow.flag & bit(16U)) != 0U &&
+                (gte.read_data(14U) & 0xffffU) == 0xfc00U,
+            "RTPS projection consumes signed S32 MAC0 after overflow");
+}
+
+void test_timed_input_latches() {
+    const auto h_boundary = Gte::input_latch_boundary(
+        Command::Rtps, RegisterBank::Control, 58U);
+    require(h_boundary.measured && h_boundary.read && h_boundary.nop_boundary == 1U,
+            "RTPS H latch boundary is measured and nonzero");
+    const auto ncs_vz = Gte::input_latch_boundary(
+        Command::Nccs, RegisterBank::Data, 1U);
+    require(ncs_vz.measured && ncs_vz.read && ncs_vz.nop_boundary == 1U,
+            "NCCS VZ latch boundary is not transcribed backwards");
+    const auto dpcs_ir0 = Gte::input_latch_boundary(
+        Command::Dpcs, RegisterBank::Data, 8U);
+    const auto dpct_ir0 = Gte::input_latch_boundary(
+        Command::Dpct, RegisterBank::Data, 8U);
+    require(dpcs_ir0.measured && dpcs_ir0.nop_boundary == 1U &&
+                dpct_ir0.measured && dpct_ir0.nop_boundary == 4U,
+            "depth-cue IR0 latch boundaries match the timing table");
+    const auto avsz3_sz0 = Gte::input_latch_boundary(
+        Command::Avsz3, RegisterBank::Data, 16U);
+    require(avsz3_sz0.measured && !avsz3_sz0.read,
+            "AVSZ3 does not read SZ0");
+    const std::array<Command, 5U> code_gap_commands = {
+        Command::Ncs, Command::Nct, Command::Dpct, Command::Intpl, Command::Gpl,
+    };
+    for (const Command command : code_gap_commands) {
+        const auto boundary = Gte::input_latch_boundary(
+            command, RegisterBank::Data, 6U);
+        require(!boundary.measured,
+                std::string("RGBC code-field timing gap remains unmeasured for ") +
+                    Gte::command_name(command));
+    }
+    const std::array<Command, 3U> triple_lighting = {
+        Command::Nct, Command::Ncct, Command::Ncdt,
+    };
+    const std::array<std::array<std::uint8_t, 6U>, 3U> triple_vectors = {{
+        {{0U, 2U, 0U, 1U, 1U, 3U}},
+        {{0U, 2U, 0U, 1U, 3U, 3U}},
+        {{0U, 0U, 0U, 1U, 3U, 4U}},
+    }};
+    for (unsigned command_index = 0U; command_index < triple_lighting.size();
+         ++command_index) {
+        for (std::uint8_t data_index = 0U; data_index < 6U; ++data_index) {
+            const auto boundary = Gte::input_latch_boundary(
+                triple_lighting[command_index], RegisterBank::Data, data_index);
+            require(boundary.measured && boundary.read &&
+                        boundary.nop_boundary == triple_vectors[command_index][data_index],
+                    "triple-lighting vector latch table is indexed by register");
+        }
+        require(!Gte::input_latch_boundary(
+                     triple_lighting[command_index], RegisterBank::Data, 6U)
+                     .measured &&
+                    !Gte::input_latch_boundary(
+                         triple_lighting[command_index], RegisterBank::Data, 8U)
+                         .measured,
+                "triple-lighting RGBC and IR0 gaps remain unmeasured");
+    }
+    require(!Gte::input_latch_boundary(
+                 Command::Mvmva, RegisterBank::Data, 0U)
+                 .measured,
+            "command-only MVMVA timing query fails closed");
+    require(Gte::timed_write_effect(
+                Command::Mvmva,
+                TimedWrite{RegisterBank::Data, 0U, 1U, 0U}) ==
+                TimedWriteEffect::Unmeasured,
+            "command-only MVMVA write query fails closed");
+    const auto mvmva_matrix = Gte::input_latch_boundary(
+        Gte::decode(command_word(Command::Mvmva, true, false, 1U, 0U, 1U)),
+        RegisterBank::Control, 40U);
+    require(!mvmva_matrix.measured,
+            "MVMVA selected-matrix max boundary is not misreported as exact");
+
+    const std::array<TimedWrite, 1U> early_write = {{
+        {RegisterBank::Control, 58U, 200U, 0U},
+    }};
+    require(Gte::timed_write_effect(
+                Gte::decode(command_word(Command::Rtps, true, false)),
+                early_write[0]) ==
+                TimedWriteEffect::MayAffectInput,
+            "RTPS sees H written before its latch boundary");
+
+    const std::array<TimedWrite, 1U> late_write = {{
+        {RegisterBank::Control, 58U, 200U, 1U},
+    }};
+    require(Gte::timed_write_effect(
+                Gte::decode(command_word(Command::Rtps, true, false)),
+                late_write[0]) ==
+                TimedWriteEffect::NoEffect,
+            "RTPS ignores H written at its latch boundary");
+
+    const std::array<TimedWrite, 1U> unsupported_write = {{
+        {RegisterBank::Data, 0U, 1U, 0U},
+    }};
+    require(Gte::timed_write_effect(
+                Gte::decode(command_word(Command::Mvmva, true, false, 2U, 0U, 2U)),
+                unsupported_write[0]) == TimedWriteEffect::Unmeasured,
+            "unmeasured MVMVA latch shape fails closed");
+}
+
+void test_negative_intpl_arithmetic() {
+    Gte gte;
+    gte.write_data(8U, 0U);
+    gte.write_data(9U, static_cast<std::uint32_t>(-1));
+    gte.write_data(10U, static_cast<std::uint32_t>(-2));
+    gte.write_data(11U, static_cast<std::uint32_t>(-3));
+    const ExecutionReceipt receipt = gte.execute(
+        command_word(Command::Intpl, true, false));
+    require(receipt.recognized && signed_word(gte.read_data(9U)) == -1 &&
+                signed_word(gte.read_data(10U)) == -2 &&
+                signed_word(gte.read_data(11U)) == -3,
+            "INTPL negative IR base uses defined signed fixed-point arithmetic");
 }
 
 void test_math_fifos_and_flags() {
@@ -300,6 +443,30 @@ void test_math_fifos_and_flags() {
             "AVSZ3 average and MAC0");
     gte.execute(command_word(Command::Avsz4));
     require(gte.read_data(7U) == 1000U, "AVSZ4 average");
+
+    gte.reset();
+    gte.write_data(17U, 65535U);
+    gte.write_data(18U, 65535U);
+    gte.write_data(19U, 65535U);
+    gte.write_control(61U, 0x8000U);
+    const ExecutionReceipt avsz_mac0_overflow = gte.execute(
+        command_word(Command::Avsz3));
+    require((avsz_mac0_overflow.flag & bit(15U)) != 0U &&
+                gte.read_data(7U) == 0U &&
+                gte.read_data(24U) == ((std::uint32_t{0x8000U} << 16U) | 0x18000U),
+            "AVSZ3 clamps negative architectural MAC0");
+
+    gte.reset();
+    gte.write_data(17U, 65535U);
+    gte.write_data(18U, 65535U);
+    gte.write_data(19U, 1U);
+    gte.write_control(61U, 0x8000U);
+    const ExecutionReceipt avsz_mac0_low_wrap = gte.execute(
+        command_word(Command::Avsz3));
+    require((avsz_mac0_low_wrap.flag & bit(15U)) != 0U &&
+                gte.read_data(7U) == 8U &&
+                gte.read_data(24U) == 0x00008000U,
+            "AVSZ3 consumes signed low-32 MAC0 after overflow");
 
     gte.reset();
     gte.write_data(9U, 3U);
@@ -366,6 +533,176 @@ void test_color_commands_and_fifo() {
     require((color_overflow.flag & (bit(21U) | bit(20U) | bit(19U))) ==
                 (bit(21U) | bit(20U) | bit(19U)),
             "color FIFO saturation flags");
+}
+
+void write_far_color(Gte& gte, std::int32_t red, std::int32_t green,
+                     std::int32_t blue) {
+    gte.write_control(53U, static_cast<std::uint32_t>(red));
+    gte.write_control(54U, static_cast<std::uint32_t>(green));
+    gte.write_control(55U, static_cast<std::uint32_t>(blue));
+}
+
+void test_command_family_vectors() {
+    Gte op;
+    write_identity(op, 32U);
+    op.write_data(9U, 2U);
+    op.write_data(10U, 3U);
+    op.write_data(11U, 4U);
+    op.execute(command_word(Command::Op, true, false));
+    require(signed_word(op.read_data(9U)) == 1 &&
+                signed_word(op.read_data(10U)) == -2 &&
+                signed_word(op.read_data(11U)) == 1,
+            "OP cross-product vector");
+
+    Gte ncs;
+    write_identity(ncs, 40U);
+    write_identity(ncs, 48U);
+    write_vector(ncs, 0U, 16, 32, 48);
+    ncs.write_data(6U, 0xaa000000U);
+    ncs.execute(command_word(Command::Ncs, true, false));
+    require(signed_word(ncs.read_data(9U)) == 16 &&
+                signed_word(ncs.read_data(10U)) == 32 &&
+                signed_word(ncs.read_data(11U)) == 48 &&
+                ncs.read_data(22U) == 0xaa030201U,
+            "NCS lighting and CODE output");
+
+    Gte nct;
+    write_identity(nct, 40U);
+    write_identity(nct, 48U);
+    write_vector(nct, 0U, 16, 0, 0);
+    write_vector(nct, 2U, 32, 0, 0);
+    write_vector(nct, 4U, 48, 0, 0);
+    nct.write_data(6U, 0xbb000000U);
+    nct.execute(command_word(Command::Nct, true, false));
+    require(nct.read_data(20U) == 0xbb000001U &&
+                nct.read_data(21U) == 0xbb000002U &&
+                nct.read_data(22U) == 0xbb000003U,
+            "NCT triple lighting FIFO");
+
+    Gte nccs;
+    write_identity(nccs, 40U);
+    write_identity(nccs, 48U);
+    write_vector(nccs, 0U, 256, 512, 768);
+    nccs.write_data(6U, 0xdd101010U);
+    nccs.execute(command_word(Command::Nccs, true, false));
+    require(nccs.read_data(22U) == 0xdd030201U &&
+                signed_word(nccs.read_data(9U)) == 16 &&
+                signed_word(nccs.read_data(10U)) == 32 &&
+                signed_word(nccs.read_data(11U)) == 48,
+            "NCCS normal-color modulation");
+
+    Gte ncct;
+    write_identity(ncct, 40U);
+    write_identity(ncct, 48U);
+    write_vector(ncct, 0U, 256, 0, 0);
+    write_vector(ncct, 2U, 512, 0, 0);
+    write_vector(ncct, 4U, 768, 0, 0);
+    ncct.write_data(6U, 0xee101010U);
+    ncct.execute(command_word(Command::Ncct, true, false));
+    require(ncct.read_data(20U) == 0xee000001U &&
+                ncct.read_data(21U) == 0xee000002U &&
+                ncct.read_data(22U) == 0xee000003U,
+            "NCCT triple normal-color FIFO");
+
+    Gte ncds;
+    write_identity(ncds, 40U);
+    write_identity(ncds, 48U);
+    write_vector(ncds, 0U, 256, 512, 768);
+    ncds.write_data(6U, 0xf1010101U);
+    ncds.write_data(8U, 0x1000U);
+    write_far_color(ncds, 16, 32, 48);
+    ncds.execute(command_word(Command::Ncds, true, false));
+    require(ncds.read_data(22U) == 0xf1030201U &&
+                signed_word(ncds.read_data(9U)) == 16 &&
+                signed_word(ncds.read_data(10U)) == 32 &&
+                signed_word(ncds.read_data(11U)) == 48,
+            "NCDS depth-cued lighting");
+
+    Gte ncdt;
+    write_identity(ncdt, 40U);
+    write_identity(ncdt, 48U);
+    write_vector(ncdt, 0U, 256, 0, 0);
+    write_vector(ncdt, 2U, 512, 0, 0);
+    write_vector(ncdt, 4U, 768, 0, 0);
+    ncdt.write_data(6U, 0xf2010101U);
+    ncdt.write_data(8U, 0x1000U);
+    write_far_color(ncdt, 16, 32, 48);
+    ncdt.execute(command_word(Command::Ncdt, true, false));
+    require(ncdt.read_data(20U) == 0xf2030201U &&
+                ncdt.read_data(21U) == 0xf2030201U &&
+                ncdt.read_data(22U) == 0xf2030201U,
+            "NCDT triple depth-cued FIFO");
+
+    Gte cdp;
+    write_identity(cdp, 48U);
+    cdp.write_data(6U, 0xf3010101U);
+    cdp.write_data(8U, 0x1000U);
+    cdp.write_data(9U, 256U);
+    cdp.write_data(10U, 512U);
+    cdp.write_data(11U, 768U);
+    write_far_color(cdp, 16, 32, 48);
+    cdp.execute(command_word(Command::Cdp, true, false));
+    require(cdp.read_data(22U) == 0xf3030201U &&
+                signed_word(cdp.read_data(9U)) == 16 &&
+                signed_word(cdp.read_data(10U)) == 32 &&
+                signed_word(cdp.read_data(11U)) == 48,
+            "CDP color-depth cue");
+
+    Gte dcpl;
+    dcpl.write_data(6U, 0xf6010101U);
+    dcpl.write_data(8U, 0x1000U);
+    dcpl.write_data(9U, 256U);
+    dcpl.write_data(10U, 512U);
+    dcpl.write_data(11U, 768U);
+    write_far_color(dcpl, 16, 32, 48);
+    dcpl.execute(command_word(Command::Dcpl, true, false));
+    require(dcpl.read_data(22U) == 0xf6030201U,
+            "DCPL depth-cued color");
+
+    Gte dpcs;
+    dpcs.write_data(6U, 0xf4102030U);
+    dpcs.write_data(8U, 0x1000U);
+    write_far_color(dpcs, 16, 32, 48);
+    dpcs.execute(command_word(Command::Dpcs, true, false));
+    require(dpcs.read_data(22U) == 0xf4030201U,
+            "DPCS depth cue");
+
+    Gte intpl;
+    intpl.write_data(6U, 0xf5010101U);
+    intpl.write_data(8U, 0x1000U);
+    intpl.write_data(9U, 256U);
+    intpl.write_data(10U, 512U);
+    intpl.write_data(11U, 768U);
+    write_far_color(intpl, 16, 32, 48);
+    intpl.execute(command_word(Command::Intpl, true, false));
+    require(intpl.read_data(22U) == 0xf5030201U,
+            "INTPL depth interpolation");
+
+    Gte gpf;
+    gpf.write_data(6U, 0xf7000000U);
+    gpf.write_data(8U, 0x1000U);
+    gpf.write_data(9U, 256U);
+    gpf.write_data(10U, 512U);
+    gpf.write_data(11U, 768U);
+    gpf.execute(command_word(Command::Gpf, true, false));
+    require(gpf.read_data(22U) == 0xf7302010U,
+            "GPF interpolation from zero base");
+
+    Gte gpl;
+    gpl.write_data(6U, 0xf8000000U);
+    gpl.write_data(8U, 0x1000U);
+    gpl.write_data(9U, 256U);
+    gpl.write_data(10U, 512U);
+    gpl.write_data(11U, 768U);
+    gpl.write_data(25U, 16U);
+    gpl.write_data(26U, 32U);
+    gpl.write_data(27U, 48U);
+    gpl.execute(command_word(Command::Gpl, true, false));
+    require(gpl.read_data(22U) == 0xf8332211U &&
+                signed_word(gpl.read_data(9U)) == 272 &&
+                signed_word(gpl.read_data(10U)) == 544 &&
+                signed_word(gpl.read_data(11U)) == 816,
+            "GPL interpolation with architectural MAC base");
 }
 
 std::uint32_t next_random(std::uint32_t& value) {
@@ -509,8 +846,11 @@ int main() {
     test_decode_and_cycle_metadata();
     test_mvmva_selectors_and_saturation();
     test_projection_and_reciprocal_edges();
+    test_timed_input_latches();
+    test_negative_intpl_arithmetic();
     test_math_fifos_and_flags();
     test_color_commands_and_fifo();
+    test_command_family_vectors();
     test_triple_fifo_order();
     test_complete_command_set_smoke();
     test_deterministic_metamorphic_vectors();

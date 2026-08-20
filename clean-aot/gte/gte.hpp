@@ -42,6 +42,30 @@ struct DecodedInstruction final {
     std::uint8_t translation_selector = 0U;
 };
 
+enum class RegisterBank : std::uint8_t {
+    Data,
+    Control,
+};
+
+struct TimedWrite final {
+    RegisterBank bank = RegisterBank::Data;
+    std::uint8_t index = 0U;
+    std::uint32_t value = 0U;
+    std::uint8_t instruction_gap = 0U;
+};
+
+enum class TimedWriteEffect : std::uint8_t {
+    Unmeasured,
+    NoEffect,
+    MayAffectInput,
+};
+
+struct InputLatchBoundary final {
+    bool measured = false;
+    bool read = false;
+    std::uint8_t nop_boundary = 0U;
+};
+
 struct ExecutionReceipt final {
     bool recognized = false;
     Command command = Command::Unknown;
@@ -60,7 +84,7 @@ struct Snapshot final {
     std::array<std::uint16_t, 4U> sz{};
     std::array<std::uint32_t, 4U> rgb{};
     std::uint32_t res1 = 0U;
-    std::array<std::int64_t, 4U> mac{};
+    std::array<std::int32_t, 4U> mac{};
     std::uint32_t lzcs = 0U;
     std::uint32_t lzcr = 0U;
     std::array<std::array<std::int16_t, 3U>, 3U> rotation{};
@@ -94,6 +118,21 @@ public:
     ExecutionReceipt execute(std::uint32_t instruction) noexcept;
     ExecutionReceipt execute(const DecodedInstruction& instruction) noexcept;
 
+    static InputLatchBoundary input_latch_boundary(
+        const DecodedInstruction& instruction,
+        RegisterBank bank,
+        std::uint8_t index) noexcept;
+    static InputLatchBoundary input_latch_boundary(
+        Command command,
+        RegisterBank bank,
+        std::uint8_t index) noexcept;
+    static TimedWriteEffect timed_write_effect(
+        const DecodedInstruction& instruction,
+        const TimedWrite& write) noexcept;
+    static TimedWriteEffect timed_write_effect(
+        Command command,
+        const TimedWrite& write) noexcept;
+
     std::uint32_t read_data(std::uint8_t index) const noexcept;
     void write_data(std::uint8_t index, std::uint32_t value) noexcept;
     std::uint32_t read_control(std::uint8_t index) const noexcept;
@@ -120,7 +159,7 @@ private:
     std::array<U16, 4U> sz_{};
     std::array<std::uint32_t, 4U> rgb_{};
     std::uint32_t res1_ = 0U;
-    std::array<S64, 4U> mac_{};
+    std::array<S32, 4U> mac_{};
     std::uint32_t lzcs_ = 0U;
     std::uint32_t lzcr_ = 0U;
 
@@ -141,6 +180,8 @@ private:
 
     static Command decode_command(std::uint32_t opcode) noexcept;
     static S64 arithmetic_shift_right(S64 value, unsigned shift) noexcept;
+    static S64 mac_shift(S64 value, unsigned shift) noexcept;
+    static S64 mac0_value(S64 value) noexcept;
     static S64 clamp(S64 value, S64 minimum, S64 maximum) noexcept;
     static S32 sign_extend_16(U16 value) noexcept;
     static S16 low_s16(std::uint32_t value) noexcept;
@@ -193,7 +234,8 @@ private:
 
     void normal_stage(const DecodedInstruction& instruction,
                       unsigned vector_index) noexcept;
-    void color_matrix_stage(const DecodedInstruction& instruction) noexcept;
+    std::array<S64, 3U> color_matrix_stage(
+        const DecodedInstruction& instruction) noexcept;
     std::array<S64, 3U> color_modulation() noexcept;
     void finish_color(const DecodedInstruction& instruction,
                       const std::array<S64, 3U>& base) noexcept;

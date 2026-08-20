@@ -14,7 +14,25 @@ The public API in `gte.hpp` provides:
 - all 22 documented retail command operations, including triple variants;
 - fixed-point MAC/IR arithmetic, saturation and FLAG reporting, the documented
   reciprocal approximation, and command cycle metadata;
-- deterministic execution receipts and a stable full-state digest.
+- deterministic execution receipts and a stable full-state digest;
+- tri-state input-latch metadata and a pure timed-write effect query for the
+  measured pipeline boundaries.
+
+`execute` is intentionally atomic. `input_latch_boundary` and
+`timed_write_effect` expose the measured timing facts without pretending that
+the timing tables specify output-register writeback races. An unmeasured
+instruction/selector/register shape is reported as `Unmeasured` and must be
+handled by the caller rather than guessed. RGBC code-field consumers whose
+tables only give a register-level dash are likewise left unmeasured, and the
+MVMVA “max 1” selected-matrix observations are not promoted to exact
+per-register boundaries. `InputLatchBoundary::nop_boundary` and
+`TimedWrite::instruction_gap` use the PSX-SPX unit exactly: the smallest
+number of intervening NOP/instruction slots before the write has no effect;
+they are not GTE-cycle timestamps. `MayAffectInput` means the write is early
+enough to be capable of affecting the sampled input, not that its value must
+change the result. Because MVMVA boundaries depend on `mx`, `v`, and `cv`, the
+command-only timing overload deliberately returns `Unmeasured`; callers must
+pass a decoded instruction.
 
 Build and test this component in isolation:
 

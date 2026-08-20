@@ -1,5 +1,6 @@
 #include "gte.hpp"
 
+#include <bit>
 #include <cstddef>
 #include <limits>
 
@@ -253,6 +254,410 @@ const char* Gte::command_name(Command command) noexcept {
     return "UNKNOWN";
 }
 
+InputLatchBoundary Gte::input_latch_boundary(
+    Command command,
+    RegisterBank bank,
+    std::uint8_t index) noexcept {
+    if (command == Command::Mvmva) {
+        return {};
+    }
+    DecodedInstruction instruction{};
+    instruction.command = command;
+    return input_latch_boundary(instruction, bank, index);
+}
+
+InputLatchBoundary Gte::input_latch_boundary(
+    const DecodedInstruction& instruction,
+    RegisterBank bank,
+    std::uint8_t index) noexcept {
+    const auto unmeasured = []() noexcept -> InputLatchBoundary { return {}; };
+    const auto not_read = []() noexcept -> InputLatchBoundary {
+        return {true, false, 0U};
+    };
+    const auto read_at = [](std::uint8_t nop_boundary) noexcept -> InputLatchBoundary {
+        return {true, true, nop_boundary};
+    };
+    const auto array_value = [index, &not_read,
+                              &read_at](std::uint8_t first,
+                                        const std::array<std::uint8_t, 5U>& values)
+        noexcept -> InputLatchBoundary {
+        if (index < first || index >= static_cast<std::uint8_t>(first + 5U)) {
+            return not_read();
+        }
+        return read_at(values[index - first]);
+    };
+    const auto vector_value = [&not_read,
+                               &read_at](std::uint8_t register_index,
+                                         std::uint8_t first,
+                                         std::uint8_t xy_cycle,
+                                         std::uint8_t z_cycle)
+        noexcept -> InputLatchBoundary {
+        if (register_index == first) {
+            return read_at(xy_cycle);
+        }
+        if (register_index == static_cast<std::uint8_t>(first + 1U)) {
+            return read_at(z_cycle);
+        }
+        return not_read();
+    };
+
+    if (instruction.command == Command::Rtps ||
+        instruction.command == Command::Rtpt) {
+        if (bank == RegisterBank::Data) {
+            if (instruction.command == Command::Rtps) {
+                const InputLatchBoundary vector = vector_value(index, 0U, 0U, 0U);
+                if (vector.read) {
+                    return vector;
+                }
+            } else {
+                const InputLatchBoundary v0 = vector_value(index, 0U, 0U, 0U);
+                if (v0.read) {
+                    return v0;
+                }
+                const InputLatchBoundary v1 = vector_value(index, 2U, 3U, 0U);
+                if (v1.read) {
+                    return v1;
+                }
+                const InputLatchBoundary v2 = vector_value(index, 4U, 2U, 0U);
+                if (v2.read) {
+                    return v2;
+                }
+            }
+        } else {
+            if (index >= 32U && index <= 36U) {
+                if (instruction.command == Command::Rtps) {
+                    return read_at(0U);
+                }
+                return read_at(index == 32U ? 2U :
+                               index == 33U || index == 34U ? 4U : 0U);
+            }
+            if (index >= 37U && index <= 39U) {
+                if (instruction.command == Command::Rtps) {
+                    return read_at(0U);
+                }
+                return read_at(index == 38U ? 4U : 1U);
+            }
+            if (instruction.command == Command::Rtps) {
+                switch (index) {
+                case 56U:
+                    return read_at(1U);
+                case 57U:
+                    return read_at(0U);
+                case 58U:
+                    return read_at(1U);
+                case 59U:
+                    return read_at(4U);
+                case 60U:
+                    return read_at(3U);
+                default:
+                    return not_read();
+                }
+            }
+            switch (index) {
+            case 56U:
+                return read_at(5U);
+            case 57U:
+                return read_at(4U);
+            case 58U:
+                return read_at(5U);
+            case 59U:
+                return read_at(7U);
+            case 60U:
+                return read_at(6U);
+            default:
+                return not_read();
+            }
+        }
+        return not_read();
+    }
+
+    if (instruction.command == Command::Ncs ||
+        instruction.command == Command::Nccs ||
+        instruction.command == Command::Ncds) {
+        if (bank == RegisterBank::Data) {
+            const std::uint8_t z_cycle = instruction.command == Command::Ncs ? 0U : 1U;
+            const InputLatchBoundary vector = vector_value(index, 0U, 0U, z_cycle);
+            if (vector.read) {
+                return vector;
+            }
+            if (index == 6U) {
+                return instruction.command == Command::Ncs
+                           ? unmeasured()
+                           : read_at(3U);
+            }
+        } else {
+            if (index >= 40U && index <= 44U) {
+                return read_at(0U);
+            }
+            if (index >= 45U && index <= 47U) {
+                return read_at(std::array<std::uint8_t, 3U>{0U, 2U, 1U}[index - 45U]);
+            }
+            if (index >= 48U && index <= 52U) {
+                return array_value(48U, {2U, 1U, 1U, 2U, 3U});
+            }
+            if (instruction.command == Command::Ncds && index >= 53U && index <= 55U) {
+                return read_at(static_cast<std::uint8_t>(2U + index - 53U));
+            }
+        }
+        return not_read();
+    }
+
+    if (instruction.command == Command::Nct ||
+        instruction.command == Command::Ncct ||
+        instruction.command == Command::Ncdt) {
+        const std::uint8_t variant = instruction.command == Command::Nct
+                                         ? 0U
+                                         : instruction.command == Command::Ncct ? 1U : 2U;
+        if (bank == RegisterBank::Data) {
+            const std::array<std::array<std::uint8_t, 2U>, 3U> vector_cycles = {{
+                {{0U, static_cast<std::uint8_t>(variant == 2U ? 0U : 2U)}},
+                {{0U, 1U}},
+                {{static_cast<std::uint8_t>(variant == 0U ? 1U : 3U),
+                  static_cast<std::uint8_t>(variant == 2U ? 4U : 3U)}},
+            }};
+            for (unsigned vector = 0U; vector < 3U; ++vector) {
+                const std::uint8_t first =
+                    static_cast<std::uint8_t>(vector * 2U);
+                const InputLatchBoundary result = vector_value(
+                    index, first,
+                    vector_cycles[vector][0], vector_cycles[vector][1]);
+                if (result.read) {
+                    return result;
+                }
+            }
+            if (index == 6U || index == 8U) {
+                return unmeasured();
+            }
+        } else {
+            if (index >= 40U && index <= 44U) {
+                return array_value(40U, instruction.command == Command::Nct
+                                             ? std::array<std::uint8_t, 5U>{0U, 0U, 3U, 0U, 0U}
+                                             : instruction.command == Command::Ncct
+                                                   ? std::array<std::uint8_t, 5U>{1U, 0U, 3U, 1U, 1U}
+                                                   : std::array<std::uint8_t, 5U>{1U, 0U, 3U, 2U, 2U});
+            }
+            if (index >= 45U && index <= 47U) {
+                return array_value(45U, instruction.command == Command::Nct
+                                             ? std::array<std::uint8_t, 5U>{8U, 9U, 9U, 0U, 0U}
+                                             : instruction.command == Command::Ncct
+                                                   ? std::array<std::uint8_t, 5U>{9U, 6U, 9U, 0U, 0U}
+                                                   : std::array<std::uint8_t, 5U>{7U, 7U, 7U, 0U, 0U});
+            }
+            if (index >= 48U && index <= 52U) {
+                return array_value(48U, instruction.command == Command::Nct
+                                             ? std::array<std::uint8_t, 5U>{6U, 3U, 8U, 8U, 6U}
+                                             : instruction.command == Command::Ncct
+                                                   ? std::array<std::uint8_t, 5U>{5U, 3U, 8U, 7U, 5U}
+                                                   : std::array<std::uint8_t, 5U>{5U, 4U, 7U, 7U, 5U});
+            }
+            if (instruction.command == Command::Ncdt && index >= 53U && index <= 55U) {
+                return array_value(53U, {13U, 14U, 14U, 0U, 0U});
+            }
+        }
+        return not_read();
+    }
+
+    if (instruction.command == Command::Cc ||
+        instruction.command == Command::Cdp) {
+        if (bank == RegisterBank::Data) {
+            if (index == 6U) {
+                return read_at(instruction.command == Command::Cc ? 0U : 1U);
+            }
+            if (index == 8U) {
+                return instruction.command == Command::Cdp ? read_at(2U) : not_read();
+            }
+            if (index >= 9U && index <= 11U) {
+                const std::array<std::uint8_t, 3U> cc = {1U, 2U, 2U};
+                const std::array<std::uint8_t, 3U> cdp = {2U, 3U, 2U};
+                return read_at((instruction.command == Command::Cc ? cc : cdp)[index - 9U]);
+            }
+        } else {
+            if (index >= 45U && index <= 47U) {
+                return read_at(0U);
+            }
+            if (index >= 48U && index <= 52U) {
+                return read_at(index == 51U ? 1U : 0U);
+            }
+            if (instruction.command == Command::Cdp && index >= 53U && index <= 55U) {
+                return read_at(index == 54U ? 2U : 0U);
+            }
+        }
+        return not_read();
+    }
+
+    if (instruction.command == Command::Dpcs ||
+        instruction.command == Command::Dpct ||
+        instruction.command == Command::Dcpl ||
+        instruction.command == Command::Intpl) {
+        if (bank == RegisterBank::Data) {
+            if ((instruction.command == Command::Dpcs ||
+                 instruction.command == Command::Dcpl) && index == 6U) {
+                return read_at(0U);
+            }
+            if (instruction.command == Command::Dpct && index >= 20U && index <= 22U) {
+                return read_at(index == 22U ? 0U : 4U);
+            }
+            if (index == 8U) {
+                if (instruction.command == Command::Dpcs) {
+                    return read_at(1U);
+                }
+                if (instruction.command == Command::Dpct) {
+                    return read_at(4U);
+                }
+                return instruction.command == Command::Dcpl ? read_at(0U) : read_at(1U);
+            }
+            if (index == 6U && (instruction.command == Command::Dpct ||
+                                instruction.command == Command::Intpl)) {
+                return unmeasured();
+            }
+            if (instruction.command == Command::Dcpl && index >= 9U && index <= 11U) {
+                return read_at(index == 10U ? 0U : 1U);
+            }
+            if (instruction.command == Command::Intpl && index >= 9U && index <= 11U) {
+                return read_at(index == 10U ? 1U : 0U);
+            }
+        } else if (index >= 53U && index <= 55U) {
+            if (instruction.command == Command::Dpct) {
+                return read_at(static_cast<std::uint8_t>(1U + index - 53U));
+            }
+            return read_at(0U);
+        }
+        return not_read();
+    }
+
+    if (instruction.command == Command::Sqr || instruction.command == Command::Op ||
+        instruction.command == Command::Nclip) {
+        if (instruction.command == Command::Sqr && bank == RegisterBank::Data &&
+            index >= 9U && index <= 11U) {
+            return read_at(index == 11U ? 1U : 0U);
+        }
+        if (instruction.command == Command::Op) {
+            if (bank == RegisterBank::Data && index >= 9U && index <= 11U) {
+                return read_at(index == 10U ? 1U : 0U);
+            }
+            if (bank == RegisterBank::Control &&
+                (index == 32U || index == 34U || index == 36U)) {
+                return read_at(0U);
+            }
+        }
+        if (instruction.command == Command::Nclip && bank == RegisterBank::Data &&
+            index >= 12U && index <= 14U) {
+            return read_at(index == 12U ? 0U : 1U);
+        }
+        return not_read();
+    }
+
+    if (instruction.command == Command::Avsz3 ||
+        instruction.command == Command::Avsz4) {
+        if (bank == RegisterBank::Data &&
+            ((instruction.command == Command::Avsz3 && index >= 17U && index <= 19U) ||
+             (instruction.command == Command::Avsz4 && index >= 16U && index <= 19U))) {
+            return read_at(0U);
+        }
+        if (bank == RegisterBank::Control &&
+            index == (instruction.command == Command::Avsz3 ? 61U : 62U)) {
+            return read_at(0U);
+        }
+        return not_read();
+    }
+
+    if (instruction.command == Command::Gpf || instruction.command == Command::Gpl) {
+        if (bank == RegisterBank::Data && index == 6U) {
+            return unmeasured();
+        }
+        if (bank == RegisterBank::Data && index == 8U) {
+            return read_at(0U);
+        }
+        if (bank == RegisterBank::Data && index >= 9U && index <= 11U) {
+            return read_at(0U);
+        }
+        if (instruction.command == Command::Gpl && bank == RegisterBank::Data &&
+            index >= 25U && index <= 27U) {
+            return read_at(0U);
+        }
+        return not_read();
+    }
+
+    if (instruction.command == Command::Mvmva) {
+        const bool measured_shape =
+            (instruction.matrix_selector == 0U &&
+             instruction.vector_selector == 0U &&
+             instruction.translation_selector == 0U) ||
+            (instruction.matrix_selector == 1U &&
+             instruction.vector_selector == 0U &&
+             instruction.translation_selector == 1U) ||
+            (instruction.matrix_selector == 2U &&
+             instruction.vector_selector == 3U &&
+             instruction.translation_selector == 1U);
+        if (!measured_shape) {
+            return unmeasured();
+        }
+        if (instruction.matrix_selector == 0U &&
+            instruction.vector_selector == 0U &&
+            instruction.translation_selector == 0U) {
+            if (bank == RegisterBank::Data) {
+                return vector_value(index, 0U, 0U, 0U);
+            }
+            if (index >= 32U && index <= 39U) {
+                return read_at(0U);
+            }
+        } else if (instruction.matrix_selector == 1U &&
+                   instruction.vector_selector == 0U &&
+                   instruction.translation_selector == 1U) {
+            if (bank == RegisterBank::Data) {
+                return vector_value(index, 0U, 0U, 2U);
+            }
+            if (index >= 40U && index <= 44U) {
+                return unmeasured();
+            }
+            if (index >= 45U && index <= 47U) {
+                return read_at(0U);
+            }
+        } else if (instruction.matrix_selector == 2U &&
+                   instruction.vector_selector == 3U &&
+                   instruction.translation_selector == 1U) {
+            if (bank == RegisterBank::Data && index >= 9U && index <= 11U) {
+                const std::array<std::uint8_t, 3U> cycles = {1U, 0U, 1U};
+                return read_at(cycles[index - 9U]);
+            }
+            if (bank == RegisterBank::Control && index >= 48U && index <= 52U) {
+                return unmeasured();
+            }
+            if (bank == RegisterBank::Control && index >= 45U && index <= 47U) {
+                return read_at(0U);
+            }
+        }
+        return not_read();
+    }
+
+    return unmeasured();
+}
+
+TimedWriteEffect Gte::timed_write_effect(
+    Command command,
+    const TimedWrite& write) noexcept {
+    if (command == Command::Mvmva) {
+        return TimedWriteEffect::Unmeasured;
+    }
+    DecodedInstruction instruction{};
+    instruction.command = command;
+    return timed_write_effect(instruction, write);
+}
+
+TimedWriteEffect Gte::timed_write_effect(
+    const DecodedInstruction& instruction,
+    const TimedWrite& write) noexcept {
+    const InputLatchBoundary boundary = input_latch_boundary(
+        instruction, write.bank, write.index);
+    if (!boundary.measured) {
+        return TimedWriteEffect::Unmeasured;
+    }
+    if (!boundary.read || write.instruction_gap >= boundary.nop_boundary) {
+        return TimedWriteEffect::NoEffect;
+    }
+    return TimedWriteEffect::MayAffectInput;
+}
+
 Gte::S64 Gte::arithmetic_shift_right(S64 value, unsigned shift) noexcept {
     if (shift == 0U) {
         return value;
@@ -265,6 +670,21 @@ Gte::S64 Gte::arithmetic_shift_right(S64 value, unsigned shift) noexcept {
     }
     const S64 divisor = S64{1} << shift;
     return -((-value + divisor - 1) / divisor);
+}
+
+Gte::S64 Gte::mac_shift(S64 value, unsigned shift) noexcept {
+    constexpr std::uint64_t kMacMask = (std::uint64_t{1} << 44U) - 1U;
+    constexpr std::uint64_t kMacSign = std::uint64_t{1} << 43U;
+    const std::uint64_t bits = static_cast<std::uint64_t>(value) & kMacMask;
+    const std::uint64_t extended =
+        (bits & kMacSign) != 0U ? bits | ~kMacMask : bits;
+    return arithmetic_shift_right(std::bit_cast<S64>(extended), shift);
+}
+
+Gte::S64 Gte::mac0_value(S64 value) noexcept {
+    const std::uint32_t bits =
+        static_cast<std::uint32_t>(static_cast<std::uint64_t>(value));
+    return static_cast<S64>(std::bit_cast<S32>(bits));
 }
 
 Gte::S64 Gte::clamp(S64 value, S64 minimum, S64 maximum) noexcept {
@@ -338,7 +758,9 @@ std::uint32_t Gte::visible_flag() const noexcept {
 }
 
 void Gte::record_mac(unsigned index, S64 value, S64 overflow_probe) noexcept {
-    mac_[index] = value;
+    const std::uint32_t bits =
+        static_cast<std::uint32_t>(static_cast<std::uint64_t>(value));
+    mac_[index] = std::bit_cast<S32>(bits);
     if (index == 0U) {
         if (overflow_probe >= (S64{1} << 31U)) {
             set_flag(kFlagMac0Positive);
@@ -483,11 +905,11 @@ void Gte::execute_rtps(const DecodedInstruction& instruction,
                         static_cast<S64>(rotation_[row][0]) * vertex[0] +
                         static_cast<S64>(rotation_[row][1]) * vertex[1] +
                         static_cast<S64>(rotation_[row][2]) * vertex[2];
-        shifted[row] = arithmetic_shift_right(raw, shift);
+        shifted[row] = mac_shift(raw, shift);
         record_mac(row + 1U, shifted[row], raw);
         S64 flag_probe = shifted[row];
         if (row == 2U && !instruction.shift_fraction) {
-            flag_probe = arithmetic_shift_right(raw, 12U);
+            flag_probe = mac_shift(raw, 12U);
         }
         set_ir(row, shifted[row], instruction.limit_negative, flag_probe,
                row == 2U);
@@ -504,17 +926,17 @@ void Gte::execute_rtps(const DecodedInstruction& instruction,
     S64 mac0 = static_cast<S64>(scale) * static_cast<S64>(ir_[0]) +
                static_cast<S64>(ofx_);
     record_mac(0U, mac0, mac0);
-    const S64 screen_x = arithmetic_shift_right(mac0, 16U);
+    const S64 screen_x = arithmetic_shift_right(mac0_value(mac0), 16U);
 
     mac0 = static_cast<S64>(scale) * static_cast<S64>(ir_[1]) +
            static_cast<S64>(ofy_);
     record_mac(0U, mac0, mac0);
-    const S64 screen_y = arithmetic_shift_right(mac0, 16U);
+    const S64 screen_y = arithmetic_shift_right(mac0_value(mac0), 16U);
 
     mac0 = static_cast<S64>(scale) * static_cast<S64>(dqa_) +
            static_cast<S64>(dqb_);
     record_mac(0U, mac0, mac0);
-    set_ir0(arithmetic_shift_right(mac0, 12U));
+    set_ir0(arithmetic_shift_right(mac0_value(mac0), 12U));
     push_sxy(screen_x, screen_y);
 }
 
@@ -547,7 +969,7 @@ void Gte::execute_mvmva(const DecodedInstruction& instruction) noexcept {
                 ? static_cast<S64>(matrix[row][1]) * vector[1] +
                       static_cast<S64>(matrix[row][2]) * vector[2]
                 : full_raw;
-        const S64 result = arithmetic_shift_right(actual_raw, shift);
+        const S64 result = mac_shift(actual_raw, shift);
         record_mac(row + 1U, result, full_raw);
         set_ir(row, result, instruction.limit_negative, result);
     }
@@ -578,7 +1000,7 @@ void Gte::execute_avsz(unsigned count) noexcept {
     }
     const S64 result = static_cast<S64>(scale) * sum;
     record_mac(0U, result, result);
-    const S64 average = arithmetic_shift_right(result, 12U);
+    const S64 average = arithmetic_shift_right(mac0_value(result), 12U);
     if (average < 0 || average > S64{0xffff}) {
         set_flag(kFlagSz3);
     }
@@ -596,7 +1018,7 @@ void Gte::execute_op(const DecodedInstruction& instruction) noexcept {
     };
     const unsigned shift = instruction.shift_fraction ? 12U : 0U;
     for (unsigned row = 0U; row < 3U; ++row) {
-        const S64 result = arithmetic_shift_right(raw[row], shift);
+        const S64 result = mac_shift(raw[row], shift);
         record_mac(row + 1U, result, raw[row]);
         set_ir(row, result, instruction.limit_negative, result);
     }
@@ -606,7 +1028,7 @@ void Gte::execute_sqr(const DecodedInstruction& instruction) noexcept {
     const unsigned shift = instruction.shift_fraction ? 12U : 0U;
     for (unsigned index = 0U; index < 3U; ++index) {
         const S64 raw = static_cast<S64>(ir_[index]) * ir_[index];
-        const S64 result = arithmetic_shift_right(raw, shift);
+        const S64 result = mac_shift(raw, shift);
         record_mac(index + 1U, result, raw);
         set_ir(index, result, true, result);
     }
@@ -620,24 +1042,28 @@ void Gte::normal_stage(const DecodedInstruction& instruction,
         const S64 raw = static_cast<S64>(light_[row][0]) * vertex[0] +
                         static_cast<S64>(light_[row][1]) * vertex[1] +
                         static_cast<S64>(light_[row][2]) * vertex[2];
-        const S64 result = arithmetic_shift_right(raw, shift);
+        const S64 result = mac_shift(raw, shift);
         record_mac(row + 1U, result, raw);
         set_ir(row, result, instruction.limit_negative, result);
     }
 }
 
-void Gte::color_matrix_stage(const DecodedInstruction& instruction) noexcept {
+std::array<Gte::S64, 3U> Gte::color_matrix_stage(
+    const DecodedInstruction& instruction) noexcept {
     const unsigned shift = instruction.shift_fraction ? 12U : 0U;
     const std::array<S16, 3U> input = ir_;
+    std::array<S64, 3U> result_values{};
     for (unsigned row = 0U; row < 3U; ++row) {
         const S64 raw = static_cast<S64>(background_[row]) * 0x1000LL +
                         static_cast<S64>(color_[row][0]) * input[0] +
                         static_cast<S64>(color_[row][1]) * input[1] +
                         static_cast<S64>(color_[row][2]) * input[2];
-        const S64 result = arithmetic_shift_right(raw, shift);
+        const S64 result = mac_shift(raw, shift);
         record_mac(row + 1U, result, raw);
         set_ir(row, result, instruction.limit_negative, result);
+        result_values[row] = result;
     }
+    return result_values;
 }
 
 std::array<Gte::S64, 3U> Gte::color_modulation() noexcept {
@@ -657,12 +1083,14 @@ std::array<Gte::S64, 3U> Gte::color_modulation() noexcept {
 void Gte::finish_color(const DecodedInstruction& instruction,
                        const std::array<S64, 3U>& base) noexcept {
     const unsigned shift = instruction.shift_fraction ? 12U : 0U;
+    std::array<S64, 3U> result_values{};
     for (unsigned index = 0U; index < 3U; ++index) {
-        const S64 result = arithmetic_shift_right(base[index], shift);
+        const S64 result = mac_shift(base[index], shift);
         record_mac(index + 1U, result, base[index]);
         set_ir(index, result, instruction.limit_negative, result);
+        result_values[index] = result;
     }
-    push_rgb(mac_[1], mac_[2], mac_[3]);
+    push_rgb(result_values[0], result_values[1], result_values[2]);
 }
 
 void Gte::execute_depth_cue(const DecodedInstruction& instruction,
@@ -674,6 +1102,7 @@ void Gte::execute_depth_cue(const DecodedInstruction& instruction,
         static_cast<S64>(far_color_[2]) * 0x1000LL,
     };
     std::array<S16, 3U> delta{};
+    std::array<S64, 3U> result_values{};
     for (unsigned index = 0U; index < 3U; ++index) {
         const S64 difference = arithmetic_shift_right(far[index] - base[index],
                                                        shift);
@@ -685,11 +1114,12 @@ void Gte::execute_depth_cue(const DecodedInstruction& instruction,
     }
     for (unsigned index = 0U; index < 3U; ++index) {
         const S64 raw = static_cast<S64>(delta[index]) * ir0_ + base[index];
-        const S64 result = arithmetic_shift_right(raw, shift);
+        const S64 result = mac_shift(raw, shift);
         record_mac(index + 1U, result, raw);
         set_ir(index, result, instruction.limit_negative, result);
+        result_values[index] = result;
     }
-    push_rgb(mac_[1], mac_[2], mac_[3]);
+    push_rgb(result_values[0], result_values[1], result_values[2]);
 }
 
 void Gte::execute_normal_color(const DecodedInstruction& instruction,
@@ -697,9 +1127,9 @@ void Gte::execute_normal_color(const DecodedInstruction& instruction,
                                bool with_color,
                                bool with_depth) noexcept {
     normal_stage(instruction, vector_index);
-    color_matrix_stage(instruction);
+    const std::array<S64, 3U> color_result = color_matrix_stage(instruction);
     if (!with_color) {
-        push_rgb(mac_[1], mac_[2], mac_[3]);
+        push_rgb(color_result[0], color_result[1], color_result[2]);
         return;
     }
     const std::array<S64, 3U> base = color_modulation();
@@ -712,7 +1142,7 @@ void Gte::execute_normal_color(const DecodedInstruction& instruction,
 
 void Gte::execute_color_color(const DecodedInstruction& instruction,
                               bool with_depth) noexcept {
-    color_matrix_stage(instruction);
+    static_cast<void>(color_matrix_stage(instruction));
     const std::array<S64, 3U> base = color_modulation();
     if (with_depth) {
         execute_depth_cue(instruction, base);
@@ -738,17 +1168,19 @@ void Gte::execute_gpf(const DecodedInstruction& instruction,
     const unsigned shift = instruction.shift_fraction ? 12U : 0U;
     const std::array<S16, 3U> input = ir_;
     const std::array<S64, 3U> base = {
-        with_base ? mac_[1] * (S64{1} << shift) : S64{0},
-        with_base ? mac_[2] * (S64{1} << shift) : S64{0},
-        with_base ? mac_[3] * (S64{1} << shift) : S64{0},
+        with_base ? static_cast<S64>(mac_[1]) * (S64{1} << shift) : S64{0},
+        with_base ? static_cast<S64>(mac_[2]) * (S64{1} << shift) : S64{0},
+        with_base ? static_cast<S64>(mac_[3]) * (S64{1} << shift) : S64{0},
     };
+    std::array<S64, 3U> result_values{};
     for (unsigned index = 0U; index < 3U; ++index) {
         const S64 raw = static_cast<S64>(input[index]) * ir0_ + base[index];
-        const S64 result = arithmetic_shift_right(raw, shift);
+        const S64 result = mac_shift(raw, shift);
         record_mac(index + 1U, result, raw);
         set_ir(index, result, instruction.limit_negative, result);
+        result_values[index] = result;
     }
-    push_rgb(mac_[1], mac_[2], mac_[3]);
+    push_rgb(result_values[0], result_values[1], result_values[2]);
 }
 
 std::uint32_t Gte::reciprocal_scale(U16 h,
@@ -821,9 +1253,9 @@ ExecutionReceipt Gte::execute(const DecodedInstruction& instruction) noexcept {
     }
     case Command::Intpl: {
         const std::array<S64, 3U> base = {
-            static_cast<S64>(ir_[0]) << 12U,
-            static_cast<S64>(ir_[1]) << 12U,
-            static_cast<S64>(ir_[2]) << 12U,
+            static_cast<S64>(ir_[0]) * 0x1000LL,
+            static_cast<S64>(ir_[1]) * 0x1000LL,
+            static_cast<S64>(ir_[2]) * 0x1000LL,
         };
         execute_depth_cue(instruction, base);
         break;
@@ -1040,7 +1472,7 @@ void Gte::write_data(std::uint8_t index, std::uint32_t value) noexcept {
     case 25U:
     case 26U:
     case 27U:
-        mac_[index - 24U] = static_cast<S32>(value);
+        mac_[index - 24U] = std::bit_cast<S32>(value);
         break;
     case 28U:
         ir_[0] = static_cast<S16>((value & 0x1fU) << 7U);
@@ -1252,21 +1684,11 @@ std::uint64_t Gte::state_digest() const noexcept {
             add_byte(static_cast<std::uint8_t>((value >> (byte * 8U)) & 0xffU));
         }
     };
-    const auto add_s64 = [&add_byte](S64 value) noexcept {
-        const std::uint64_t bits = static_cast<std::uint64_t>(value);
-        for (unsigned byte = 0U; byte < 8U; ++byte) {
-            add_byte(static_cast<std::uint8_t>((bits >> (byte * 8U)) & 0xffU));
-        }
-    };
-
     for (std::uint8_t index = 0U; index < 32U; ++index) {
         add_u32(read_data(index));
     }
     for (std::uint8_t index = 32U; index < 64U; ++index) {
         add_u32(read_control(index));
-    }
-    for (const S64 value : mac_) {
-        add_s64(value);
     }
     return hash;
 }

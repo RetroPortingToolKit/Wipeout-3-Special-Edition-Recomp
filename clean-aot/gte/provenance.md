@@ -15,10 +15,14 @@ The implementation was derived from the written sections in
 - `GTE Division Inaccuracy`
 
 Cycle metadata and input-latch context were taken from the written
-`docs/gtepipelinetimings.md` section `Result tables`. The model itself does
-not encode the measured latch offsets; it reports the documented total command
-cycle count for compiler-side metadata and keeps register semantics
-deterministic.
+`docs/gtepipelinetimings.md` sections `Overview`, `Result tables`, and
+`Patterns`. The model reports documented total command cycle counts and
+exposes the measured input-effect boundaries as tri-state metadata. It keeps
+`execute` atomic: the timing table does not specify output-register writeback
+ordering, so the oracle does not invent in-flight state mutation semantics.
+Register-level dashes that conflict with a field consumer (notably RGBC's
+CODE byte) are exposed as unmeasured, and MVMVA selected-matrix observations
+described only as “max 1” are not represented as exact per-register timings.
 
 No implementation source was copied from a recompiler, emulator, debugger, or
 other execution engine. The reciprocal path follows the written normalized
