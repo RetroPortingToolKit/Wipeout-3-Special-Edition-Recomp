@@ -39,7 +39,7 @@ namespace {
         return value;
     }
     const std::uint32_t shifted = value >> amount;
-    if ((value & 0x80000000u) == 0u) {
+    if ((value & kWordSignBit) == 0u) {
         return shifted;
     }
     return shifted | (std::numeric_limits<std::uint32_t>::max() << (32u - amount));
@@ -59,15 +59,50 @@ namespace {
     case Op::Bgez:
     case Op::Bltzal:
     case Op::Bgezal:
+    case Op::Bc0f:
+    case Op::Bc0t:
+    case Op::Bc2f:
+    case Op::Bc2t:
         return true;
     default:
         return false;
     }
 }
 
+[[nodiscard]] constexpr bool is_coprocessor0_operation(Op op) noexcept {
+    return op == Op::Mfc0 || op == Op::Mtc0 || op == Op::Rfe ||
+           op == Op::Bc0f || op == Op::Bc0t;
+}
+
+[[nodiscard]] constexpr bool is_coprocessor2_operation(Op op) noexcept {
+    switch (op) {
+    case Op::Mfc2:
+    case Op::Cfc2:
+    case Op::Mtc2:
+    case Op::Ctc2:
+    case Op::Bc2f:
+    case Op::Bc2t:
+    case Op::Cop2Command:
+    case Op::Lwc2:
+    case Op::Swc2:
+        return true;
+    default:
+        return false;
+    }
+}
+
+[[nodiscard]] constexpr bool instruction_fields_valid(const Instruction& instruction) noexcept {
+    const auto op = static_cast<std::uint8_t>(instruction.op);
+    constexpr std::uint32_t target_mask = (std::uint32_t{1} << 26u) - 1u;
+    return op <= static_cast<std::uint8_t>(Op::Swc2) &&
+           instruction.rs < 32u && instruction.rt < 32u && instruction.rd < 32u &&
+           instruction.shamt < 32u && instruction.target <= target_mask &&
+           instruction.coprocessor < 4u;
+}
+
 [[nodiscard]] DecodeResult invalid_decode(std::uint32_t raw, std::string error) {
     DecodeResult result;
-    result.instruction = Instruction{Op::Reserved, 0, 0, 0, 0, 0, 0, raw};
+    (void)raw;
     result.error = std::move(error);
     return result;
 }
@@ -123,7 +158,8 @@ bool Cop0State::write(std::uint8_t reg, std::uint32_t value) noexcept {
     case 13:
         // Only the two software interrupt-pending bits are writable by
         // MTC0; hardware-owned Cause fields remain live state.
-        cause = (cause & ~0x00000300u) | (value & 0x00000300u);
+        cause = (cause & ~kCauseSoftwareInterruptMask) |
+                (value & kCauseSoftwareInterruptMask);
         return true;
     case 14:
         epc = value;
@@ -135,7 +171,8 @@ bool Cop0State::write(std::uint8_t reg, std::uint32_t value) noexcept {
     }
 }
 
-Memory::Memory(std::uint32_t base, std::size_t size) : base_(base), bytes_(size, 0u) {}
+Memory::Memory(std::uint32_t base, std::size_t size)
+    : base_(normalize_address(base)), bytes_(size, 0u) {}
 
 void Memory::fill(std::uint8_t value) noexcept {
     std::fill(bytes_.begin(), bytes_.end(), value);
@@ -143,10 +180,11 @@ void Memory::fill(std::uint8_t value) noexcept {
 
 std::optional<std::size_t> Memory::offset(std::uint32_t address,
                                           std::size_t width) const noexcept {
-    if (address < base_) {
+    const std::uint32_t physical = normalize_address(address);
+    if (physical < base_) {
         return std::nullopt;
     }
-    const std::uint64_t delta = static_cast<std::uint64_t>(address - base_);
+    const std::uint64_t delta = static_cast<std::uint64_t>(physical - base_);
     const std::uint64_t end = delta + static_cast<std::uint64_t>(width);
     if (end > static_cast<std::uint64_t>(bytes_.size())) {
         return std::nullopt;
@@ -226,6 +264,11 @@ DecodeResult decode(std::uint32_t raw) {
     auto result = [&](Op op) {
         DecodeResult decoded;
         decoded.instruction = Instruction{op, rs, rt, rd, shamt, immediate, target, raw};
+        return decoded;
+    };
+    auto unavailable_coprocessor = [&](std::uint8_t coprocessor) {
+        DecodeResult decoded = result(Op::UnavailableCoprocessor);
+        decoded.instruction->coprocessor = coprocessor;
         return decoded;
     };
     auto require = [&](bool condition, const char* error) -> std::optional<DecodeResult> {
@@ -443,10 +486,52 @@ DecodeResult decode(std::uint32_t raw) {
         if (rs == 0x04u && shamt == 0u && funct == 0u) {
             return result(Op::Mtc0);
         }
+        if (rs == 0x08u) {
+            if (rt == 0u) {
+                return result(Op::Bc0f);
+            }
+            if (rt == 1u) {
+                return result(Op::Bc0t);
+            }
+            return invalid_decode(raw, "unknown COP0 branch condition");
+        }
         if (rs == 0x10u && rt == 0u && rd == 0u && shamt == 0u && funct == 0x10u) {
             return result(Op::Rfe);
         }
         return invalid_decode(raw, "unknown COP0 function");
+    case 0x11:
+        return unavailable_coprocessor(1u);
+    case 0x12:
+        if (rs == 0x00u && shamt == 0u && funct == 0u) {
+            return result(Op::Mfc2);
+        }
+        if (rs == 0x02u && shamt == 0u && funct == 0u) {
+            return result(Op::Cfc2);
+        }
+        if (rs == 0x04u && shamt == 0u && funct == 0u) {
+            return result(Op::Mtc2);
+        }
+        if (rs == 0x06u && shamt == 0u && funct == 0u) {
+            return result(Op::Ctc2);
+        }
+        if (rs == 0x08u) {
+            if (rt == 0u) {
+                return result(Op::Bc2f);
+            }
+            if (rt == 1u) {
+                return result(Op::Bc2t);
+            }
+            return invalid_decode(raw, "unknown COP2 branch condition");
+        }
+        if ((rs & 0x10u) != 0u) {
+            return result(Op::Cop2Command);
+        }
+        return invalid_decode(raw, "unknown COP2 function");
+    case 0x13:
+        if (rs == 0x00u && shamt == 0u && funct == 0u) {
+            return invalid_decode(raw, "MFC3 is reserved on R3000A");
+        }
+        return unavailable_coprocessor(3u);
     case 0x20:
         return result(Op::Lb);
     case 0x21:
@@ -471,25 +556,81 @@ DecodeResult decode(std::uint32_t raw) {
         return result(Op::Sw);
     case 0x2E:
         return result(Op::Swr);
+    case 0x31:
+        return unavailable_coprocessor(1u);
+    case 0x32:
+        return result(Op::Lwc2);
+    case 0x33:
+        return unavailable_coprocessor(3u);
+    case 0x39:
+        return unavailable_coprocessor(1u);
+    case 0x3A:
+        return result(Op::Swc2);
+    case 0x3B:
+        return invalid_decode(raw, "SWC3 is reserved on R3000A");
     default:
         return invalid_decode(raw, "unknown primary opcode");
     }
 }
 
-Machine::Machine(Memory& memory, std::uint32_t reset_pc) : memory_(memory) {
-    reset(reset_pc);
+Machine::Machine(Memory& memory, ResetState reset_state, Coprocessor2* coprocessor2)
+    : memory_(memory), coprocessor2_(coprocessor2) {
+    reset(reset_state);
 }
 
-void Machine::reset(std::uint32_t reset_pc) {
+void Machine::reset(ResetState reset_state) {
     cpu_ = CpuState{};
     cop0_ = Cop0State{};
-    cpu_.pc = reset_pc;
-    cpu_.next_pc = reset_pc + 4u;
+    cpu_.pc = reset_state.pc;
+    cpu_.next_pc = reset_state.pc + 4u;
+    cop0_.status = reset_state.status;
+    cop0_.prid = reset_state.processor_id;
+    status_effect_delay_ = DeferredControlEffect{};
+    cause_effect_delay_ = DeferredControlEffect{};
     last_exception_.reset();
 }
 
+void Machine::set_hardware_interrupts(std::uint8_t pending) noexcept {
+    const std::uint32_t hardware =
+        (static_cast<std::uint32_t>(pending) << 10u) & kCauseHardwareInterruptMask;
+    cop0_.cause = (cop0_.cause & ~kCauseHardwareInterruptMask) | hardware;
+}
+
+bool Machine::interrupt_pending() const noexcept {
+    const std::uint32_t status = effective_status();
+    return (status & kStatusCurrentInterruptEnable) != 0u &&
+           (status & effective_cause() & kStatusInterruptMask) != 0u;
+}
+
+bool Machine::coprocessor0_usable() const noexcept {
+    const std::uint32_t status = effective_status();
+    return (status & kStatusCurrentUser) == 0u ||
+           (status & kStatusCoprocessorUsable0) != 0u;
+}
+
+bool Machine::coprocessor2_usable() const noexcept {
+    return coprocessor2_ != nullptr &&
+           (effective_status() & kStatusCoprocessorUsable2) != 0u;
+}
+
+std::uint32_t Machine::effective_status() const noexcept {
+    if (!status_effect_delay_.valid) {
+        return cop0_.status;
+    }
+    return (cop0_.status & ~kStatusDeferredEffectMask) |
+           (status_effect_delay_.previous_bits & kStatusDeferredEffectMask);
+}
+
+std::uint32_t Machine::effective_cause() const noexcept {
+    if (!cause_effect_delay_.valid) {
+        return cop0_.cause;
+    }
+    return (cop0_.cause & ~kCauseSoftwareInterruptMask) |
+           (cause_effect_delay_.previous_bits & kCauseSoftwareInterruptMask);
+}
+
 std::uint32_t Machine::read_gpr(std::uint8_t reg) const noexcept {
-    return reg == 0u ? 0u : cpu_.gpr[reg];
+    return reg == 0u || reg >= cpu_.gpr.size() ? 0u : cpu_.gpr[reg];
 }
 
 std::uint32_t Machine::read_merge_source(std::uint8_t reg) const noexcept {
@@ -501,7 +642,7 @@ std::uint32_t Machine::read_merge_source(std::uint8_t reg) const noexcept {
 
 void Machine::set_register_write(RegisterWrite& write, std::uint8_t reg,
                                  std::uint32_t value) noexcept {
-    if (reg == 0u) {
+    if (reg == 0u || reg >= 32u) {
         write = RegisterWrite{};
         return;
     }
@@ -513,7 +654,7 @@ void Machine::set_register_write(RegisterWrite& write, std::uint8_t reg,
 void Machine::set_load_write(LoadDelayState& write, std::uint8_t reg,
                              std::uint32_t value, std::uint32_t issue_pc,
                              bool merge_load) noexcept {
-    if (reg == 0u) {
+    if (reg == 0u || reg >= 32u) {
         write = LoadDelayState{};
         return;
     }
@@ -524,27 +665,82 @@ void Machine::set_load_write(LoadDelayState& write, std::uint8_t reg,
     write.merge_load = merge_load;
 }
 
+void Machine::set_coprocessor_write(CoprocessorWriteState& write,
+                                    CoprocessorWriteTarget target,
+                                    std::uint8_t reg, std::uint32_t value,
+                                    std::uint32_t issue_pc) noexcept {
+    if (reg >= 32u) {
+        write = CoprocessorWriteState{};
+        return;
+    }
+    write.target = target;
+    write.reg = reg;
+    write.value = value;
+    write.issue_pc = issue_pc;
+}
+
 void Machine::commit_register_write(const RegisterWrite& write) noexcept {
-    if (write.valid && write.reg != 0u) {
+    if (write.valid && write.reg != 0u && write.reg < cpu_.gpr.size()) {
         cpu_.gpr[write.reg] = write.value;
     }
     cpu_.gpr[0] = 0u;
 }
 
 void Machine::commit_load(const LoadDelayState& load) noexcept {
-    if (load.valid && load.reg != 0u) {
+    if (load.valid && load.reg != 0u && load.reg < cpu_.gpr.size()) {
         cpu_.gpr[load.reg] = load.value;
     }
     cpu_.gpr[0] = 0u;
 }
 
+void Machine::commit_coprocessor_write(const CoprocessorWriteState& write) noexcept {
+    if (write.reg >= 32u) {
+        return;
+    }
+    switch (write.target) {
+    case CoprocessorWriteTarget::None:
+        break;
+    case CoprocessorWriteTarget::Cop0:
+        (void)cop0_.write(write.reg, write.value);
+        break;
+    case CoprocessorWriteTarget::Cop2Data:
+        if (coprocessor2_ != nullptr) {
+            coprocessor2_->write_data(write.reg, write.value);
+        }
+        break;
+    case CoprocessorWriteTarget::Cop2Control:
+        if (coprocessor2_ != nullptr) {
+            coprocessor2_->write_control(write.reg, write.value);
+        }
+        break;
+    }
+}
+
+void Machine::advance_deferred_control_effects() noexcept {
+    const auto advance = [](DeferredControlEffect& effect) {
+        if (!effect.valid) {
+            return;
+        }
+        if (effect.instructions_remaining > 0u) {
+            --effect.instructions_remaining;
+        }
+        if (effect.instructions_remaining == 0u) {
+            effect = DeferredControlEffect{};
+        }
+    };
+    advance(status_effect_delay_);
+    advance(cause_effect_delay_);
+}
+
 StepResult Machine::step_word(std::uint32_t raw) {
     const DecodeResult decoded = decode(raw);
-    if (!decoded) {
-        Instruction invalid = decoded.instruction.value();
+    if (!decoded.instruction.has_value() || !decoded.error.empty()) {
+        Instruction invalid;
+        invalid.op = Op::Reserved;
+        invalid.raw = raw;
         return step(invalid);
     }
-    return step(*decoded.instruction);
+    return step(decoded.instruction.value());
 }
 
 StepResult Machine::step(const Instruction& instruction) {
@@ -553,23 +749,31 @@ StepResult Machine::step(const Instruction& instruction) {
     const std::uint32_t pending_branch_target = cpu_.branch_target;
     const std::uint32_t pending_branch_pc = cpu_.branch_pc;
     const LoadDelayState previous_load = cpu_.load_delay;
+    const CoprocessorWriteState previous_coprocessor_write = cpu_.coprocessor_write;
+    CycleMetadata timing = cycle_metadata(instruction.op);
     cpu_.in_delay_slot = was_delay_slot;
     last_exception_.reset();
 
     RegisterWrite register_write;
     LoadDelayState load_write;
+    CoprocessorWriteState coprocessor_write;
+    std::optional<std::uint32_t> status_effect_previous;
+    std::optional<std::uint32_t> cause_effect_previous;
     ControlTransfer transfer;
     std::optional<ExceptionCode> fault;
     std::uint32_t fault_address = 0;
     bool has_fault_address = false;
+    std::optional<std::uint8_t> fault_coprocessor;
     std::string fault_detail;
 
     const auto fail = [&](ExceptionCode code, std::string detail,
-                          std::uint32_t address = 0u, bool has_address = false) {
+                          std::uint32_t address = 0u, bool has_address = false,
+                          std::optional<std::uint8_t> coprocessor = std::nullopt) {
         fault = code;
         fault_detail = std::move(detail);
         fault_address = address;
         has_fault_address = has_address;
+        fault_coprocessor = coprocessor;
     };
     const auto effective_address = [&]() {
         return add_offset(read_gpr(instruction.rs), sign_extend16(instruction.immediate));
@@ -582,11 +786,40 @@ StepResult Machine::step(const Instruction& instruction) {
         transfer.target = condition ? branch_target(instr_pc, instruction.immediate)
                                     : instr_pc + 8u;
     };
+    const auto address_allowed = [&](std::uint32_t address, AccessType access) {
+        if ((effective_status() & kStatusCurrentUser) == 0u ||
+            !is_kernel_address(address)) {
+            return true;
+        }
+        const ExceptionCode code = access == AccessType::Load
+                                       ? ExceptionCode::AddressErrorLoad
+                                       : ExceptionCode::AddressErrorStore;
+        fail(code, "user-mode access to a kernel segment", address, true);
+        return false;
+    };
 
     if ((instr_pc & 3u) != 0u) {
         fail(ExceptionCode::AddressErrorLoad, "instruction PC is not word aligned", instr_pc, true);
+        timing = CycleMetadata{0u, 0u, 0u, false};
+    } else if ((effective_status() & kStatusCurrentUser) != 0u &&
+               is_kernel_address(instr_pc)) {
+        fail(ExceptionCode::AddressErrorLoad, "user-mode instruction fetch from a kernel segment",
+             instr_pc, true);
+        timing = CycleMetadata{0u, 0u, 0u, false};
+    } else if (interrupt_pending()) {
+        fail(ExceptionCode::Interrupt, "enabled interrupt pending");
+        timing = CycleMetadata{0u, 0u, 0u, false};
+    } else if (!instruction_fields_valid(instruction)) {
+        fail(ExceptionCode::ReservedInstruction,
+             "decoded instruction contains an out-of-range field");
     } else if (was_delay_slot && is_control_transfer(instruction.op)) {
         fail(ExceptionCode::ReservedInstruction, "control transfer in a branch delay slot");
+    } else if (is_coprocessor0_operation(instruction.op) && !coprocessor0_usable()) {
+        fail(ExceptionCode::CoprocessorUnusable, "COP0 is unusable in the current mode",
+             0u, false, 0u);
+    } else if (is_coprocessor2_operation(instruction.op) && !coprocessor2_usable()) {
+        fail(ExceptionCode::CoprocessorUnusable, "COP2 is disabled or not attached",
+             0u, false, 2u);
     } else {
         switch (instruction.op) {
         case Op::Reserved:
@@ -627,6 +860,11 @@ StepResult Machine::step(const Instruction& instruction) {
             transfer.target = read_gpr(instruction.rs);
             if ((transfer.target & 3u) != 0u) {
                 fail(ExceptionCode::AddressErrorLoad, "JALR target is not word aligned",
+                     transfer.target, true);
+            } else if ((effective_status() & kStatusCurrentUser) != 0u &&
+                       is_kernel_address(transfer.target)) {
+                fail(ExceptionCode::AddressErrorLoad,
+                     "JALR target is outside the current accessible address space",
                      transfer.target, true);
             } else {
                 transfer.valid = true;
@@ -851,21 +1089,71 @@ StepResult Machine::step(const Instruction& instruction) {
             break;
         }
         case Op::Mtc0:
-            if (!cop0_.write(instruction.rd, read_gpr(instruction.rt))) {
+        {
+            const std::uint32_t value = read_gpr(instruction.rt);
+            Cop0State probe = cop0_;
+            if (!probe.write(instruction.rd, value)) {
                 fail(ExceptionCode::ReservedInstruction, "MTC0 references a read-only register");
+            } else {
+                set_coprocessor_write(coprocessor_write, CoprocessorWriteTarget::Cop0,
+                                      instruction.rd, value, instr_pc);
+                if (instruction.rd == 12u) {
+                    status_effect_previous = effective_status() & kStatusDeferredEffectMask;
+                } else if (instruction.rd == 13u) {
+                    cause_effect_previous = effective_cause() & kCauseSoftwareInterruptMask;
+                }
             }
             break;
+        }
         case Op::Rfe: {
             const std::uint32_t mode = cop0_.status & kStatusModeMask;
             const std::uint32_t restored = (mode & 0x3Cu) >> 2u;
             cop0_.status = (cop0_.status & ~0x0Fu) | restored;
             break;
         }
+        case Op::Bc0f:
+            branch_if(!coprocessor0_branch_condition_);
+            break;
+        case Op::Bc0t:
+            branch_if(coprocessor0_branch_condition_);
+            break;
+        case Op::Mfc2:
+            schedule_load(instruction.rt, coprocessor2_->read_data(instruction.rd), false);
+            break;
+        case Op::Cfc2:
+            schedule_load(instruction.rt, coprocessor2_->read_control(instruction.rd), false);
+            break;
+        case Op::Mtc2:
+            set_coprocessor_write(coprocessor_write, CoprocessorWriteTarget::Cop2Data,
+                                  instruction.rd, read_gpr(instruction.rt), instr_pc);
+            break;
+        case Op::Ctc2:
+            set_coprocessor_write(coprocessor_write, CoprocessorWriteTarget::Cop2Control,
+                                  instruction.rd, read_gpr(instruction.rt), instr_pc);
+            break;
+        case Op::Bc2f:
+            branch_if(!coprocessor2_->branch_condition());
+            break;
+        case Op::Bc2t:
+            branch_if(coprocessor2_->branch_condition());
+            break;
+        case Op::Cop2Command:
+            timing.result_latency_cycles =
+                std::max(1u, coprocessor2_->execute_command(instruction.raw));
+            timing.side_effect_latency_cycles = timing.result_latency_cycles;
+            break;
+        case Op::UnavailableCoprocessor:
+            fail(ExceptionCode::CoprocessorUnusable, "coprocessor is not attached",
+                 0u, false, instruction.coprocessor);
+            break;
         case Op::Lb: {
             const std::uint32_t address = effective_address();
+            if (!address_allowed(address, AccessType::Load)) {
+                break;
+            }
             const std::optional<std::uint8_t> value = memory_.load8(address);
             if (!value.has_value()) {
-                fail(ExceptionCode::AddressErrorLoad, "LB address is outside memory", address, true);
+                fail(ExceptionCode::BusErrorData, "LB backing memory read failed");
             } else {
                 const std::int8_t signed_value = std::bit_cast<std::int8_t>(*value);
                 schedule_load(instruction.rt, unsigned_bits(static_cast<std::int32_t>(signed_value)), false);
@@ -874,13 +1162,16 @@ StepResult Machine::step(const Instruction& instruction) {
         }
         case Op::Lh: {
             const std::uint32_t address = effective_address();
+            if (!address_allowed(address, AccessType::Load)) {
+                break;
+            }
             if ((address & 1u) != 0u) {
                 fail(ExceptionCode::AddressErrorLoad, "LH address is not halfword aligned", address, true);
                 break;
             }
             const std::optional<std::uint16_t> value = memory_.load16le(address);
             if (!value.has_value()) {
-                fail(ExceptionCode::AddressErrorLoad, "LH address is outside memory", address, true);
+                fail(ExceptionCode::BusErrorData, "LH backing memory read failed");
             } else {
                 const std::int16_t signed_value = std::bit_cast<std::int16_t>(*value);
                 schedule_load(instruction.rt, unsigned_bits(static_cast<std::int32_t>(signed_value)), false);
@@ -889,10 +1180,13 @@ StepResult Machine::step(const Instruction& instruction) {
         }
         case Op::Lwl: {
             const std::uint32_t address = effective_address();
+            if (!address_allowed(address, AccessType::Load)) {
+                break;
+            }
             const std::uint32_t aligned = address & ~3u;
             const std::optional<std::uint32_t> word = memory_.load32le(aligned);
             if (!word.has_value()) {
-                fail(ExceptionCode::AddressErrorLoad, "LWL aligned word is outside memory", address, true);
+                fail(ExceptionCode::BusErrorData, "LWL backing memory read failed");
                 break;
             }
             const std::uint32_t old_value = read_merge_source(instruction.rt);
@@ -913,13 +1207,16 @@ StepResult Machine::step(const Instruction& instruction) {
         }
         case Op::Lw: {
             const std::uint32_t address = effective_address();
+            if (!address_allowed(address, AccessType::Load)) {
+                break;
+            }
             if ((address & 3u) != 0u) {
                 fail(ExceptionCode::AddressErrorLoad, "LW address is not word aligned", address, true);
                 break;
             }
             const std::optional<std::uint32_t> value = memory_.load32le(address);
             if (!value.has_value()) {
-                fail(ExceptionCode::AddressErrorLoad, "LW address is outside memory", address, true);
+                fail(ExceptionCode::BusErrorData, "LW backing memory read failed");
             } else {
                 schedule_load(instruction.rt, *value, false);
             }
@@ -927,9 +1224,12 @@ StepResult Machine::step(const Instruction& instruction) {
         }
         case Op::Lbu: {
             const std::uint32_t address = effective_address();
+            if (!address_allowed(address, AccessType::Load)) {
+                break;
+            }
             const std::optional<std::uint8_t> value = memory_.load8(address);
             if (!value.has_value()) {
-                fail(ExceptionCode::AddressErrorLoad, "LBU address is outside memory", address, true);
+                fail(ExceptionCode::BusErrorData, "LBU backing memory read failed");
             } else {
                 schedule_load(instruction.rt, *value, false);
             }
@@ -937,13 +1237,16 @@ StepResult Machine::step(const Instruction& instruction) {
         }
         case Op::Lhu: {
             const std::uint32_t address = effective_address();
+            if (!address_allowed(address, AccessType::Load)) {
+                break;
+            }
             if ((address & 1u) != 0u) {
                 fail(ExceptionCode::AddressErrorLoad, "LHU address is not halfword aligned", address, true);
                 break;
             }
             const std::optional<std::uint16_t> value = memory_.load16le(address);
             if (!value.has_value()) {
-                fail(ExceptionCode::AddressErrorLoad, "LHU address is outside memory", address, true);
+                fail(ExceptionCode::BusErrorData, "LHU backing memory read failed");
             } else {
                 schedule_load(instruction.rt, *value, false);
             }
@@ -951,10 +1254,13 @@ StepResult Machine::step(const Instruction& instruction) {
         }
         case Op::Lwr: {
             const std::uint32_t address = effective_address();
+            if (!address_allowed(address, AccessType::Load)) {
+                break;
+            }
             const std::uint32_t aligned = address & ~3u;
             const std::optional<std::uint32_t> word = memory_.load32le(aligned);
             if (!word.has_value()) {
-                fail(ExceptionCode::AddressErrorLoad, "LWR aligned word is outside memory", address, true);
+                fail(ExceptionCode::BusErrorData, "LWR backing memory read failed");
                 break;
             }
             const std::uint32_t old_value = read_merge_source(instruction.rt);
@@ -975,28 +1281,37 @@ StepResult Machine::step(const Instruction& instruction) {
         }
         case Op::Sb: {
             const std::uint32_t address = effective_address();
+            if (!address_allowed(address, AccessType::Store)) {
+                break;
+            }
             if (!memory_.store8(address, static_cast<std::uint8_t>(read_gpr(instruction.rt)))) {
-                fail(ExceptionCode::AddressErrorStore, "SB address is outside memory", address, true);
+                fail(ExceptionCode::BusErrorData, "SB backing memory write failed");
             }
             break;
         }
         case Op::Sh: {
             const std::uint32_t address = effective_address();
+            if (!address_allowed(address, AccessType::Store)) {
+                break;
+            }
             if ((address & 1u) != 0u) {
                 fail(ExceptionCode::AddressErrorStore, "SH address is not halfword aligned", address, true);
                 break;
             }
             if (!memory_.store16le(address, static_cast<std::uint16_t>(read_gpr(instruction.rt)))) {
-                fail(ExceptionCode::AddressErrorStore, "SH address is outside memory", address, true);
+                fail(ExceptionCode::BusErrorData, "SH backing memory write failed");
             }
             break;
         }
         case Op::Swl: {
             const std::uint32_t address = effective_address();
+            if (!address_allowed(address, AccessType::Store)) {
+                break;
+            }
             const std::uint32_t aligned = address & ~3u;
             const std::optional<std::uint32_t> old_word = memory_.load32le(aligned);
             if (!old_word.has_value()) {
-                fail(ExceptionCode::AddressErrorStore, "SWL aligned word is outside memory", address, true);
+                fail(ExceptionCode::BusErrorData, "SWL backing memory read failed");
                 break;
             }
             const std::uint32_t value = read_gpr(instruction.rt);
@@ -1013,27 +1328,33 @@ StepResult Machine::step(const Instruction& instruction) {
                 }
             }();
             if (!memory_.store32le(aligned, merged)) {
-                fail(ExceptionCode::AddressErrorStore, "SWL aligned word is outside memory", address, true);
+                fail(ExceptionCode::BusErrorData, "SWL backing memory write failed");
             }
             break;
         }
         case Op::Sw: {
             const std::uint32_t address = effective_address();
+            if (!address_allowed(address, AccessType::Store)) {
+                break;
+            }
             if ((address & 3u) != 0u) {
                 fail(ExceptionCode::AddressErrorStore, "SW address is not word aligned", address, true);
                 break;
             }
             if (!memory_.store32le(address, read_gpr(instruction.rt))) {
-                fail(ExceptionCode::AddressErrorStore, "SW address is outside memory", address, true);
+                fail(ExceptionCode::BusErrorData, "SW backing memory write failed");
             }
             break;
         }
         case Op::Swr: {
             const std::uint32_t address = effective_address();
+            if (!address_allowed(address, AccessType::Store)) {
+                break;
+            }
             const std::uint32_t aligned = address & ~3u;
             const std::optional<std::uint32_t> old_word = memory_.load32le(aligned);
             if (!old_word.has_value()) {
-                fail(ExceptionCode::AddressErrorStore, "SWR aligned word is outside memory", address, true);
+                fail(ExceptionCode::BusErrorData, "SWR backing memory read failed");
                 break;
             }
             const std::uint32_t value = read_gpr(instruction.rt);
@@ -1050,7 +1371,42 @@ StepResult Machine::step(const Instruction& instruction) {
                 }
             }();
             if (!memory_.store32le(aligned, merged)) {
-                fail(ExceptionCode::AddressErrorStore, "SWR aligned word is outside memory", address, true);
+                fail(ExceptionCode::BusErrorData, "SWR backing memory write failed");
+            }
+            break;
+        }
+        case Op::Lwc2: {
+            const std::uint32_t address = effective_address();
+            if (!address_allowed(address, AccessType::Load)) {
+                break;
+            }
+            if ((address & 3u) != 0u) {
+                fail(ExceptionCode::AddressErrorLoad, "LWC2 address is not word aligned",
+                     address, true);
+                break;
+            }
+            const std::optional<std::uint32_t> value = memory_.load32le(address);
+            if (!value.has_value()) {
+                fail(ExceptionCode::BusErrorData, "LWC2 backing memory read failed");
+            } else {
+                set_coprocessor_write(coprocessor_write,
+                                      CoprocessorWriteTarget::Cop2Data,
+                                      instruction.rt, *value, instr_pc);
+            }
+            break;
+        }
+        case Op::Swc2: {
+            const std::uint32_t address = effective_address();
+            if (!address_allowed(address, AccessType::Store)) {
+                break;
+            }
+            if ((address & 3u) != 0u) {
+                fail(ExceptionCode::AddressErrorStore, "SWC2 address is not word aligned",
+                     address, true);
+                break;
+            }
+            if (!memory_.store32le(address, coprocessor2_->read_data(instruction.rt))) {
+                fail(ExceptionCode::BusErrorData, "SWC2 backing memory write failed");
             }
             break;
         }
@@ -1058,13 +1414,27 @@ StepResult Machine::step(const Instruction& instruction) {
     }
 
     commit_load(previous_load);
+    commit_coprocessor_write(previous_coprocessor_write);
     if (fault.has_value()) {
-        return raise_exception(*fault, instr_pc, was_delay_slot, pending_branch_pc,
-                               fault_address, has_fault_address, std::move(fault_detail));
+        StepResult result = raise_exception(*fault, instr_pc, was_delay_slot, pending_branch_pc,
+                                            fault_address, has_fault_address,
+                                            fault_coprocessor, std::move(fault_detail));
+        result.cycles = timing;
+        return result;
     }
 
     commit_register_write(register_write);
     cpu_.load_delay = load_write;
+    cpu_.coprocessor_write = coprocessor_write;
+    advance_deferred_control_effects();
+    if (status_effect_previous.has_value()) {
+        status_effect_delay_ =
+            DeferredControlEffect{true, *status_effect_previous, 2u};
+    }
+    if (cause_effect_previous.has_value()) {
+        cause_effect_delay_ =
+            DeferredControlEffect{true, *cause_effect_previous, 2u};
+    }
 
     if (was_delay_slot) {
         cpu_.pc = pending_branch_target;
@@ -1087,27 +1457,32 @@ StepResult Machine::step(const Instruction& instruction) {
     }
     cpu_.in_delay_slot = cpu_.branch_pending;
     cpu_.gpr[0] = 0u;
-    return StepResult{true, std::nullopt, instr_pc, cpu_.pc, was_delay_slot};
+    return StepResult{true, std::nullopt, instr_pc, cpu_.pc, was_delay_slot, timing};
 }
 
 StepResult Machine::raise_exception(ExceptionCode code, std::uint32_t fault_pc,
                                     bool in_delay_slot, std::uint32_t branch_pc,
                                     std::uint32_t bad_vaddr, bool has_bad_vaddr,
+                                    std::optional<std::uint8_t> coprocessor,
                                     std::string detail) {
     const std::uint32_t epc = in_delay_slot ? branch_pc : fault_pc;
     cop0_.epc = epc;
     if (has_bad_vaddr) {
         cop0_.bad_vaddr = bad_vaddr;
     }
-    cop0_.cause &= ~(kCauseBd | kCauseExceptionMask);
+    cop0_.cause &= ~(kCauseBd | kCauseCoprocessorMask | kCauseExceptionMask);
     cop0_.cause |= (static_cast<std::uint32_t>(code) << 2u);
+    if (coprocessor.has_value()) {
+        cop0_.cause |= (static_cast<std::uint32_t>(*coprocessor) & 3u)
+                       << kCauseCoprocessorShift;
+    }
     if (in_delay_slot) {
         cop0_.cause |= kCauseBd;
     }
-    const std::uint32_t mode = cop0_.status & kStatusModeMask;
-    // Exception entry pushes the current pair into previous, previous into
-    // old, and enters kernel mode with interrupts disabled ([1, 0]).
-    const std::uint32_t pushed = ((mode << 2u) & 0x3Cu) | 0x2u;
+    const std::uint32_t mode = effective_status() & kStatusModeMask;
+    // Exception entry pushes current into previous and previous into old. The
+    // new current pair is zero: kernel mode with interrupts disabled.
+    const std::uint32_t pushed = (mode << 2u) & 0x3Cu;
     cop0_.status = (cop0_.status & ~kStatusModeMask) | pushed;
 
     ExceptionMetadata metadata;
@@ -1116,6 +1491,8 @@ StepResult Machine::raise_exception(ExceptionCode code, std::uint32_t fault_pc,
     metadata.epc = epc;
     metadata.bad_vaddr = bad_vaddr;
     metadata.has_bad_vaddr = has_bad_vaddr;
+    metadata.coprocessor = coprocessor.value_or(0u);
+    metadata.has_coprocessor = coprocessor.has_value();
     metadata.in_delay_slot = in_delay_slot;
     metadata.branch_pc = branch_pc;
     metadata.cause = cop0_.cause;
@@ -1131,13 +1508,17 @@ StepResult Machine::raise_exception(ExceptionCode code, std::uint32_t fault_pc,
     cpu_.branch_pc = 0u;
     cpu_.in_delay_slot = false;
     cpu_.load_delay = LoadDelayState{};
+    cpu_.coprocessor_write = CoprocessorWriteState{};
+    status_effect_delay_ = DeferredControlEffect{};
+    cause_effect_delay_ = DeferredControlEffect{};
     cpu_.gpr[0] = 0u;
 
     return StepResult{false, metadata, fault_pc, cpu_.pc, in_delay_slot};
 }
 
 std::uint32_t Machine::exception_vector() const noexcept {
-    return (cop0_.status & kStatusBev) != 0u ? 0xBFC00180u : 0x80000080u;
+    return (cop0_.status & kStatusBev) != 0u ? kBootExceptionVector
+                                             : kGeneralExceptionVector;
 }
 
 } // namespace r3000a::reference
