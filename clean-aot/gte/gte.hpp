@@ -59,6 +59,7 @@ struct Snapshot final {
     std::array<std::array<std::int16_t, 2U>, 3U> sxy{};
     std::array<std::uint16_t, 4U> sz{};
     std::array<std::uint32_t, 4U> rgb{};
+    std::uint32_t res1 = 0U;
     std::array<std::int64_t, 4U> mac{};
     std::uint32_t lzcs = 0U;
     std::uint32_t lzcr = 0U;

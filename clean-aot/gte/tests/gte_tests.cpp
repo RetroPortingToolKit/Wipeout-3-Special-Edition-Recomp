@@ -203,6 +203,15 @@ void test_mvmva_selectors_and_saturation() {
             "negative IR saturation");
     require((negative.flag & (bit(24U) | bit(23U) | bit(22U))) != 0U,
             "negative IR saturation flags");
+
+    gte.reset();
+    write_identity(gte, 32U);
+    write_vector(gte, 0U, 32767, 32767, 32767);
+    gte.write_control(37U, 0x7fffffffU);
+    const ExecutionReceipt mac_overflow = gte.execute(
+        command_word(Command::Mvmva, true, false, 0U, 0U, 0U));
+    require((mac_overflow.flag & bit(30U)) != 0U,
+            "MAC1 overflow checks the pre-shift accumulator");
 }
 
 void test_projection_and_reciprocal_edges() {

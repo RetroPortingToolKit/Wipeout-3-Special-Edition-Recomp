@@ -482,7 +482,7 @@ void Gte::execute_rtps(const DecodedInstruction& instruction,
                         static_cast<S64>(rotation_[row][1]) * vertex[1] +
                         static_cast<S64>(rotation_[row][2]) * vertex[2];
         shifted[row] = arithmetic_shift_right(raw, shift);
-        record_mac(row + 1U, shifted[row], shifted[row]);
+        record_mac(row + 1U, shifted[row], raw);
         S64 flag_probe = shifted[row];
         if (row == 2U && !instruction.shift_fraction) {
             flag_probe = arithmetic_shift_right(raw, 12U);
@@ -545,8 +545,7 @@ void Gte::execute_mvmva(const DecodedInstruction& instruction) noexcept {
                       static_cast<S64>(matrix[row][2]) * vector[2]
                 : full_raw;
         const S64 result = arithmetic_shift_right(actual_raw, shift);
-        const S64 overflow_probe = arithmetic_shift_right(full_raw, shift);
-        record_mac(row + 1U, result, overflow_probe);
+        record_mac(row + 1U, result, full_raw);
         set_ir(row, result, instruction.limit_negative, result);
     }
 }
@@ -595,7 +594,7 @@ void Gte::execute_op(const DecodedInstruction& instruction) noexcept {
     const unsigned shift = instruction.shift_fraction ? 12U : 0U;
     for (unsigned row = 0U; row < 3U; ++row) {
         const S64 result = arithmetic_shift_right(raw[row], shift);
-        record_mac(row + 1U, result, result);
+        record_mac(row + 1U, result, raw[row]);
         set_ir(row, result, instruction.limit_negative, result);
     }
 }
@@ -605,7 +604,7 @@ void Gte::execute_sqr(const DecodedInstruction& instruction) noexcept {
     for (unsigned index = 0U; index < 3U; ++index) {
         const S64 raw = static_cast<S64>(ir_[index]) * ir_[index];
         const S64 result = arithmetic_shift_right(raw, shift);
-        record_mac(index + 1U, result, result);
+        record_mac(index + 1U, result, raw);
         set_ir(index, result, true, result);
     }
 }
@@ -619,7 +618,7 @@ void Gte::normal_stage(const DecodedInstruction& instruction,
                         static_cast<S64>(light_[row][1]) * vertex[1] +
                         static_cast<S64>(light_[row][2]) * vertex[2];
         const S64 result = arithmetic_shift_right(raw, shift);
-        record_mac(row + 1U, result, result);
+        record_mac(row + 1U, result, raw);
         set_ir(row, result, instruction.limit_negative, result);
     }
 }
@@ -633,7 +632,7 @@ void Gte::color_matrix_stage(const DecodedInstruction& instruction) noexcept {
                         static_cast<S64>(color_[row][1]) * input[1] +
                         static_cast<S64>(color_[row][2]) * input[2];
         const S64 result = arithmetic_shift_right(raw, shift);
-        record_mac(row + 1U, result, result);
+        record_mac(row + 1U, result, raw);
         set_ir(row, result, instruction.limit_negative, result);
     }
 }
@@ -657,7 +656,7 @@ void Gte::finish_color(const DecodedInstruction& instruction,
     const unsigned shift = instruction.shift_fraction ? 12U : 0U;
     for (unsigned index = 0U; index < 3U; ++index) {
         const S64 result = arithmetic_shift_right(base[index], shift);
-        record_mac(index + 1U, result, result);
+        record_mac(index + 1U, result, base[index]);
         set_ir(index, result, instruction.limit_negative, result);
     }
     push_rgb(mac_[1], mac_[2], mac_[3]);
@@ -684,7 +683,7 @@ void Gte::execute_depth_cue(const DecodedInstruction& instruction,
     for (unsigned index = 0U; index < 3U; ++index) {
         const S64 raw = static_cast<S64>(delta[index]) * ir0_ + base[index];
         const S64 result = arithmetic_shift_right(raw, shift);
-        record_mac(index + 1U, result, result);
+        record_mac(index + 1U, result, raw);
         set_ir(index, result, instruction.limit_negative, result);
     }
     push_rgb(mac_[1], mac_[2], mac_[3]);
@@ -743,7 +742,7 @@ void Gte::execute_gpf(const DecodedInstruction& instruction,
     for (unsigned index = 0U; index < 3U; ++index) {
         const S64 raw = static_cast<S64>(input[index]) * ir0_ + base[index];
         const S64 result = arithmetic_shift_right(raw, shift);
-        record_mac(index + 1U, result, result);
+        record_mac(index + 1U, result, raw);
         set_ir(index, result, instruction.limit_negative, result);
     }
     push_rgb(mac_[1], mac_[2], mac_[3]);
@@ -1211,6 +1210,7 @@ Snapshot Gte::snapshot() const noexcept {
     result.sxy = sxy_;
     result.sz = sz_;
     result.rgb = rgb_;
+    result.res1 = res1_;
     result.mac = mac_;
     result.lzcs = lzcs_;
     result.lzcr = lzcr_;
@@ -1232,7 +1232,8 @@ Snapshot Gte::snapshot() const noexcept {
 }
 
 std::uint64_t Gte::state_digest() const noexcept {
-    std::uint64_t hash = 1469598103934665603ULL;
+    std::uint64_t hash = (static_cast<std::uint64_t>(kFNVOffset) << 32U) |
+                         static_cast<std::uint64_t>(kFNVOffset);
     const auto add_byte = [&hash](std::uint8_t byte) noexcept {
         const std::uint32_t low = fnv_step(
             static_cast<std::uint32_t>(hash & 0xffffffffULL), byte);
