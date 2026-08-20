@@ -1,30 +1,31 @@
-#ifndef W3_CLEAN_MACHINE_HPP
-#define W3_CLEAN_MACHINE_HPP
+#ifndef CLEAN_AOT_MACHINE_HPP
+#define CLEAN_AOT_MACHINE_HPP
 
 #include "machine_c.h"
 
 #include <cstdint>
+#include <limits>
 
-namespace w3::machine {
+namespace clean_aot::machine {
 
 enum class VBlankRate : std::uint32_t {
-    Hz25 = W3_MACHINE_VBLANK_25,
-    Hz50 = W3_MACHINE_VBLANK_50,
-    Hz100 = W3_MACHINE_VBLANK_100,
+    Hz25 = CLEAN_AOT_MACHINE_VBLANK_25,
+    Hz50 = CLEAN_AOT_MACHINE_VBLANK_50,
+    Hz100 = CLEAN_AOT_MACHINE_VBLANK_100,
 };
 
 enum class EventKind : std::uint32_t {
-    ModeSwitch = W3_MACHINE_EVENT_MODE_SWITCH,
-    VBlank = W3_MACHINE_EVENT_VBLANK,
-    CpuCycles = W3_MACHINE_EVENT_CPU_CYCLES,
-    SpuSamples = W3_MACHINE_EVENT_SPU_SAMPLES,
-    CddaSectors = W3_MACHINE_EVENT_CDDA_SECTORS,
+    ModeSwitch = CLEAN_AOT_MACHINE_EVENT_MODE_SWITCH,
+    VBlank = CLEAN_AOT_MACHINE_EVENT_VBLANK,
+    CpuCycles = CLEAN_AOT_MACHINE_EVENT_CPU_CYCLES,
+    SpuSamples = CLEAN_AOT_MACHINE_EVENT_SPU_SAMPLES,
+    CddaSectors = CLEAN_AOT_MACHINE_EVENT_CDDA_SECTORS,
 };
 
-using Event = w3_machine_event;
-using FrameReceipt = w3_machine_frame_receipt;
+using Event = clean_aot_machine_event;
+using FrameReceipt = clean_aot_machine_frame_receipt;
 
-/* The callback must not throw and must not retain the event pointer. */
+/* The callback must not throw, retain the event pointer, or re-enter Machine. */
 using EventSink = void (*)(const Event& event, void* user);
 
 class Machine final {
@@ -33,13 +34,14 @@ public:
     static constexpr std::uint64_t SpuHz = 44'100;
     static constexpr std::uint64_t CddaSectorsPerSecond = 75;
     static constexpr std::uint64_t TimebaseHz = 100;
+    static constexpr std::uint64_t MaxTimebaseTicksPerFrame = 4;
 
     explicit Machine(VBlankRate initial_rate = VBlankRate::Hz100);
 
     bool set_vblank_rate(VBlankRate rate);
     VBlankRate vblank_rate() const noexcept;
 
-    /* Advances exactly one machine VBlank. There is no host pacing here. */
+    /* Emits a frame-start VBlank then its domain budgets. No host pacing. */
     FrameReceipt step_frame(EventSink sink = nullptr, void* user = nullptr);
 
     void reset() noexcept;
@@ -84,7 +86,25 @@ static_assert(Machine::SpuHz % Machine::TimebaseHz == 0,
               "SPU clock must be integral at the machine timebase");
 static_assert(Machine::CddaSectorsPerSecond < Machine::TimebaseHz,
               "CDDA must retain a fractional accumulator at 100 Hz");
+static_assert(
+    Machine::CpuHz <=
+        (std::numeric_limits<std::uint64_t>::max() -
+         (Machine::TimebaseHz - 1)) /
+            Machine::MaxTimebaseTicksPerFrame,
+    "CPU per-frame rational numerator must not overflow");
+static_assert(
+    Machine::SpuHz <=
+        (std::numeric_limits<std::uint64_t>::max() -
+         (Machine::TimebaseHz - 1)) /
+            Machine::MaxTimebaseTicksPerFrame,
+    "SPU per-frame rational numerator must not overflow");
+static_assert(
+    Machine::CddaSectorsPerSecond <=
+        (std::numeric_limits<std::uint64_t>::max() -
+         (Machine::TimebaseHz - 1)) /
+            Machine::MaxTimebaseTicksPerFrame,
+    "CDDA per-frame rational numerator must not overflow");
 
-} // namespace w3::machine
+} // namespace clean_aot::machine
 
-#endif // W3_CLEAN_MACHINE_HPP
+#endif // CLEAN_AOT_MACHINE_HPP

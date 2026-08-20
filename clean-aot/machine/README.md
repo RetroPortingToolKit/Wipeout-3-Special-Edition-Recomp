@@ -22,9 +22,19 @@ introduced.
 
 `machine_c.h` is the narrow C event ABI. `machine.hpp` provides the small C++
 wrapper. Every frame emits VBlank, CPU, SPU, and CDDA events in that order;
-CDDA events may have amount zero. A pending mode change is emitted immediately
-before the next frame's VBlank event. Frame receipts and the event stream are
-hashed with a fixed FNV-1a byte order for deterministic evidence.
+VBlank is the frame-start boundary and the domain budgets belong to the
+following simulation interval. CDDA events may have amount zero. A pending mode
+change is emitted immediately before the next frame's VBlank event. Frame
+receipts and the event stream are hashed with a fixed FNV-1a byte order for
+deterministic evidence. Public C and C++ identifiers use the neutral
+`clean_aot_machine` / `clean_aot::machine` names; title policy remains outside
+this generic component.
+
+All per-frame rational numerators are compile-time proven to fit in 64 bits.
+Cumulative CPU cycles are the first public counter that can exhaust; at the
+nominal clock its unsigned 64-bit range exceeds 17,000 years of continuous
+machine time. The one-hour test independently proves exact totals without
+floating point or accumulated drift.
 
 Build and run:
 
@@ -34,7 +44,9 @@ cmake --build build-clean-machine --config Release
 ctest --test-dir build-clean-machine --build-config Release --output-on-failure
 ```
 
-The test executable performs a 3,600-frame 100 Hz run, checks exact CPU/SPU
+The C++ test executable performs a 3,600-frame 100 Hz run, checks exact CPU/SPU
 budgets and CDDA allocation, performs a separate 3,600-frame 100/50/25/100
-mode-switch schedule, compares all receipts and events across repeated runs,
-and exercises the C ABI.
+mode-switch schedule, verifies nonzero fractional phase across rate changes,
+checks a one-hour no-drift run, compares repeated receipts/events, and exercises
+invalid C ABI inputs. A separate C translation unit links against the C++
+library and runs through the public C ABI.

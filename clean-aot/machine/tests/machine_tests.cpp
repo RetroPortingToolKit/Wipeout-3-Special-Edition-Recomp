@@ -8,11 +8,11 @@
 
 namespace {
 
-using w3::machine::Event;
-using w3::machine::EventKind;
-using w3::machine::FrameReceipt;
-using w3::machine::Machine;
-using w3::machine::VBlankRate;
+using clean_aot::machine::Event;
+using clean_aot::machine::EventKind;
+using clean_aot::machine::FrameReceipt;
+using clean_aot::machine::Machine;
+using clean_aot::machine::VBlankRate;
 
 void require(bool condition, const std::string& message) {
     if (!condition) {
@@ -61,7 +61,7 @@ void test_100_hz_3600_frames() {
         reference_cdda_total = next_cdda_total;
 
         require(receipt.frame_index == frame, "100 Hz frame index");
-        require(receipt.vblank_hz == W3_MACHINE_VBLANK_100,
+        require(receipt.vblank_hz == CLEAN_AOT_MACHINE_VBLANK_100,
                 "100 Hz mode receipt");
         require(receipt.timebase_ticks == 1, "100 Hz timebase quantum");
         require(receipt.cpu_cycles == 338'688,
@@ -91,13 +91,16 @@ void test_100_hz_3600_frames() {
             "100 Hz event count after 3,600 frames");
     for (std::size_t block = 0; block < 900; ++block) {
         const std::size_t first = block * 16;
-        require(log.events[first + 0].kind == W3_MACHINE_EVENT_VBLANK,
+        require(log.events[first + 0].kind == CLEAN_AOT_MACHINE_EVENT_VBLANK,
                 "VBlank event order");
-        require(log.events[first + 1].kind == W3_MACHINE_EVENT_CPU_CYCLES,
+        require(log.events[first + 1].kind ==
+                    CLEAN_AOT_MACHINE_EVENT_CPU_CYCLES,
                 "CPU event order");
-        require(log.events[first + 2].kind == W3_MACHINE_EVENT_SPU_SAMPLES,
+        require(log.events[first + 2].kind ==
+                    CLEAN_AOT_MACHINE_EVENT_SPU_SAMPLES,
                 "SPU event order");
-        require(log.events[first + 3].kind == W3_MACHINE_EVENT_CDDA_SECTORS,
+        require(log.events[first + 3].kind ==
+                    CLEAN_AOT_MACHINE_EVENT_CDDA_SECTORS,
                 "CDDA event order");
         const std::uint64_t cdda_block_total =
             log.events[first + 3].amount +
@@ -140,6 +143,31 @@ void test_fixed_modes() {
             "25 Hz exact SPU samples per VBlank");
     require(receipt.cdda_sectors == 3,
             "25 Hz exact CDDA sectors per VBlank");
+}
+
+void test_one_hour_has_no_drift() {
+    constexpr std::uint64_t seconds = 3'600;
+    constexpr std::uint64_t frames = seconds * 100;
+    Machine machine(VBlankRate::Hz100);
+    FrameReceipt receipt{};
+
+    for (std::uint64_t frame = 0; frame < frames; ++frame) {
+        receipt = machine.step_frame();
+    }
+
+    require(receipt.frame_index == frames - 1,
+            "one-hour final frame index");
+    require(receipt.elapsed_timebase_ticks == frames,
+            "one-hour exact elapsed timebase");
+    require(receipt.total_cpu_cycles == Machine::CpuHz * seconds,
+            "one-hour CPU total has no drift");
+    require(receipt.total_spu_samples == Machine::SpuHz * seconds,
+            "one-hour SPU total has no drift");
+    require(receipt.total_cdda_sectors ==
+                Machine::CddaSectorsPerSecond * seconds,
+            "one-hour CDDA total has no drift");
+    require(receipt.cdda_phase == 0,
+            "one-hour CDDA phase returns to zero");
 }
 
 struct ModeSegment {
@@ -239,7 +267,7 @@ void test_mode_switching_is_repeatable() {
 
     std::size_t mode_switches = 0;
     for (const Event& event : first_log.events) {
-        if (event.kind == W3_MACHINE_EVENT_MODE_SWITCH) {
+        if (event.kind == CLEAN_AOT_MACHINE_EVENT_MODE_SWITCH) {
             ++mode_switches;
             require(event.amount == event.vblank_hz,
                     "mode event new rate");
@@ -268,58 +296,139 @@ void test_unobserved_mode_change_is_collapsed() {
             "accept reversion before a frame boundary");
     const FrameReceipt receipt =
         machine.step_frame(EventLog::collect, &log);
-    require(receipt.vblank_hz == W3_MACHINE_VBLANK_100,
+    require(receipt.vblank_hz == CLEAN_AOT_MACHINE_VBLANK_100,
             "reverted mode remains the sampled mode");
     require(log.events.size() == 4,
             "unobserved transient modes do not create fake events");
 }
 
-struct CEventLog {
-    std::vector<w3_machine_event> events;
+void test_mode_switch_preserves_fractional_phase_and_event_order() {
+    Machine machine(VBlankRate::Hz100);
+    FrameReceipt receipt = machine.step_frame();
+    require(receipt.cdda_sectors == 0 && receipt.cdda_phase == 75,
+            "100 Hz establishes nonzero CDDA phase");
 
-    static void collect(const w3_machine_event* event, void* user) {
+    EventLog log;
+    require(machine.set_vblank_rate(VBlankRate::Hz25),
+            "switch to 25 Hz at nonzero phase");
+    receipt = machine.step_frame(EventLog::collect, &log);
+    require(receipt.cdda_sectors == 3 && receipt.cdda_phase == 75,
+            "25 Hz preserves incoming CDDA phase");
+    require(log.events.size() == 5,
+            "switch frame contains one mode and four frame events");
+    require(receipt.event_sequence_end == receipt.event_sequence_begin + 4,
+            "switch receipt spans five inclusive event sequences");
+    require(log.events[0].kind == CLEAN_AOT_MACHINE_EVENT_MODE_SWITCH &&
+                log.events[0].auxiliary == CLEAN_AOT_MACHINE_VBLANK_100 &&
+                log.events[0].amount == CLEAN_AOT_MACHINE_VBLANK_25,
+            "mode switch is first and records old/new rates");
+    require(log.events[1].kind == CLEAN_AOT_MACHINE_EVENT_VBLANK &&
+                log.events[2].kind == CLEAN_AOT_MACHINE_EVENT_CPU_CYCLES &&
+                log.events[3].kind == CLEAN_AOT_MACHINE_EVENT_SPU_SAMPLES &&
+                log.events[4].kind == CLEAN_AOT_MACHINE_EVENT_CDDA_SECTORS,
+            "switch frame retains documented event order");
+
+    require(machine.set_vblank_rate(VBlankRate::Hz50),
+            "switch to 50 Hz at nonzero phase");
+    receipt = machine.step_frame();
+    require(receipt.cdda_sectors == 2 && receipt.cdda_phase == 25,
+            "50 Hz carries CDDA phase exactly");
+    require(machine.set_vblank_rate(VBlankRate::Hz100),
+            "switch to 100 Hz at nonzero phase");
+    receipt = machine.step_frame();
+    require(receipt.cdda_sectors == 1 && receipt.cdda_phase == 0,
+            "mixed-rate schedule closes CDDA phase exactly");
+}
+
+void test_reset_restores_initial_state() {
+    Machine machine(VBlankRate::Hz50);
+    Machine fresh(VBlankRate::Hz50);
+    (void)machine.step_frame();
+    require(machine.set_vblank_rate(VBlankRate::Hz100),
+            "queue mode switch before reset");
+    machine.reset();
+
+    require(machine.vblank_rate() == VBlankRate::Hz50,
+            "reset restores construction rate");
+    require(machine.frame_count() == 0, "reset restores frame count");
+    require(machine.receipt_digest() == fresh.receipt_digest(),
+            "reset restores digest seed");
+
+    const FrameReceipt reset_receipt = machine.step_frame();
+    const FrameReceipt fresh_receipt = fresh.step_frame();
+    require(reset_receipt.digest == fresh_receipt.digest &&
+                reset_receipt.event_sequence_begin == 0 &&
+                reset_receipt.event_sequence_end == 3,
+            "reset removes pending events and reproduces fresh state");
+}
+
+struct CEventLog {
+    std::vector<clean_aot_machine_event> events;
+
+    static void collect(const clean_aot_machine_event* event, void* user) {
         auto* log = static_cast<CEventLog*>(user);
         log->events.push_back(*event);
     }
 };
 
 void test_c_abi() {
-    require(w3_machine_create(13) == nullptr,
+    clean_aot_machine_frame_receipt null_receipt{};
+    require(clean_aot_machine_create(13) == nullptr,
             "C ABI rejects unsupported initial rate");
-    w3_machine* machine = w3_machine_create(W3_MACHINE_VBLANK_100);
+    require(clean_aot_machine_set_vblank_rate(nullptr, 100) ==
+                CLEAN_AOT_MACHINE_STATUS_INVALID_ARGUMENT,
+            "C ABI rejects null machine for rate change");
+    require(clean_aot_machine_step_frame(nullptr, nullptr, nullptr,
+                                         &null_receipt) ==
+                CLEAN_AOT_MACHINE_STATUS_INVALID_ARGUMENT,
+            "C ABI rejects null machine for step");
+    require(clean_aot_machine_get_vblank_rate(nullptr) == 0 &&
+                clean_aot_machine_frame_count(nullptr) == 0 &&
+                clean_aot_machine_receipt_digest(nullptr) == 0,
+            "C ABI null queries are stable");
+    clean_aot_machine_reset(nullptr);
+    clean_aot_machine_destroy(nullptr);
+
+    clean_aot_machine* machine =
+        clean_aot_machine_create(CLEAN_AOT_MACHINE_VBLANK_100);
     require(machine != nullptr, "C ABI creates machine");
-    require(w3_machine_get_vblank_rate(machine) == 100,
+    require(clean_aot_machine_get_vblank_rate(machine) == 100,
             "C ABI reports initial rate");
 
     CEventLog log;
-    w3_machine_frame_receipt receipt{};
-    require(w3_machine_step_frame(machine, CEventLog::collect, &log,
-                                  &receipt) == W3_MACHINE_STATUS_OK,
+    clean_aot_machine_frame_receipt receipt{};
+    require(clean_aot_machine_step_frame(machine, nullptr, nullptr, nullptr) ==
+                CLEAN_AOT_MACHINE_STATUS_INVALID_ARGUMENT,
+            "C ABI rejects null receipt");
+    require(clean_aot_machine_step_frame(machine, CEventLog::collect, &log,
+                                         &receipt) ==
+                CLEAN_AOT_MACHINE_STATUS_OK,
             "C ABI advances frame");
     require(receipt.cpu_cycles == 338'688 && receipt.spu_samples == 441,
             "C ABI exact 100 Hz receipt");
     require(log.events.size() == 4, "C ABI receives domain events");
-    require(w3_machine_set_vblank_rate(machine, 13) ==
-                W3_MACHINE_STATUS_INVALID_RATE,
+    require(clean_aot_machine_set_vblank_rate(machine, 13) ==
+                CLEAN_AOT_MACHINE_STATUS_INVALID_RATE,
             "C ABI rejects unsupported mode switch");
-    require(w3_machine_set_vblank_rate(machine, 50) ==
-                W3_MACHINE_STATUS_OK,
+    require(clean_aot_machine_set_vblank_rate(machine, 50) ==
+                CLEAN_AOT_MACHINE_STATUS_OK,
             "C ABI accepts supported mode switch");
-    require(w3_machine_step_frame(machine, CEventLog::collect, &log,
-                                  &receipt) == W3_MACHINE_STATUS_OK,
+    require(clean_aot_machine_step_frame(machine, CEventLog::collect, &log,
+                                         &receipt) ==
+                CLEAN_AOT_MACHINE_STATUS_OK,
             "C ABI advances switched frame");
     require(receipt.vblank_hz == 50 && receipt.timebase_ticks == 2,
             "C ABI switched receipt");
     require(log.events.size() == 9,
             "C ABI reports pending mode switch before next frame");
-    require(w3_machine_frame_count(machine) == 2,
+    require(clean_aot_machine_frame_count(machine) == 2,
             "C ABI frame count");
-    require(w3_machine_receipt_digest(machine) == receipt.digest,
+    require(clean_aot_machine_receipt_digest(machine) == receipt.digest,
             "C ABI digest query");
-    w3_machine_reset(machine);
-    require(w3_machine_frame_count(machine) == 0,
+    clean_aot_machine_reset(machine);
+    require(clean_aot_machine_frame_count(machine) == 0,
             "C ABI reset frame count");
-    w3_machine_destroy(machine);
+    clean_aot_machine_destroy(machine);
 }
 
 } // namespace
@@ -327,10 +436,14 @@ void test_c_abi() {
 int main() {
     test_100_hz_3600_frames();
     test_fixed_modes();
+    test_one_hour_has_no_drift();
     test_mode_switching_is_repeatable();
     test_unobserved_mode_change_is_collapsed();
+    test_mode_switch_preserves_fractional_phase_and_event_order();
+    test_reset_restores_initial_state();
     test_c_abi();
     std::cout << "PASS: clean deterministic machine timing core; "
-              << "3,600-frame 100 Hz run, 3,600-frame switched run, C ABI\n";
+              << "3,600-frame 100 Hz run, one-hour drift run, "
+              << "3,600-frame switched run, C and C++ ABI\n";
     return EXIT_SUCCESS;
 }

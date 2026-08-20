@@ -26,7 +26,7 @@ void digest_u64(std::uint64_t& digest, std::uint64_t value) noexcept {
 }
 
 void digest_event(std::uint64_t& digest,
-                  const w3_machine_event& event) noexcept {
+                  const clean_aot_machine_event& event) noexcept {
     digest_u64(digest, event.sequence);
     digest_u64(digest, event.frame_index);
     digest_u32(digest, event.kind);
@@ -36,15 +36,16 @@ void digest_event(std::uint64_t& digest,
     digest_u64(digest, event.auxiliary);
 }
 
-void forward_c_callback(const w3_machine_event& event, void* context) {
+void forward_c_callback(const clean_aot_machine_event& event, void* context) {
     auto* callback_context =
-        static_cast<std::pair<w3_machine_event_callback, void*>*>(context);
+        static_cast<std::pair<clean_aot_machine_event_callback, void*>*>(
+            context);
     callback_context->first(&event, callback_context->second);
 }
 
 } // namespace
 
-namespace w3::machine {
+namespace clean_aot::machine {
 
 Machine::RationalAccumulator::RationalAccumulator(
     std::uint64_t frequency,
@@ -77,9 +78,9 @@ std::uint32_t Machine::rate_value(VBlankRate rate) noexcept {
 }
 
 bool Machine::supported_rate(std::uint32_t rate) noexcept {
-    return rate == W3_MACHINE_VBLANK_25 ||
-           rate == W3_MACHINE_VBLANK_50 ||
-           rate == W3_MACHINE_VBLANK_100;
+    return rate == CLEAN_AOT_MACHINE_VBLANK_25 ||
+           rate == CLEAN_AOT_MACHINE_VBLANK_50 ||
+           rate == CLEAN_AOT_MACHINE_VBLANK_100;
 }
 
 std::uint32_t Machine::timebase_ticks_for_rate(
@@ -93,7 +94,7 @@ std::uint32_t Machine::timebase_ticks_for_rate(
 Machine::Machine(VBlankRate initial_rate)
     : initial_rate_hz_(supported_rate(rate_value(initial_rate))
                            ? rate_value(initial_rate)
-                           : W3_MACHINE_VBLANK_100),
+                           : CLEAN_AOT_MACHINE_VBLANK_100),
       current_rate_hz_(initial_rate_hz_),
       pending_mode_switch_(false),
       pending_mode_switch_from_hz_(0),
@@ -156,7 +157,7 @@ FrameReceipt Machine::step_frame(EventSink sink, void* user) {
     if (pending_mode_switch_) {
         Event mode_event{};
         mode_event.frame_index = frame_index;
-        mode_event.kind = W3_MACHINE_EVENT_MODE_SWITCH;
+        mode_event.kind = CLEAN_AOT_MACHINE_EVENT_MODE_SWITCH;
         mode_event.vblank_hz = current_rate_hz_;
         mode_event.amount = current_rate_hz_;
         mode_event.cumulative = frame_count_;
@@ -175,7 +176,7 @@ FrameReceipt Machine::step_frame(EventSink sink, void* user) {
 
     Event vblank_event{};
     vblank_event.frame_index = frame_index;
-    vblank_event.kind = W3_MACHINE_EVENT_VBLANK;
+    vblank_event.kind = CLEAN_AOT_MACHINE_EVENT_VBLANK;
     vblank_event.vblank_hz = current_rate_hz_;
     vblank_event.amount = 1;
     vblank_event.cumulative = frame_count_;
@@ -184,7 +185,7 @@ FrameReceipt Machine::step_frame(EventSink sink, void* user) {
 
     Event cpu_event{};
     cpu_event.frame_index = frame_index;
-    cpu_event.kind = W3_MACHINE_EVENT_CPU_CYCLES;
+    cpu_event.kind = CLEAN_AOT_MACHINE_EVENT_CPU_CYCLES;
     cpu_event.vblank_hz = current_rate_hz_;
     cpu_event.amount = cpu_cycles;
     cpu_event.cumulative = cpu_clock_.total;
@@ -192,7 +193,7 @@ FrameReceipt Machine::step_frame(EventSink sink, void* user) {
 
     Event spu_event{};
     spu_event.frame_index = frame_index;
-    spu_event.kind = W3_MACHINE_EVENT_SPU_SAMPLES;
+    spu_event.kind = CLEAN_AOT_MACHINE_EVENT_SPU_SAMPLES;
     spu_event.vblank_hz = current_rate_hz_;
     spu_event.amount = spu_samples;
     spu_event.cumulative = spu_clock_.total;
@@ -200,7 +201,7 @@ FrameReceipt Machine::step_frame(EventSink sink, void* user) {
 
     Event cdda_event{};
     cdda_event.frame_index = frame_index;
-    cdda_event.kind = W3_MACHINE_EVENT_CDDA_SECTORS;
+    cdda_event.kind = CLEAN_AOT_MACHINE_EVENT_CDDA_SECTORS;
     cdda_event.vblank_hz = current_rate_hz_;
     cdda_event.amount = cdda_sectors;
     cdda_event.cumulative = cdda_clock_.total;
@@ -241,79 +242,86 @@ std::uint64_t Machine::receipt_digest() const noexcept {
     return digest_;
 }
 
-} // namespace w3::machine
+} // namespace clean_aot::machine
 
-struct w3_machine {
-    explicit w3_machine(std::uint32_t rate)
-        : impl(static_cast<w3::machine::VBlankRate>(rate)) {}
+struct clean_aot_machine {
+    explicit clean_aot_machine(std::uint32_t rate)
+        : impl(static_cast<clean_aot::machine::VBlankRate>(rate)) {}
 
-    w3::machine::Machine impl;
+    clean_aot::machine::Machine impl;
 };
 
 extern "C" {
 
-w3_machine* w3_machine_create(std::uint32_t initial_vblank_hz) {
-    if (initial_vblank_hz != W3_MACHINE_VBLANK_25 &&
-        initial_vblank_hz != W3_MACHINE_VBLANK_50 &&
-        initial_vblank_hz != W3_MACHINE_VBLANK_100) {
+clean_aot_machine* clean_aot_machine_create(
+    std::uint32_t initial_vblank_hz) {
+    if (initial_vblank_hz != CLEAN_AOT_MACHINE_VBLANK_25 &&
+        initial_vblank_hz != CLEAN_AOT_MACHINE_VBLANK_50 &&
+        initial_vblank_hz != CLEAN_AOT_MACHINE_VBLANK_100) {
         return nullptr;
     }
     try {
-        return new w3_machine(initial_vblank_hz);
+        return new clean_aot_machine(initial_vblank_hz);
     } catch (const std::bad_alloc&) {
         return nullptr;
     }
 }
 
-void w3_machine_destroy(w3_machine* machine) {
+void clean_aot_machine_destroy(clean_aot_machine* machine) {
     delete machine;
 }
 
-w3_machine_status w3_machine_set_vblank_rate(w3_machine* machine,
-                                               std::uint32_t vblank_hz) {
+clean_aot_machine_status clean_aot_machine_set_vblank_rate(
+    clean_aot_machine* machine,
+    std::uint32_t vblank_hz) {
     if (machine == nullptr) {
-        return W3_MACHINE_STATUS_INVALID_ARGUMENT;
+        return CLEAN_AOT_MACHINE_STATUS_INVALID_ARGUMENT;
     }
     const bool accepted = machine->impl.set_vblank_rate(
-        static_cast<w3::machine::VBlankRate>(vblank_hz));
-    return accepted ? W3_MACHINE_STATUS_OK : W3_MACHINE_STATUS_INVALID_RATE;
+        static_cast<clean_aot::machine::VBlankRate>(vblank_hz));
+    return accepted ? CLEAN_AOT_MACHINE_STATUS_OK
+                    : CLEAN_AOT_MACHINE_STATUS_INVALID_RATE;
 }
 
-std::uint32_t w3_machine_get_vblank_rate(const w3_machine* machine) {
+std::uint32_t clean_aot_machine_get_vblank_rate(
+    const clean_aot_machine* machine) {
     if (machine == nullptr) {
         return 0;
     }
     return static_cast<std::uint32_t>(machine->impl.vblank_rate());
 }
 
-w3_machine_status w3_machine_step_frame(w3_machine* machine,
-                                         w3_machine_event_callback callback,
-                                         void* user,
-                                         w3_machine_frame_receipt* receipt) {
+clean_aot_machine_status clean_aot_machine_step_frame(
+    clean_aot_machine* machine,
+    clean_aot_machine_event_callback callback,
+    void* user,
+    clean_aot_machine_frame_receipt* receipt) {
     if (machine == nullptr || receipt == nullptr) {
-        return W3_MACHINE_STATUS_INVALID_ARGUMENT;
+        return CLEAN_AOT_MACHINE_STATUS_INVALID_ARGUMENT;
     }
     if (callback == nullptr) {
         *receipt = machine->impl.step_frame();
-        return W3_MACHINE_STATUS_OK;
+        return CLEAN_AOT_MACHINE_STATUS_OK;
     }
-    std::pair<w3_machine_event_callback, void*> callback_context{callback,
-                                                                  user};
+    std::pair<clean_aot_machine_event_callback, void*> callback_context{
+        callback, user};
     *receipt = machine->impl.step_frame(forward_c_callback, &callback_context);
-    return W3_MACHINE_STATUS_OK;
+    return CLEAN_AOT_MACHINE_STATUS_OK;
 }
 
-void w3_machine_reset(w3_machine* machine) {
+void clean_aot_machine_reset(clean_aot_machine* machine) {
     if (machine != nullptr) {
         machine->impl.reset();
     }
 }
 
-std::uint64_t w3_machine_frame_count(const w3_machine* machine) {
+std::uint64_t clean_aot_machine_frame_count(
+    const clean_aot_machine* machine) {
     return machine == nullptr ? 0 : machine->impl.frame_count();
 }
 
-std::uint64_t w3_machine_receipt_digest(const w3_machine* machine) {
+std::uint64_t clean_aot_machine_receipt_digest(
+    const clean_aot_machine* machine) {
     return machine == nullptr ? 0 : machine->impl.receipt_digest();
 }
 
