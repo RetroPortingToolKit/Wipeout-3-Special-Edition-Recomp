@@ -18,18 +18,15 @@ using InstructionMap = std::map<GuestAddress, Instruction>;
 [[nodiscard]] bool valid_instruction_address(const PsxExeImage& image,
                                              GuestAddress address,
                                              std::uint64_t region_end) noexcept {
-    return static_cast<std::uint64_t>(address) >=
+    return (address % sizeof(std::uint32_t)) == 0U &&
+           static_cast<std::uint64_t>(address) >=
                static_cast<std::uint64_t>(image.load_address()) &&
            static_cast<std::uint64_t>(address) + sizeof(std::uint32_t) <= region_end &&
            image.contains(address, sizeof(std::uint32_t));
 }
 
-[[nodiscard]] GuestAddress checked_plus(GuestAddress address, std::uint32_t amount) {
-    const std::uint64_t result = static_cast<std::uint64_t>(address) + amount;
-    if (result > 0xffffffffULL) {
-        throw IrError("guest address arithmetic overflowed the 32-bit address space");
-    }
-    return static_cast<GuestAddress>(result);
+[[nodiscard]] GuestAddress next_pc(GuestAddress address, std::uint32_t amount) noexcept {
+    return static_cast<GuestAddress>(address + amount);
 }
 
 void add_edge(Region& region,
@@ -40,12 +37,6 @@ void add_edge(Region& region,
     edge.source = source;
     edge.kind = kind;
     edge.target = target;
-    if (target.has_value()) {
-        const BasicBlock* block = region.block_at(*target);
-        if (block != nullptr) {
-            edge.target_block = block->id;
-        }
-    }
     region.edges.push_back(edge);
 }
 
@@ -56,6 +47,9 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
     const std::uint64_t image_begin = static_cast<std::uint64_t>(image.load_address());
     if (region_end <= image_begin || region_end > image.text_end_exclusive()) {
         throw IrError("region end must lie inside the PS-X EXE text image");
+    }
+    if ((region_end % sizeof(std::uint32_t)) != 0U) {
+        throw IrError("region end must be instruction aligned");
     }
     if (options.entry_points.empty()) {
         throw IrError("region requires at least one entry point");
@@ -103,7 +97,7 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
                 pc, decode_instruction(pc, image.read_u32(pc)));
             const Instruction& instruction = it->second;
             if (instruction.has_delay_slot) {
-                const GuestAddress delay_address = checked_plus(pc, 4U);
+                const GuestAddress delay_address = next_pc(pc, 4U);
                 if (!valid_instruction_address(image, delay_address, region_end)) {
                     throw IrError("control transfer has no bounded delay-slot instruction");
                 }
@@ -120,15 +114,16 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
                     queue_target(*instruction.direct_target);
                 }
                 if (instruction.kind == InstructionKind::ConditionalBranch ||
+                    instruction.kind == InstructionKind::ConditionalCall ||
                     instruction.kind == InstructionKind::DirectCall ||
                     instruction.kind == InstructionKind::IndirectCall) {
-                    const GuestAddress fallthrough = checked_plus(pc, 8U);
+                    const GuestAddress fallthrough = next_pc(pc, 8U);
                     queue_target(fallthrough);
                 }
                 break;
             }
 
-            const GuestAddress next = checked_plus(pc, 4U);
+            const GuestAddress next = next_pc(pc, 4U);
             if (!valid_instruction_address(image, next, region_end)) {
                 break;
             }
@@ -176,7 +171,7 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
             covered.insert(pc);
             block.instructions.push_back(instruction);
             if (instruction.has_delay_slot) {
-                const GuestAddress delay_address = checked_plus(pc, 4U);
+                const GuestAddress delay_address = next_pc(pc, 4U);
                 if (!instructions.contains(delay_address) || covered.contains(delay_address)) {
                     throw IrError("delay-slot ownership is ambiguous");
                 }
@@ -186,7 +181,7 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
                 break;
             }
 
-            const GuestAddress next = checked_plus(pc, 4U);
+            const GuestAddress next = next_pc(pc, 4U);
             if (!instructions.contains(next) || block_starts.contains(next)) {
                 break;
             }
@@ -215,9 +210,10 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
                 add_edge(region,
                          block.id,
                          EdgeKind::Fallthrough,
-                         checked_plus(terminator.address, 8U));
+                         next_pc(terminator.address, 8U));
                 break;
             case InstructionKind::ConditionalBranch:
+            case InstructionKind::ConditionalCall:
                 add_edge(region,
                          block.id,
                          EdgeKind::BranchTaken,
@@ -225,31 +221,29 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
                 add_edge(region,
                          block.id,
                          EdgeKind::BranchFallthrough,
-                         checked_plus(terminator.address, 8U));
+                         next_pc(terminator.address, 8U));
                 break;
             case InstructionKind::IndirectCall:
                 add_edge(region, block.id, EdgeKind::IndirectCall, std::nullopt);
                 add_edge(region,
                          block.id,
                          EdgeKind::Fallthrough,
-                         checked_plus(terminator.address, 8U));
+                         next_pc(terminator.address, 8U));
                 break;
             case InstructionKind::IndirectJump:
                 add_edge(region, block.id, EdgeKind::IndirectJump, std::nullopt);
                 break;
             case InstructionKind::Return:
+                add_edge(region, block.id, EdgeKind::Return, std::nullopt);
                 break;
             case InstructionKind::Other:
             case InstructionKind::Nop:
                 throw IrError("terminator index names a non-control instruction");
             }
         } else {
-            const GuestAddress next = checked_plus(
+            const GuestAddress next = next_pc(
                 block.instructions.back().address, 4U);
-            const auto instruction_it = instructions.find(next);
-            if (instruction_it != instructions.end()) {
-                add_edge(region, block.id, EdgeKind::Fallthrough, next);
-            }
+            add_edge(region, block.id, EdgeKind::Fallthrough, next);
         }
     }
 

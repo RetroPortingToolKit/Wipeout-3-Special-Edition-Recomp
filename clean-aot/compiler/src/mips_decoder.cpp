@@ -28,14 +28,19 @@ Instruction decode_instruction(GuestAddress address, std::uint32_t raw) {
 
     const std::uint32_t opcode = raw >> 26U;
     switch (opcode) {
-    case 0x01U:
-        // REGIMM contains several conditional branches. Keeping this family
-        // at the same CFG level is sufficient for edge construction; the
-        // instruction semantics belong to a later lowering pass.
-        instruction.kind = InstructionKind::ConditionalBranch;
+    case 0x01U: {
+        const std::uint32_t function = (raw >> 16U) & 0x1fU;
+        if (function == 0x10U || function == 0x11U) {
+            instruction.kind = InstructionKind::ConditionalCall;
+        } else {
+            // The R3000A decodes every REGIMM rt value as a branch. Only the
+            // two architectural link encodings above write the return address.
+            instruction.kind = InstructionKind::ConditionalBranch;
+        }
         instruction.has_delay_slot = true;
         instruction.direct_target = branch_target(address, raw);
         return instruction;
+    }
     case 0x02U:
         instruction.kind = InstructionKind::DirectJump;
         instruction.has_delay_slot = true;
@@ -48,6 +53,10 @@ Instruction decode_instruction(GuestAddress address, std::uint32_t raw) {
         return instruction;
     case 0x04U:
     case 0x05U:
+        instruction.kind = InstructionKind::ConditionalBranch;
+        instruction.has_delay_slot = true;
+        instruction.direct_target = branch_target(address, raw);
+        return instruction;
     case 0x06U:
     case 0x07U:
         instruction.kind = InstructionKind::ConditionalBranch;
@@ -61,12 +70,14 @@ Instruction decode_instruction(GuestAddress address, std::uint32_t raw) {
     if (opcode == 0U) {
         const std::uint32_t function = raw & 0x3fU;
         const std::uint32_t rs = (raw >> 21U) & 0x1fU;
+        const std::uint32_t rd = (raw >> 11U) & 0x1fU;
         if (function == 0x08U) {
             instruction.kind = rs == 31U ? InstructionKind::Return
                                          : InstructionKind::IndirectJump;
             instruction.has_delay_slot = true;
         } else if (function == 0x09U) {
-            instruction.kind = InstructionKind::IndirectCall;
+            instruction.kind = rd == 0U ? InstructionKind::IndirectJump
+                                        : InstructionKind::IndirectCall;
             instruction.has_delay_slot = true;
         }
     }
@@ -79,6 +90,7 @@ bool is_control_transfer(InstructionKind kind) noexcept {
     case InstructionKind::DirectJump:
     case InstructionKind::DirectCall:
     case InstructionKind::ConditionalBranch:
+    case InstructionKind::ConditionalCall:
     case InstructionKind::IndirectJump:
     case InstructionKind::IndirectCall:
     case InstructionKind::Return:

@@ -48,6 +48,38 @@ else()
     )
 endif()
 
+if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
+    set(CLEAN_AOT_COMPILER_GENERATED_FIXTURE
+        ${CMAKE_CURRENT_BINARY_DIR}/generated_compiler_fixture.cpp
+    )
+    add_custom_command(
+        OUTPUT ${CLEAN_AOT_COMPILER_GENERATED_FIXTURE}
+        COMMAND $<TARGET_FILE:clean_aot_compiler_tests>
+                --emit ${CLEAN_AOT_COMPILER_GENERATED_FIXTURE}
+        DEPENDS clean_aot_compiler_tests
+        COMMENT "Generating deterministic clean-AOT compiler fixture"
+        VERBATIM
+    )
+    add_library(clean_aot_compiler_generated_fixture OBJECT
+        ${CLEAN_AOT_COMPILER_GENERATED_FIXTURE}
+    )
+    target_compile_features(clean_aot_compiler_generated_fixture PRIVATE cxx_std_20)
+    if(MSVC)
+        target_compile_options(clean_aot_compiler_generated_fixture PRIVATE
+            /W4
+            /permissive-
+        )
+    else()
+        target_compile_options(clean_aot_compiler_generated_fixture PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+            -Wconversion
+            -Wshadow
+        )
+    endif()
+endif()
+
 if(BUILD_TESTING)
     add_test(NAME clean_aot_compiler_tests COMMAND clean_aot_compiler_tests)
 endif()

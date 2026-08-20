@@ -22,6 +22,7 @@ enum class InstructionKind : std::uint8_t {
     DirectJump,
     DirectCall,
     ConditionalBranch,
+    ConditionalCall,
     IndirectJump,
     IndirectCall,
     Return,
@@ -43,6 +44,7 @@ enum class EdgeKind : std::uint8_t {
     BranchFallthrough,
     IndirectJump,
     IndirectCall,
+    Return,
 };
 
 struct Edge final {

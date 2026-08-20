@@ -64,6 +64,10 @@ PsxExeImage PsxExeImage::parse(std::span<const std::uint8_t> file_bytes) {
     if (static_cast<std::uint64_t>(text_size) > static_cast<std::uint64_t>(payload_size)) {
         throw ExeFormatError("PS-X EXE text extends beyond the available file bytes");
     }
+    if (static_cast<std::uint64_t>(text_size) >
+        static_cast<std::uint64_t>(std::numeric_limits<std::ptrdiff_t>::max())) {
+        throw ExeFormatError("PS-X EXE text is too large for host iterator arithmetic");
+    }
 
     const std::uint64_t entry_end = static_cast<std::uint64_t>(entry_pc) + sizeof(std::uint32_t);
     if (static_cast<std::uint64_t>(entry_pc) < static_cast<std::uint64_t>(load_address) ||
