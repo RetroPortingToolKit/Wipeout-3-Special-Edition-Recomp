@@ -82,7 +82,7 @@ struct Snapshot final {
     std::array<std::int16_t, 3U> ir{};
     std::array<std::array<std::int16_t, 2U>, 3U> sxy{};
     std::array<std::uint16_t, 4U> sz{};
-    std::array<std::uint32_t, 4U> rgb{};
+    std::array<std::uint32_t, 3U> rgb{};
     std::uint32_t res1 = 0U;
     std::array<std::int32_t, 4U> mac{};
     std::uint32_t lzcs = 0U;
@@ -157,7 +157,7 @@ private:
     std::array<S16, 3U> ir_{};
     std::array<std::array<S16, 2U>, 3U> sxy_{};
     std::array<U16, 4U> sz_{};
-    std::array<std::uint32_t, 4U> rgb_{};
+    std::array<std::uint32_t, 3U> rgb_{};
     std::uint32_t res1_ = 0U;
     std::array<S32, 4U> mac_{};
     std::uint32_t lzcs_ = 0U;
@@ -184,6 +184,7 @@ private:
     static S64 mac0_value(S64 value) noexcept;
     static S64 clamp(S64 value, S64 minimum, S64 maximum) noexcept;
     static S32 sign_extend_16(U16 value) noexcept;
+    static S32 word_s32(std::uint32_t value) noexcept;
     static S16 low_s16(std::uint32_t value) noexcept;
     static U16 low_u16(std::uint32_t value) noexcept;
     static std::uint32_t pack_s16(S16 low, S16 high) noexcept;
@@ -206,6 +207,7 @@ private:
     void set_sz3(S64 value) noexcept;
     void push_sxy(S64 x, S64 y) noexcept;
     void push_rgb(S64 red, S64 green, S64 blue) noexcept;
+    void push_rgb_from_mac() noexcept;
 
     const std::array<S16, 3U>& selected_vector(std::uint8_t selector) const noexcept;
     const std::array<std::array<S16, 3U>, 3U>& selected_matrix(
@@ -234,8 +236,7 @@ private:
 
     void normal_stage(const DecodedInstruction& instruction,
                       unsigned vector_index) noexcept;
-    std::array<S64, 3U> color_matrix_stage(
-        const DecodedInstruction& instruction) noexcept;
+    void color_matrix_stage(const DecodedInstruction& instruction) noexcept;
     std::array<S64, 3U> color_modulation() noexcept;
     void finish_color(const DecodedInstruction& instruction,
                       const std::array<S64, 3U>& base) noexcept;

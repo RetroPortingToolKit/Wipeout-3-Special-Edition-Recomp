@@ -277,6 +277,12 @@ InputLatchBoundary Gte::input_latch_boundary(
     const auto read_at = [](std::uint8_t nop_boundary) noexcept -> InputLatchBoundary {
         return {true, true, nop_boundary};
     };
+    const bool valid_data = bank == RegisterBank::Data && index < 32U;
+    const bool valid_control = bank == RegisterBank::Control &&
+                               index >= 32U && index < 64U;
+    if (!valid_data && !valid_control) {
+        return unmeasured();
+    }
     const auto array_value = [index, &not_read,
                               &read_at](std::uint8_t first,
                                         const std::array<std::uint8_t, 5U>& values)
@@ -385,6 +391,9 @@ InputLatchBoundary Gte::input_latch_boundary(
                            ? unmeasured()
                            : read_at(3U);
             }
+            if (index == 8U && instruction.command == Command::Ncds) {
+                return unmeasured();
+            }
         } else {
             if (index >= 40U && index <= 44U) {
                 return read_at(0U);
@@ -425,8 +434,15 @@ InputLatchBoundary Gte::input_latch_boundary(
                     return result;
                 }
             }
-            if (index == 6U || index == 8U) {
-                return unmeasured();
+            if (index == 6U) {
+                if (instruction.command == Command::Nct) {
+                    return unmeasured();
+                }
+                return read_at(instruction.command == Command::Ncct ? 12U : 15U);
+            }
+            if (index == 8U) {
+                return instruction.command == Command::Ncdt ? unmeasured()
+                                                             : not_read();
             }
         } else {
             if (index >= 40U && index <= 44U) {
@@ -698,11 +714,15 @@ Gte::S64 Gte::clamp(S64 value, S64 minimum, S64 maximum) noexcept {
 }
 
 Gte::S32 Gte::sign_extend_16(U16 value) noexcept {
-    return static_cast<S32>(static_cast<S16>(value));
+    return static_cast<S32>(std::bit_cast<S16>(value));
+}
+
+Gte::S32 Gte::word_s32(std::uint32_t value) noexcept {
+    return std::bit_cast<S32>(value);
 }
 
 Gte::S16 Gte::low_s16(std::uint32_t value) noexcept {
-    return static_cast<S16>(static_cast<U16>(value & 0xffffU));
+    return std::bit_cast<S16>(low_u16(value));
 }
 
 Gte::U16 Gte::low_u16(std::uint32_t value) noexcept {
@@ -836,6 +856,12 @@ void Gte::push_rgb(S64 red, S64 green, S64 blue) noexcept {
     rgb_[1] = rgb_[2];
     const std::uint32_t code = rgbc_ >> 24U;
     rgb_[2] = color_pack(output[0], output[1], output[2], code);
+}
+
+void Gte::push_rgb_from_mac() noexcept {
+    push_rgb(static_cast<S64>(mac_[1]),
+             static_cast<S64>(mac_[2]),
+             static_cast<S64>(mac_[3]));
 }
 
 const std::array<Gte::S16, 3U>& Gte::selected_vector(
@@ -1048,11 +1074,9 @@ void Gte::normal_stage(const DecodedInstruction& instruction,
     }
 }
 
-std::array<Gte::S64, 3U> Gte::color_matrix_stage(
-    const DecodedInstruction& instruction) noexcept {
+void Gte::color_matrix_stage(const DecodedInstruction& instruction) noexcept {
     const unsigned shift = instruction.shift_fraction ? 12U : 0U;
     const std::array<S16, 3U> input = ir_;
-    std::array<S64, 3U> result_values{};
     for (unsigned row = 0U; row < 3U; ++row) {
         const S64 raw = static_cast<S64>(background_[row]) * 0x1000LL +
                         static_cast<S64>(color_[row][0]) * input[0] +
@@ -1061,9 +1085,7 @@ std::array<Gte::S64, 3U> Gte::color_matrix_stage(
         const S64 result = mac_shift(raw, shift);
         record_mac(row + 1U, result, raw);
         set_ir(row, result, instruction.limit_negative, result);
-        result_values[row] = result;
     }
-    return result_values;
 }
 
 std::array<Gte::S64, 3U> Gte::color_modulation() noexcept {
@@ -1083,14 +1105,12 @@ std::array<Gte::S64, 3U> Gte::color_modulation() noexcept {
 void Gte::finish_color(const DecodedInstruction& instruction,
                        const std::array<S64, 3U>& base) noexcept {
     const unsigned shift = instruction.shift_fraction ? 12U : 0U;
-    std::array<S64, 3U> result_values{};
     for (unsigned index = 0U; index < 3U; ++index) {
         const S64 result = mac_shift(base[index], shift);
         record_mac(index + 1U, result, base[index]);
         set_ir(index, result, instruction.limit_negative, result);
-        result_values[index] = result;
     }
-    push_rgb(result_values[0], result_values[1], result_values[2]);
+    push_rgb_from_mac();
 }
 
 void Gte::execute_depth_cue(const DecodedInstruction& instruction,
@@ -1102,7 +1122,6 @@ void Gte::execute_depth_cue(const DecodedInstruction& instruction,
         static_cast<S64>(far_color_[2]) * 0x1000LL,
     };
     std::array<S16, 3U> delta{};
-    std::array<S64, 3U> result_values{};
     for (unsigned index = 0U; index < 3U; ++index) {
         const S64 difference = arithmetic_shift_right(far[index] - base[index],
                                                        shift);
@@ -1117,9 +1136,8 @@ void Gte::execute_depth_cue(const DecodedInstruction& instruction,
         const S64 result = mac_shift(raw, shift);
         record_mac(index + 1U, result, raw);
         set_ir(index, result, instruction.limit_negative, result);
-        result_values[index] = result;
     }
-    push_rgb(result_values[0], result_values[1], result_values[2]);
+    push_rgb_from_mac();
 }
 
 void Gte::execute_normal_color(const DecodedInstruction& instruction,
@@ -1127,9 +1145,9 @@ void Gte::execute_normal_color(const DecodedInstruction& instruction,
                                bool with_color,
                                bool with_depth) noexcept {
     normal_stage(instruction, vector_index);
-    const std::array<S64, 3U> color_result = color_matrix_stage(instruction);
+    color_matrix_stage(instruction);
     if (!with_color) {
-        push_rgb(color_result[0], color_result[1], color_result[2]);
+        push_rgb_from_mac();
         return;
     }
     const std::array<S64, 3U> base = color_modulation();
@@ -1142,7 +1160,7 @@ void Gte::execute_normal_color(const DecodedInstruction& instruction,
 
 void Gte::execute_color_color(const DecodedInstruction& instruction,
                               bool with_depth) noexcept {
-    static_cast<void>(color_matrix_stage(instruction));
+    color_matrix_stage(instruction);
     const std::array<S64, 3U> base = color_modulation();
     if (with_depth) {
         execute_depth_cue(instruction, base);
@@ -1172,15 +1190,13 @@ void Gte::execute_gpf(const DecodedInstruction& instruction,
         with_base ? static_cast<S64>(mac_[2]) * (S64{1} << shift) : S64{0},
         with_base ? static_cast<S64>(mac_[3]) * (S64{1} << shift) : S64{0},
     };
-    std::array<S64, 3U> result_values{};
     for (unsigned index = 0U; index < 3U; ++index) {
         const S64 raw = static_cast<S64>(input[index]) * ir0_ + base[index];
         const S64 result = mac_shift(raw, shift);
         record_mac(index + 1U, result, raw);
         set_ir(index, result, instruction.limit_negative, result);
-        result_values[index] = result;
     }
-    push_rgb(result_values[0], result_values[1], result_values[2]);
+    push_rgb_from_mac();
 }
 
 std::uint32_t Gte::reciprocal_scale(U16 h,
@@ -1596,23 +1612,23 @@ void Gte::write_control(std::uint8_t index, std::uint32_t value) noexcept {
     case 37U:
     case 38U:
     case 39U:
-        translation_[index - 37U] = static_cast<S32>(value);
+        translation_[index - 37U] = word_s32(value);
         break;
     case 45U:
     case 46U:
     case 47U:
-        background_[index - 45U] = static_cast<S32>(value);
+        background_[index - 45U] = word_s32(value);
         break;
     case 53U:
     case 54U:
     case 55U:
-        far_color_[index - 53U] = static_cast<S32>(value);
+        far_color_[index - 53U] = word_s32(value);
         break;
     case 56U:
-        ofx_ = static_cast<S32>(value);
+        ofx_ = word_s32(value);
         break;
     case 57U:
-        ofy_ = static_cast<S32>(value);
+        ofy_ = word_s32(value);
         break;
     case 58U:
         h_ = low_u16(value);
@@ -1621,7 +1637,7 @@ void Gte::write_control(std::uint8_t index, std::uint32_t value) noexcept {
         dqa_ = low_s16(value);
         break;
     case 60U:
-        dqb_ = static_cast<S32>(value);
+        dqb_ = word_s32(value);
         break;
     case 61U:
         zsf3_ = low_s16(value);

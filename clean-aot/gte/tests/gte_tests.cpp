@@ -1,6 +1,7 @@
 #include "gte.hpp"
 
 #include <array>
+#include <bit>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
@@ -44,8 +45,10 @@ std::uint32_t command_word(Command command,
 }
 
 std::int32_t signed_word(std::uint32_t word) {
-    return static_cast<std::int32_t>(word);
+    return std::bit_cast<std::int32_t>(word);
 }
+
+static_assert(clean_aot::gte::Snapshot{}.rgb.size() == 3U);
 
 void write_identity(Gte& gte, std::uint8_t base) {
     gte.write_control(base, 0x00001000U);
@@ -91,6 +94,9 @@ void test_register_transfers_and_fifo() {
     gte.write_control(63U, 0x00555000U);
     require((gte.read_control(63U) & 0x00555000U) == 0x00555000U,
             "writable FLAG bits survive transfer");
+    gte.write_control(63U, bit(12U));
+    require(gte.read_control(63U) == bit(12U),
+            "IR0 saturation is excluded from FLAG summary bit");
 
     gte.write_data(28U, 0x000003ffU);
     require(gte.read_data(9U) == 0x00000f80U, "IRGB red expansion");
@@ -179,6 +185,18 @@ void test_mvmva_selectors_and_saturation() {
                 signed_word(gte.read_data(10U)) == 3 &&
                 signed_word(gte.read_data(11U)) == 4,
             "MVMVA far-color selector uses documented two-term quirk");
+
+    gte.reset();
+    gte.write_control(48U, 0x7fff7fffU);
+    gte.write_control(49U, 0x00007fffU);
+    write_vector(gte, 0U, 32767, 32767, 32767);
+    gte.write_control(53U, 0x7fffffffU);
+    const ExecutionReceipt far_color_probe = gte.execute(
+        command_word(Command::Mvmva, true, false, 2U, 0U, 2U));
+    require((far_color_probe.flag & bit(30U)) != 0U &&
+                gte.read_data(25U) == 0x0007ffe0U &&
+                signed_word(gte.read_data(9U)) == 32767,
+            "MVMVA far-color quirk probes full-form MAC overflow flags");
 
     gte.reset();
     write_identity(gte, 32U);
@@ -329,8 +347,20 @@ void test_timed_input_latches() {
         Command::Avsz3, RegisterBank::Data, 16U);
     require(avsz3_sz0.measured && !avsz3_sz0.read,
             "AVSZ3 does not read SZ0");
-    const std::array<Command, 5U> code_gap_commands = {
-        Command::Ncs, Command::Nct, Command::Dpct, Command::Intpl, Command::Gpl,
+    require(!Gte::input_latch_boundary(
+                 Command::Rtps, RegisterBank::Data, 32U)
+                 .measured &&
+                !Gte::input_latch_boundary(
+                     Command::Rtps, RegisterBank::Control, 31U)
+                     .measured,
+            "invalid timing register-bank/index pairs fail closed");
+    require(!Gte::input_latch_boundary(
+                 Command::Ncds, RegisterBank::Data, 8U)
+                 .measured,
+            "NCDS IR0 consumer remains unmeasured when absent from timing table");
+    const std::array<Command, 6U> code_gap_commands = {
+        Command::Ncs,  Command::Nct, Command::Dpct,
+        Command::Intpl, Command::Gpf, Command::Gpl,
     };
     for (const Command command : code_gap_commands) {
         const auto boundary = Gte::input_latch_boundary(
@@ -356,13 +386,24 @@ void test_timed_input_latches() {
                         boundary.nop_boundary == triple_vectors[command_index][data_index],
                     "triple-lighting vector latch table is indexed by register");
         }
-        require(!Gte::input_latch_boundary(
-                     triple_lighting[command_index], RegisterBank::Data, 6U)
-                     .measured &&
-                    !Gte::input_latch_boundary(
-                         triple_lighting[command_index], RegisterBank::Data, 8U)
-                         .measured,
-                "triple-lighting RGBC and IR0 gaps remain unmeasured");
+        const auto rgbc = Gte::input_latch_boundary(
+            triple_lighting[command_index], RegisterBank::Data, 6U);
+        if (triple_lighting[command_index] == Command::Nct) {
+            require(!rgbc.measured,
+                    "NCT CODE-only RGBC timing remains unmeasured");
+        } else {
+            const std::uint8_t expected =
+                triple_lighting[command_index] == Command::Ncct ? 12U : 15U;
+            require(rgbc.measured && rgbc.read &&
+                        rgbc.nop_boundary == expected,
+                    "NCCT/NCDT RGBC latch boundary matches measured table");
+        }
+        const auto ir0 = Gte::input_latch_boundary(
+            triple_lighting[command_index], RegisterBank::Data, 8U);
+        require(triple_lighting[command_index] == Command::Ncdt
+                    ? !ir0.measured
+                    : ir0.measured && !ir0.read,
+                "triple-lighting IR0 metadata distinguishes consumers");
     }
     require(!Gte::input_latch_boundary(
                  Command::Mvmva, RegisterBank::Data, 0U)
@@ -492,8 +533,9 @@ void test_math_fifos_and_flags() {
     gte.write_data(13U, 0x7fff8000U);
     gte.write_data(14U, bit(31U) | 0x7fffU);
     const ExecutionReceipt large_clip = gte.execute(command_word(Command::Nclip));
-    require((large_clip.flag & (bit(16U) | bit(15U))) != 0U,
-            "MAC0 overflow flags are retained");
+    require((large_clip.flag & (bit(16U) | bit(15U))) != 0U &&
+                (large_clip.flag & bit(31U)) != 0U,
+            "MAC0 overflow contributes to the documented FLAG summary mask");
 }
 
 void test_color_commands_and_fifo() {
@@ -531,8 +573,24 @@ void test_color_commands_and_fifo() {
     const ExecutionReceipt color_overflow = gte.execute(
         command_word(Command::Dpcs, false, false));
     require((color_overflow.flag & (bit(21U) | bit(20U) | bit(19U))) ==
-                (bit(21U) | bit(20U) | bit(19U)),
-            "color FIFO saturation flags");
+                (bit(21U) | bit(20U) | bit(19U)) &&
+                (color_overflow.flag & bit(31U)) != 0U,
+            "color FIFO saturation contributes to FLAG summary");
+
+    gte.reset();
+    write_identity(gte, 40U);
+    write_identity(gte, 48U);
+    write_vector(gte, 0U, 0, 0, 0);
+    gte.write_data(6U, 0xab000000U);
+    gte.write_control(45U, 1000000U);
+    const ExecutionReceipt wrapped_color = gte.execute(
+        command_word(Command::Ncs, false, false));
+    require(gte.read_data(25U) == 0xf4240000U &&
+                signed_word(gte.read_data(9U)) == 32767 &&
+                gte.read_data(22U) == 0xab000000U &&
+                (wrapped_color.flag & (bit(24U) | bit(21U))) ==
+                    (bit(24U) | bit(21U)),
+            "color FIFO divides the architectural S32 MAC after wrap");
 }
 
 void write_far_color(Gte& gte, std::int32_t red, std::int32_t green,
