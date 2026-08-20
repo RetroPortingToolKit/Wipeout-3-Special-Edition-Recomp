@@ -1,0 +1,89 @@
+# Clean AOT executable-region catalog
+
+This directory contains the first clean-AOT boundary for executable-region
+identity and selection. It is intentionally self-contained and uses only the
+Python standard library. It does not import, invoke, or reproduce a runtime
+compiler, an executable capture pipeline, or an interpreter.
+
+## Identity model
+
+An executable variant is identified by the exact tuple:
+
+```text
+load_range + sha256 + relocation_metadata
+```
+
+`load_range` is a half-open, 32-bit guest-address range. The SHA-256 is the
+hash of the bytes in that range before relocation. Relocation metadata is an
+optional canonical JSON object; `null` and an object are different identities.
+The catalog permits multiple content epochs at the same address, provided
+their hashes or relocation metadata differ. A selector never treats a missing
+variant as a request to compile or interpret the bytes.
+
+A selection request's digest is not trusted on its own. Selection succeeds
+only after the implementation stream-hashes the supplied executable file (or
+hashes the supplied in-memory bytes), verifies its exact range length, and
+matches the complete identity tuple. This makes a claimed digest, partial
+image, relocated near-match, or same-address unknown epoch a rejection.
+
+Every variant also records:
+
+- 4-byte-aligned dispatch roots;
+- sorted, coalesced executed ranges;
+- explicit branch/delay-slot ownership, including page-crossing slots;
+- source-media file names, sizes, and hashes (no media bytes);
+- the relative path, ID, and SHA-256 of the already-built native artifact.
+
+Artifact paths are NFC-normalized relative POSIX paths with additional
+portable-filesystem restrictions. Absolute, drive-relative, UNC, traversal,
+Windows device, case-fold-colliding, trailing-dot/space, formatting-control,
+and non-NFC paths are rejected. Before returning a selection, the artifact is
+resolved beneath the configured root without symlinks or junctions and its
+bytes are checked against the manifest SHA-256.
+
+The manifest-wide stack window is a forbidden range. Load ranges, roots,
+executed ranges, and delay-slot ownership may not overlap it. Roots must be
+inside an executed range. Executable ranges and instruction ownership are
+4-byte aligned and cannot cross the address-space limit.
+
+## Canonical JSON
+
+The package defines a narrow canonical JSON profile: objects have string keys,
+keys are sorted lexicographically, arrays retain their declared order, numbers
+are integers only, non-ASCII is emitted as UTF-8, and separators contain no
+whitespace. Duplicate object keys, floats, NaN, Infinity, invalid Unicode
+scalars, and integers outside the interoperable JSON range are rejected.
+SHA-256 digests are computed over these canonical UTF-8 bytes without a final
+newline. CLI JSON output adds one newline for terminal use.
+
+## CLI
+
+Run from this directory, or set `PYTHONPATH` to it:
+
+```powershell
+python -m psx_catalog validate manifest.json
+python -m psx_catalog normalize manifest.json
+python -m psx_catalog hash precompiled/region-a.bin
+python -m psx_catalog select manifest.json request.json executable.bin artifact-root
+```
+
+`select` exits `0` only when both the executable and native artifact bytes have
+been measured and an exact precompiled variant is selected. Unknown code,
+byte/range mismatches, missing artifacts, indirect artifact paths, and native
+integrity failures print a compact canonical rejection receipt and exit `3`.
+Malformed manifests, requests, paths, or command lines print a canonical
+validation error and exit `2`. There is no fallback selection result.
+
+The request file has the same identity fields used by a variant:
+
+```json
+{
+  "load_range": {"start": 4096, "end_exclusive": 4352},
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "relocation_metadata": null
+}
+```
+
+The exact manifest schema and validation details are encoded in
+`psx_catalog.model`; keeping the parser strict is deliberate so a future
+runtime cannot silently accept an unreviewed field.
