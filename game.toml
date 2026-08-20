@@ -159,7 +159,12 @@ hd_texture_dir = "C:/Users/Shokunin/Documents/ChatGPT/wipeout3se/disc"
 # draw (doubled glyph edges; historically invisible text). Config-owned so
 # regenerating the (gitignored) pack directory cannot silently lose the
 # exclusion the way the pack-local exclude.txt did.
-hd_texture_exclude = ["75f5e38b", "4cb2ec4e", "d20dee94", "861ad9f1"]
+# F500 title/menu atlases (75f5e38b, 4cb2ec4e) are ENABLED: the pack images
+# carry coverage-union backing (tools/fonts/final/ holds the canonical copies;
+# restore them into the pack dir if it is ever regenerated) so the fill pass
+# covers the game's own shadow pass. Only the sans atlases stay excluded:
+# their glyphs touch, so substitution cannot be cell-safe.
+hd_texture_exclude = ["d20dee94", "861ad9f1"]
 
 # CPU overclock, percent of stock.
 #
