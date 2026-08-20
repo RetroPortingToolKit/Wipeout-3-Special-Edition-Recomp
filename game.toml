@@ -165,7 +165,10 @@ hd_texture_dir = "C:/Users/Shokunin/Documents/ChatGPT/wipeout3se/disc"
 # any shadow-doubling refinement happens by regenerating the atlases from
 # tools/fonts/F500 Ang-ular.ttf, never by toggling this list. Only the sans
 # atlases stay excluded (glyphs touch; substitution cannot be cell-safe).
-hd_texture_exclude = ["d20dee94", "861ad9f1"]
+hd_texture_exclude = []  # NOTHING excluded: every font atlas renders HD.
+# Excluding atlases to hide the F500 shadow-doubling ALSO killed HD on the
+# sans atlases (the "(c)2000 Psygnosis Ltd" line went pixelated). Doubling is
+# fixed in the atlas/shader, never by turning HD off.
 
 # CPU overclock, percent of stock.
 #

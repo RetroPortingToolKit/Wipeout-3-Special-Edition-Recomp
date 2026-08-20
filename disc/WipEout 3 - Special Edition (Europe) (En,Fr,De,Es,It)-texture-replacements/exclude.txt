@@ -4,5 +4,5 @@
 # stroke edges from sub-texel HD strokes under the game's two-pass shadow
 # draw). Texture hashes are palette-independent — one line excludes every
 # palette variant of the atlas.
-d20dee94
-861ad9f1
+# d20dee94
+# 861ad9f1
