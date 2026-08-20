@@ -159,7 +159,8 @@ private:
     void set_ir(unsigned index,
                 S64 value,
                 bool limit_negative,
-                S64 flag_probe) noexcept;
+                S64 flag_probe,
+                bool flag_uses_lm_zero = false) noexcept;
     void set_ir0(S64 value) noexcept;
     void set_sz3(S64 value) noexcept;
     void push_sxy(S64 x, S64 y) noexcept;

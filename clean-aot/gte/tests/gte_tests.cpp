@@ -212,6 +212,15 @@ void test_mvmva_selectors_and_saturation() {
         command_word(Command::Mvmva, true, false, 0U, 0U, 0U));
     require((mac_overflow.flag & bit(30U)) != 0U,
             "MAC1 overflow checks the pre-shift accumulator");
+
+    gte.reset();
+    write_identity(gte, 32U);
+    write_vector(gte, 0U, 0, 0, static_cast<std::int16_t>(-1));
+    const ExecutionReceipt rtps_lm = gte.execute(
+        command_word(Command::Rtps, true, true));
+    require(signed_word(gte.read_data(11U)) == 0 &&
+                (rtps_lm.flag & bit(22U)) == 0U,
+            "RTPS IR3 storage honors lm while FLAG.22 uses lm zero");
 }
 
 void test_projection_and_reciprocal_edges() {
@@ -256,6 +265,16 @@ void test_projection_and_reciprocal_edges() {
         command_word(Command::Rtps, true, false));
     require((zero_z.flag & bit(17U)) != 0U, "zero denominator overflow");
     require(gte.read_data(19U) == 0U, "negative/zero Z clamps to zero");
+
+    gte.reset();
+    write_identity(gte, 32U);
+    write_vector(gte, 0U, 32767, 0, 32767);
+    gte.write_control(36U, 0x7fffU);
+    gte.write_control(58U, 65535U);
+    const ExecutionReceipt final_table = gte.execute(
+        command_word(Command::Rtps, false, false));
+    require((final_table.flag & bit(17U)) == 0U,
+            "reciprocal final table entry remains non-overflowing");
 }
 
 void test_math_fifos_and_flags() {

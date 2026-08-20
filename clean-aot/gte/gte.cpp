@@ -358,9 +358,11 @@ void Gte::record_mac(unsigned index, S64 value, S64 overflow_probe) noexcept {
 void Gte::set_ir(unsigned index,
                  S64 value,
                  bool limit_negative,
-                 S64 flag_probe) noexcept {
+                 S64 flag_probe,
+                 bool flag_uses_lm_zero) noexcept {
     const S64 minimum = limit_negative ? S64{0} : S64{-32768};
-    if (flag_probe < minimum || flag_probe > S64{32767}) {
+    const S64 flag_minimum = flag_uses_lm_zero ? S64{-32768} : minimum;
+    if (flag_probe < flag_minimum || flag_probe > S64{32767}) {
         set_flag(kFlagIr[index]);
     }
     const S64 stored = clamp(value, minimum, S64{32767});
@@ -487,7 +489,8 @@ void Gte::execute_rtps(const DecodedInstruction& instruction,
         if (row == 2U && !instruction.shift_fraction) {
             flag_probe = arithmetic_shift_right(raw, 12U);
         }
-        set_ir(row, shifted[row], instruction.limit_negative, flag_probe);
+        set_ir(row, shifted[row], instruction.limit_negative, flag_probe,
+               row == 2U);
     }
 
     const S64 z_value = arithmetic_shift_right(
@@ -765,8 +768,10 @@ std::uint32_t Gte::reciprocal_scale(U16 h,
     }
     const std::uint32_t numerator = static_cast<std::uint32_t>(h) << leading;
     const std::uint32_t table_index = (normalized - 0x7fc0U) >> 7U;
+    const std::uint32_t table_value =
+        ((0x40000U / (table_index + 0x100U)) + 1U) / 2U;
     const std::uint32_t reciprocal =
-        ((0x40000U / (table_index + 0x100U)) + 1U) / 2U - 0x101U;
+        table_value > 0x101U ? table_value - 0x101U : 0U;
     const std::uint32_t u = reciprocal + 0x101U;
     std::uint32_t refined = (0x2000080U - normalized * u) >> 8U;
     refined = (0x80U + refined * u) >> 8U;
