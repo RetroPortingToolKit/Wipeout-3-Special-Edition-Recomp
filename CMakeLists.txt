@@ -4,15 +4,10 @@ project(Wipeout_3_Special_Edition_Recomp LANGUAGES C CXX)
 set(PSXRECOMP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/psxrecomp" CACHE PATH
     "Path to psxrecomp")
 
-# --- Opt-in product surfaces (OFF by default in the framework) -------------
-# Scaffold prompts / flags fill these. Without recomp-ui, PSX_RECOMP_UI is OFF.
-# Setup-host CI requires WIZARD_CMAKE_BLOCK / ENABLE_SETUP_WIZARD (FORCE_SETUP_HOST
-# alone does not open first-run / Generate & rebuild).
-# recomp-ui submodule present (PSX_RECOMP_UI defaults ON).
-if(EXISTS "${PSXRECOMP_ROOT}/lib/recomp-net/CMakeLists.txt")
-    set(PSX_NETPLAY ON CACHE BOOL
-        "Link recomp-net delay-sync (opt-in; needs recomp-net)" FORCE)
-endif()
+# --- Opt-in product surfaces ------------------------------------------------
+# Netplay is outside this remaster's acceptance scope. Keep the framework's
+# OFF default even when the optional recomp-net submodule is present; developers
+# can still opt in explicitly with -DPSX_NETPLAY=ON.
 set(PSX_SETUP_WIZARD ON CACHE BOOL
     "Advertise first-run setup wizard + Generate & rebuild in recomp-ui" FORCE)
 include("${PSXRECOMP_ROOT}/runtime/runtime.cmake")

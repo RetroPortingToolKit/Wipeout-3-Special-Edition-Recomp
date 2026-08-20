@@ -1,0 +1,55 @@
+{
+  "format_version": 1,
+  "game": {
+    "id": "SCES-02845",
+    "title": "WipEout 3 Special Edition",
+    "cue_tracks": 14
+  },
+  "track_01": {
+    "redump": {
+      "size": 94660944,
+      "md5": "b9d48f139544051893f45eed62780e42",
+      "sha1": "a7bb5cdafdf97ba1cd99cc832439f57ce0c39a8a",
+      "crc32": "a0e9e5c2",
+      "blake3": "8f7d08844df14b1afe8150fb0e434bf9c4f088834da65c8623025722d56586a5"
+    },
+    "hueponik_pal": {
+      "size": 94660944,
+      "md5": "462dcfa91348954eee4eb888ad103bd6",
+      "sha1": "22c47101af94426c2e8c309c8164ff2427274b82",
+      "sha256": "397b8a30f401bbd9d12904d6054946474ce4746bdf19565a8db534d65ba179e1",
+      "blake3": "f192d03f9fb94c91cf719ca796ffe1145471d9a8cec4c125c7f612ee0af306be"
+    }
+  },
+  "audio_tracks": [
+    {"track": 2, "size": 43472016, "md5": "e868eeae81bddf113cc5eeffe2c7f091"},
+    {"track": 3, "size": 32911536, "md5": "26cc951fedd4b9da2152dfbcfdf505a9"},
+    {"track": 4, "size": 45706416, "md5": "fab19a45b7605675670539091e1bad9d"},
+    {"track": 5, "size": 44490432, "md5": "43a06f9bfc62a99d75fbad87add147be"},
+    {"track": 6, "size": 44518656, "md5": "63639ec65313ee6a4a11948398164a70"},
+    {"track": 7, "size": 39297216, "md5": "6355ba71d3aa01aaac92f261ed0fcc25"},
+    {"track": 8, "size": 38991456, "md5": "d4d01f4e840fa66c508cb7a260086258"},
+    {"track": 9, "size": 45410064, "md5": "892ea613090dffafa05f368ab689254c"},
+    {"track": 10, "size": 44953776, "md5": "e1b354c0279badc539845f2c2eabdd65"},
+    {"track": 11, "size": 45106656, "md5": "1a64f88c57c44d18b82eec49a6a05723"},
+    {"track": 12, "size": 39179616, "md5": "ca2f5b4cc767b68ba5b296c61e9ad31b"},
+    {"track": 13, "size": 42914592, "md5": "96f8d32adbec0774bd72cc6711dddff0"},
+    {"track": 14, "size": 43961232, "md5": "d3210c8fd2724365ce24b31455d38774"}
+  ],
+  "hueponik_patch": {
+    "repository": "https://codeberg.org/hueponik/wip3out-patches.git",
+    "branch": "dev",
+    "commit": "ac46a5dc500a9581ea55b8efb5c1a0d4be944aba",
+    "filename": "pal_track01.xdelta3",
+    "size": 154496,
+    "sha256": "ae54516a409e133b95a22be94dac17f55381b167834e457ddbc4d569c1e75ec9",
+    "blake3": "c663c95edf41e844ef2c3e2d27c6409870aa7a2a245491b6549b325c744d7f62"
+  },
+  "bios": {
+    "scph1001": {
+      "size": 524288,
+      "md5": "924e392ed05558ffdb115408c263dccf",
+      "sha256": "71af94d1e47a68c11e8fdb9f8368040601514a42a5a399cda48c7d3bff1e99d3"
+    }
+  }
+}

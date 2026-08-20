@@ -6,11 +6,12 @@ source or acceptance oracle.
 
 ## Trusted starting points
 
-- Game project: `d980fa1`, the initial New Project Layout scaffold.
-- Framework: upstream `mstan/psxrecomp` at
-  `d56bd0247c472f7987e61162fcd7b812b65c4e7f`.
-- UI: `mstan/recomp-ui` at
-  `036b963ebd0c6ea51da1a3c29b9aca8600b0f0e3`.
+- Product repository: cleanroom root
+  `e217914e7c33ada690067eb8a2d213f86ae0c8c0`.
+- New generic compiler/runtime source: original files created under
+  `clean-aot/`, with no source parent in a prior PS1 recompiler tree.
+- Third-party dependencies: accepted only at an exact upstream commit with a
+  recorded license and independently recomputed content identity.
 - User media: accepted only after a local identity check. Disc images, BIOS
   dumps, generated executables, save data, and captures are never committed.
 - External projects may be used as behavioral references. Their code is not
@@ -30,6 +31,15 @@ documentation claim crosses into this branch merely because it exists there.
 - Dirty canonical checkout at that branch (preserved in place)
 - Framework feature branch / PR 169:
   `2641f7c59bc18c5cbe64578de45e016c708a6c62`
+- Framework snapshot `mstan/psxrecomp` at
+  `d56bd0247c472f7987e61162fcd7b812b65c4e7f` and every ancestor/descendant in
+  that repository. An immutable history audit found WipEout, Mega Man X5/X6,
+  Tomba, Ape Escape, Crash Bash, runtime compilation/interpreter paths, and
+  always-on oracle/debug machinery throughout the available DAG. It is a
+  reproducible legacy runner, not an independent implementation base.
+- `mstan/recomp-ui` at
+  `036b963ebd0c6ea51da1a3c29b9aca8600b0f0e3` until it independently passes
+  the dependency/provenance and release-link boundary.
 - Game PRs 5, 6, and 7, existing build trees, reports, dumps, fonts, texture
   variants, patches, scripts, and handoff documents derived from that work
 
@@ -65,6 +75,15 @@ The target is region-based static recompilation. Normal code paths must execute
 compiled regions with guest values resident in host temporaries across basic
 blocks. CPU state is materialized only at explicit exits and observation
 boundaries. Cycle accounting is exact at device-visible boundaries, not
-implemented as an opaque helper after every guest instruction. Runtime decoding
-is a guarded fallback for genuinely dynamic or unsupported code, and fallback
-coverage must be reported rather than hidden.
+implemented as an opaque helper after every guest instruction.
+
+The shipping runtime contains no general interpreter, runtime compiler,
+capture-and-compile path, or compatibility dispatch. Offline setup identifies
+every executable image/overlay variant by load range and content hash and emits
+all variants ahead of time. Runtime executable writes may select a known
+precompiled variant; an unknown executable identity fails closed with a compact
+coverage receipt.
+
+The quarantined legacy lane may decode, interpret, capture, or expose debug
+commands only to discover routes and test inputs. Its output is explicitly not
+a correctness oracle and none of those facilities may enter the release link.

@@ -1,0 +1,25 @@
+{
+  "format": "psxrecomp-input-route-v1",
+  "description": "Diagnostic route from the running intro to FEISAR / Porto Kora / Vector",
+  "precondition": "Intro race is visibly running; no saved language preference",
+  "steps": [
+    {"pad_word": "0xFFF7", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 180},
+    {"pad_word": "0xFFF7", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 180},
+    {"pad_word": "0xFFBF", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 30},
+    {"pad_word": "0xBFFF", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 300},
+    {"pad_word": "0xBFFF", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 300},
+    {"pad_word": "0xBFFF", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 300},
+    {"pad_word": "0xBFFF", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 300},
+    {"pad_word": "0xBFFF", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 300},
+    {"pad_word": "0xBFFF", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 1200}
+  ]
+}

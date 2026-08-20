@@ -5,8 +5,8 @@
 name = "Wipeout 3 Special Edition"
 id = "SCES-02845"
 players = 2
-exe = "disc/SCES_028.45"
-disc = "disc/WipEout 3 - Special Edition (Europe) (En,Fr,De,Es,It).cue"
+exe = "prepared_disc/SCES_028.45"
+disc = "prepared_disc/WipEout 3 - Special Edition (Europe) (En,Fr,De,Es,It).cue"
 load_address = "0x80010000"
 entry_pc = "0x80162474"
 text_size = "0x0016C000"
@@ -14,19 +14,21 @@ stack_base = "0x801FFFF0"
 
 # Digests are for data Track 01 (first BINARY FILE / TRACK 01).
 [prepare_disc]
-out_dir = "disc"
+out_dir = "prepared_disc"
 bin_name = "WipEout 3 - Special Edition (Europe) (En,Fr,De,Es,It) (Track 01).bin"
 cue_name = "WipEout 3 - Special Edition (Europe) (En,Fr,De,Es,It).cue"
 boot_exe = "SCES_028.45"
 known_sizes = [94660944]
 known_md5 = [
-  "b9d48f139544051893f45eed62780e42",
+  # Exact output of hueponik dev ac46a5d pal_track01.xdelta3.
+  "462dcfa91348954eee4eb888ad103bd6",
 ]
 known_sha1 = [
-  "a7bb5cdafdf97ba1cd99cc832439f57ce0c39a8a",
+  "22c47101af94426c2e8c309c8164ff2427274b82",
 ]
 known_crc32 = [
-  "a0e9e5c2",
+  # CRC32 is intentionally omitted from the prepare gate; MD5 and SHA-1 are
+  # both checked above, and the cleanroom verifier also checks SHA-256/BLAKE3.
 ]
 
 [recompiler]
