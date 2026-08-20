@@ -52,4 +52,9 @@ exec bash "${PACKAGER}" \
   --project-file README.md \
   --project-dir seeds \
   --project-dir launcher_assets \
+  --project-dir translations \
+  --project-dir assets \
+  --project-dir mods \
+  --runtime-dir-optional mods \
+  --runtime-dir-optional bezels \
   "${EXTRA_PROJECT[@]}"

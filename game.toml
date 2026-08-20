@@ -444,6 +444,13 @@ required_disc_fp = "a8a369bf31c63906bfcf91d1a0a87d93bde7984d82f02edc5e79727d1e32
 # Each machine runs its own console visibly plus a headless follower for the
 # other; the cable is local shm, netplay carries only the 4 pad streams.
 link_lobby = true
+# Shared dev channel. When set (or via PSX_NETPLAY_DEV_TAG at runtime) this
+# build advertises "dev+<tag>" to the lobby instead of its release version:
+# every build carrying the same tag finds each other, and the rooms stay
+# invisible to players on a versioned release (their browser pins an exact
+# version no dev build advertises, and the server refuses a version mismatch
+# on join). Leave unset for a shipping build.
+# dev_tag = "wipeout-lab"
 
 # 8 MB framerate mod (ntscfull8): the enhancement engine at 0x80780000+ is a
 # detour trampoline farm — patched text sites `j 0x8078xxxx` into stubs that
