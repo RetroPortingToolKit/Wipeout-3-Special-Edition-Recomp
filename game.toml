@@ -150,13 +150,14 @@ hd_texture_dir = "hd_textures"
 # hueponik's pal100full8 patch requires >900%.
 cpu_overclock = 100
 
-# Artwork drawn behind the frame, filling the letterbox/pillarbox margins
-# the way vertical shmups fill the dead space on a horizontal display.
-# "random" picks one of the bundled team logos per launch and keeps it for
-# the session; a team name ("qirex", "feisar", ...) pins one; a path uses
-# your own image, relative to the disc directory; "off" disables it.
+# Margin artwork is game-owned on the Mods page (Bezel Artwork), not a config
+# knob -- same move as Widescreen below. Left "off" so the package owns the
+# setting outright: the plugin writes the player's team choice at activation,
+# and a disabled package leaves this value standing, which is the off state.
+# A team name ("qirex"), "random", or a path still works here if you want the
+# artwork without the mod, but the Mods page will override it when enabled.
 # Logos by toolboxio (deviantart.com/toolboxio), via awesome-wipeout.github.io.
-bezel = "random"
+bezel = "off"
 
 # Authentic 4:3 is the baseline. The Widescreen mod below activates WipEout
 # 3's game-specific native-wide hooks and chooses fixed/adaptive presentation.

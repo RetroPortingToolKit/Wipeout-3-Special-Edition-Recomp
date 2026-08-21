@@ -1,0 +1,76 @@
+format_version = 5
+id = "wipeout3.enhancement.bezel"
+version = "1.0.0"
+name = "WipEout 3 Bezel Artwork"
+author = "mstan"
+description = "Fills the pillarbox margins beside the 4:3 picture with a tiled WipEout 3 team mark instead of black, the way vertical shmups dress the dead space on a horizontal display."
+license = "Artwork (c) toolboxio, no formal licence; see assets/bezels/CREDITS.txt"
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[author_link]]
+name = "toolboxio (artwork)"
+url = "https://www.deviantart.com/toolboxio"
+
+[[target]]
+game_id = "SCES-02845"
+disc_sha256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
+
+# Presentation only -- nothing guest-side is patched. The margins only exist
+# when the game rect does not fill the window, so this shows at 4:3 on a wider
+# display and quietly does nothing once Widescreen fills the screen.
+[[feature]]
+id = "bezel"
+name = "Bezel Artwork"
+description = "Disabled by default (black margins are the authentic floor). Tiles a team mark across the pillarbox, over a dark ground mixed from that team's own colours, and fades it out toward the picture so it never competes with the game. Requires the OpenGL renderer; margins on FMV frames stay black."
+group = "Display"
+default_enabled = false
+
+[[option]]
+feature = "bezel"
+id = "team"
+label = "Team mark"
+description = "Which mark tiles the margins. 'Random' picks one at launch and keeps it for the whole session."
+group = "Display"
+type = "choice"
+default = "random"
+
+[[option.choice]]
+value = "random"
+label = "Random (per launch)"
+
+[[option.choice]]
+value = "ag-systems"
+label = "AG Systems"
+
+[[option.choice]]
+value = "assegai"
+label = "Assegai"
+
+[[option.choice]]
+value = "auricom"
+label = "Auricom"
+
+[[option.choice]]
+value = "feisar"
+label = "Feisar"
+
+[[option.choice]]
+value = "goteki-45"
+label = "Goteki 45"
+
+[[option.choice]]
+value = "icaras"
+label = "Icaras"
+
+[[option.choice]]
+value = "piranha"
+label = "Piranha"
+
+[[option.choice]]
+value = "qirex"
+label = "Qirex"
+
+[[plugin]]
+feature = "bezel"
+id = "wipeout3.bezel"
