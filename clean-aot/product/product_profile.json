@@ -1,0 +1,77 @@
+{
+  "schema": "psxrecomp.clean-aot.product-profile.v1",
+  "game": {
+    "id": "SCES-02845",
+    "title": "WipEout 3 Special Edition",
+    "cue_tracks": 14
+  },
+  "bios": {
+    "id": "SCPH1001",
+    "size": 524288,
+    "sha256": "71af94d1e47a68c11e8fdb9f8368040601514a42a5a399cda48c7d3bff1e99d3"
+  },
+  "hueponik_patch": {
+    "repository": "https://codeberg.org/hueponik/wip3out-patches.git",
+    "branch": "dev",
+    "commit": "ac46a5dc500a9581ea55b8efb5c1a0d4be944aba",
+    "filename": "pal_track01.xdelta3",
+    "size": 154496,
+    "sha256": "ae54516a409e133b95a22be94dac17f55381b167834e457ddbc4d569c1e75ec9"
+  },
+  "patched_track_01": {
+    "size": 94660944,
+    "sha256": "397b8a30f401bbd9d12904d6054946474ce4746bdf19565a8db534d65ba179e1"
+  },
+  "main_executable": {
+    "logical_path": "/SCES_028.45",
+    "file_size": 1492992,
+    "file_sha256": "7004d1400015fe1466131fa3f31b529cc6e544d30efe7cbfadc69dcb34b3d7ac",
+    "entry_pc": 2148934772,
+    "load_range": {
+      "start": 2147549184,
+      "end_exclusive": 2149040128
+    },
+    "text_sha256": "d483d38423965f7995e3d13fc919c887cf63c3f7f2b9d618859c80771488b0c3"
+  },
+  "catalog": {
+    "id": "wipeout3se-pal-clean-aot",
+    "page_size": 4096,
+    "stack_window": {
+      "start": 2149515264,
+      "end_exclusive": 2149580800
+    }
+  },
+  "runtime_variants": [
+    {
+      "id": "nfe-entry-5",
+      "kind": "pbp-expanded-payload",
+      "logical_path": "/WIPEOUT3/NFE.PB",
+      "container_size": 149580,
+      "container_sha256": "92ddc40d7ee51317d69fc478e977711a33a4bb6fea055c84565b117b379f6aa9",
+      "entry_index": 5,
+      "stored_size": 72894,
+      "stored_sha256": "7687751be1d8ef3678d04be423b36c6429aedf2a6ebb19450265a0f2fcb20d48",
+      "expanded_size": 136908,
+      "expanded_sha256": "3dc9945ce03c83229b8cec74369e743b205bda2ed95eb7a8de775b54c0f10810",
+      "load_range": {
+      "start": 2148268032,
+      "end_exclusive": 2148404940
+      },
+      "relocation_metadata": null
+    }
+  ],
+  "limits": {
+    "max_cue_bytes": 1048576,
+    "max_raw_track_bytes": 268435456,
+    "max_cooked_image_bytes": 268435456,
+    "max_iso_files": 2048,
+    "max_extracted_bytes": 268435456,
+    "max_pbp_bytes": 67108864,
+    "max_pbp_entries": 4096,
+    "max_runtime_variants": 64,
+    "max_generated_files": 4096,
+    "max_generated_bytes": 536870912,
+    "max_generated_file_bytes": 67108864,
+    "max_compiler_output_bytes": 1048576
+  }
+}
