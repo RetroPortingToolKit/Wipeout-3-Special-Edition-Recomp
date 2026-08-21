@@ -15,12 +15,26 @@ is a build input or source template.
   commands, rumble mapping, memory-card framing, raw-card geometry, and frame
   checksums. Its prose and code are not copied into this component.
 
+The independent review rechecked the register table and protocol byte tables
+against that pinned revision. In particular, the implementation now uses the
+documented `0x0A` control offset, 16/32-bit RX preview/removal rules,
+free-running half-bit baud timer, disabled-TX overwrite rule, single-shot
+address phase, delayed `/ACK` event, original-card
+late read ACK, PS1 analog-pad type
+byte, command-48 response position, masked mode-lock key, and dynamic digital
+reply length implied by the six rumble-map bytes. The old one-motor command is
+evaluated from both documented control bytes rather than latching either byte
+independently. These are behavioral facts
+expressed in original code and adversarial tests, not imported implementation.
+
 The reference documents describe some behavior as measured, uncertain, or
 revision-dependent. This tranche therefore records the following explicit
 limits rather than inventing compatibility: SIO1 is absent; multitap and
 third-party card extensions are absent; undocumented/DualShock2 pressure
-commands are bounded; and exact electrical ACK edge placement is deferred to
-machine-level traces.
+commands are bounded; and revision-exact electrical ACK edge placement is
+deferred to machine-level traces. The 400-cycle delay, 100-cycle pulse, and
+31,000-cycle extra Sony-card read delay are documented nominal values and
+remain explicit timing metadata for later trace calibration.
 
 ## Implementation boundary
 

@@ -1,8 +1,10 @@
-#pragma once
+#ifndef CLEAN_AOT_SIO_SIO_HPP
+#define CLEAN_AOT_SIO_SIO_HPP
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <span>
 
 namespace clean_aot::sio {
@@ -21,6 +23,7 @@ enum class MmioError : std::uint8_t {
     UnsupportedWidth,
     UnknownRegister,
     TimeWentBackwards,
+    CycleOverflow,
     DeviceDisabled,
     ReceiveEmpty,
     InvalidImage,
@@ -29,6 +32,7 @@ enum class MmioError : std::uint8_t {
     NoDevice,
     DeviceConflict,
     UnsupportedValue,
+    UnsupportedMode,
 };
 
 struct MmioReadResult {
@@ -57,14 +61,27 @@ enum class DeviceKind : std::uint8_t {
 struct ByteTransfer {
     std::uint8_t value = 0xFFU;
     bool acknowledged = false;
+    Cycle acknowledge_delay = 0;
+    Cycle acknowledge_width = 0;
 };
+
+// Nominal Sony-compatible timings from the pinned behavioral reference. The
+// device result carries these values explicitly so machine integration can
+// replace them when hardware traces establish a more specific device profile.
+inline constexpr Cycle kNominalAckDelayCycles = 400U;
+inline constexpr Cycle kNominalAckPulseCycles = 100U;
+inline constexpr Cycle kMemoryCardReadLateAckExtraCycles = 31'000U;
+inline constexpr Cycle kMaximumAckLeadCycles = kNominalAckDelayCycles +
+                                                kMemoryCardReadLateAckExtraCycles +
+                                                kNominalAckPulseCycles;
+inline constexpr Cycle kNoEventCycle = std::numeric_limits<Cycle>::max();
 
 // SIO0 is mapped by the machine layer. These are offsets, not absolute guest
 // addresses, so this component can be reused by any PS1 memory map.
 inline constexpr std::uint32_t kDataOffset = 0x00U;
 inline constexpr std::uint32_t kStatusOffset = 0x04U;
 inline constexpr std::uint32_t kModeOffset = 0x08U;
-inline constexpr std::uint32_t kControlOffset = 0x0CU;
+inline constexpr std::uint32_t kControlOffset = 0x0AU;
 inline constexpr std::uint32_t kBaudOffset = 0x0EU;
 
 inline constexpr std::uint16_t kModeFactorMask = 0x0003U;
@@ -72,6 +89,9 @@ inline constexpr std::uint16_t kModeLengthMask = 0x000CU;
 inline constexpr std::uint16_t kModeParityEnable = 0x0010U;
 inline constexpr std::uint16_t kModeParityOdd = 0x0020U;
 inline constexpr std::uint16_t kModeClockPolarity = 0x0100U;
+inline constexpr std::uint16_t kSio0ModeWritableMask =
+    kModeFactorMask | kModeLengthMask | kModeParityEnable |
+    kModeParityOdd | kModeClockPolarity;
 
 inline constexpr std::uint16_t kControlTxEnable = 0x0001U;
 inline constexpr std::uint16_t kControlDtr = 0x0002U;
@@ -157,6 +177,7 @@ struct PadSnapshot {
     std::uint8_t pending_mode = 0;
     std::uint8_t pending_key = 0;
     bool command_valid = false;
+    bool transaction_done = false;
 };
 
 class PadDevice final : public SioDevice {
@@ -182,6 +203,8 @@ public:
 private:
     [[nodiscard]] std::uint8_t normal_id() const noexcept;
     [[nodiscard]] std::uint8_t response_id() const noexcept;
+    [[nodiscard]] std::uint8_t normal_final_phase() const noexcept;
+    [[nodiscard]] std::uint8_t analog_or_padding(std::uint8_t phase) const noexcept;
     [[nodiscard]] ByteTransfer exchange_normal(std::uint8_t value,
                                                Cycle cycle) noexcept;
     [[nodiscard]] ByteTransfer exchange_configuration(std::uint8_t value,
@@ -199,6 +222,7 @@ private:
     std::uint8_t pending_mode_ = 0;
     std::uint8_t pending_key_ = 0;
     bool command_valid_ = false;
+    bool transaction_done_ = false;
 };
 
 struct WriteReceipt {
@@ -221,6 +245,7 @@ struct MemoryCardSnapshot {
     std::uint8_t data_index = 0;
     std::uint8_t checksum = 0;
     std::uint8_t received_checksum = 0;
+    std::uint8_t previous_value = 0;
     bool selected = false;
     bool valid_sector = false;
     bool pending_write_valid = false;
@@ -293,10 +318,10 @@ private:
     };
 
     [[nodiscard]] ByteTransfer response(std::uint8_t value,
-                                        bool more_data) noexcept;
+                                        bool more_data,
+                                        Cycle extra_ack_delay = 0) noexcept;
     [[nodiscard]] bool valid_address() const noexcept;
     [[nodiscard]] std::size_t image_offset() const noexcept;
-    [[nodiscard]] std::uint8_t checksum_for_pending() const noexcept;
     [[nodiscard]] std::uint64_t protocol_fingerprint() const noexcept;
     void commit_pending_write() noexcept;
     void fail_command() noexcept;
@@ -313,6 +338,7 @@ private:
     std::uint8_t data_index_ = 0;
     std::uint8_t checksum_ = 0;
     std::uint8_t received_checksum_ = 0;
+    std::uint8_t previous_value_ = 0;
     std::uint8_t flag_ = 0x08U;
     std::uint32_t write_generation_ = 0;
     std::uint32_t error_count_ = 0;
@@ -327,6 +353,9 @@ struct SioSnapshot {
 
     Cycle cycle = 0;
     Cycle shift_complete = 0;
+    Cycle shift_bit_period = 0;
+    Cycle baud_timer_value = 0;
+    Cycle ack_begin = 0;
     Cycle ack_until = 0;
     std::uint16_t mode = 0;
     std::uint16_t control = 0;
@@ -336,6 +365,8 @@ struct SioSnapshot {
     std::uint8_t rx_head = 0;
     std::uint8_t rx_count = 0;
     bool shift_active = false;
+    bool baud_timer_running = false;
+    bool ack_pending = false;
     bool dsr = false;
     bool irq = false;
     bool parity_error = false;
@@ -344,6 +375,7 @@ struct SioSnapshot {
     bool forced_receive = false;
     bool addressing = true;
     bool device_conflict = false;
+    bool ack_collision = false;
     Port selected_port = Port::One;
     DeviceKind active_device = DeviceKind::None;
     std::array<TxEntry, 2> tx_fifo{};
@@ -355,7 +387,8 @@ public:
     static constexpr std::size_t kTxCapacity = 2U;
     static constexpr std::size_t kRxCapacity = 8U;
     static constexpr Cycle kCpuClockHz = 33'868'800U;
-    static constexpr Cycle kDefaultAckPulseCycles = 68U;
+    static constexpr Cycle kDefaultAckDelayCycles = kNominalAckDelayCycles;
+    static constexpr Cycle kDefaultAckPulseCycles = kNominalAckPulseCycles;
 
     struct Callbacks {
         void (*irq)(void*, bool) noexcept = nullptr;
@@ -390,8 +423,10 @@ public:
     [[nodiscard]] Cycle cycle() const noexcept;
     [[nodiscard]] Cycle cycles_per_bit() const noexcept;
     [[nodiscard]] Cycle cycles_per_byte() const noexcept;
+    [[nodiscard]] Cycle next_event_cycle() const noexcept;
     [[nodiscard]] bool irq_pending() const noexcept;
     [[nodiscard]] bool dsr_active() const noexcept;
+    [[nodiscard]] bool ack_collision() const noexcept;
     [[nodiscard]] bool rx_overrun() const noexcept;
     [[nodiscard]] MmioError last_error() const noexcept;
     [[nodiscard]] SioSnapshot snapshot() const noexcept;
@@ -411,7 +446,11 @@ private:
                                      MmioWidth expected) noexcept;
     [[nodiscard]] std::uint32_t status_value() const noexcept;
     [[nodiscard]] Cycle baud_factor() const noexcept;
+    [[nodiscard]] Cycle baud_timer_reload() const noexcept;
     [[nodiscard]] Cycle baud_timer() const noexcept;
+    [[nodiscard]] bool device_mode_supported() const noexcept;
+    [[nodiscard]] static bool event_time_fits(Cycle base, Cycle delay) noexcept;
+    [[nodiscard]] bool queued_transfer_window_fits() const noexcept;
     [[nodiscard]] std::uint8_t rx_threshold() const noexcept;
     [[nodiscard]] bool rx_condition() const noexcept;
     [[nodiscard]] bool tx_condition() const noexcept;
@@ -421,9 +460,12 @@ private:
     void apply_control(std::uint16_t value, Cycle cycle) noexcept;
     void begin_bus_select(Cycle cycle) noexcept;
     void end_bus_select(Cycle cycle) noexcept;
-    void try_start_transfer() noexcept;
-    void complete_transfer() noexcept;
+    [[nodiscard]] bool try_start_transfer() noexcept;
+    [[nodiscard]] bool complete_transfer() noexcept;
+    [[nodiscard]] bool schedule_ack(const ByteTransfer& transfer) noexcept;
+    void begin_ack() noexcept;
     void expire_ack() noexcept;
+    void advance_baud_timer(Cycle elapsed) noexcept;
     void enqueue_rx(std::uint8_t value) noexcept;
     void enqueue_tx(std::uint8_t value, bool tx_enabled) noexcept;
     [[nodiscard]] bool tx_can_start() const noexcept;
@@ -437,8 +479,10 @@ private:
     std::array<Slot, 2> slots_{};
     Cycle cycle_ = 0;
     Cycle shift_complete_ = 0;
+    Cycle shift_bit_period_ = 0;
+    Cycle baud_timer_value_ = 0;
+    Cycle ack_begin_ = 0;
     Cycle ack_until_ = 0;
-    Cycle ack_pulse_cycles_ = kDefaultAckPulseCycles;
     std::uint16_t mode_ = 0;
     std::uint16_t control_ = 0;
     std::uint16_t baud_ = 0;
@@ -447,6 +491,8 @@ private:
     std::uint8_t rx_head_ = 0;
     std::uint8_t rx_count_ = 0;
     bool shift_active_ = false;
+    bool baud_timer_running_ = false;
+    bool ack_pending_ = false;
     bool dsr_ = false;
     bool irq_ = false;
     bool parity_error_ = false;
@@ -455,6 +501,7 @@ private:
     bool forced_receive_ = false;
     bool addressing_ = true;
     bool device_conflict_ = false;
+    bool ack_collision_ = false;
     MmioError last_error_ = MmioError::None;
     Port selected_port_ = Port::One;
     DeviceKind active_kind_ = DeviceKind::None;
@@ -463,3 +510,5 @@ private:
 };
 
 } // namespace clean_aot::sio
+
+#endif // CLEAN_AOT_SIO_SIO_HPP
