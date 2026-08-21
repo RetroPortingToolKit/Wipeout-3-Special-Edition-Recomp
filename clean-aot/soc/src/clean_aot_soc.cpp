@@ -623,6 +623,12 @@ SocStatus RootCounters::advance_cpu(
         const CounterState& counter = state_storage_[index];
         next_phases[index] =
             Fraction{counter.phase_numerator, counter.phase_denominator};
+        if (!counter.running) {
+            // A synchronized pause freezes the fractional clock as well as
+            // the visible count; paused native time must not be discarded as
+            // a synthetic tick when the gate opens again.
+            continue;
+        }
         const CounterClockSource source =
             counter_clock_source(index, counter.mode);
         if (source != CounterClockSource::system &&

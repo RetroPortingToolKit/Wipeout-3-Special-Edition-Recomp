@@ -600,6 +600,28 @@ void test_counter_adversarial_state(TestRunner& runner) {
                        SocStatus::ok);
     EXPECT(runner, counters.read_count(0U) == 3U);
 
+    EXPECT(runner, counters.write_mode(0U, 0x0001U) == SocStatus::ok);
+    EXPECT(runner, counters.write_count(0U, 0U) == SocStatus::ok);
+    EXPECT(runner,
+           counters.advance_cpu(CycleDelta{1U, 2U}, nullptr) ==
+               SocStatus::ok);
+    EXPECT(runner, counters.snapshot(0U).phase_numerator == 1U &&
+                       counters.snapshot(0U).phase_denominator == 2U);
+    EXPECT(runner, counters.input_edge(CounterEdge::hblank_begin, nullptr) ==
+                       SocStatus::ok);
+    EXPECT(runner, !counters.running(0U));
+    EXPECT(runner,
+           counters.advance_cpu(CycleDelta{1U, 2U}, nullptr) ==
+               SocStatus::ok);
+    EXPECT(runner, counters.read_count(0U) == 0U);
+    EXPECT(runner, counters.input_edge(CounterEdge::hblank_end, nullptr) ==
+                       SocStatus::ok);
+    EXPECT(runner, counters.running(0U));
+    EXPECT(runner,
+           counters.advance_cpu(CycleDelta{1U, 2U}, nullptr) ==
+               SocStatus::ok);
+    EXPECT(runner, counters.read_count(0U) == 1U);
+
     EXPECT(runner, counters.write_mode(1U, 0x0007U) == SocStatus::ok);
     EXPECT(runner, !counters.running(1U));
     const std::size_t before_counter1_release = log.count;
@@ -613,6 +635,21 @@ void test_counter_adversarial_state(TestRunner& runner) {
     EXPECT(runner, counters.input_edge(CounterEdge::vblank_begin, nullptr) ==
                        SocStatus::ok);
     EXPECT(runner, log.count == before_counter1_release + 1U);
+    const CounterSnapshot released_counter1 = counters.snapshot(1U);
+    RootCounters released_replay;
+    EXPECT(runner,
+           released_replay.restore(1U, released_counter1) == SocStatus::ok);
+    EXPECT(runner,
+           equal_counter_snapshot(released_counter1,
+                                  released_replay.snapshot(1U)));
+    auto malformed_release = released_counter1;
+    malformed_release.running = false;
+    EXPECT(runner,
+           released_replay.restore(1U, malformed_release) ==
+               SocStatus::snapshot_mismatch);
+    EXPECT(runner,
+           equal_counter_snapshot(released_counter1,
+                                  released_replay.snapshot(1U)));
 
     InterruptController toggle_interrupts;
     RootCounters toggle(&toggle_interrupts);
