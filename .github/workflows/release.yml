@@ -543,12 +543,78 @@ jobs:
           scripts/package_setup_release.sh build-ci "${{ matrix.artifact }}" build-recompiler
           ls -la dist/
 
+      - name: Package player (lean) zip
+        run: |
+          set -euo pipefail
+          chmod +x scripts/package_lean_release.sh
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            export PSXRECOMP_RUNTIME_BIN_DIR=/mingw64/bin
+            export BPE_RUNTIME_BIN_DIR=/mingw64/bin
+          fi
+          export RELEASE_VERSION
+          # Play-only package: game + precompiled overlay shards + the overlay
+          # autocompile prerequisites. No source tree, no SDK, no wizard.
+          scripts/package_lean_release.sh build-ci "${{ matrix.artifact }}" build-recompiler
+          ls -la dist/
+
+      # A bundle that cannot compile overlays silently runs every mod-patched
+      # region on the dirty-RAM interpreter for the life of the install (a
+      # shipped build was measured at 29.3M interpreted dispatches over 12.9k
+      # frames because compile_overlays.py was not in the zip). The packager
+      # asserts this at stage time; re-assert it on the ACTUAL zip contents so
+      # no packaging refactor can reship the regression.
+      - name: Verify bundle prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail=0
+          for zip in dist/wse-*-${{ matrix.artifact }}.zip dist/wse-*-${{ matrix.artifact }}-lean.zip; do
+            [[ -f "${zip}" ]] || continue
+            echo "== ${zip}"
+            list="$(unzip -Z1 "${zip}")"
+            for req in \
+              'psxrecomp/tools/compile_overlays.py' \
+              'psxrecomp/runtime/include/overlay_api.h'
+            do
+              if ! grep -qxF "${req}" <<<"${list}"; then
+                echo "   MISSING: ${req}" >&2
+                fail=1
+              fi
+            done
+            if ! grep -qE '^psxrecomp/recompiler/build/psxrecomp-game(\.exe)?$' <<<"${list}"; then
+              echo "   MISSING: psxrecomp/recompiler/build/psxrecomp-game" >&2
+              fail=1
+            fi
+            shards="$(grep -cE '^cache/.*\.so$|^cache/.*\.dll$' <<<"${list}" || true)"
+            ranges="$(grep -cE '^cache/.*\.ranges$' <<<"${list}" || true)"
+            echo "   shards=${shards} ranges=${ranges}"
+            if [[ "${shards}" -gt 0 && "${shards}" -ne "${ranges}" ]]; then
+              echo "   MISMATCH: every shard needs its .ranges sidecar" >&2
+              fail=1
+            fi
+            # Build-time transients must never ship (stale locks confuse a
+            # player install and waste bundle space).
+            if grep -qE '\.pair-lock$|\.pair-txn\.json$' <<<"${list}"; then
+              echo "   LEAKED build transients (.pair-lock/.pair-txn.json)" >&2
+              fail=1
+            fi
+          done
+          [[ "${fail}" -eq 0 ]] || {
+            echo "Bundle prerequisite check FAILED — overlay autocompile would be" >&2
+            echo "impossible on an install and mod-patched code would stay interpreted." >&2
+            exit 1
+          }
+          echo "bundle prerequisites OK"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           # Artifact name uses the title zip prefix (e.g. bpe, motk).
           name: wse-${{ matrix.artifact }}
-          path: dist/wse-*-${{ matrix.artifact }}.zip
+          # Both shapes: the setup-host zip and the play-only (-lean) zip.
+          path: |
+            dist/wse-*-${{ matrix.artifact }}.zip
+            dist/wse-*-${{ matrix.artifact }}-lean.zip
           if-no-files-found: error
           retention-days: 30
 
