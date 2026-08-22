@@ -32,6 +32,11 @@
   only 526 guest deliveries (~52.6/s). Headless produced an invalid ~204/s
   result. The PAL-100 path therefore remains disabled until the title/menu
   cadence and presentation bottleneck are isolated and corrected.
+- A follow-up perf diagnostic confirms the headless result is an uncapped
+  diagnostic only: after PAL x2, the guest cadence varied above 100 Hz while
+  the host pacer was intentionally bypassed. It does not prove presentation.
+  The windowed 100 Hz result must be re-run with the render workload measured;
+  do not convert the headless surplus into a PAL-100 release claim.
 
 ## Open blockers
 
