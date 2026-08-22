@@ -163,6 +163,11 @@
   preserves guest-clocked audio production. The host bridge still reports
   large aggregate underruns during the accelerated wall-time run, so host
   presentation smoothness and a byte-for-byte paired normal trace remain open.
+- The frame-fingerprint interface was exercised on the clean normal prefix and
+  returns per-frame RAM/MMIO hashes, write counts, and guest cycles. A paired
+  accelerated fingerprint capture still needs to be retained and diffed as a
+  durable artifact; the disposable probe was removed without treating its
+  partial run as a pass.
 - Runtime still links generic overlay/autocompile/interpreter plumbing even
   though the release configuration disables its behavior; strict link-surface
   removal remains unfinished.
