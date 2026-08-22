@@ -2,13 +2,13 @@
   "delta_from_receipt_sha256_57511195433271ecbd3f3c76bc30f5aac1400964371113100a97a05cb1dc9fae": {
     "main-exe": {
       "authorized_instruction_delta": 5171,
-      "proved_cross_image_direct_edges": 0,
+      "proved_cross_image_direct_edges": 1,
       "rejected_direct_edge_delta": -16,
       "unresolved_indirect_delta": -17
     },
     "nfe-entry5-route-variant": {
-      "authorized_instruction_delta": 0,
-      "proved_cross_image_direct_edges": 1220,
+      "authorized_instruction_delta": 108,
+      "proved_cross_image_direct_edges": 1236,
       "rejected_direct_edge_delta": -1220,
       "unresolved_indirect_delta": 0
     }
@@ -1130,7 +1130,14 @@
         }
       ],
       "base": 2147549184,
-      "cross_image_direct_edges": [],
+      "cross_image_direct_edges": [
+        {
+          "kind": "direct_call",
+          "source": 2148629152,
+          "target": 2148268032,
+          "target_image": "nfe-entry5-route-variant"
+        }
+      ],
       "delay_slot_owners": [
         {
           "delay_slot": 2148336648,
@@ -48823,7 +48830,9 @@
           2148913000,
           2148913728,
           2148914356,
+          2148922772,
           2148922804,
+          2148922820,
           2148922836,
           2148922852,
           2148922868,
@@ -232084,11 +232093,6 @@
           "kind": "fallthrough",
           "source": 2148629144,
           "target": 2148629152
-        },
-        {
-          "kind": "direct_call",
-          "source": 2148629152,
-          "target": 2148268032
         },
         {
           "kind": "fallthrough",
@@ -553545,7 +553549,9 @@
         2148913000,
         2148913728,
         2148914356,
+        2148922772,
         2148922804,
+        2148922820,
         2148922836,
         2148922852,
         2148922868,
@@ -555234,11 +555240,11 @@
       ]
     },
     {
-      "authorized_instruction_count": 31719,
+      "authorized_instruction_count": 31827,
       "authorized_ranges": [
         {
           "end_exclusive": 2148268716,
-          "start": 2148268464
+          "start": 2148268032
         },
         {
           "end_exclusive": 2148269156,
@@ -555311,6 +555317,102 @@
       ],
       "base": 2148268032,
       "cross_image_direct_edges": [
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268088,
+          "target": 2148922820,
+          "target_image": "main-exe"
+        },
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268120,
+          "target": 2148922820,
+          "target_image": "main-exe"
+        },
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268152,
+          "target": 2148922820,
+          "target_image": "main-exe"
+        },
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268184,
+          "target": 2148922820,
+          "target_image": "main-exe"
+        },
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268216,
+          "target": 2148922820,
+          "target_image": "main-exe"
+        },
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268248,
+          "target": 2148922820,
+          "target_image": "main-exe"
+        },
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268280,
+          "target": 2148922820,
+          "target_image": "main-exe"
+        },
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268312,
+          "target": 2148922820,
+          "target_image": "main-exe"
+        },
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268328,
+          "target": 2148922772,
+          "target_image": "main-exe"
+        },
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268340,
+          "target": 2148922772,
+          "target_image": "main-exe"
+        },
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268352,
+          "target": 2148922772,
+          "target_image": "main-exe"
+        },
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268364,
+          "target": 2148922772,
+          "target_image": "main-exe"
+        },
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268376,
+          "target": 2148922772,
+          "target_image": "main-exe"
+        },
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268388,
+          "target": 2148922772,
+          "target_image": "main-exe"
+        },
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268400,
+          "target": 2148922772,
+          "target_image": "main-exe"
+        },
+        {
+          "reason": "outside_cross_evidence",
+          "source": 2148268412,
+          "target": 2148922772,
+          "target_image": "main-exe"
+        },
         {
           "reason": "outside_cross_evidence",
           "source": 2148268512,
@@ -562633,6 +562735,74 @@
         }
       ],
       "delay_slot_owners": [
+        {
+          "delay_slot": 2148268092,
+          "owner": 2148268088
+        },
+        {
+          "delay_slot": 2148268124,
+          "owner": 2148268120
+        },
+        {
+          "delay_slot": 2148268156,
+          "owner": 2148268152
+        },
+        {
+          "delay_slot": 2148268188,
+          "owner": 2148268184
+        },
+        {
+          "delay_slot": 2148268220,
+          "owner": 2148268216
+        },
+        {
+          "delay_slot": 2148268252,
+          "owner": 2148268248
+        },
+        {
+          "delay_slot": 2148268284,
+          "owner": 2148268280
+        },
+        {
+          "delay_slot": 2148268316,
+          "owner": 2148268312
+        },
+        {
+          "delay_slot": 2148268332,
+          "owner": 2148268328
+        },
+        {
+          "delay_slot": 2148268344,
+          "owner": 2148268340
+        },
+        {
+          "delay_slot": 2148268356,
+          "owner": 2148268352
+        },
+        {
+          "delay_slot": 2148268368,
+          "owner": 2148268364
+        },
+        {
+          "delay_slot": 2148268380,
+          "owner": 2148268376
+        },
+        {
+          "delay_slot": 2148268392,
+          "owner": 2148268388
+        },
+        {
+          "delay_slot": 2148268404,
+          "owner": 2148268400
+        },
+        {
+          "delay_slot": 2148268416,
+          "owner": 2148268412
+        },
+        {
+          "delay_slot": 2148268460,
+          "owner": 2148268456
+        },
         {
           "delay_slot": 2148268516,
           "owner": 2148268512
@@ -578090,6 +578260,456 @@
         "seeds": []
       },
       "direct_edges": [
+        {
+          "kind": "linear",
+          "source": 2148268032,
+          "target": 2148268036
+        },
+        {
+          "kind": "linear",
+          "source": 2148268036,
+          "target": 2148268040
+        },
+        {
+          "kind": "linear",
+          "source": 2148268040,
+          "target": 2148268044
+        },
+        {
+          "kind": "linear",
+          "source": 2148268044,
+          "target": 2148268048
+        },
+        {
+          "kind": "linear",
+          "source": 2148268048,
+          "target": 2148268052
+        },
+        {
+          "kind": "linear",
+          "source": 2148268052,
+          "target": 2148268056
+        },
+        {
+          "kind": "linear",
+          "source": 2148268056,
+          "target": 2148268060
+        },
+        {
+          "kind": "linear",
+          "source": 2148268060,
+          "target": 2148268064
+        },
+        {
+          "kind": "linear",
+          "source": 2148268064,
+          "target": 2148268068
+        },
+        {
+          "kind": "linear",
+          "source": 2148268068,
+          "target": 2148268072
+        },
+        {
+          "kind": "linear",
+          "source": 2148268072,
+          "target": 2148268076
+        },
+        {
+          "kind": "linear",
+          "source": 2148268076,
+          "target": 2148268080
+        },
+        {
+          "kind": "linear",
+          "source": 2148268080,
+          "target": 2148268084
+        },
+        {
+          "kind": "linear",
+          "source": 2148268084,
+          "target": 2148268088
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268088,
+          "target": 2148268096
+        },
+        {
+          "kind": "linear",
+          "source": 2148268096,
+          "target": 2148268100
+        },
+        {
+          "kind": "linear",
+          "source": 2148268100,
+          "target": 2148268104
+        },
+        {
+          "kind": "linear",
+          "source": 2148268104,
+          "target": 2148268108
+        },
+        {
+          "kind": "linear",
+          "source": 2148268108,
+          "target": 2148268112
+        },
+        {
+          "kind": "linear",
+          "source": 2148268112,
+          "target": 2148268116
+        },
+        {
+          "kind": "linear",
+          "source": 2148268116,
+          "target": 2148268120
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268120,
+          "target": 2148268128
+        },
+        {
+          "kind": "linear",
+          "source": 2148268128,
+          "target": 2148268132
+        },
+        {
+          "kind": "linear",
+          "source": 2148268132,
+          "target": 2148268136
+        },
+        {
+          "kind": "linear",
+          "source": 2148268136,
+          "target": 2148268140
+        },
+        {
+          "kind": "linear",
+          "source": 2148268140,
+          "target": 2148268144
+        },
+        {
+          "kind": "linear",
+          "source": 2148268144,
+          "target": 2148268148
+        },
+        {
+          "kind": "linear",
+          "source": 2148268148,
+          "target": 2148268152
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268152,
+          "target": 2148268160
+        },
+        {
+          "kind": "linear",
+          "source": 2148268160,
+          "target": 2148268164
+        },
+        {
+          "kind": "linear",
+          "source": 2148268164,
+          "target": 2148268168
+        },
+        {
+          "kind": "linear",
+          "source": 2148268168,
+          "target": 2148268172
+        },
+        {
+          "kind": "linear",
+          "source": 2148268172,
+          "target": 2148268176
+        },
+        {
+          "kind": "linear",
+          "source": 2148268176,
+          "target": 2148268180
+        },
+        {
+          "kind": "linear",
+          "source": 2148268180,
+          "target": 2148268184
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268184,
+          "target": 2148268192
+        },
+        {
+          "kind": "linear",
+          "source": 2148268192,
+          "target": 2148268196
+        },
+        {
+          "kind": "linear",
+          "source": 2148268196,
+          "target": 2148268200
+        },
+        {
+          "kind": "linear",
+          "source": 2148268200,
+          "target": 2148268204
+        },
+        {
+          "kind": "linear",
+          "source": 2148268204,
+          "target": 2148268208
+        },
+        {
+          "kind": "linear",
+          "source": 2148268208,
+          "target": 2148268212
+        },
+        {
+          "kind": "linear",
+          "source": 2148268212,
+          "target": 2148268216
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268216,
+          "target": 2148268224
+        },
+        {
+          "kind": "linear",
+          "source": 2148268224,
+          "target": 2148268228
+        },
+        {
+          "kind": "linear",
+          "source": 2148268228,
+          "target": 2148268232
+        },
+        {
+          "kind": "linear",
+          "source": 2148268232,
+          "target": 2148268236
+        },
+        {
+          "kind": "linear",
+          "source": 2148268236,
+          "target": 2148268240
+        },
+        {
+          "kind": "linear",
+          "source": 2148268240,
+          "target": 2148268244
+        },
+        {
+          "kind": "linear",
+          "source": 2148268244,
+          "target": 2148268248
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268248,
+          "target": 2148268256
+        },
+        {
+          "kind": "linear",
+          "source": 2148268256,
+          "target": 2148268260
+        },
+        {
+          "kind": "linear",
+          "source": 2148268260,
+          "target": 2148268264
+        },
+        {
+          "kind": "linear",
+          "source": 2148268264,
+          "target": 2148268268
+        },
+        {
+          "kind": "linear",
+          "source": 2148268268,
+          "target": 2148268272
+        },
+        {
+          "kind": "linear",
+          "source": 2148268272,
+          "target": 2148268276
+        },
+        {
+          "kind": "linear",
+          "source": 2148268276,
+          "target": 2148268280
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268280,
+          "target": 2148268288
+        },
+        {
+          "kind": "linear",
+          "source": 2148268288,
+          "target": 2148268292
+        },
+        {
+          "kind": "linear",
+          "source": 2148268292,
+          "target": 2148268296
+        },
+        {
+          "kind": "linear",
+          "source": 2148268296,
+          "target": 2148268300
+        },
+        {
+          "kind": "linear",
+          "source": 2148268300,
+          "target": 2148268304
+        },
+        {
+          "kind": "linear",
+          "source": 2148268304,
+          "target": 2148268308
+        },
+        {
+          "kind": "linear",
+          "source": 2148268308,
+          "target": 2148268312
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268312,
+          "target": 2148268320
+        },
+        {
+          "kind": "linear",
+          "source": 2148268320,
+          "target": 2148268324
+        },
+        {
+          "kind": "linear",
+          "source": 2148268324,
+          "target": 2148268328
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268328,
+          "target": 2148268336
+        },
+        {
+          "kind": "linear",
+          "source": 2148268336,
+          "target": 2148268340
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268340,
+          "target": 2148268348
+        },
+        {
+          "kind": "linear",
+          "source": 2148268348,
+          "target": 2148268352
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268352,
+          "target": 2148268360
+        },
+        {
+          "kind": "linear",
+          "source": 2148268360,
+          "target": 2148268364
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268364,
+          "target": 2148268372
+        },
+        {
+          "kind": "linear",
+          "source": 2148268372,
+          "target": 2148268376
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268376,
+          "target": 2148268384
+        },
+        {
+          "kind": "linear",
+          "source": 2148268384,
+          "target": 2148268388
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268388,
+          "target": 2148268396
+        },
+        {
+          "kind": "linear",
+          "source": 2148268396,
+          "target": 2148268400
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268400,
+          "target": 2148268408
+        },
+        {
+          "kind": "linear",
+          "source": 2148268408,
+          "target": 2148268412
+        },
+        {
+          "kind": "fallthrough",
+          "source": 2148268412,
+          "target": 2148268420
+        },
+        {
+          "kind": "linear",
+          "source": 2148268420,
+          "target": 2148268424
+        },
+        {
+          "kind": "linear",
+          "source": 2148268424,
+          "target": 2148268428
+        },
+        {
+          "kind": "linear",
+          "source": 2148268428,
+          "target": 2148268432
+        },
+        {
+          "kind": "linear",
+          "source": 2148268432,
+          "target": 2148268436
+        },
+        {
+          "kind": "linear",
+          "source": 2148268436,
+          "target": 2148268440
+        },
+        {
+          "kind": "linear",
+          "source": 2148268440,
+          "target": 2148268444
+        },
+        {
+          "kind": "linear",
+          "source": 2148268444,
+          "target": 2148268448
+        },
+        {
+          "kind": "linear",
+          "source": 2148268448,
+          "target": 2148268452
+        },
+        {
+          "kind": "linear",
+          "source": 2148268452,
+          "target": 2148268456
+        },
         {
           "kind": "linear",
           "source": 2148268464,
@@ -726515,6 +727135,7 @@
       "rejected_roots": [],
       "root_evidence": "route-observed authenticated PCs plus authenticated cross-image direct targets; Ghidra bodies constrain extension but never create roots",
       "roots": [
+        2148268032,
         2148270408,
         2148270412,
         2148270416,
@@ -738528,10 +739149,6 @@
         2148404936
       ],
       "unknown_ranges": [
-        {
-          "end_exclusive": 2148268464,
-          "start": 2148268032
-        },
         {
           "end_exclusive": 2148269100,
           "start": 2148268716

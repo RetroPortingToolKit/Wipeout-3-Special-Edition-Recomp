@@ -57,6 +57,17 @@ def build(authority: dict[str, Any], finite: dict[str, Any],
         "main-exe": evidence["exe_text_sha256"],
         "nfe-entry5-route-variant": evidence["nfe_route_variant_sha256"],
     }
+    epoch = authority.get("overlapping_epoch_dispatch")
+    if (not isinstance(epoch, dict) or
+            epoch.get("schema") != "wo3se.overlapping-executable-epoch-dispatch.v1" or
+            epoch.get("main_identity_sha256") != identities["main-exe"] or
+            epoch.get("nfe_identity_sha256") != identities["nfe-entry5-route-variant"] or
+            epoch.get("selection_key") != "authenticated-active-image-sha256" or
+            epoch.get("unknown_epoch_action") != "reject"):
+        raise ShardError("authenticated epoch discriminator contract is invalid")
+    epoch_sites = {row.get("pc") for row in epoch.get("sites", [])}
+    if None in epoch_sites or len(epoch_sites) != len(epoch.get("sites", [])):
+        raise ShardError("epoch discriminator sites are malformed or duplicated")
     cfi_sites: dict[str, set[int]] = {name: set() for name in selected}
     cfi_targets: dict[tuple[str, int], set[int]] = {}
     if cfi is not None:
@@ -96,8 +107,12 @@ def build(authority: dict[str, Any], finite: dict[str, Any],
     rejected: dict[str, set[int]] = {}
 
     for name, image in selected.items():
-        rejected[name] = ({edge["source"] for edge in image["rejected_direct_edges"]} |
-                          {edge["source"] for edge in image.get("epoch_discriminated_edges", [])})
+        epoch_edges = image.get("epoch_discriminated_edges", [])
+        if any(edge.get("source") not in epoch_sites or
+               edge.get("action") != "dispatch-only-after-authenticated-epoch-selection" or
+               edge.get("contract") != epoch["schema"] for edge in epoch_edges):
+            raise ShardError("epoch-discriminated edge lacks exact contract binding")
+        rejected[name] = {edge["source"] for edge in image["rejected_direct_edges"]}
         unsafe_indirect = {item["pc"] for item in image["unresolved_indirects"]}
         if name == "main-exe":
             unsafe_indirect -= finite_sites.keys()
@@ -111,6 +126,15 @@ def build(authority: dict[str, Any], finite: dict[str, Any],
         for edge in image.get("cross_image_direct_edges", []):
             dependencies.setdefault((name, edge["source"]), set()).add(
                 (edge["target_image"], edge["target"]))
+        for edge in epoch_edges:
+            candidates = [
+                candidate for candidate in sorted(selected)
+                if edge["source"] in nodes[candidate] and edge["target"] in nodes[candidate]
+            ]
+            if len(candidates) != 1:
+                raise ShardError("epoch edge does not select one authorized identity variant")
+            dependencies.setdefault((name, edge["source"]), set()).add(
+                (candidates[0], edge["target"]))
         if name == "main-exe":
             for source, targets in finite_sites.items():
                 dependencies.setdefault((name, source), set()).update(
@@ -176,6 +200,17 @@ def build(authority: dict[str, Any], finite: dict[str, Any],
             "delay_slots_are_atomic": True,
             "full_game_closure_claimed": False,
             "indirect_cfi": cfi is not None,
+            "authenticated_epoch_variants": True,
+        },
+        "epoch_dispatch": {
+            "schema": epoch["schema"],
+            "selection_key": epoch["selection_key"],
+            "unknown_epoch_action": epoch["unknown_epoch_action"],
+            "variants": [
+                {"identity_sha256": identities[name], "image": name}
+                for name in sorted(selected)
+            ],
+            "sites": sorted(epoch_sites),
         },
         "images": images,
     }

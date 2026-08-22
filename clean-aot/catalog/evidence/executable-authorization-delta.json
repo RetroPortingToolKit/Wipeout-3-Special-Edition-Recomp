@@ -1,16 +1,16 @@
 {
   "baseline_receipt_sha256": "57511195433271ecbd3f3c76bc30f5aac1400964371113100a97a05cb1dc9fae",
-  "current_receipt_sha256": "dc0e88975cf8826d2493b0c4a15308c453004e42837a42dcfb2642a1aabebb8b",
+  "current_receipt_sha256": "bf6e53454c55be48496da8840700d5c8b095d97debd2f5d6bd79df530b055082",
   "images": {
     "main-exe": {
       "authorized_instruction_delta": 5171,
-      "proved_cross_image_direct_edges": 0,
+      "proved_cross_image_direct_edges": 1,
       "rejected_direct_edge_delta": -16,
       "unresolved_indirect_delta": -17
     },
     "nfe-entry5-route-variant": {
-      "authorized_instruction_delta": 0,
-      "proved_cross_image_direct_edges": 1220,
+      "authorized_instruction_delta": 108,
+      "proved_cross_image_direct_edges": 1236,
       "rejected_direct_edge_delta": -1220,
       "unresolved_indirect_delta": 0
     }
@@ -28,7 +28,7 @@
     },
     "nfe-entry5-route-variant": {
       "rejected_direct_edges": 0,
-      "unknown_ranges": 18,
+      "unknown_ranges": 17,
       "unresolved_indirects": 10
     }
   },

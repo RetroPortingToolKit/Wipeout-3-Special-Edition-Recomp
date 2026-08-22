@@ -563,7 +563,21 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
             not args.nfe_base <= edge["target"] < nfe_end and
             edge["target"] in exe_allowed
         }
-        added_nfe: set[int] = set()
+        # The exact main-image loader call to the NFE payload base is an
+        # authenticated cross-image root. Decode only that identity's bounded
+        # direct corridor; overlapping main bytes gain no authority from it.
+        added_nfe = {
+            edge["target"] for edge in exe_report["rejected_direct_edges"]
+            if edge["reason"] == "outside_cross_evidence" and
+            edge["target"] == args.nfe_base
+        }
+        added_nfe.update(
+            edge["target"] for edge in exe_report["direct_edges"]
+            if edge["target"] == args.nfe_base and
+            edge["target"] not in exe_report["_authorized"]
+        )
+        if added_nfe:
+            nfe_allowed.update(prove_direct_corridors(bytes(nfe), args.nfe_base, added_nfe))
         old_sizes = (len(exe_roots), len(nfe_roots))
         exe_roots.update(added_exe)
         nfe_roots.update(added_nfe)
@@ -721,6 +735,14 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         remaining: list[dict[str, Any]] = []
         other_name = "main-exe"
         other_authorized = authorized_by_name[other_name]
+        retained_direct: list[dict[str, Any]] = []
+        for edge in report["direct_edges"]:
+            if (name == "main-exe" and edge["target"] not in authorized_by_name[name] and
+                    edge["target"] in authorized_by_name["nfe-entry5-route-variant"]):
+                cross_edges.append({**edge, "target_image": "nfe-entry5-route-variant"})
+            else:
+                retained_direct.append(edge)
+        report["direct_edges"] = retained_direct
         for edge in report["rejected_direct_edges"]:
             if (
                 name == "nfe-entry5-route-variant"

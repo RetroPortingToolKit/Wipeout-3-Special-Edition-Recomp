@@ -131,15 +131,26 @@ direct corridors for eight bounded switches and the renderer's three-target
 constant dispatcher. Identity-bound value/set analysis closes every indirect
 site exposed by those corridors: 68 memory-loaded callbacks, 47 argument
 callbacks, two inherited renderer callbacks, three constant-set sites, and 962
-`JR $ra` sites. The resulting closed shards contain 131,520 instructions in 289
-regions (103,201 main-image and 28,319 NFE instructions), with zero unresolved
-CFI sites. Unknown identities, PCs, and target values still fail closed. Six overlapping-address edges
+`JR $ra` sites. The authenticated epoch discriminator now binds separate main
+and NFE region variants at all six overlapping sites. The exact loader call at
+`0x80117AA0` roots the legality-checked NFE entry corridor at `0x800BF800`.
+The resulting closed shards contain all 135,829 currently authorized game
+instructions in 290 regions (104,002 main-image and 31,827 NFE instructions),
+with zero excluded instructions and zero unresolved CFI sites. Unknown
+identities, PCs, and target values still fail closed. Six overlapping-address edges
 are now governed by the authenticated epoch-discriminator contract rather than
 remaining rejected. The direct
 corridor recovery receipt hashes every newly admitted exact range and rejects
 reserved instruction encodings; no invalid instruction was suppressed. The 13 ISO audio pseudo-files
 outside the data-track image are explicitly excluded rather than silently
 treated as payloads.
+
+`evidence/unknown-code-range-audit.json` independently hashes all 290 remaining
+unknown game-image ranges and checks every word against legal R3000A/COP0/COP2
+encodings. It finds no authenticated direct successor from compiled code into
+an unknown range, so it recovers zero additional instructions. The many
+legal-looking words remain unknown because instruction shape alone never
+creates an executable root.
 
 `evidence/content-payload-clusters.json` is the identity-level extension,
 exact-size, leading-magic, occurrence-frequency, and structure clustering

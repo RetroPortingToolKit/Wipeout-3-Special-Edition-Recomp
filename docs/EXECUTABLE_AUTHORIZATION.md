@@ -27,7 +27,7 @@ entry-5 bytes and hash-named captured slices. It differs at exactly four words:
 | Image | Authorized instructions | Authorized bytes | Unknown bytes | Unresolved indirects | Rejected direct edges |
 |---|---:|---:|---:|---:|---:|
 | Main EXE | 104,002 | 416,008 | 1,074,936 | 110 | 0 |
-| NFE entry-5 route variant | 31,719 | 126,876 | 10,032 | 10 | 0 |
+| NFE entry-5 route variant | 31,827 | 127,308 | 9,600 | 10 | 0 |
 | Verified retail BIOS direct frontier | 3,013 | 12,052 | 512,236 | 27 | 0 |
 
 The raw authorization graph records 120 dynamic indirect sites. The separate
@@ -51,11 +51,11 @@ The deterministic 17,353-instruction execution receipt additionally proves the
 runtime return target `0xBFC0703C`. Manifest generation preserves that root even
 though its bytes coalesce with the surrounding authorized range.
 
-The exact 273 main-image unknown ranges and 18 NFE unknown ranges are recorded
+The exact 273 main-image unknown ranges and 17 NFE unknown ranges are recorded
 under each image's `unknown_ranges` array in the receipt. The NFE ranges are:
 
 ```text
-[0x800BF800,0x800BF9B0) [0x800BFAAC,0x800BFC2C)
+[0x800BFAAC,0x800BFC2C)
 [0x800BFC64,0x800BFD24) [0x800C2354,0x800C24D4)
 [0x800C2E0C,0x800C2F50) [0x800C4020,0x800C4184)
 [0x800C4190,0x800C4318) [0x800C7BD4,0x800C7C1C)

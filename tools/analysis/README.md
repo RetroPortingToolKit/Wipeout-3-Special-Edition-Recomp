@@ -111,3 +111,8 @@ emitting per-site universes only when every target corridor is executable-
 authorized. The shard builder turns those universes into mandatory precompiled
 dependencies. Unknown values, unauthenticated table targets, unclassified
 computed transfers, and cross-image callbacks remain rejected.
+
+`audit_unknown_code_ranges.py` binds every remaining unknown range to exact
+authenticated bytes, counts only legal R3000A/COP0/COP2 words, and independently
+checks compiled direct transfers for incoming roots. Legal-looking bytes never
+create authority; ranges without an authenticated incoming edge remain unknown.

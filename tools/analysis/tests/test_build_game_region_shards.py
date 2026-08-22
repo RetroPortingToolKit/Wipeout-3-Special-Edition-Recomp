@@ -27,6 +27,13 @@ class GameShardTests(unittest.TestCase):
             "schema": "wo3se.executable-authorization.v1",
             "evidence": {"exe_text_sha256": "a" * 64,
                          "nfe_route_variant_sha256": "b" * 64},
+            "overlapping_epoch_dispatch": {
+                "schema": "wo3se.overlapping-executable-epoch-dispatch.v1",
+                "main_identity_sha256": "a" * 64,
+                "nfe_identity_sha256": "b" * 64,
+                "selection_key": "authenticated-active-image-sha256",
+                "unknown_epoch_action": "reject", "sites": [],
+            },
             "images": [main, nfe],
         }
 
@@ -51,13 +58,20 @@ class GameShardTests(unittest.TestCase):
         nfe = next(x for x in result["images"] if x["name"].startswith("nfe"))
         self.assertNotIn(0x2000, nfe["entries"])
 
-    def test_epoch_discriminated_source_is_not_compiled_in_wrong_identity(self):
+    def test_epoch_discriminated_source_is_compiled_only_with_exact_contract(self):
         authority = self.authority()
         authority["images"][0]["epoch_discriminated_edges"] = [
-            {"source": 0x1008, "target": 0x100C}]
+            {"source": 0x1008, "target": 0x100C,
+             "action": "dispatch-only-after-authenticated-epoch-selection",
+             "contract": "wo3se.overlapping-executable-epoch-dispatch.v1"}]
+        authority["overlapping_epoch_dispatch"]["sites"] = [{"pc": 0x1008}]
         result = build(authority, self.finite())
         main = next(x for x in result["images"] if x["name"] == "main-exe")
-        self.assertNotIn(0x1008, main["entries"])
+        self.assertIn(0x1008, main["entries"])
+        self.assertTrue(result["policy"]["authenticated_epoch_variants"])
+        authority["overlapping_epoch_dispatch"]["sites"] = []
+        with self.assertRaises(ShardError):
+            build(authority, self.finite())
 
     def test_cfi_callback_source_is_admitted_only_with_exact_identity(self):
         authority = self.authority()
