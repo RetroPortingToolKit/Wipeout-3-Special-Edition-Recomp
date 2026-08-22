@@ -6,6 +6,7 @@ import unittest
 from tools.analysis.audit_content_static_coverage import (
     AuditError,
     build_audit,
+    embedded_psx_exe_candidates,
     parse_named_envelope,
     parse_tim,
     parse_vag,
@@ -123,6 +124,16 @@ class ContentCoverageAuditTests(unittest.TestCase):
         self.assertEqual(parsed_envelope["name"], "BODY_TEST")
         self.assertEqual(parsed_envelope["body"]["role"], "unknown")
         self.assertIsNone(parse_named_envelope(b"body_test\0" + bytes(20)))
+
+        exe = bytearray(2052)
+        exe[:8] = b"PS-X EXE"
+        struct.pack_into("<III", exe, 0x10, 0x80010000, 0, 0x80010000)
+        struct.pack_into("<I", exe, 0x1C, 4)
+        candidates = embedded_psx_exe_candidates(bytes(exe))
+        self.assertEqual(candidates[0]["entry_pc"], 0x80010000)
+        malformed_exe = bytearray(exe)
+        struct.pack_into("<I", malformed_exe, 0x1C, 8)
+        self.assertEqual(embedded_psx_exe_candidates(bytes(malformed_exe)), [])
 
         words = [0x27BDFFE0, 0xAFBF001C] + [0] * 6 + [0x03E00008, 0]
         code = struct.pack(f"<{len(words)}I", *words)

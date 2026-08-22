@@ -76,3 +76,9 @@ The dominant named-record family is exposed only as a validated 16-byte
 uppercase identifier envelope plus a separately hashed unknown-role body.
 Unknown instances are also grouped by exact expanded SHA-256 so repeated media
 content is reviewed once, without weakening the executable-risk gate.
+
+`cluster_content_payloads.py` emits the focused identity clustering receipt.
+It verifies the parent audit's instance and unique-identity accounting before
+grouping by container extension, exact expanded size, four-byte magic,
+occurrence frequency, and structural classification. Cluster labels remain
+non-semantic and all unknown-role and executable-risk gates remain closed.

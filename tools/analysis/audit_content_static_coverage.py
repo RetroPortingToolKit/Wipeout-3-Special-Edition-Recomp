@@ -137,8 +137,30 @@ def parse_named_envelope(data: bytes) -> dict[str, Any] | None:
         return None
     body = data[16:]
     return {"body": {"bytes": len(body), "offset": 16,
-                     "role": "unknown", "sha256": sha256(body)},
+                     "role": "unknown", "sha256": sha256(body),
+                     "standard_data_format": (parse_tim(body) or parse_vag(body)),
+                     "raw_mips_candidate": raw_mips_candidate(body)},
             "format": "wip3out-named-envelope", "name": name.decode("ascii")}
+
+
+def embedded_psx_exe_candidates(data: bytes) -> list[dict[str, Any]]:
+    """Validate aligned embedded PS-X EXE containers without executing them."""
+    result = []
+    for offset in range(0, max(0, len(data) - 2048 + 1), 4):
+        if data[offset:offset + 8] != b"PS-X EXE":
+            continue
+        entry = struct.unpack_from("<I", data, offset + 0x10)[0]
+        load, text_bytes = struct.unpack_from("<II", data, offset + 0x18)
+        end = load + text_bytes
+        file_end = offset + 2048 + text_bytes
+        if text_bytes == 0 or text_bytes % 4 or load % 4 or entry % 4 or \
+                end > 1 << 32 or not load <= entry < end or file_end > len(data):
+            continue
+        child = data[offset:file_end]
+        result.append({"bytes": len(child), "entry_pc": entry,
+                       "load_end_exclusive": end, "load_start": load,
+                       "offset": offset, "sha256": sha256(child)})
+    return result
 
 
 def classify(data: bytes, authenticated_executable: bool) -> tuple[str, Any]:
@@ -150,6 +172,10 @@ def classify(data: bytes, authenticated_executable: bool) -> tuple[str, Any]:
     vag = parse_vag(data)
     if vag is not None:
         return "authenticated-data-format", vag
+    exe_candidates = embedded_psx_exe_candidates(data)
+    if exe_candidates:
+        return "executable-candidate", {
+            "candidates": exe_candidates, "format": "embedded-ps-x-exe-candidate"}
     candidate = raw_mips_candidate(data)
     if candidate is not None:
         return "executable-candidate", candidate
@@ -230,6 +256,7 @@ def build_audit(iso: dict[str, Any], iso_digest: str,
                 "expanded_sha256": row["expanded_sha256"],
                 "index": row["index"],
                 "inventory_sha256": digest,
+                "prefix_hex": payload_bytes[key][:16].hex(),
                 "proof": proof,
                 "static_mapping": None,
             })
@@ -263,6 +290,7 @@ def build_audit(iso: dict[str, Any], iso_digest: str,
             "expanded_sha256": row["expanded_sha256"],
             "index": row["index"],
             "inventory_sha256": nfe_digest,
+            "prefix_hex": payload_bytes[key][:16].hex(),
             "proof": proof,
             "static_mapping": "nfe-entry5-route-variant" if row["index"] == 5 else None,
         })
@@ -330,6 +358,7 @@ def build_audit(iso: dict[str, Any], iso_digest: str,
         "expanded_sha256": evidence["exe_text_sha256"],
         "index": None,
         "inventory_sha256": iso_digest,
+        "prefix_hex": None,
         "proof": None,
         "static_mapping": "main-exe",
     })

@@ -131,3 +131,12 @@ as proof of absence. In addition,
 main/NFE static region set is yet marked compiled. The 13 ISO audio pseudo-files
 outside the data-track image are explicitly excluded rather than silently
 treated as payloads.
+
+`evidence/content-payload-clusters.json` is the identity-level extension,
+exact-size, leading-magic, occurrence-frequency, and structure clustering
+receipt for all 650 unknown-role hashes. It binds the complete content audit,
+records every identity exactly once, and identifies the dominant numeric and
+named-envelope families without assigning semantic roles from a cluster label.
+Named bodies are recursively hashed and checked for complete TIM/VAG children,
+embedded bounded PS-X EXE containers, and raw MIPS ABI candidates. A parser miss
+does not close executable risk.
