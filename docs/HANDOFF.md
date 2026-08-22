@@ -535,6 +535,15 @@ instruction and fails closed on every unknown PC or executable identity.
   dispatches with 9,521 reads, 18,423 writes, 3,720 isolated-cache writes, one
   device read, and 49 device writes. Receipt `bios-frontier-00086834.json`
   records the new `UnknownCode` frontier with fault-free COP0 state.
+- Under epoch `9548d3d4...4a35d`, only continuation `[0x283C,0x2870)` is
+  authenticated. It calls the already-exact `0x4360` helper, then reaches A0
+  service 0x96 through exact stub `[0x6AA0,0x6AAC)`; the subsequent A0/0x97
+  call remains dormant and unbound. The live service enters only immutable BIOS
+  wrapper `[0xBFC085B0,0xBFC085D4)` and returns to unbound copied RAM
+  `0x00003C2C`. Two repeated probes reach 86,892 instructions and 15,069
+  dispatches with 9,524 reads, 18,432 writes, 3,720 isolated-cache writes, one
+  device read, and 50 device writes. Receipt `bios-frontier-00086892.json`
+  records `UnknownCode`; RAM remains `9548d3d4...4a35d` and COP0 is fault-free.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control
