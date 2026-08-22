@@ -49,6 +49,9 @@
   not reach 100 Hz and still reports audio underruns. The earlier A/B with
   supersampling 1 and HD replacement disabled remained CPU-bound as well, so
   graphics presentation is not the sole cause.
+- A link-time-optimization experiment was ruled out by the bundled compiler:
+  its `cc1` has no LTO support. The Release build was restored to its original
+  `-O3 -DNDEBUG` flags; no product behavior depends on the failed experiment.
 
 ## Open blockers
 
