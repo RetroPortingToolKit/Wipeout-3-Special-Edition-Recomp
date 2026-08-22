@@ -27,6 +27,8 @@ if __package__ in {None, ""}:
     from windows_audit import audit_windows_package, smoke_windows_product  # type: ignore[import-not-found]
     from installer_lane import (audit_installed_runtime, create_installer,
                                 validate_installer)  # type: ignore[import-not-found]
+    from release_readiness import (audit_release_readiness,
+                                   write_readiness_receipt)  # type: ignore[import-not-found]
 else:
     from .pipeline import (
         DEFAULT_MEDIA_MANIFEST,
@@ -43,6 +45,7 @@ else:
                                orchestrate_first_run)
     from .windows_audit import audit_windows_package, smoke_windows_product
     from .installer_lane import audit_installed_runtime, create_installer, validate_installer
+    from .release_readiness import audit_release_readiness, write_readiness_receipt
 
 
 def _common_media(parser: argparse.ArgumentParser) -> None:
@@ -108,8 +111,10 @@ def _build_parser() -> argparse.ArgumentParser:
     package.add_argument("--profile", type=Path, default=DEFAULT_PROFILE)
 
     validate = subparsers.add_parser(
-        "validate-release", help="remeasure a package after relocation")
+        "validate-release", help="remeasure package and fail closed on full product readiness")
     validate.add_argument("--package", type=Path, required=True)
+    validate.add_argument("--evidence-root", type=Path, default=Path("clean-aot"))
+    validate.add_argument("--receipt", type=Path)
 
     install = subparsers.add_parser(
         "install", help="initialize durable per-user state and first-run media UX")
@@ -252,7 +257,12 @@ def main(argv: list[str] | None = None) -> int:
                 sources=args.source, allowlist=args.allowlist,
                 leakage_profile=args.profile)
         elif args.command == "validate-release":
-            document = validate_release(args.package)
+            structural = validate_release(args.package)
+            document = audit_release_readiness(args.package, args.evidence_root, structural)
+            if args.receipt:
+                write_readiness_receipt(args.receipt, document)
+            _print(document)
+            return 0 if document["game_ready"] else 4
         elif args.command == "install":
             document = initialize_install(args.package, args.user_data)
         elif args.command == "first-run":

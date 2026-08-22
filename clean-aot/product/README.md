@@ -271,3 +271,20 @@ they are bounded by the update count and never presented as completed frames.
 Passing these gates proves package isolation, relocation, deterministic harness
 output, and the measured performance threshold only. It does not prove BIOS or
 game boot, race completion, or release readiness.
+
+`validate-release` is the executable full-product readiness decision, not only
+a package checksum check. It remeasures the relocated package, hashes every
+supporting receipt, writes a deterministic gate matrix, and exits 4 while any
+objective is unmet:
+
+```powershell
+python tools/product/build_product.py validate-release `
+  --package build-product-runtime `
+  --evidence-root clean-aot `
+  --receipt clean-aot/product/evidence/release-readiness.json
+```
+
+The current receipt is intentionally `not-ready`: direct game instructions and
+authenticated media reads have not occurred, the content-coverage receipt still
+contains unresolved gates, the complete graphics matrix has not been recorded,
+and the existing soak receipts predate the current package.
