@@ -131,6 +131,36 @@ public:
         return false;
     }
 };
+class IdentityProvenance final : public clean_aot::app::IPolygonProvenanceProvider {
+public:
+    bool resolve(const clean_aot::gpu::PolygonEvent& event,
+                 clean_aot::app::PolygonProvenanceView& view) noexcept override {
+        try {
+            if (event.vertex_count < 3U || event.vertex_count > 4U) return false;
+            for (std::size_t i = 0U; i < event.vertex_count; ++i) {
+                const psx::render::NativePosition native{
+                    event.vertices[i].x, event.vertices[i].y};
+                const auto gte = state.write_gte(
+                    static_cast<psx::render::GteRegister>(i % 3U), native,
+                    {static_cast<double>(native.x), static_cast<double>(native.y),
+                     1.0, 1.0});
+                const std::uint32_t address =
+                    0x400U + static_cast<std::uint32_t>(i) * 4U;
+                const std::uint32_t raw = static_cast<std::uint16_t>(native.x) |
+                    (static_cast<std::uint32_t>(
+                         static_cast<std::uint16_t>(native.y)) << 16U);
+                if (!state.store_memory(address, raw, gte.candidate().enhancement)
+                         .carried_precise()) return false;
+                candidates[i] = state.load_memory(address)->candidate();
+            }
+            view = {std::span<const psx::render::VertexCandidate>(
+                        candidates.data(), event.vertex_count), &state};
+            return true;
+        } catch (...) { return false; }
+    }
+    psx::render::ProvenanceState state{};
+    std::array<psx::render::VertexCandidate, 4U> candidates{};
+};
 
 void test_live_pgxp_projection_pipeline() {
     using namespace clean_aot;
@@ -223,6 +253,91 @@ void test_live_pgxp_projection_pipeline() {
            fallback.precise_fallbacks() == 1U &&
            fallback.visual_digest() == native.visual_digest(),
            "missing provenance produces byte-exact native frame fallback");
+}
+
+void test_live_gp0_primitive_compatibility_matrix() {
+    using namespace clean_aot;
+    std::vector<std::uint8_t> bios(512U * 1024U, 0U);
+    runtime::Configuration runtime_config{};
+    runtime_config.bios = bios;
+    runtime::Runtime runtime(runtime_config);
+    auto& gpu = runtime.gpu();
+    expect(gpu.write_gp1(0x03000000U).accepted &&
+           gpu.write_gp1(0x05000000U).accepted &&
+           gpu.write_gp1(0x06c00200U).accepted &&
+           gpu.write_gp1(0x07040010U).accepted &&
+           gpu.write_gp1(0x08000001U).accepted,
+           "GP0 compatibility display configures");
+    const auto send = [&](std::uint32_t word) {
+        expect(gpu.write_gp0(word).accepted,
+               "GP0 compatibility matrix packet accepts");
+    };
+    const auto vertex = [](std::uint16_t x, std::uint16_t y) {
+        return static_cast<std::uint32_t>(x) |
+            (static_cast<std::uint32_t>(y) << 16U);
+    };
+    send(0xe3000000U);
+    send(0xe4000000U | (239U << 10U) | 319U);
+    send(0x02000040U); send(0U); send((240U << 16U) | 320U);
+    send(0x02ffffffU); send(64U); send((16U << 16U) | 16U);
+    send(0xe1000101U);
+    send(0xe2000001U);
+
+    send(0x200000ffU); send(vertex(20U, 20U));
+    send(vertex(50U, 20U)); send(vertex(20U, 50U));
+    send(0x2a00ff00U); send(vertex(60U, 20U));
+    send(vertex(90U, 20U)); send(vertex(60U, 50U)); send(vertex(90U, 50U));
+    send(0x300000ffU); send(vertex(100U, 20U));
+    send(0x0000ff00U); send(vertex(130U, 20U));
+    send(0x00ff0000U); send(vertex(100U, 50U));
+    send(0x25ffffffU); send(vertex(140U, 20U)); send(0U);
+    send(vertex(170U, 20U)); send(0x01010001U);
+    send(vertex(140U, 50U)); send(0x00000100U);
+    send(0x3dffffffU); send(vertex(180U, 20U)); send(0U);
+    send(0x00ffffffU); send(vertex(210U, 20U)); send(0x01010001U);
+    send(0x00ffffffU); send(vertex(180U, 50U)); send(0x00000100U);
+    send(0x00ffffffU); send(vertex(210U, 50U)); send(0x00000101U);
+
+    send(0x4000ffffU); send(vertex(20U, 70U)); send(vertex(80U, 70U));
+    send(0x500000ffU); send(vertex(20U, 75U));
+    send(0x00ff0000U); send(vertex(80U, 75U));
+    send(0x4800ffffU); send(vertex(20U, 80U)); send(vertex(50U, 90U));
+    send(vertex(80U, 80U)); send(0x50005000U);
+    send(0x580000ffU); send(vertex(20U, 95U));
+    send(0x0000ff00U); send(vertex(50U, 105U));
+    send(0x00ff0000U); send(vertex(80U, 95U)); send(0x50005000U);
+
+    send(0x6000ffffU); send(vertex(100U, 70U)); send((12U << 16U) | 20U);
+    send(0x65ffffffU); send(vertex(130U, 70U)); send(0U);
+    send((8U << 16U) | 8U);
+    send(0x680000ffU); send(vertex(150U, 70U));
+    send(0x7000ff00U); send(vertex(160U, 70U));
+    send(0x780000ffU); send(vertex(180U, 70U));
+
+    send(0xe5001802U);
+    send(0xe6000003U);
+    send(0x600000ffU); send(vertex(220U, 80U)); send((8U << 16U) | 8U);
+    send(0x6000ff00U); send(vertex(220U, 80U)); send((8U << 16U) | 8U);
+
+    IdentityProvenance provenance;
+    app::GraphicsConfiguration configuration{};
+    configuration.runtime_scanout = true;
+    configuration.pgxp_enabled = true;
+    configuration.provenance_provider = &provenance;
+    app::RuntimeGraphics graphics(configuration);
+    host::HeadlessBackend host;
+    expect(graphics.present(runtime, host, 0U).success() &&
+           host.service().success() && gpu.event_count() == 0U,
+           "complete GP0 primitive matrix reaches live presentation");
+    expect(graphics.precise_primitives() == 5U &&
+           graphics.precise_fallbacks() == 0U &&
+           graphics.precise_raster_stats().precise_fragments != 0U &&
+           graphics.visual_digest() == 0x0720ae19714abdb8ULL,
+           "all polygon matrix modes reach precise raster without drops");
+    std::cout << "GP0 matrix precise/fallback: " << graphics.precise_primitives()
+              << '/' << graphics.precise_fallbacks() << '\n';
+    std::cout << "GP0 compatibility matrix digest: 0x" << std::hex
+              << graphics.visual_digest() << std::dec << '\n';
 }
 
 void test_precise_raster_perspective_interpolation() {
@@ -855,6 +970,7 @@ void test_native_png_decode() {
 } // namespace
 int main() {
     test_live_pgxp_projection_pipeline();
+    test_live_gp0_primitive_compatibility_matrix();
     test_precise_raster_perspective_interpolation();
     test_beetle_upload_key_derivation_and_sampling();
     test_live_replacement_pipeline();

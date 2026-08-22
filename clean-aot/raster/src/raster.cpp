@@ -833,6 +833,10 @@ struct ReferenceRasterizer::Impl {
                            double x, double y) noexcept {
       return (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
     };
+    const auto top_left_d = [](const PreciseVertex& a,
+                               const PreciseVertex& b) noexcept {
+      return b.y < a.y || (b.y == a.y && b.x > a.x);
+    };
     for (std::size_t triangle = 0U; triangle < expected / 3U; ++triangle) {
       std::array<PreciseVertex, 3> v{
           vertices[triangle * 3U], vertices[triangle * 3U + 1U],
@@ -842,12 +846,21 @@ struct ReferenceRasterizer::Impl {
       if (area < 0.0) { std::swap(v[1], v[2]); area = -area; }
       for (std::int64_t y = bounds[triangle].top; y <= bounds[triangle].bottom; ++y) {
         for (std::int64_t x = bounds[triangle].left; x <= bounds[triangle].right; ++x) {
-          const double a = edge_d(v[1], v[2], static_cast<double>(x),
-                                  static_cast<double>(y)) / area;
-          const double b = edge_d(v[2], v[0], static_cast<double>(x),
-                                  static_cast<double>(y)) / area;
-          const double c = 1.0 - a - b;
-          if (a < 0.0 || b < 0.0 || c < 0.0) continue;
+          const double weight_a = edge_d(
+              v[1], v[2], static_cast<double>(x), static_cast<double>(y));
+          const double weight_b = edge_d(
+              v[2], v[0], static_cast<double>(x), static_cast<double>(y));
+          const double weight_c = edge_d(
+              v[0], v[1], static_cast<double>(x), static_cast<double>(y));
+          if (weight_a < 0.0 || weight_b < 0.0 || weight_c < 0.0 ||
+              (weight_a == 0.0 && !top_left_d(v[1], v[2])) ||
+              (weight_b == 0.0 && !top_left_d(v[2], v[0])) ||
+              (weight_c == 0.0 && !top_left_d(v[0], v[1]))) {
+            continue;
+          }
+          const double a = weight_a / area;
+          const double b = weight_b / area;
+          const double c = weight_c / area;
           ++precise_stats.precise_fragments;
           const double denominator = a / v[0].w + b / v[1].w + c / v[2].w;
           if (!std::isfinite(denominator) || denominator == 0.0) continue;

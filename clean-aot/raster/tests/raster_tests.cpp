@@ -1374,6 +1374,39 @@ void test_precise_transparency_safe_filtering() {
           "transparent footprint was filtered across a PS1 cutout edge");
 }
 
+void test_precise_quad_half_open_ownership() {
+  ReferenceRasterizer rasterizer;
+  rasterizer.reset(0x7c00U);
+  PolygonEvent quad{};
+  quad.quad = true;
+  quad.vertex_count = 4U;
+  quad.semi_transparent = true;
+  quad.first_color = color(255U, 0U, 0U);
+  quad.state = full_state();
+  quad.vertices[0] = vertex(10, 10);
+  quad.vertices[1] = vertex(20, 10);
+  quad.vertices[2] = vertex(10, 20);
+  quad.vertices[3] = vertex(20, 20);
+  const auto precise = [](double x, double y) {
+    return clean_aot::raster::PreciseVertex{
+        x, y, 1.0, 1.0, 0.0, 0.0, 0xff0000ffU, 1U, 1U};
+  };
+  const std::array<clean_aot::raster::PreciseVertex, 6U> vertices{
+      precise(10.0, 10.0), precise(20.0, 10.0), precise(10.0, 20.0),
+      precise(20.0, 10.0), precise(10.0, 20.0), precise(20.0, 20.0)};
+  require(rasterizer.consume_precise_polygon(quad, vertices).accepted(),
+          "precise semi-transparent quad was rejected");
+  require(rasterizer.read_vram(15U, 15U) == 0x3c0fU,
+          "precise quad shared diagonal blended more than once");
+  require(rasterizer.precise_stats().precise_fragments == 100U,
+          "precise quad did not assign every covered pixel exactly once");
+  ReferenceRasterizer native;
+  native.reset(0x7c00U);
+  consume_ok(native, Event{quad});
+  require(native.digest() == rasterizer.digest(),
+          "identity-projected precise quad diverged from native blend/mask coverage");
+}
+
 void test_edge_aware_4k_resolve_contract() {
   constexpr std::uint32_t width = 3U;
   constexpr std::uint32_t height = 3U;
@@ -1465,6 +1498,7 @@ int main() {
     test_bounds_presentation_and_backend();
     test_adversarial_coordinates_and_budgets();
     test_precise_transparency_safe_filtering();
+    test_precise_quad_half_open_ownership();
     test_edge_aware_4k_resolve_contract();
     test_bounded_chroma_smoothing_contract();
     test_scanout_boundaries();

@@ -151,6 +151,27 @@ hardware blend class. `NearestNative` remains the default and is byte-identical
 to the unenhanced path. Counters expose fragment, fetch, and fallback costs for
 deterministic performance receipts.
 
+## Live GP0 compatibility matrix
+
+The application drains every decoded primitive through one authoritative VRAM
+path. Enhanced geometry is attempted only for polygons with complete current
+provenance; rejection immediately consumes the unchanged event natively.
+
+| GP0 family | Native coverage | Enhanced coverage |
+| --- | --- | --- |
+| Flat/Gouraud triangles | draw offset, clip, dither, blend and mask | PGXP position/W, perspective color/UV, native or expanded culling |
+| Flat/Gouraud quads | two triangles with one-owner shared edge | same half-open edge ownership; no duplicate diagonal blend |
+| Textured polygons | 4/8/15-bit, CLUT, window, raw/modulated, STP | same texture state, replacement handle and transparency-safe filtering |
+| Flat/Gouraud lines and polylines | joins, offsets, dither, blend and mask | authoritative native fallback; never silently discarded |
+| Tiles and textured sprites | variable/1/8/16 sizes, flips, window, blend and mask | native raster plus safe generation-checked HD UI overlay |
+| Fill/copy/upload/download and environment | wrapped VRAM and mask semantics | authoritative state/source generation for later enhanced draws |
+
+The deterministic live matrix test frames these packet families together and
+requires all polygon variants to reach precise raster with zero fallback. A
+separate identity-projection test requires a semi-transparent precise quad to
+match the complete native VRAM digest, protecting shared-edge blend and mask
+semantics.
+
 `ScanoutMapper::upscale_edge_aware_rgb888()` is the high-resolution
 presentation resolve. It applies the Scale2x edge rules directly at an
 arbitrary 2x-or-greater target size, selecting only colors already present in
