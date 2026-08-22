@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import struct
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +22,7 @@ SYSTEM_DLLS = {name.casefold() for name in (
     "oleaut32.dll", "gdi32.dll", "comdlg32.dll", "combase.dll", "ntdll.dll",
     "secur32.dll", "setupapi.dll", "cfgmgr32.dll", "imm32.dll", "version.dll",
     "winmm.dll", "ws2_32.dll", "bcrypt.dll", "crypt32.dll", "shlwapi.dll",
-    "windowscodecs.dll", "vulkan-1.dll", "dwmapi.dll", "uxtheme.dll")}
+    "windowscodecs.dll", "vulkan-1.dll", "dwmapi.dll", "uxtheme.dll", "msvcrt.dll")}
 
 
 def _hash(path: Path) -> str:
@@ -98,3 +99,36 @@ def audit_windows_package(package: Path, *, link_map: Path, root: Path,
             "frontier_evidence_sha256": _hash(frontier_evidence),
             "bios_instructions_executed": frontier["bios_instructions_executed"],
             "imports": imports}
+
+
+def smoke_windows_product(package: Path, *, bios: Path, receipt_path: Path,
+                          minimum_bios_instructions: int = 1509) -> dict[str, Any]:
+    package_receipt = validate_release(package)
+    package = package.resolve(strict=True)
+    bios = bios.resolve(strict=True)
+    try: bios.relative_to(package)
+    except ValueError: pass
+    else: raise ReleaseError("copyrighted BIOS input must remain outside the package")
+    completed = subprocess.run(
+        [str(package / "bin" / "Wipeout3SE.exe"), "--bios", str(bios), "--smoke-hidden"],
+        cwd=package / "bin", stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, timeout=30.0, check=False)
+    try: frontier = json.loads(completed.stdout.decode("utf-8").strip().splitlines()[-1])
+    except (UnicodeError, ValueError, IndexError) as error:
+        raise ReleaseError("installed product emitted no boot frontier") from error
+    if (completed.returncode != 0 or frontier.get("schema") != "clean-aot.bootstrap-receipt.v1"
+            or frontier.get("stage") != "bios-slice-stopped"
+            or frontier.get("reason") != "unknown-generated-bios-pc"
+            or type(frontier.get("bios_instructions_executed")) is not int
+            or frontier["bios_instructions_executed"] < minimum_bios_instructions):
+        raise ReleaseError("installed product did not reach the required fail-closed frontier")
+    receipt = {"schema": "wipeout3se.clean-aot.windows-installed-smoke.v1",
+               "status": "passed-not-game-ready", "game_ready": False,
+               "package_manifest_sha256": package_receipt["manifest_sha256"],
+               "bios_input_sha256": _hash(bios), "frontier": frontier,
+               "stdout_sha256": hashlib.sha256(completed.stdout).hexdigest(),
+               "stderr_sha256": hashlib.sha256(completed.stderr).hexdigest()}
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    if receipt_path.exists(): raise ReleaseError("refusing to overwrite smoke receipt")
+    receipt_path.write_bytes(canonical_json_bytes(receipt) + b"\n")
+    return receipt

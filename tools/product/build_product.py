@@ -23,7 +23,7 @@ if __package__ in {None, ""}:
         ReleaseError, create_release, initialize_install, run_soak, validate_release)
     from install_lane import (InstallError, launch_and_record, migrate_upgrade,
                               orchestrate_first_run)  # type: ignore[import-not-found]
-    from windows_audit import audit_windows_package  # type: ignore[import-not-found]
+    from windows_audit import audit_windows_package, smoke_windows_product  # type: ignore[import-not-found]
 else:
     from .pipeline import (
         DEFAULT_MEDIA_MANIFEST,
@@ -38,7 +38,7 @@ else:
                                run_soak, validate_release)
     from .install_lane import (InstallError, launch_and_record, migrate_upgrade,
                                orchestrate_first_run)
-    from .windows_audit import audit_windows_package
+    from .windows_audit import audit_windows_package, smoke_windows_product
 
 
 def _common_media(parser: argparse.ArgumentParser) -> None:
@@ -138,6 +138,13 @@ def _build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--frontier", type=Path, required=True)
     audit.add_argument("--allowlist", type=Path)
 
+    smoke = subparsers.add_parser(
+        "smoke-windows", help="run a relocated product against external BIOS and record frontier")
+    smoke.add_argument("--package", type=Path, required=True)
+    smoke.add_argument("--bios", type=Path, required=True)
+    smoke.add_argument("--receipt", type=Path, required=True)
+    smoke.add_argument("--minimum-bios-instructions", type=int, default=1509)
+
     soak = subparsers.add_parser(
         "soak", help="run a deterministic bounded performance/soak command")
     soak.add_argument("--iterations", type=int, default=100)
@@ -234,6 +241,10 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "upgrade":
             document = migrate_upgrade(args.user_data, json.loads(
                 args.active_receipt.read_text(encoding="utf-8")))
+        elif args.command == "smoke-windows":
+            document = smoke_windows_product(
+                args.package, bios=args.bios, receipt_path=args.receipt,
+                minimum_bios_instructions=args.minimum_bios_instructions)
         elif args.command == "soak":
             command_line = args.command_line
             if command_line and command_line[0] == "--":

@@ -8,6 +8,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(CLEAN_AOT_APP_BUILD_TESTS "Build application-shell tests" ON)
 option(CLEAN_AOT_APP_ENABLE_SDL "Build the native SDL platform adapter" OFF)
 option(CLEAN_AOT_APP_ENABLE_SANITIZERS "Enable ASan and UBSan" OFF)
+set(CLEAN_AOT_PRODUCT_GENERATED_DIR "" CACHE PATH "External locally generated clean BIOS region sources")
+set(CLEAN_AOT_PRODUCT_BINDING_SYMBOL "" CACHE STRING "Generated BIOS binding accessor identifier")
 
 include(CTest)
 set(_clean_aot_app_build_testing "${BUILD_TESTING}")
@@ -70,6 +72,31 @@ if(CLEAN_AOT_APP_ENABLE_SDL)
     target_link_libraries(clean_aot_app_sdl PUBLIC clean_aot_app
         clean_aot_host_sdl_vulkan SDL3::SDL3)
     clean_aot_app_warnings(clean_aot_app_sdl)
+    add_executable(Wipeout3SE src/product_main.cpp)
+    target_link_libraries(Wipeout3SE PRIVATE clean_aot_runtime
+        clean_aot_host_sdl_vulkan SDL3::SDL3)
+    if(CLEAN_AOT_PRODUCT_GENERATED_DIR)
+        file(GLOB _clean_aot_product_generated CONFIGURE_DEPENDS
+            "${CLEAN_AOT_PRODUCT_GENERATED_DIR}/*.cpp")
+        if(NOT _clean_aot_product_generated)
+            message(FATAL_ERROR "CLEAN_AOT_PRODUCT_GENERATED_DIR contains no generated sources")
+        endif()
+        target_sources(Wipeout3SE PRIVATE ${_clean_aot_product_generated})
+    endif()
+    if(CLEAN_AOT_PRODUCT_BINDING_SYMBOL)
+        target_compile_definitions(Wipeout3SE PRIVATE
+            CLEAN_AOT_PRODUCT_BINDING_SYMBOL=${CLEAN_AOT_PRODUCT_BINDING_SYMBOL})
+    endif()
+    if(MSVC)
+        target_link_options(Wipeout3SE PRIVATE "/MAP:$<TARGET_FILE_DIR:Wipeout3SE>/Wipeout3SE.map")
+    else()
+        target_link_options(Wipeout3SE PRIVATE "-Wl,-Map,$<TARGET_FILE_DIR:Wipeout3SE>/Wipeout3SE.map")
+    endif()
+    clean_aot_app_warnings(Wipeout3SE)
+    add_custom_command(TARGET Wipeout3SE POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "$<TARGET_FILE:SDL3::SDL3>" "$<TARGET_FILE_DIR:Wipeout3SE>"
+        VERBATIM)
     if(CLEAN_AOT_APP_BUILD_TESTS AND BUILD_TESTING)
         add_executable(clean_aot_app_sdl_tests tests/sdl_platform_tests.cpp)
         target_link_libraries(clean_aot_app_sdl_tests PRIVATE clean_aot_app_sdl)
