@@ -26,6 +26,12 @@
   native XA audio sectors, 1,340,640 CD-input frames, 2,219,248 SPU frames at
   44.1 kHz, and zero audio underruns. This is strong runtime timing evidence,
   but does not yet prove exact game simulation-update count or stable racing.
+- The first deterministic windowed cadence probe is a failure, not a release
+  receipt: after resetting the debug VBlank counters and measuring exactly
+  10.004 seconds on a 100 Hz panel, the run reported 842 cycle-paced raises but
+  only 526 guest deliveries (~52.6/s). Headless produced an invalid ~204/s
+  result. The PAL-100 path therefore remains disabled until the title/menu
+  cadence and presentation bottleneck are isolated and corrected.
 
 ## Open blockers
 
