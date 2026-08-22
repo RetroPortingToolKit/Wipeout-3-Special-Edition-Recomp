@@ -55,10 +55,10 @@ python tools/product/build_product.py setup `
 
 `--compiler-interface clean-aot-v1` matches the current offline compiler CLI
 shape (`--exe`, `--manifest`, `--output`) for PS-X EXE images. The
-`clean-aot-image-v1` adapter is reserved for a compiler that explicitly accepts
-bounded raw payload images; it is required before a runtime payload can be
-compiled. The setup command never wraps a raw payload in a fabricated PS-X EXE
-header.
+`clean-aot-image-v1` is the explicit bounded-raw-image adapter. The compiler
+library now accepts raw bytes only with caller-supplied load and entry addresses;
+the remaining CLI adapter must pass those checked manifest values through. The
+setup command never wraps a raw payload in a fabricated PS-X EXE header.
 
 The region file is mandatory for a real setup. It is the authorization boundary
 for code/data ranges, roots, finite indirect targets, delay-slot ownership, and
@@ -85,7 +85,9 @@ python tools/product/build_product.py finalize `
 The `finalize` command calls the existing `psx_catalog validate` CLI before
 publishing the catalog. The setup catalog-input carries the profile SHA-256;
 finalization revalidates that binding and the complete pinned variant set
-before it measures artifacts. Catalog selection remains exact and fail-closed;
+before it measures artifacts. Successful selection also emits the validated
+load range, dispatch roots, and executed ranges needed to construct the native
+runtime binding. Catalog selection remains exact and fail-closed;
 it does not compile, interpret, capture-compile, or approximate a missing
 variant. Use `--profile` on `finalize` only when finalizing against the same
 explicit profile file used by setup.
@@ -109,8 +111,9 @@ external directory and are not repository assets.
 
 The product boundary is ready, but it cannot honestly claim a finished game
 until the clean compiler has a reviewed CLI in the canonical worktree, a
-complete region/CFG authorization for the main image, a raw bounded-image
-compiler path for `NFE.PB` entry 5, and a clean runtime target that links the
-generated sources. Those are explicit fail-closed inputs rather than hidden
-fallbacks. The pipeline is designed so those interfaces can land without
-changing media provenance or allowing emulator code into the final link graph.
+complete region/CFG authorization for the main image, the
+`clean-aot-image-v1` CLI adapter for `NFE.PB` entry 5, and a product target that
+constructs the generated entry table and drives the clean runtime dispatcher.
+The underlying bounded raw-image parser, catalog binding receipt, stable
+generated-region ABI, and fail-closed dispatcher now exist. Those are explicit
+fail-closed inputs rather than hidden fallbacks.

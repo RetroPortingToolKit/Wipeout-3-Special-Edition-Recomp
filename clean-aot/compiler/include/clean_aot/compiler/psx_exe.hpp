@@ -24,6 +24,9 @@ public:
     static constexpr std::size_t kHeaderSize = 0x800U;
 
     static PsxExeImage parse(std::span<const std::uint8_t> file_bytes);
+    static PsxExeImage parse_raw(std::span<const std::uint8_t> image_bytes,
+                                 GuestAddress load_address,
+                                 GuestAddress entry_pc);
     static PsxExeImage read_file(const std::filesystem::path& path);
 
     [[nodiscard]] GuestAddress entry_pc() const noexcept { return entry_pc_; }

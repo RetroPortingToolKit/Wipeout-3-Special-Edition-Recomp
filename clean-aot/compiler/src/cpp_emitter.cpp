@@ -101,10 +101,6 @@ std::string CppEmitter::emit(const Region& region) {
            << "    std::optional<std::uint32_t> target;\n"
            << "    EdgeKind kind;\n"
            << "};\n\n"
-           << "struct CpuState final {\n"
-           << "    std::uint32_t pc;\n"
-           << "    bool branch_taken;\n"
-           << "};\n\n"
            << "inline constexpr std::array<Edge, " << region.edges.size() << "> kEdges = {{\n";
 
     for (const Edge* edge : ordered_edges) {
@@ -122,8 +118,12 @@ std::string CppEmitter::emit(const Region& region) {
     output << "}};\n\n"
            << "// Returns true when a resolved edge advanced the guest PC.\n"
            << "// An unresolved indirect edge leaves the caller's PC untouched.\n"
-           << "inline bool step(CpuState& state) {\n"
-           << "    switch (state.pc) {\n";
+           << "extern \"C\" bool clean_aot_region_"
+           << std::hex << std::setw(8) << std::setfill('0') << region.start
+           << std::dec << std::setfill(' ')
+           << "(std::uint32_t& pc, bool branch_taken) noexcept {\n"
+           << "    (void)branch_taken;\n"
+           << "    switch (pc) {\n";
 
     for (const BasicBlock* block : ordered_blocks) {
         output << "    case ";
@@ -151,7 +151,7 @@ std::string CppEmitter::emit(const Region& region) {
         }
 
         if (resolved != nullptr && resolved->target.has_value()) {
-            output << "        state.pc = ";
+            output << "        pc = ";
             write_address(output, *resolved->target);
             output << ";\n        return true;\n";
         } else if (block->terminator_index.has_value() &&
@@ -165,7 +165,7 @@ std::string CppEmitter::emit(const Region& region) {
                 !taken->target.has_value() || !fallthrough->target.has_value()) {
                 throw IrError("emitter found an invalid conditional edge shape");
             }
-            output << "        state.pc = state.branch_taken ? ";
+            output << "        pc = branch_taken ? ";
             write_address(output, *taken->target);
             output << " : ";
             write_address(output, *fallthrough->target);

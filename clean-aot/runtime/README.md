@@ -22,7 +22,10 @@ This first integration slice owns:
   register routing;
 - DMA endpoint wiring for MDEC, GPU, CD-ROM, SPU, OTC, and RAM;
 - exact native-time advancement and level-to-latched interrupt propagation;
-- cache-control and deterministic SIO1 bootstrap registers.
+- cache-control and deterministic SIO1 bootstrap registers;
+- exact-identity binding of sorted generated-region entry tables, with unknown
+  PCs, unresolved generated edges, malformed tables, and identity mismatches
+  rejected before any fallback can occur.
 
 Host presentation, media-file parsing, scanout/raster draining, frame pacing,
 audio-device queues, and product policy are separate components.

@@ -29,6 +29,31 @@ constexpr std::size_t kMagicSize = 8U;
 
 } // namespace
 
+PsxExeImage PsxExeImage::parse_raw(std::span<const std::uint8_t> image_bytes,
+                                   GuestAddress load_address,
+                                   GuestAddress entry_pc) {
+    if (image_bytes.empty() || (image_bytes.size() % sizeof(std::uint32_t)) != 0U) {
+        throw ExeFormatError("raw image size must be a non-zero multiple of four");
+    }
+    if ((load_address % sizeof(std::uint32_t)) != 0U ||
+        (entry_pc % sizeof(std::uint32_t)) != 0U) {
+        throw ExeFormatError("raw image load address and entry PC must be aligned");
+    }
+    const std::uint64_t end = static_cast<std::uint64_t>(load_address) + image_bytes.size();
+    constexpr std::uint64_t kGuestAddressSpaceSize =
+        static_cast<std::uint64_t>(std::numeric_limits<GuestAddress>::max()) + 1ULL;
+    if (end > kGuestAddressSpaceSize) {
+        throw ExeFormatError("raw image range wraps the guest address space");
+    }
+    const std::uint64_t entry_end = static_cast<std::uint64_t>(entry_pc) +
+                                    sizeof(std::uint32_t);
+    if (entry_pc < load_address || entry_end > end) {
+        throw ExeFormatError("raw image entry PC is outside the image");
+    }
+    return PsxExeImage(entry_pc, load_address, end,
+                       std::vector<std::uint8_t>(image_bytes.begin(), image_bytes.end()));
+}
+
 PsxExeImage PsxExeImage::parse(std::span<const std::uint8_t> file_bytes) {
     if (file_bytes.size() < kHeaderSize) {
         throw ExeFormatError("PS-X EXE is shorter than its fixed header");

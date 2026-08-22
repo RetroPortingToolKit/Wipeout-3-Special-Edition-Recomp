@@ -15,6 +15,7 @@ foreach(component IN ITEMS machine memory soc gte gpu cdrom mdec sio spu)
 endforeach()
 
 add_library(clean_aot_runtime STATIC
+    src/native_dispatch.cpp
     src/runtime.cpp
 )
 

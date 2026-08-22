@@ -129,6 +129,11 @@ class SelectionResult:
             "status": "selected",
             "catalog_sha256": self.catalog_sha256,
             "variant_identity_sha256": self.variant.identity_sha256,
+            "binding": {
+                "load_range": self.variant.load_range.to_dict(),
+                "dispatch_roots": list(self.variant.dispatch_roots),
+                "executed_ranges": [item.to_dict() for item in self.variant.executed_ranges],
+            },
             "artifact": artifact,
         }
 

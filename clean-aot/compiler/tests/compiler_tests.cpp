@@ -171,6 +171,27 @@ void test_checked_exe_ingestion() {
     }, "an unaligned load address must be rejected");
 }
 
+void test_bounded_raw_image_ingestion() {
+    std::vector<std::uint8_t> bytes(8U, 0U);
+    write_le32(bytes, 0U, 0x12345678U);
+    const PsxExeImage image = PsxExeImage::parse_raw(bytes, 0x00002000U, 0x00002004U);
+    require(image.load_address() == 0x00002000U && image.entry_pc() == 0x00002004U,
+            "raw image must preserve explicit bounded placement");
+    require(image.text_end_exclusive() == 0x00002008U &&
+                image.read_u32(0x00002000U) == 0x12345678U,
+            "raw image bytes must be available to the region builder");
+    require_throws([&] {
+        (void)PsxExeImage::parse_raw(bytes, 0xfffffffCU, 0xfffffffCU);
+    }, "raw image address wrap must fail closed");
+    require_throws([&] {
+        (void)PsxExeImage::parse_raw(bytes, 0x00002000U, 0x00002008U);
+    }, "raw image entry outside the bounded payload must fail closed");
+    require_throws([&] {
+        (void)PsxExeImage::parse_raw(std::span<const std::uint8_t>(bytes).first(6U),
+                                     0x00002000U, 0x00002000U);
+    }, "partial instruction bytes must fail closed");
+}
+
 void test_direct_decoder_control_classes() {
     const auto branch = clean_aot::compiler::decode_instruction(
         0x00001000U, encode_regimm(2U, 0x00U, -2));
@@ -320,7 +341,7 @@ void test_bounded_straight_line_publishes_external_fallthrough() {
             "bounded fallthrough must publish the architectural next PC externally");
 
     const std::string source = clean_aot::compiler::CppEmitter::emit(region);
-    require(source.find("state.pc = 0x00002404u;") != std::string::npos,
+    require(source.find("pc = 0x00002404u;") != std::string::npos,
             "emitted boundary fallthrough must write the architectural next PC");
 }
 
@@ -334,7 +355,7 @@ void test_image_end_fallthrough_can_publish_zero() {
     require(region.edges.size() == 1U && region.edges[0].target == 0x00000000U,
             "32-bit sequential PC wrap must be an explicit edge, not a missing target");
     const std::string source = clean_aot::compiler::CppEmitter::emit(region);
-    require(source.find("state.pc = 0x00000000u;") != std::string::npos,
+    require(source.find("pc = 0x00000000u;") != std::string::npos,
             "a real zero next PC must be emitted explicitly");
 }
 
@@ -369,7 +390,7 @@ void test_direct_call_emitter_advances_to_callee() {
     require(call_case != std::string::npos, "direct-call block must be emitted");
     const std::size_t next_case = source.find("    case ", call_case + 1U);
     const std::string call_body = source.substr(call_case, next_case - call_case);
-    require(call_body.find("state.pc = 0x00002C10u;") != std::string::npos,
+    require(call_body.find("pc = 0x00002C10u;") != std::string::npos,
             "direct call must advance to its callee rather than leave a stale PC");
 }
 
@@ -524,10 +545,12 @@ void test_emitter_contains_compilable_graph_shape() {
             "emitter must preserve the trampoline target");
     require(source.find("0x00001020u") != std::string::npos,
             "emitter must preserve the continuation target");
-    require(source.find("state.pc = 0;") == std::string::npos,
+    require(source.find("pc = 0;") == std::string::npos,
             "emitter must not synthesize a zero PC for an unresolved name");
-    require(source.find("step(CpuState& state)") != std::string::npos,
-            "emitter must provide a small callable fixture stepper");
+    require(source.find(
+                "extern \"C\" bool clean_aot_region_00001000(std::uint32_t& pc, bool branch_taken) noexcept") !=
+                std::string::npos,
+            "emitter must provide a stable, region-unique dispatch ABI");
 }
 
 } // namespace
@@ -554,6 +577,7 @@ int main(int argc, char** argv) {
 
     const std::vector<std::pair<std::string_view, std::function<void()>>> tests = {
         {"checked_exe_ingestion", test_checked_exe_ingestion},
+        {"bounded_raw_image_ingestion", test_bounded_raw_image_ingestion},
         {"direct_decoder_control_classes", test_direct_decoder_control_classes},
         {"unnamed_direct_path_preserves_targets", test_unnamed_direct_path_preserves_targets},
         {"branch_delay_slot_and_fallthrough", test_branch_delay_slot_and_fallthrough},

@@ -412,6 +412,14 @@ class SelectionTests(unittest.TestCase):
         with verified_selector(catalog) as (selector, root):
             result = selector.select(request_for(known), EXECUTABLE_A)
             self.assertEqual(result.artifact_size, len(artifact_bytes("known")))
+            self.assertEqual(
+                result.to_dict()["binding"],
+                {
+                    "load_range": known.load_range.to_dict(),
+                    "dispatch_roots": list(known.dispatch_roots),
+                    "executed_ranges": [item.to_dict() for item in known.executed_ranges],
+                },
+            )
             artifact = root.joinpath(*known.artifact.path.split("/"))
             artifact.write_bytes(b"tampered-native-code")
             with self.assertRaises(CatalogSelectionError) as raised:

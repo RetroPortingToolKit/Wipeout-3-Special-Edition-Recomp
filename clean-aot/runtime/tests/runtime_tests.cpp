@@ -1,4 +1,5 @@
 #include "clean_aot/runtime/runtime.hpp"
+#include "clean_aot/runtime/native_dispatch.hpp"
 
 #include "clean_aot_soc.hpp"
 
@@ -42,6 +43,64 @@ std::unique_ptr<clean_aot::runtime::Runtime> make_runtime(
     configuration.cpu_multiplier_numerator = numerator;
     configuration.cpu_multiplier_denominator = denominator;
     return std::make_unique<clean_aot::runtime::Runtime>(configuration);
+}
+
+bool generated_step_a(std::uint32_t& pc, bool branch_taken) noexcept {
+    pc = branch_taken ? 0x00001020U : 0x00001010U;
+    return true;
+}
+
+bool generated_step_b(std::uint32_t& pc, bool) noexcept {
+    pc = 0x00001030U;
+    return true;
+}
+
+bool unresolved_generated_step(std::uint32_t&, bool) noexcept {
+    return false;
+}
+
+void test_authenticated_generated_dispatch(Runner& runner) {
+    using clean_aot::runtime::DispatchStatus;
+    using clean_aot::runtime::GeneratedDispatcher;
+    using clean_aot::runtime::GeneratedExecutableBinding;
+    using clean_aot::runtime::GeneratedRegionEntry;
+
+    constexpr std::string_view identity =
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const std::array entries{
+        GeneratedRegionEntry{0x00001000U, generated_step_a},
+        GeneratedRegionEntry{0x00001010U, generated_step_b},
+        GeneratedRegionEntry{0x00001020U, unresolved_generated_step},
+    };
+    const GeneratedExecutableBinding binding{identity, 0x00001000U, 0x00001100U, entries};
+    GeneratedDispatcher dispatcher;
+    EXPECT(runner, dispatcher.bind(identity, binding) == DispatchStatus::Bound);
+
+    std::uint32_t pc = 0x00001000U;
+    EXPECT(runner, dispatcher.dispatch(pc, false) == DispatchStatus::Executed);
+    EXPECT(runner, pc == 0x00001010U);
+    EXPECT(runner, dispatcher.dispatch(pc, false) == DispatchStatus::Executed);
+    EXPECT(runner, pc == 0x00001030U);
+    EXPECT(runner, dispatcher.dispatch(pc, false) == DispatchStatus::UnknownCode);
+
+    pc = 0x00001004U;
+    EXPECT(runner, dispatcher.dispatch(pc, false) == DispatchStatus::UnknownCode);
+    pc = 0x00001020U;
+    EXPECT(runner, dispatcher.dispatch(pc, false) == DispatchStatus::UnknownCode);
+    EXPECT(runner, pc == 0x00001020U);
+
+    GeneratedDispatcher mismatch;
+    EXPECT(runner, mismatch.bind(
+                       "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                       binding) == DispatchStatus::IdentityMismatch);
+    EXPECT(runner, !mismatch.bound());
+
+    const std::array unsorted{
+        GeneratedRegionEntry{0x00001010U, generated_step_b},
+        GeneratedRegionEntry{0x00001000U, generated_step_a},
+    };
+    const GeneratedExecutableBinding bad{identity, 0x00001000U, 0x00001100U, unsorted};
+    EXPECT(runner, mismatch.bind(identity, bad) == DispatchStatus::InvalidBinding);
 }
 
 void test_retirement_clock(Runner& runner) {
@@ -282,6 +341,7 @@ void test_spu_irq_sample_deadline(Runner& runner) {
 
 int main() {
     Runner runner;
+    test_authenticated_generated_dispatch(runner);
     test_retirement_clock(runner);
     test_configuration_and_plain_memory(runner);
     test_issue_cycle_and_mmio(runner);

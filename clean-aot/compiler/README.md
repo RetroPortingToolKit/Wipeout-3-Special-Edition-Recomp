@@ -7,13 +7,15 @@ guest addresses. There is no inferred function object in the model.
 
 The current tranche provides:
 
-- checked PS-X EXE parsing for the executable header and text image;
+- checked PS-X EXE parsing plus explicit bounded raw-image ingestion with a
+  caller-supplied load address and entry PC;
 - a checked MIPS-I direct-control decoder that distinguishes calls, conditional
   link branches, jumps, indirect transfers, and returns;
 - deterministic reachable-region construction with delay-slot-aware blocks;
 - explicit direct, conditional, fallthrough, call, return, and indirect edges,
   including external straight-line fallthrough at image/region boundaries;
-- a standalone C++ edge-table emitter suitable for synthetic fixtures.
+- a standalone C++ edge-table emitter with a stable region-unique C dispatch
+  symbol suitable for registration by the clean runtime.
 
 The tests use only fabricated addresses and instruction words. They do not load
 the product disc, BIOS, generated sources, or any other project-specific input.
