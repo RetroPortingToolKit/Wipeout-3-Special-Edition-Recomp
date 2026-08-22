@@ -190,11 +190,6 @@ def portable_launcher() -> bytes:
             "set \"PACKAGE_ROOT=%~dp0\"\r\n"
             "if not defined LOCALAPPDATA exit /b 64\r\n"
             "set \"USER_DATA=%LOCALAPPDATA%\\Wipeout3SE\"\r\n"
-            "if not exist \"%USER_DATA%\\receipts\\active-setup.json\" (\r\n"
-            "  echo First run requires your WipEout 3 SE CUE/BIN set and PlayStation BIOS. 1>&2\r\n"
-            "  echo Use the authenticated first-run setup command documented in policy\\first-run-setup.json. 1>&2\r\n"
-            "  exit /b 78\r\n"
-            ")\r\n"
             "\"%PACKAGE_ROOT%bin\\Wipeout3SE.exe\" --user-data \"%USER_DATA%\"\r\n"
             "exit /b %ERRORLEVEL%\r\n").encode("ascii")
 
@@ -252,13 +247,10 @@ def create_release(*, app: Path, sdl: Path, artifacts: Sequence[tuple[str, Path]
                             "sha256": payload_hash})
         policy = temporary / "policy"
         policy.mkdir()
-        (policy / "first-run-setup.json").write_bytes(
-            _canonical(default_setup_contract(executable_name)))
         (policy / "default-config.json").write_bytes(_canonical(default_config()))
         launcher = temporary / "Wipeout3SE.cmd"
         launcher.write_bytes(portable_launcher())
-        for path, role in ((policy / "first-run-setup.json", "setup-contract"),
-                           (policy / "default-config.json", "configuration-defaults"),
+        for path, role in ((policy / "default-config.json", "configuration-defaults"),
                            (launcher, "portable-launcher")):
             entries.append({"path": path.relative_to(temporary).as_posix(), "role": role,
                             "size": path.stat().st_size, "sha256": _sha256(path)})
@@ -301,21 +293,12 @@ def validate_release(package: Path) -> dict[str, Any]:
     actual = {path.relative_to(package).as_posix() for path in package.rglob("*") if path.is_file()}
     if actual != listed:
         raise ReleaseError("release contains unmanifested or missing files")
-    for policy_name in ("first-run-setup.json", "default-config.json"):
+    for policy_name in ("default-config.json",):
         text = (package / "policy" / policy_name).read_text(encoding="utf-8")
         if str(package) in text or "C:\\" in text or "/home/" in text:
             raise ReleaseError("release policy embeds a machine-specific path")
-    setup = json.loads((package / "policy" / "first-run-setup.json").read_text(
-        encoding="utf-8"))
     config = json.loads((package / "policy" / "default-config.json").read_text(
         encoding="utf-8"))
-    if (setup.get("schema") != SETUP_SCHEMA or setup.get("mode") != "one-time-first-run"
-            or setup.get("unknown_identity") != "reject-before-runtime-initialization"
-            or len(setup.get("required_imports", [])) != 3
-            or "first-run" not in setup.get("setup_command", "")
-            or setup.get("activation") != "compile-finalize-copy-generated-artifacts-atomic-switch"
-            or not str(setup.get("user_data_root", "")).startswith("${USER_DATA}/")):
-        raise ReleaseError("first-run setup UX contract is invalid")
     _validate_config(config)
     launcher = (package / "Wipeout3SE.cmd").read_bytes()
     if launcher != portable_launcher() or b"%~dp0" not in launcher:

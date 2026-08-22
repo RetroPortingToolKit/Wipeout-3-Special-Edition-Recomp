@@ -25,6 +25,8 @@ if __package__ in {None, ""}:
     from install_lane import (InstallError, launch_and_record, migrate_upgrade, rollback_upgrade,
                               orchestrate_first_run)  # type: ignore[import-not-found]
     from windows_audit import audit_windows_package, smoke_windows_product  # type: ignore[import-not-found]
+    from installer_lane import (audit_installed_runtime, create_installer,
+                                validate_installer)  # type: ignore[import-not-found]
 else:
     from .pipeline import (
         DEFAULT_MEDIA_MANIFEST,
@@ -40,6 +42,7 @@ else:
     from .install_lane import (InstallError, launch_and_record, migrate_upgrade, rollback_upgrade,
                                orchestrate_first_run)
     from .windows_audit import audit_windows_package, smoke_windows_product
+    from .installer_lane import audit_installed_runtime, create_installer, validate_installer
 
 
 def _common_media(parser: argparse.ArgumentParser) -> None:
@@ -167,6 +170,15 @@ def _build_parser() -> argparse.ArgumentParser:
     installed_soak.add_argument("--timeout-seconds", type=float, default=30.0)
     installed_soak.add_argument("--max-p95-ms", type=float, required=True)
     installed_soak.add_argument("--receipt", type=Path)
+    installer = subparsers.add_parser("package-installer", help="create the two-stage offline installer")
+    installer.add_argument("--setup-exe", type=Path, required=True)
+    installer.add_argument("--runtime-payload", type=Path, required=True)
+    installer.add_argument("--setup-payload", action="append", default=[], metavar="RELATIVE=PATH")
+    installer.add_argument("--output", type=Path, required=True)
+    validate_installer_parser = subparsers.add_parser("validate-installer")
+    validate_installer_parser.add_argument("--package", type=Path, required=True)
+    runtime_audit = subparsers.add_parser("audit-installed-runtime")
+    runtime_audit.add_argument("--runtime", type=Path, required=True)
     return parser
 
 
@@ -277,6 +289,14 @@ def main(argv: list[str] | None = None) -> int:
                 args.package, bios=args.bios, profile=args.profile, updates=args.updates,
                 iterations=args.iterations, timeout_seconds=args.timeout_seconds,
                 max_p95_ms=args.max_p95_ms, receipt_path=args.receipt)
+        elif args.command == "package-installer":
+            document = create_installer(setup_exe=args.setup_exe,
+                runtime_payload=args.runtime_payload, setup_payload=_artifacts(args.setup_payload),
+                output=args.output)
+        elif args.command == "validate-installer":
+            document = validate_installer(args.package)
+        elif args.command == "audit-installed-runtime":
+            document = audit_installed_runtime(args.runtime)
         else:  # pragma: no cover - argparse enforces the command set
             raise ProductError("unknown product command")
         _print(document)

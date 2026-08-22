@@ -104,12 +104,9 @@ class ReleaseLaneTests(unittest.TestCase):
         self.assertEqual(config["video"]["update_rate_hz"], 100)
         self.assertEqual(config["audio"]["underrun"], "count-and-resume-next-batch")
         self.assertEqual(config["input"]["mapping"]["cross"], "south")
-        setup = json.loads((relocated / "policy" / "first-run-setup.json").read_text())
-        self.assertEqual(setup["mode"], "one-time-first-run")
-        self.assertNotIn(str(package), json.dumps(setup))
+        self.assertFalse((relocated / "policy" / "first-run-setup.json").exists())
         launcher = (relocated / "Wipeout3SE.cmd").read_text()
         self.assertIn("%~dp0", launcher)
-        self.assertIn("receipts\\active-setup.json", launcher)
         self.assertIn("--user-data", launcher)
         self.assertNotIn(str(package), launcher)
 
