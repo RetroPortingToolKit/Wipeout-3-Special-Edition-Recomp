@@ -56,6 +56,7 @@ overlay_autocompile_cmd = "python3 psxrecomp/tools/compile_overlays.py --capture
 [video]
 renderer = "opengl"
 geometry_correction = true
+auto_skip_fmv = false
 # Authentic 4:3 is the baseline. The Widescreen mod below activates WipEout
 # 3's game-specific native-wide hooks and chooses fixed/adaptive presentation.
 aspect_ratio = "4:3"
