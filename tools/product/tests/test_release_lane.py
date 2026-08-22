@@ -214,13 +214,16 @@ class ReleaseLaneTests(unittest.TestCase):
         artifact = root / "region.native"
         artifact.write_bytes(b"region")
         digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-        catalog = {"variants": [{"artifact": {"path": "region.native", "sha256": digest}}]}
+        catalog = {"schema": "psxrecomp.clean-aot.catalog.v1",
+                   "variants": [{"artifact": {"path": "region.native", "sha256": digest}}]}
         (root / "catalog.json").write_bytes(canonical_json_bytes(catalog) + b"\n")
         catalog_hash = hashlib.sha256(canonical_json_bytes(catalog)).hexdigest()
         (root / "setup.json").write_text(json.dumps(
-            {"status": "setup-complete", "catalog": {"input_sha256": "a" * 64}}))
+            {"schema": "psxrecomp.clean-aot.product-receipt.v1",
+             "status": "setup-complete", "catalog": {"input_sha256": "a" * 64}}))
         (root / "finalize.json").write_text(json.dumps(
-            {"status": "catalog-finalized", "catalog_input_sha256": "b" * 64,
+            {"schema": "psxrecomp.clean-aot.product-finalize-receipt.v1",
+             "status": "catalog-finalized", "catalog_input_sha256": "b" * 64,
              "catalog_sha256": catalog_hash}))
         with self.assertRaisesRegex(InstallError, "stale for this setup"):
             generation_lock(root / "setup.json", root / "finalize.json",

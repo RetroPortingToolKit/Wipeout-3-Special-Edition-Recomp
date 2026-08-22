@@ -49,7 +49,11 @@ def _atomic(path: Path, document: Any) -> None:
 def generation_lock(setup: Path, finalize: Path, catalog: Path,
                     artifact_root: Path) -> dict[str, Any]:
     setup_doc, final_doc, catalog_doc = load_json(setup), load_json(finalize), load_json(catalog)
-    if setup_doc.get("status") != "setup-complete" or final_doc.get("status") != "catalog-finalized":
+    if (setup_doc.get("schema") != "psxrecomp.clean-aot.product-receipt.v1"
+            or setup_doc.get("status") != "setup-complete"
+            or final_doc.get("schema") != "psxrecomp.clean-aot.product-finalize-receipt.v1"
+            or final_doc.get("status") != "catalog-finalized"
+            or catalog_doc.get("schema") != "psxrecomp.clean-aot.catalog.v1"):
         raise InstallError("setup is not finalized")
     if setup_doc.get("catalog", {}).get("input_sha256") != final_doc.get("catalog_input_sha256"):
         raise InstallError("finalized catalog is stale for this setup")
