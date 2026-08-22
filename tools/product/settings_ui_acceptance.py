@@ -42,7 +42,7 @@ def _run(executable: Path, config: Path, actions: list[str]) -> dict[str, Any]:
 def run_settings_ui_acceptance(package: Path, receipt_path: Path | None = None) -> dict[str, Any]:
     package = package.resolve()
     validation = validate_release(package)
-    executable = package / "bin" / "Wipeout3SE.exe"
+    executable = package / "Wipeout3SE.exe"
     with tempfile.TemporaryDirectory(prefix="wipeout3se-settings-ui-") as temporary:
         config = Path(temporary) / "\u5229\u7528\u8005" / "\u69cb\u6210.json"
         save = _run(executable, config, [

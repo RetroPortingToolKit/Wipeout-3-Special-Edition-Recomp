@@ -26,9 +26,8 @@ if __package__ in {None, ""}:
     from install_lane import (InstallError, launch_and_record, migrate_upgrade, rollback_upgrade,
                               orchestrate_first_run)  # type: ignore[import-not-found]
     from windows_audit import audit_windows_package, smoke_windows_product  # type: ignore[import-not-found]
-    from installer_lane import (audit_installed_runtime, create_installer,
-                                run_installer_acceptance,
-                                validate_installer)  # type: ignore[import-not-found]
+    from installer_lane import audit_installed_runtime  # type: ignore[import-not-found]
+    from portable_acceptance import run_portable_acceptance  # type: ignore[import-not-found]
     from release_readiness import (audit_release_readiness,
                                    write_readiness_receipt)  # type: ignore[import-not-found]
     from content_coverage import build_content_coverage_ledger  # type: ignore[import-not-found]
@@ -52,8 +51,8 @@ else:
     from .install_lane import (InstallError, launch_and_record, migrate_upgrade, rollback_upgrade,
                                orchestrate_first_run)
     from .windows_audit import audit_windows_package, smoke_windows_product
-    from .installer_lane import (audit_installed_runtime, create_installer,
-                                 run_installer_acceptance, validate_installer)
+    from .installer_lane import audit_installed_runtime
+    from .portable_acceptance import run_portable_acceptance
     from .release_readiness import audit_release_readiness, write_readiness_receipt
     from .content_coverage import build_content_coverage_ledger
     from .behavioral_runner import build_scenario_plan, run_behavioral_scenarios
@@ -230,19 +229,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "settings-ui-acceptance", help="exercise installed native/headless settings UX")
     settings_ui_acceptance.add_argument("--package", type=Path, required=True)
     settings_ui_acceptance.add_argument("--receipt", type=Path, required=True)
-    installer = subparsers.add_parser("package-installer", help="create the two-stage offline installer")
-    installer.add_argument("--setup-exe", type=Path, required=True)
-    installer.add_argument("--runtime-payload", type=Path, required=True)
-    installer.add_argument("--setup-payload", action="append", default=[], metavar="RELATIVE=PATH")
-    installer.add_argument("--output", type=Path, required=True)
-    validate_installer_parser = subparsers.add_parser("validate-installer")
-    validate_installer_parser.add_argument("--package", type=Path, required=True)
-    installer_acceptance = subparsers.add_parser(
-        "installer-acceptance", help="relocate and remeasure installer/runtime acceptance")
-    installer_acceptance.add_argument("--installer", type=Path, required=True)
-    installer_acceptance.add_argument("--runtime", type=Path, required=True)
-    installer_acceptance.add_argument("--frontier", type=Path, required=True)
-    installer_acceptance.add_argument("--receipt", type=Path, required=True)
+    portable = subparsers.add_parser(
+        "portable-acceptance", help="exercise relocated single-entrypoint first-run import")
+    portable.add_argument("--package", type=Path, required=True)
+    portable.add_argument("--bios", type=Path, required=True)
+    portable.add_argument("--cue", type=Path, required=True)
+    portable.add_argument("--receipt", type=Path, required=True)
     runtime_audit = subparsers.add_parser("audit-installed-runtime")
     runtime_audit.add_argument("--runtime", type=Path, required=True)
     return parser
@@ -389,15 +381,8 @@ def main(argv: list[str] | None = None) -> int:
                 receipt_path=args.receipt)
         elif args.command == "settings-ui-acceptance":
             document = run_settings_ui_acceptance(args.package, args.receipt)
-        elif args.command == "package-installer":
-            document = create_installer(setup_exe=args.setup_exe,
-                runtime_payload=args.runtime_payload, setup_payload=_artifacts(args.setup_payload),
-                output=args.output)
-        elif args.command == "validate-installer":
-            document = validate_installer(args.package)
-        elif args.command == "installer-acceptance":
-            document = run_installer_acceptance(
-                args.installer, args.runtime, args.frontier, args.receipt)
+        elif args.command == "portable-acceptance":
+            document = run_portable_acceptance(args.package, args.bios, args.cue, args.receipt)
         elif args.command == "audit-installed-runtime":
             document = audit_installed_runtime(args.runtime)
         else:  # pragma: no cover - argparse enforces the command set

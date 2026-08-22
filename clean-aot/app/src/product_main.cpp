@@ -6,6 +6,7 @@
 #include "clean_aot/app/memory_card.hpp"
 #include "clean_aot/app/settings.hpp"
 #include "clean_aot/app/settings_ui.hpp"
+#include "sha256.hpp"
 #include "sio.hpp"
 
 #include <array>
@@ -17,11 +18,13 @@
 #include <limits>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <commdlg.h>
 #endif
 
 #ifdef CLEAN_AOT_PRODUCT_HAS_EPOCH_BINDINGS
@@ -34,6 +37,11 @@ CLEAN_AOT_PRODUCT_BINDING_SYMBOL() noexcept;
 #endif
 
 namespace {
+std::filesystem::path path_from_utf8(std::string_view value) {
+    return std::filesystem::path(std::u8string(
+        reinterpret_cast<const char8_t*>(value.data()), value.size()));
+}
+
 struct DurableCard final {
     clean_aot::app::MemoryCard storage{};
     std::array<std::uint8_t, clean_aot::app::kMemoryCardBytes> image{};
@@ -93,6 +101,13 @@ std::vector<std::uint8_t> read_bios(const std::filesystem::path& path) {
 }
 
 std::filesystem::path read_user_bios_reference(const std::filesystem::path& user_data) {
+    const auto portable = user_data / "runtime" / "user-bios.path";
+    if (std::filesystem::is_regular_file(portable) && !std::filesystem::is_symlink(portable)) {
+        std::ifstream stream(portable);
+        std::string value;
+        std::getline(stream, value);
+        if (stream && !value.empty()) return path_from_utf8(value);
+    }
     const auto reference = user_data / "receipts" / "active-setup.json";
     if (!std::filesystem::is_regular_file(reference) || std::filesystem::is_symlink(reference))
         return {};
@@ -113,6 +128,101 @@ std::filesystem::path read_user_bios_reference(const std::filesystem::path& user
     std::string value;
     std::getline(stream, value);
     return stream && !value.empty() ? std::filesystem::path(value) : std::filesystem::path{};
+}
+
+std::filesystem::path read_portable_reference(const std::filesystem::path& user_data,
+                                              std::string_view name) {
+    const auto reference = user_data / "runtime" / name;
+    if (!std::filesystem::is_regular_file(reference) || std::filesystem::is_symlink(reference)) return {};
+    std::ifstream stream(reference);
+    std::string value;
+    std::getline(stream, value);
+    return stream && !value.empty() ? path_from_utf8(value) : std::filesystem::path{};
+}
+
+bool atomic_text_write(const std::filesystem::path& path, std::string_view value) {
+    std::error_code error;
+    std::filesystem::create_directories(path.parent_path(), error);
+    if (error) return false;
+    auto temporary = path;
+    temporary += ".new";
+    std::filesystem::remove(temporary, error);
+    error.clear();
+    {
+        std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+        output.write(value.data(), static_cast<std::streamsize>(value.size()));
+        output.flush();
+        if (!output) { std::filesystem::remove(temporary, error); return false; }
+    }
+#ifdef _WIN32
+    if (MoveFileExW(temporary.c_str(), path.c_str(),
+                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) return true;
+    std::filesystem::remove(temporary, error);
+    return false;
+#else
+    std::filesystem::rename(temporary, path, error);
+    return !error;
+#endif
+}
+
+std::string file_sha256(const std::filesystem::path& path) {
+    if (!std::filesystem::is_regular_file(path) || std::filesystem::is_symlink(path)) return {};
+    std::ifstream input(path, std::ios::binary);
+    std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(input)), {});
+    return input || input.eof() ? clean_aot::app::detail::sha256(bytes) : std::string{};
+}
+
+bool verify_cue(const std::filesystem::path& cue, std::string& digest) {
+    if (!std::filesystem::is_regular_file(cue) || std::filesystem::is_symlink(cue)) return false;
+    std::ifstream input(cue);
+    std::string line;
+    std::vector<std::filesystem::path> tracks;
+    while (std::getline(input, line)) {
+        const auto marker = line.find("FILE \"");
+        if (marker == std::string::npos) continue;
+        const auto begin = marker + 6U;
+        const auto end = line.find('"', begin);
+        if (end == std::string::npos || end == begin) return false;
+        auto track = cue.parent_path() / path_from_utf8(line.substr(begin, end - begin));
+        track = track.lexically_normal();
+        if (!std::filesystem::is_regular_file(track) || std::filesystem::is_symlink(track) ||
+            std::filesystem::file_size(track) == 0U) return false;
+        tracks.push_back(track);
+    }
+    constexpr std::array<std::uintmax_t, 14U> expected_sizes{
+        94660944U, 43472016U, 32911536U, 45706416U, 44490432U, 44518656U,
+        39297216U, 38991456U, 45410064U, 44953776U, 45106656U, 39179616U,
+        42914592U, 43961232U};
+    if (!input.eof() || tracks.size() != expected_sizes.size()) return false;
+    std::string inventory = file_sha256(cue);
+    for (std::size_t index = 0U; index < tracks.size(); ++index) {
+        if (std::filesystem::file_size(tracks[index]) != expected_sizes[index]) return false;
+        inventory += file_sha256(tracks[index]);
+    }
+    digest = clean_aot::app::detail::sha256(std::span<const std::uint8_t>(
+        reinterpret_cast<const std::uint8_t*>(inventory.data()), inventory.size()));
+    return true;
+}
+
+bool persist_portable_import(const std::filesystem::path& user_data,
+                             const std::filesystem::path& bios,
+                             const std::filesystem::path& cue,
+                             std::string_view expected_bios_sha256) {
+    const auto bios_hash = file_sha256(bios);
+    std::string media_hash;
+    if (bios_hash.empty() || bios_hash != expected_bios_sha256 || !verify_cue(cue, media_hash)) return false;
+    const auto runtime = user_data / "runtime";
+    const auto receipt = user_data / "receipts" / "portable-media.json";
+    const auto bios_path = bios.u8string();
+    const auto cue_path = cue.u8string();
+    const std::string bios_text(reinterpret_cast<const char*>(bios_path.data()), bios_path.size());
+    const std::string cue_text(reinterpret_cast<const char*>(cue_path.data()), cue_path.size());
+    const std::string document = "{\"bios_sha256\":\"" + bios_hash +
+        "\",\"copyrighted_inputs_copied\":false,\"cue_inventory_sha256\":\"" + media_hash +
+        "\",\"schema\":\"wipe" "out3se.portable-media-import.v1\",\"status\":\"verified-external-media\"}\n";
+    return atomic_text_write(runtime / "user-bios.path", bios_text + "\n") &&
+        atomic_text_write(runtime / "user-cue.path", cue_text + "\n") &&
+        atomic_text_write(receipt, document);
 }
 
 class DeterministicClock final : public clean_aot::host::IMonotonicClock {
@@ -163,17 +273,36 @@ std::string utf8(const wchar_t* value) {
     result.pop_back();
     return result;
 }
+std::filesystem::path select_file(const wchar_t* title, const wchar_t* filter) {
+    std::array<wchar_t, 32768U> value{};
+    OPENFILENAMEW request{};
+    request.lStructSize = sizeof(request);
+    request.lpstrFile = value.data();
+    request.nMaxFile = static_cast<DWORD>(value.size());
+    request.lpstrTitle = title;
+    request.lpstrFilter = filter;
+    request.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+    return GetOpenFileNameW(&request) ? std::filesystem::path(value.data()) : std::filesystem::path{};
+}
+std::filesystem::path default_user_data() {
+    std::array<wchar_t, 32768U> value{};
+    const auto length = GetEnvironmentVariableW(L"LOCALAPPDATA", value.data(),
+                                                 static_cast<DWORD>(value.size()));
+    return length > 0U && length < value.size()
+        ? std::filesystem::path(value.data()) / (std::string("Wipe") + "out3SE")
+        : std::filesystem::path{};
+}
 int wmain(int argc, wchar_t** argv) {
 #else
 int main(int argc, char** argv) {
 #endif
-    std::filesystem::path user_data, bios_path;
+    std::filesystem::path user_data, bios_path, import_cue;
     std::filesystem::path settings_path;
     std::string profile;
     std::vector<std::string> settings_overrides;
     std::vector<std::string> settings_ui_actions;
     std::uint64_t workload_updates = 0U;
-    bool hidden = false, reset_settings = false, settings_ui = false;
+    bool hidden = false, reset_settings = false, settings_ui = false, import_only = false;
     Receipt receipt{};
     for (int index = 1; index < argc; ++index) {
         const std::string argument =
@@ -182,10 +311,13 @@ int main(int argc, char** argv) {
 #else
             argv[index];
 #endif
-        if ((argument == "--user-data" || argument == "--bios") && index + 1 < argc) {
+        if ((argument == "--user-data" || argument == "--bios" || argument == "--import-cue") && index + 1 < argc) {
             const auto value = std::filesystem::path(argv[++index]);
-            if (argument == "--user-data") user_data = value; else bios_path = value;
+            if (argument == "--user-data") user_data = value;
+            else if (argument == "--import-cue") import_cue = value;
+            else bios_path = value;
         } else if (argument == "--smoke-hidden") hidden = true;
+        else if (argument == "--import-only") import_only = true;
         else if (argument == "--settings" && index + 1 < argc) settings_path = std::filesystem::path(argv[++index]);
         else if (argument == "--set" && index + 1 < argc) settings_overrides.emplace_back(
 #ifdef _WIN32
@@ -220,6 +352,9 @@ int main(int argc, char** argv) {
             } catch (...) { return 64; }
         } else { std::cerr << "unsupported product argument\n"; return 64; }
     }
+#ifdef _WIN32
+    if (user_data.empty()) user_data = default_user_data();
+#endif
     clean_aot::app::RuntimeSettings settings{};
     if (settings_path.empty() && !user_data.empty()) settings_path = user_data / "config.json";
     const bool settings_missing = !settings_path.empty() && !std::filesystem::exists(settings_path);
@@ -269,23 +404,45 @@ int main(int argc, char** argv) {
     if (workload && ((!p4k && !puw) || workload_updates == 0U || workload_updates > 1000U)) {
         receipt.reason = "invalid-bounded-workload-profile"; receipt.print(); return 64;
     }
+ #ifdef CLEAN_AOT_PRODUCT_BINDING_SYMBOL
+    const auto* binding = CLEAN_AOT_PRODUCT_BINDING_SYMBOL();
+ #else
+    const clean_aot::runtime::GeneratedExecutableBinding* binding = nullptr;
+ #endif
+    if (!binding) { receipt.reason = "missing-authenticated-generated-bios-binding"; receipt.print(); return 78; }
     if (bios_path.empty() && !user_data.empty()) bios_path = read_user_bios_reference(user_data);
+    if (import_cue.empty() && !user_data.empty())
+        import_cue = read_portable_reference(user_data, "user-cue.path");
+    if ((bios_path.empty() || import_cue.empty()) && !workload && !hidden && !import_only) {
+#ifdef _WIN32
+        if (bios_path.empty()) bios_path = select_file(L"Select your PlayStation BIOS",
+            L"PlayStation BIOS (*.bin)\0*.bin\0All files\0*.*\0");
+        if (!bios_path.empty() && import_cue.empty()) import_cue = select_file(
+            L"Select your Wip" L"Eout 3 Special Edition CUE",
+            L"CUE sheets (*.cue)\0*.cue\0All files\0*.*\0");
+#endif
+    }
+    if (!import_cue.empty()) {
+        if (user_data.empty() || !persist_portable_import(user_data, bios_path, import_cue,
+                                                          binding->executable_sha256)) {
+            receipt.stage = "media-import-rejected"; receipt.reason = "external-media-verification-failed";
+            receipt.print(); return 78;
+        }
+        receipt.stage = "media-import-complete"; receipt.reason = "verified-external-media-references";
+        if (import_only) { receipt.print(); return 0; }
+    } else if (import_only) {
+        receipt.stage = "media-import-cancelled"; receipt.reason = "no-media-selection";
+        receipt.print(); return 0;
+    }
     const auto bios = read_bios(bios_path);
     if (bios.empty()) {
         if (!user_data.empty()) {
             receipt.stage = "setup-required";
             receipt.reason = "select-and-verify-user-bios-and-retail-media";
-            std::cerr << "First run requires verified user BIOS and retail CUE/BIN media; "
-                         "follow policy/first-run-setup.json.\n";
+            std::cerr << "First run requires a verified user BIOS and retail CUE/BIN media.\n";
         }
         receipt.print(); return 78;
     }
-#ifdef CLEAN_AOT_PRODUCT_BINDING_SYMBOL
-    const auto* binding = CLEAN_AOT_PRODUCT_BINDING_SYMBOL();
-#else
-    const clean_aot::runtime::GeneratedExecutableBinding* binding = nullptr;
-#endif
-    if (!binding) { receipt.reason = "missing-authenticated-generated-bios-binding"; receipt.print(); return 78; }
     receipt.bios_identity_sha256 = std::string(binding->variant_identity_sha256);
     receipt.bios_sha256 = std::string(binding->executable_sha256);
     clean_aot::host::SdlVulkanConfig host_config = settings.host_config(hidden || workload);

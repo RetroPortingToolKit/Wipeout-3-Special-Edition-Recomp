@@ -64,7 +64,7 @@ def run_persistence_acceptance(*, package: Path, memory_card_test: Path, policy_
                                receipt_path: Path | None = None) -> dict[str, Any]:
     package = package.resolve()
     validation = validate_release(package)
-    executable = package / "bin" / "Wipeout3SE.exe"
+    executable = package / "Wipeout3SE.exe"
     link_map = link_map.resolve()
     try:
         link_text = link_map.read_text(encoding="utf-8", errors="replace")

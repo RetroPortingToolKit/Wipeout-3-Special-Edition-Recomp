@@ -143,13 +143,16 @@ The source list and its exact allowlist are release-build artifacts matching
 the final link graph. Passing broad source trees or the analysis-stage product
 allowlist fails closed on unreviewed architecture constants and stale records.
 
-The package contains only the application, SDL runtime, declared generated
-clean artifacts, a hash manifest, a one-time first-run setup contract, and
-portable configuration defaults. Disc tracks, CUE files, BIOS bytes, selected
-executable bytes, setup receipts, compiler/oracle tools, legacy runtime code,
-and absolute build paths are forbidden. First run imports and verifies the
-player's lawful inputs into `${USER_DATA}/Wipeout3SE`; unknown identities are
-rejected before runtime initialization. Saves, two controller/card slots,
+The package is a portable folder with `Wipeout3SE.exe` as its only user-facing
+entrypoint, `SDL3.dll`, declared generated clean artifacts, a hash manifest, and
+portable configuration defaults. There is no installer, Setup executable,
+wizard, registry installation, or command-line step for users. Disc tracks,
+CUE files, BIOS bytes, compiler/patch/oracle tools, legacy runtime code, and
+absolute build paths are forbidden. On first open the executable presents its
+native settings/launcher UI, selects and verifies the player's external lawful
+BIOS and CUE/BIN set, and atomically stores only hashes and external path
+references under `${LOCALAPPDATA}/Wipeout3SE`. Unknown identities are rejected
+before runtime initialization. Saves, two controller/card slots,
 input deadzone/hotplug policy, exact 44.1-kHz stereo audio, 100-Hz presentation,
 and 4K/ultrawide defaults have separate bounded configuration sections.
 
@@ -160,61 +163,12 @@ reject additions or tampering:
 python tools/product/build_product.py validate-release --package D:/Games/Wipeout3SE
 ```
 
-Initialize per-user state before authenticated media setup:
-
-```powershell
-python tools/product/build_product.py install `
-  --package D:/Games/Wipeout3SE `
-  --user-data "$env:LOCALAPPDATA/Wipeout3SE"
-```
-
-This creates two exact 128-KiB memory cards and the bounded modern controller,
-44.1-kHz bounded audio-buffer/underrun-counting, 4K/ultrawide display configuration using atomic
-write-through replacement. Its receipt remains
-`awaiting-authenticated-media-import`; the portable `Wipeout3SE.cmd` resolves
-the package from its own location and refuses to launch until the existing
-authenticated setup/finalization pipeline has published `finalize.json`.
-
-The complete first-run path invokes the existing hash-pinned media verifier,
-patcher, bounded clean compiler, and strict catalog finalizer in one staging
-directory. Only after every step passes does an atomic active-setup receipt
-select the version; upgrades never mutate the prior setup in place:
-
-```powershell
-python tools/product/build_product.py first-run `
-  --cue D:/Media/Wipeout3SE.cue --bios D:/Media/SCPH1001.bin `
-  --patch tools/patches/pal_track01.xdelta3 --xdelta3 tools/xdelta3.exe `
-  --compiler build-tools/clean-aot-compiler.exe `
-  --regions build-policy/product-regions.json `
-  --artifacts build-native/artifacts.json --artifact-root build-native `
-  --user-data "$env:LOCALAPPDATA/Wipeout3SE"
-```
-
-Disc, patch, compiler, and source BIOS bytes remain outside the portable
-package. Locally generated BIOS/game regions are copied into the versioned
-per-user setup and locked to exact setup, finalize, catalog, artifact hashes,
-and sizes. Setup retains no disc, patch, executable-image, or BIOS bytes; it
-stores only a private path to the exact verified external user BIOS. Launch
-remeasures that entire lock before starting the app and
-atomically records the canonical bootstrap frontier:
-
-```powershell
-python tools/product/build_product.py launch `
-  --package D:/Games/Wipeout3SE `
-  --user-data "$env:LOCALAPPDATA/Wipeout3SE"
-```
-
-Any cross-version finalize receipt, modified region, missing region, or stale
-active lock fails before launch. A recorded BIOS frontier remains explicitly
-`frontier-recorded-not-game-ready`; it is evidence, not a game-ready promotion.
-Failed processes and bounded launch timeouts write hash-only diagnostics to
-`receipts/launch-diagnostic.json`. Setup upgrades atomically switch the active
-version while preserving global configuration and both memory cards.
-`rollback --user-data ... --version <prior-version>` remeasures an intact prior
-generation before restoring it; stale generations leave the active setup
-unchanged. After activation, relocated `Wipeout3SE.cmd` launches
-`Wipeout3SE.exe --user-data` directly. Before activation it fails closed and
-points to the BIOS/media selection contract in `policy/first-run-setup.json`.
+The executable creates its validated settings and dual 128-KiB memory cards in
+per-user data. Import is cancellation-safe and never mutates the portable
+source folder, so the folder may be relocated under a Unicode path or kept
+read-only. Subsequent opens remeasure the external references and launch
+directly. Compiler-era setup receipts remain historical engineering evidence;
+they are not a release requirement and no compiler or setup payload ships.
 
 The Windows package audit parses each PE import table directly, requires every
 non-system DLL to exist in the package, reruns the shipping link-map leakage
@@ -239,16 +193,17 @@ user BIOS, then stops on the first unknown generated PC. The later authenticated
 receipt includes staged RAM epochs and is not represented as a directly
 reproduced installed boot.
 
-The installer acceptance command independently relocates both distribution
-stages under a Unicode path and remeasures the installed runtime, complete game
-shard authority, and authenticated frontier:
+The portable acceptance command independently relocates the folder under a
+Unicode path, marks the source files read-only, drives the executable's bounded
+headless equivalents of the native selectors, verifies atomic/cancellation
+behavior, and proves no BIOS, CUE, track, compiler, or setup bytes were copied:
 
 ```powershell
-python tools/product/build_product.py installer-acceptance `
-  --installer build-installer `
-  --runtime build-product-runtime `
-  --frontier build-product-runtime/artifacts/artifacts/regions/frontier-evidence.json `
-  --receipt clean-aot/product/evidence/two-stage-installer-acceptance.json
+python tools/product/build_product.py portable-acceptance `
+  --package build-product-runtime `
+  --bios D:/UserMedia/SCPH1001.BIN `
+  --cue D:/UserMedia/WipEout3SE.cue `
+  --receipt clean-aot/product/evidence/portable-launcher-acceptance.json
 ```
 
 The deterministic soak command runs a headless validation executable multiple

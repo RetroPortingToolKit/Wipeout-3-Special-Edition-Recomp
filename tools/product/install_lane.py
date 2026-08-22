@@ -154,7 +154,7 @@ def launch_and_record(package: Path, user_data: Path, *, timeout_seconds: float 
                               setup_root / "catalog.json", setup_root / "artifacts")
     if current != active.get("generation_lock"):
         raise InstallError("active generated artifacts are stale")
-    launch = list(command) if command is not None else [str(package / "bin" / "Wipeout3SE.exe"),
+    launch = list(command) if command is not None else [str(package / "Wipeout3SE.exe"),
                                                         "--user-data", str(user_data)]
     try:
         completed = subprocess.run(launch, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,

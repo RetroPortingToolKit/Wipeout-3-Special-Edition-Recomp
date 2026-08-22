@@ -138,11 +138,11 @@ class ReleaseLaneTests(unittest.TestCase):
         self.assertEqual(config["presentation"]["rate_hz"], 100)
         self.assertEqual(config["audio"]["underrun"], "count-and-resume-next-batch")
         self.assertEqual(config["input"]["mapping"]["cross"], "south")
-        self.assertFalse((relocated / "policy" / "first-run-setup.json").exists())
-        launcher = (relocated / "Wipeout3SE.cmd").read_text()
-        self.assertIn("%~dp0", launcher)
-        self.assertIn("--user-data", launcher)
-        self.assertNotIn(str(package), launcher)
+        self.assertEqual(manifest["entrypoint"], "Wipeout3SE.exe")
+        self.assertTrue((relocated / "Wipeout3SE.exe").is_file())
+        self.assertTrue((relocated / "SDL3.dll").is_file())
+        self.assertFalse((relocated / "Wipeout3SE.cmd").exists())
+        self.assertFalse((relocated / "Wipeout3SE-Setup.exe").exists())
 
     def test_install_creates_durable_cards_and_remains_fail_closed(self) -> None:
         package = self.root / "release"
@@ -187,10 +187,10 @@ class ReleaseLaneTests(unittest.TestCase):
     def test_tamper_unmanifested_file_and_forbidden_payload_fail_closed(self) -> None:
         package = self.root / "release"
         self.package(package)
-        (package / "bin" / "Wipeout3SE.exe").write_bytes(b"tampered")
+        (package / "Wipeout3SE.exe").write_bytes(b"tampered")
         with self.assertRaisesRegex(ReleaseError, "measurement mismatch"):
             validate_release(package)
-        (package / "bin" / "Wipeout3SE.exe").write_bytes(b"MZ synthetic clean app")
+        (package / "Wipeout3SE.exe").write_bytes(b"MZ synthetic clean app")
         (package / "extra.txt").write_text("unlisted", encoding="utf-8")
         with self.assertRaisesRegex(ReleaseError, "unmanifested"):
             validate_release(package)

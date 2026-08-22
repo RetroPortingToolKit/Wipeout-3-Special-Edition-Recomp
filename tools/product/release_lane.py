@@ -235,15 +235,6 @@ def initialize_install(package: Path, user_data: Path) -> dict[str, Any]:
     return receipt
 
 
-def portable_launcher() -> bytes:
-    return ("@echo off\r\nsetlocal\r\n"
-            "set \"PACKAGE_ROOT=%~dp0\"\r\n"
-            "if not defined LOCALAPPDATA exit /b 64\r\n"
-            "set \"USER_DATA=%LOCALAPPDATA%\\Wipeout3SE\"\r\n"
-            "\"%PACKAGE_ROOT%bin\\Wipeout3SE.exe\" --user-data \"%USER_DATA%\"\r\n"
-            "exit /b %ERRORLEVEL%\r\n").encode("ascii")
-
-
 def create_release(*, app: Path, sdl: Path, artifacts: Sequence[tuple[str, Path]],
                    output: Path, root: Path, link_map: Path,
                    sources: Sequence[Path], allowlist: Path | None = None,
@@ -268,8 +259,8 @@ def create_release(*, app: Path, sdl: Path, artifacts: Sequence[tuple[str, Path]
 
     executable_name = "Wipeout3SE.exe" if app.suffix.casefold() == ".exe" else "Wipeout3SE"
     payloads: list[tuple[str, Path, str]] = [
-        (f"bin/{executable_name}", app, "application"),
-        (f"bin/{sdl.name}", sdl, "sdl-runtime"),
+        (executable_name, app, "application"),
+        (sdl.name, sdl, "sdl-runtime"),
     ]
     for relative, source in artifacts:
         safe = _safe_relative(relative)
@@ -298,15 +289,15 @@ def create_release(*, app: Path, sdl: Path, artifacts: Sequence[tuple[str, Path]
         policy = temporary / "policy"
         policy.mkdir()
         (policy / "default-config.json").write_bytes(_canonical(default_config()))
-        launcher = temporary / "Wipeout3SE.cmd"
-        launcher.write_bytes(portable_launcher())
-        for path, role in ((policy / "default-config.json", "configuration-defaults"),
-                           (launcher, "portable-launcher")):
+        for path, role in ((policy / "default-config.json", "configuration-defaults"),):
             entries.append({"path": path.relative_to(temporary).as_posix(), "role": role,
                             "size": path.stat().st_size, "sha256": _sha256(path)})
         entries.sort(key=lambda item: item["path"])
         manifest = {"schema": SCHEMA, "status": "packaged-not-game-ready",
-                    "entrypoint": f"bin/{executable_name}", "files": entries,
+                    "entrypoint": executable_name, "files": entries,
+                    "delivery": {"mode": "portable-single-entrypoint",
+                                 "first_run": "native-settings-and-external-media-import",
+                                 "registry_installation": False},
                     "isolation": {"source_receipt_sha256": hashlib.sha256(
                         _canonical(source_receipt)).hexdigest(),
                         "link_map_receipt_sha256": hashlib.sha256(
@@ -350,9 +341,16 @@ def validate_release(package: Path) -> dict[str, Any]:
     config = json.loads((package / "policy" / "default-config.json").read_text(
         encoding="utf-8"))
     _validate_config(config)
-    launcher = (package / "Wipeout3SE.cmd").read_bytes()
-    if launcher != portable_launcher() or b"%~dp0" not in launcher:
-        raise ReleaseError("portable launcher contract is invalid")
+    if manifest.get("entrypoint") != "Wipeout3SE.exe" or not (package / "Wipeout3SE.exe").is_file():
+        raise ReleaseError("portable single-executable entrypoint is invalid")
+    delivery = manifest.get("delivery", {})
+    if (delivery.get("mode") != "portable-single-entrypoint" or
+            delivery.get("first_run") != "native-settings-and-external-media-import" or
+            delivery.get("registry_installation") is not False):
+        raise ReleaseError("portable delivery contract is invalid")
+    if any(path.name.casefold().endswith(".exe") and path.name != "Wipeout3SE.exe"
+           for path in package.rglob("*")):
+        raise ReleaseError("portable release exposes setup/compiler executable")
     return {"schema": SCHEMA, "status": "validated", "files": len(listed),
             "manifest_sha256": _sha256(manifest_path)}
 
@@ -429,7 +427,7 @@ def run_installed_product_soak(package: Path, *, bios: Path, profile: str,
     if not 2 <= iterations <= 1000 or timeout_seconds <= 0 or max_p95_ms <= 0:
         raise ReleaseError("installed-product soak bound is invalid")
     package_validation = validate_release(package)
-    command = [str(package.resolve(strict=True) / "bin" / "Wipeout3SE.exe"),
+    command = [str(package.resolve(strict=True) / "Wipeout3SE.exe"),
                "--bios", str(bios.resolve(strict=True)), "--smoke-hidden",
                "--workload-profile", profile, "--workload-updates", str(updates)]
     environment = {"PATH": os.environ.get("PATH", ""), "LANG": "C", "LC_ALL": "C",
@@ -442,7 +440,7 @@ def run_installed_product_soak(package: Path, *, bios: Path, profile: str,
     for _ in range(iterations):
         started = time.perf_counter_ns()
         try:
-            completed = subprocess.run(command, cwd=package / "bin", env=environment,
+            completed = subprocess.run(command, cwd=package, env=environment,
                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 timeout=timeout_seconds, check=False)
         except subprocess.TimeoutExpired as error:
@@ -528,7 +526,7 @@ def generate_graphics_matrix_receipt(package: Path, soak_paths: Sequence[Path],
         "schema": "wipeout3se.clean-aot.graphics-feature-matrix.v1", "status": "pass",
         "matrix_complete": True, "game_ready": False,
         "package_manifest_sha256": validation["manifest_sha256"],
-        "runtime_executable_sha256": _sha256(package / "bin" / "Wipeout3SE.exe"),
+        "runtime_executable_sha256": _sha256(package / "Wipeout3SE.exe"),
         "settings_sha256": _sha256(package / "policy" / "default-config.json"),
         "physical_present_timing": physical_timing,
         "profiles": {name: profiles[name] for name in sorted(profiles)}}

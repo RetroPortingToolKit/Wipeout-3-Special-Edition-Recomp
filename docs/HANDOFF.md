@@ -1126,3 +1126,24 @@ instruction and fails closed on every unknown PC or executable identity.
   12/15: direct BIOS-to-game execution, all 64 behavioral routes, and
   authenticated media execution are the only failures. Physical present timing
   remains `unavailable`; no readiness claim or timing waiver was introduced.
+
+## Portable single-entrypoint delivery checkpoint (2026-08-22)
+
+- Installer/Setup delivery is retired. The authoritative package is a portable
+  folder with exactly four manifested payloads: root `Wipeout3SE.exe`, root
+  `SDL3.dll`, `policy/default-config.json`, and the clean generated frontier
+  artifact. No batch launcher, Setup executable, compiler, patcher, BIOS, CUE,
+  BIN, registry installation, or wizard ships.
+- Root `Wipeout3SE.exe` now owns native first-run BIOS/CUE selection. It verifies
+  the exact BIOS identity and all 14 externally referenced track sizes, writes
+  only external path references plus hash-only evidence using atomic Unicode-safe
+  replacement, and leaves a read-only relocated source folder unchanged.
+  Cancellation creates no media state. Portable acceptance used lawful external
+  inputs and is bound to executable SHA-256
+  `ceb9cbf7607d9586344adf54df23ec4991ae42762792af06bf738aa85c820e44`
+  and package manifest SHA-256
+  `1cd3b6a3479b546d3bc63dfe543d9bca48300065cdacbdd96e1512e551f3499f`.
+- All 32 product tests, DLL/source/link isolation, settings, persistence, four
+  4K/ultrawide 100-Hz soaks, and graphics matrix pass. Readiness remains 12/15;
+  only direct game execution, 64 behavioral routes, and authenticated media
+  execution remain failed.

@@ -123,7 +123,7 @@ def smoke_windows_product(package: Path, *, bios: Path, receipt_path: Path,
     except ValueError: pass
     else: raise ReleaseError("copyrighted BIOS input must remain outside the package")
     completed = subprocess.run(
-        [str(package / "bin" / "Wipeout3SE.exe"), "--bios", str(bios), "--smoke-hidden"],
+        [str(package / "Wipeout3SE.exe"), "--bios", str(bios), "--smoke-hidden"],
         cwd=package / "bin", stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, timeout=30.0, check=False)
     try: frontier = json.loads(completed.stdout.decode("utf-8").strip().splitlines()[-1])

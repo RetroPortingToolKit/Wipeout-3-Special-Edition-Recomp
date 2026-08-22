@@ -152,7 +152,7 @@ def run_behavioral_scenarios(*, package: Path, policy_path: Path, media_manifest
     package = package.resolve()
     validation = validate_release(package)
     manifest_hash = validation["manifest_sha256"]
-    executable = package / "bin" / "Wipeout3SE.exe"
+    executable = package / "Wipeout3SE.exe"
     executable_hash = _sha(executable)
     plan = build_scenario_plan(policy_path)
     selected = set(routes) if routes else {item["route"] for item in plan["scenarios"]}

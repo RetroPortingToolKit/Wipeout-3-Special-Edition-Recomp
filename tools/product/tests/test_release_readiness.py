@@ -13,9 +13,9 @@ class ReleaseReadinessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             package = root / "package"
-            (package / "bin").mkdir(parents=True)
+            package.mkdir(parents=True)
             (package / "policy").mkdir()
-            (package / "bin" / "Wipeout3SE.exe").write_bytes(b"MZ")
+            (package / "Wipeout3SE.exe").write_bytes(b"MZ")
             (package / "policy" / "default-config.json").write_text(json.dumps({
                 "schema": "wipeout3se.runtime-settings.v2",
                 "saves": {"atomic": True}, "input": {"profile": "modern-gamepad"},

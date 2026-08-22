@@ -86,6 +86,9 @@ if(CLEAN_AOT_APP_ENABLE_SDL)
     endif()
     target_link_libraries(Wipeout3SE PRIVATE clean_aot_app clean_aot_runtime
         clean_aot_host_sdl_vulkan SDL3::SDL3)
+    if(WIN32)
+        target_link_libraries(Wipeout3SE PRIVATE comdlg32)
+    endif()
     if(CLEAN_AOT_PRODUCT_GENERATED_DIR)
         file(GLOB _clean_aot_product_generated CONFIGURE_DEPENDS
             "${CLEAN_AOT_PRODUCT_GENERATED_DIR}/*.cpp")

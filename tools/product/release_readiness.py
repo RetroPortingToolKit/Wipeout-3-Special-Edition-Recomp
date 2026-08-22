@@ -71,16 +71,29 @@ def audit_release_readiness(package: Path, evidence_root: Path,
                           {"path": label(path), "sha256": _sha(path)}
                           for path in evidence if path.is_file()]})
 
-    acceptance_path = product / "two-stage-installer-acceptance.json"
+    acceptance_path = product / "portable-launcher-acceptance.json"
     acceptance = _load(acceptance_path) or {}
-    executable = package / "bin" / "Wipeout3SE.exe"
-    setup_ok = (acceptance.get("installer", {}).get("status") == "validated" and
-                acceptance.get("installer", {}).get("atomic_runtime_installation") is True and
-                acceptance.get("runtime_isolation", {}).get("status") == "passed" and
-                acceptance.get("runtime_artifact", {}).get("sha256") == _sha(executable))
-    gate("lawful-two-stage-setup", setup_ok, [acceptance_path],
-         "setup is separate and runtime artifact identity is bound" if setup_ok else
-         "current package is not bound to a validated lawful two-stage setup receipt")
+    executable = package / "Wipeout3SE.exe"
+    first_run = acceptance.get("first_run", {})
+    delivery = acceptance.get("delivery", {})
+    portable_ok = (
+        acceptance.get("schema") == "wipeout3se.clean-aot.portable-launcher-acceptance.v1" and
+        acceptance.get("status") == "passed-not-game-ready" and
+        acceptance.get("runtime_executable_sha256") == _sha(executable) and
+        delivery == {"entrypoint": "Wipeout3SE.exe", "installer": False,
+                     "portable_folder": True, "registry_installation": False,
+                     "setup_executable": False} and
+        first_run.get("native_selectors") is True and
+        first_run.get("atomic_activation") is True and
+        first_run.get("cancel_without_mutation") is True and
+        first_run.get("unicode_paths") is True and
+        first_run.get("read_only_source") is True and
+        first_run.get("external_bios_cue_only") is True and
+        first_run.get("copyrighted_inputs_copied") is False and
+        acceptance.get("runtime_isolation", {}).get("status") == "pass")
+    gate("lawful-portable-first-run", portable_ok, [acceptance_path],
+         "single executable verifies external BIOS/CUE and atomically activates user data"
+         if portable_ok else "current package lacks authoritative portable first-run acceptance")
 
     game_receipts = []
     for path in sorted(catalog.glob("*.json")):
@@ -147,7 +160,7 @@ def audit_release_readiness(package: Path, evidence_root: Path,
     verification = _load(verification_path) or {}
     no_fallback = (verification.get("implementation", {}).get("interpreter_fallback") is False and
                    verification.get("implementation", {}).get("runtime_compilation") is False and
-                   acceptance.get("runtime_isolation", {}).get("status") == "passed")
+                   acceptance.get("runtime_isolation", {}).get("status") == "pass")
     gate("no-fallback-compiler-media-leakage", no_fallback,
          [verification_path, acceptance_path], "runtime isolation and no-fallback policy pass" if no_fallback else
          "fallback/compiler/media isolation proof is incomplete")
