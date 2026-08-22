@@ -181,6 +181,7 @@ std::string CppEmitter::emit(const Region& region) {
             if (delay) write_address(output, block->instructions[*block->terminator_index].address);
             else output << "0u";
             output << ");\n";
+            output << "        cpu_ops::sample_interrupt(state); if(state.exception_raised) return true;\n";
             if (!is_control_transfer(instruction.kind)) write_semantic(output, instruction);
             else if(instruction.kind==InstructionKind::DirectCall||instruction.kind==InstructionKind::ConditionalCall){
                 output << "        state.write(31, "; write_address(output,instruction.address+8U); output << ");\n";

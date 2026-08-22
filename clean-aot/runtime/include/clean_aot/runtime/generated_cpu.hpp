@@ -10,7 +10,7 @@ enum class CpuException:std::uint8_t{Interrupt=0,AddressErrorLoad=4,AddressError
 struct GeneratedCpuState final{
  using Read8=bool(*)(void*,std::uint32_t,std::uint8_t&)noexcept;using Read16=bool(*)(void*,std::uint32_t,std::uint16_t&)noexcept;using Read32=bool(*)(void*,std::uint32_t,std::uint32_t&)noexcept;
  using Write8=bool(*)(void*,std::uint32_t,std::uint8_t)noexcept;using Write16=bool(*)(void*,std::uint32_t,std::uint16_t)noexcept;using Write32=bool(*)(void*,std::uint32_t,std::uint32_t)noexcept;
- std::array<std::uint32_t,32> gpr{};std::uint32_t hi=0,lo=0,pc=0,next_pc=4;bool branch_taken=false;CpuFault fault=CpuFault::None;
+ std::array<std::uint32_t,32> gpr{};std::uint32_t hi=0,lo=0,pc=0,next_pc=4;std::uint64_t issue_cycle=0;bool branch_taken=false;CpuFault fault=CpuFault::None;
  std::uint32_t cop0_status=kStatusBev,cop0_cause=0,cop0_epc=0,cop0_bad_vaddr=0;bool exception_raised=false;CpuException exception_code=CpuException::ReservedInstruction;
  std::uint32_t instruction_pc=0,branch_pc=0;bool in_delay_slot=false;
  bool load_valid=false;std::uint8_t load_reg=0;std::uint32_t load_value=0;bool commit_load_valid=false;std::uint8_t commit_load_reg=0;std::uint32_t commit_load_value=0;
@@ -20,12 +20,13 @@ struct GeneratedCpuState final{
 namespace cpu_ops{
 inline void begin(GeneratedCpuState&c,std::uint32_t pc,bool delay=false,std::uint32_t branch=0)noexcept{c.commit_load_valid=c.load_valid;c.commit_load_reg=c.load_reg;c.commit_load_value=c.load_value;c.load_valid=false;c.instruction_pc=pc;c.in_delay_slot=delay;c.branch_pc=branch;c.exception_raised=false;}
 inline void begin(GeneratedCpuState&c)noexcept{begin(c,c.pc);}
-inline void end(GeneratedCpuState&c)noexcept{if(c.commit_load_valid)c.write(c.commit_load_reg,c.commit_load_value);c.commit_load_valid=false;}
+inline void end(GeneratedCpuState&c)noexcept{if(c.commit_load_valid)c.write(c.commit_load_reg,c.commit_load_value);c.commit_load_valid=false;++c.issue_cycle;}
 inline void raise_exception(GeneratedCpuState&c,CpuException code,std::uint32_t bad=0,bool has_bad=false)noexcept{c.exception_code=code;c.cop0_epc=c.in_delay_slot?c.branch_pc:c.instruction_pc;if(has_bad)c.cop0_bad_vaddr=bad;c.cop0_cause&=~(kCauseBd|kCauseExceptionMask);c.cop0_cause|=static_cast<std::uint32_t>(code)<<2U;if(c.in_delay_slot)c.cop0_cause|=kCauseBd;const auto mode=c.cop0_status&0x3FU;c.cop0_status=(c.cop0_status&~0x3FU)|((mode<<2U)&0x3CU);c.pc=(c.cop0_status&kStatusBev)?kBootExceptionVector:kGeneralExceptionVector;c.next_pc=c.pc+4U;c.load_valid=false;c.commit_load_valid=false;c.exception_raised=true;c.gpr[0]=0;}
+inline void sample_interrupt(GeneratedCpuState&c)noexcept{if((c.cop0_status&1U)!=0U&&(c.cop0_status&c.cop0_cause&0x0000FF00U)!=0U)raise_exception(c,CpuException::Interrupt);}
 inline void queue_load(GeneratedCpuState&c,std::uint8_t r,std::uint32_t v)noexcept{if(r){c.load_valid=true;c.load_reg=r;c.load_value=v;}}
 inline std::uint32_t read_cop0(const GeneratedCpuState&c,std::uint8_t d)noexcept{switch(d){case 8:return c.cop0_bad_vaddr;case 12:return c.cop0_status;case 13:return c.cop0_cause;case 14:return c.cop0_epc;default:return 0;}}
 inline void mfc0(GeneratedCpuState&c,std::uint8_t r,std::uint8_t d)noexcept{queue_load(c,r,read_cop0(c,d));}
-inline void mtc0(GeneratedCpuState&c,std::uint8_t r,std::uint8_t d)noexcept{const auto v=c.gpr[r];switch(d){case 8:c.cop0_bad_vaddr=v;break;case 12:c.cop0_status=v;break;case 13:c.cop0_cause=v;break;case 14:c.cop0_epc=v;break;default:break;}}
+inline void mtc0(GeneratedCpuState&c,std::uint8_t r,std::uint8_t d)noexcept{const auto v=c.gpr[r];switch(d){case 12:c.cop0_status=v;break;case 13:c.cop0_cause=(c.cop0_cause&~0x300U)|(v&0x300U);break;case 14:c.cop0_epc=v;break;default:raise_exception(c,CpuException::ReservedInstruction);break;}}
 inline void rfe(GeneratedCpuState&c)noexcept{const auto mode=c.cop0_status&0x3FU;c.cop0_status=(c.cop0_status&~0xFU)|((mode>>2U)&0xFU);}
 inline std::uint32_t merge_source(const GeneratedCpuState&c,std::uint8_t r)noexcept{return c.commit_load_valid&&c.commit_load_reg==r?c.commit_load_value:c.gpr[r];}
 inline std::int32_t s(std::uint32_t v)noexcept{return static_cast<std::int32_t>(v);}

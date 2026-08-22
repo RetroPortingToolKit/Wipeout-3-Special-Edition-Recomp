@@ -189,6 +189,17 @@ struct DeviceDeadline final {
  */
 class Runtime final {
 public:
+    struct GeneratedExecutionSnapshot final {
+        std::uint32_t pc = 0U;
+        std::uint32_t cop0_status = 0U;
+        std::uint32_t cop0_cause = 0U;
+        std::uint32_t cop0_epc = 0U;
+        std::uint32_t cop0_bad_vaddr = 0U;
+        std::uint64_t memory_reads = 0U;
+        std::uint64_t memory_writes = 0U;
+        std::uint64_t device_reads = 0U;
+        std::uint64_t device_writes = 0U;
+    };
     explicit Runtime(Configuration configuration);
     ~Runtime();
 
@@ -207,6 +218,7 @@ public:
     [[nodiscard]] DispatchStatus dispatch_bios() noexcept;
     [[nodiscard]] std::uint32_t bios_pc() const noexcept;
     [[nodiscard]] std::uint32_t last_bios_instruction_count() const noexcept;
+    [[nodiscard]] GeneratedExecutionSnapshot bios_execution_snapshot() const noexcept;
     [[nodiscard]] DispatchStatus load_authenticated_executable(
         std::string_view selected_variant_identity_sha256,
         std::span<const std::uint8_t> executable,

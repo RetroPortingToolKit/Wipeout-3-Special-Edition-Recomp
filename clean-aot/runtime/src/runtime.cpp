@@ -286,9 +286,21 @@ struct RationalPreview final {
         return false;
     }
     const std::uint32_t bytes = access_width_bytes(width);
-    return bytes != 0U && *physical >= memory::kMmioPhysicalBase &&
-           *physical < memory::kBiosPhysicalBase &&
-           bytes <= memory::kBiosPhysicalBase - *physical;
+    const bool expansion_one = *physical >= 0x1f00'0000U &&
+                               *physical < 0x1f80'0000U &&
+                               bytes <= 0x1f80'0000U - *physical;
+    const bool mmio = *physical >= memory::kMmioPhysicalBase &&
+                      *physical < memory::kBiosPhysicalBase &&
+                      bytes <= memory::kBiosPhysicalBase - *physical;
+    return bytes != 0U && (expansion_one || mmio);
+}
+
+[[nodiscard]] bool is_expansion_one(std::uint32_t address,
+                                    memory::AccessWidth width) noexcept {
+    const auto physical = physical_address(address);
+    const std::uint32_t bytes = access_width_bytes(width);
+    return physical.has_value() && bytes != 0U && *physical >= 0x1f00'0000U &&
+           *physical < 0x1f80'0000U && bytes <= 0x1f80'0000U - *physical;
 }
 
 [[nodiscard]] sio::MmioWidth sio_width(memory::AccessWidth width) noexcept {
@@ -459,22 +471,31 @@ struct Runtime::Impl final {
     std::string bios_sha256{};
     bool bios_bound = false;
     bool executable_loaded = false;
+    GeneratedCpuState* active_generated_cpu = nullptr;
+    std::uint64_t generated_memory_reads = 0U;
+    std::uint64_t generated_memory_writes = 0U;
+    std::uint64_t generated_device_reads = 0U;
+    std::uint64_t generated_device_writes = 0U;
 
     static bool generated_write32(void* context, std::uint32_t address,
                                   std::uint32_t value) noexcept {
         auto* self = static_cast<Impl*>(context);
         if (self == nullptr) return false;
+        AccessFault fault=AccessFault::None;if(self->active_generated_cpu==nullptr||!self->sync_for_access({self->active_generated_cpu->issue_cycle,self->active_generated_cpu->instruction_pc,self->active_generated_cpu->in_delay_slot},address,memory::AccessWidth::Word,fault))return false;
+        ++self->generated_memory_writes;
+        if (is_device_access(address, memory::AccessWidth::Word) ||
+            address == kCacheControl) ++self->generated_device_writes;
         if (address == kCacheControl) {
             self->cache_control = value;
             return true;
         }
         return self->bus.write32(address, value).ok();
     }
-    static bool generated_read8(void* c,std::uint32_t a,std::uint8_t& v) noexcept{auto*s=static_cast<Impl*>(c);if(!s)return false;auto r=s->bus.read8(a);v=r.value;return r.ok();}
-    static bool generated_read16(void* c,std::uint32_t a,std::uint16_t& v) noexcept{auto*s=static_cast<Impl*>(c);if(!s)return false;auto r=s->bus.read16(a);v=r.value;return r.ok();}
-    static bool generated_read32(void* c,std::uint32_t a,std::uint32_t& v) noexcept{auto*s=static_cast<Impl*>(c);if(!s)return false;auto r=s->bus.read32(a);v=r.value;return r.ok();}
-    static bool generated_write8(void* c,std::uint32_t a,std::uint8_t v) noexcept{auto*s=static_cast<Impl*>(c);return s&&s->bus.write8(a,v).ok();}
-    static bool generated_write16(void* c,std::uint32_t a,std::uint16_t v) noexcept{auto*s=static_cast<Impl*>(c);return s&&s->bus.write16(a,v).ok();}
+    static bool generated_read8(void* c,std::uint32_t a,std::uint8_t& v) noexcept{auto*s=static_cast<Impl*>(c);if(!s||!s->active_generated_cpu)return false;AccessFault f=AccessFault::None;if(!s->sync_for_access({s->active_generated_cpu->issue_cycle,s->active_generated_cpu->instruction_pc,s->active_generated_cpu->in_delay_slot},a,memory::AccessWidth::Byte,f))return false;++s->generated_memory_reads;if(is_device_access(a,memory::AccessWidth::Byte)||is_expansion_one(a,memory::AccessWidth::Byte))++s->generated_device_reads;if(is_expansion_one(a,memory::AccessWidth::Byte)){v=0xffU;return true;}auto r=s->bus.read8(a);v=r.value;return r.ok();}
+    static bool generated_read16(void* c,std::uint32_t a,std::uint16_t& v) noexcept{auto*s=static_cast<Impl*>(c);if(!s||!s->active_generated_cpu)return false;AccessFault f=AccessFault::None;if(!s->sync_for_access({s->active_generated_cpu->issue_cycle,s->active_generated_cpu->instruction_pc,s->active_generated_cpu->in_delay_slot},a,memory::AccessWidth::Halfword,f))return false;++s->generated_memory_reads;if(is_device_access(a,memory::AccessWidth::Halfword)||is_expansion_one(a,memory::AccessWidth::Halfword))++s->generated_device_reads;if(is_expansion_one(a,memory::AccessWidth::Halfword)){v=0xffffU;return true;}auto r=s->bus.read16(a);v=r.value;return r.ok();}
+    static bool generated_read32(void* c,std::uint32_t a,std::uint32_t& v) noexcept{auto*s=static_cast<Impl*>(c);if(!s||!s->active_generated_cpu)return false;AccessFault f=AccessFault::None;if(!s->sync_for_access({s->active_generated_cpu->issue_cycle,s->active_generated_cpu->instruction_pc,s->active_generated_cpu->in_delay_slot},a,memory::AccessWidth::Word,f))return false;++s->generated_memory_reads;if(is_device_access(a,memory::AccessWidth::Word)||is_expansion_one(a,memory::AccessWidth::Word))++s->generated_device_reads;if(is_expansion_one(a,memory::AccessWidth::Word)){v=0xffff'ffffU;return true;}auto r=s->bus.read32(a);v=r.value;return r.ok();}
+    static bool generated_write8(void* c,std::uint32_t a,std::uint8_t v) noexcept{auto*s=static_cast<Impl*>(c);if(!s||!s->active_generated_cpu)return false;AccessFault f=AccessFault::None;if(!s->sync_for_access({s->active_generated_cpu->issue_cycle,s->active_generated_cpu->instruction_pc,s->active_generated_cpu->in_delay_slot},a,memory::AccessWidth::Byte,f))return false;++s->generated_memory_writes;if(is_device_access(a,memory::AccessWidth::Byte))++s->generated_device_writes;return s->bus.write8(a,v).ok();}
+    static bool generated_write16(void* c,std::uint32_t a,std::uint16_t v) noexcept{auto*s=static_cast<Impl*>(c);if(!s||!s->active_generated_cpu)return false;AccessFault f=AccessFault::None;if(!s->sync_for_access({s->active_generated_cpu->issue_cycle,s->active_generated_cpu->instruction_pc,s->active_generated_cpu->in_delay_slot},a,memory::AccessWidth::Halfword,f))return false;++s->generated_memory_writes;if(is_device_access(a,memory::AccessWidth::Halfword))++s->generated_device_writes;return s->bus.write16(a,v).ok();}
 
     class CdScheduler final : public cdrom::MachineScheduler {
     public:
@@ -1642,6 +1663,10 @@ Status Runtime::reset() noexcept {
     impl_->bios_cpu.write8=&Impl::generated_write8;impl_->bios_cpu.write16=&Impl::generated_write16;
     impl_->bios_cpu.write32 = &Impl::generated_write32;
     impl_->bios_bound = false;
+    impl_->generated_memory_reads = 0U;
+    impl_->generated_memory_writes = 0U;
+    impl_->generated_device_reads = 0U;
+    impl_->generated_device_writes = 0U;
     impl_->generated_cpu = GeneratedCpuState{};
     impl_->executable_loaded = false;
     impl_->sample_device_irqs();
@@ -1678,6 +1703,10 @@ DispatchStatus Runtime::bind_authenticated_bios(
     impl_->bios_cpu.write8=&Impl::generated_write8;impl_->bios_cpu.write16=&Impl::generated_write16;
     impl_->bios_cpu.write32 = &Impl::generated_write32;
     impl_->bios_bound = true;
+    impl_->generated_memory_reads = 0U;
+    impl_->generated_memory_writes = 0U;
+    impl_->generated_device_reads = 0U;
+    impl_->generated_device_writes = 0U;
     return DispatchStatus::Bound;
 }
 
@@ -1685,7 +1714,13 @@ DispatchStatus Runtime::dispatch_bios() noexcept {
     if (!operational() || !impl_->bios_bound || impl_->executable_loaded) {
         return DispatchStatus::LoadRejected;
     }
-    return impl_->bios_dispatcher.dispatch(impl_->bios_cpu);
+    impl_->bios_cpu.issue_cycle=impl_->clock.retirement_total();
+    impl_->bios_cpu.cop0_cause=(impl_->bios_cpu.cop0_cause&~0x0000FC00U)|((static_cast<std::uint32_t>(impl_->interrupt_lines)<<10U)&0x0000FC00U);
+    impl_->active_generated_cpu=&impl_->bios_cpu;
+    const auto result=impl_->bios_dispatcher.dispatch(impl_->bios_cpu);
+    impl_->active_generated_cpu=nullptr;
+    if(result==DispatchStatus::Executed)(void)impl_->advance_to(impl_->bios_cpu.issue_cycle);
+    return result;
 }
 
 std::uint32_t Runtime::bios_pc() const noexcept {
@@ -1694,6 +1729,15 @@ std::uint32_t Runtime::bios_pc() const noexcept {
 
 std::uint32_t Runtime::last_bios_instruction_count() const noexcept {
     return impl_ != nullptr ? impl_->bios_dispatcher.last_instruction_count() : 0U;
+}
+
+Runtime::GeneratedExecutionSnapshot Runtime::bios_execution_snapshot() const noexcept {
+    if (impl_ == nullptr) return {};
+    return {impl_->bios_cpu.pc, impl_->bios_cpu.cop0_status,
+            impl_->bios_cpu.cop0_cause, impl_->bios_cpu.cop0_epc,
+            impl_->bios_cpu.cop0_bad_vaddr, impl_->generated_memory_reads,
+            impl_->generated_memory_writes, impl_->generated_device_reads,
+            impl_->generated_device_writes};
 }
 
 DispatchStatus Runtime::load_authenticated_executable(
@@ -1751,7 +1795,13 @@ DispatchStatus Runtime::dispatch_selected(bool branch_taken) noexcept {
         return DispatchStatus::LoadRejected;
     }
     impl_->generated_cpu.branch_taken = branch_taken;
-    return impl_->generated_dispatcher.dispatch(impl_->generated_cpu);
+    impl_->generated_cpu.issue_cycle=impl_->clock.retirement_total();
+    impl_->generated_cpu.cop0_cause=(impl_->generated_cpu.cop0_cause&~0x0000FC00U)|((static_cast<std::uint32_t>(impl_->interrupt_lines)<<10U)&0x0000FC00U);
+    impl_->active_generated_cpu=&impl_->generated_cpu;
+    const auto result=impl_->generated_dispatcher.dispatch(impl_->generated_cpu);
+    impl_->active_generated_cpu=nullptr;
+    if(result==DispatchStatus::Executed)(void)impl_->advance_to(impl_->generated_cpu.issue_cycle);
+    return result;
 }
 
 std::uint32_t Runtime::selected_pc() const noexcept {
@@ -1780,6 +1830,9 @@ ReadResult Runtime::read8(AccessContext context,
     if (is_cache_control(address, memory::AccessWidth::Byte)) {
         return cache_read(*impl_, address, memory::AccessWidth::Byte);
     }
+    if (is_expansion_one(address, memory::AccessWidth::Byte)) {
+        return {AccessFault::None, 0xffU, 0U};
+    }
     const auto result = impl_->bus.read8(address);
     return {map_bus_status(result.status), result.value, 0U};
 }
@@ -1802,6 +1855,9 @@ ReadResult Runtime::read16(AccessContext context,
     if (is_cache_control(address, memory::AccessWidth::Halfword)) {
         return cache_read(*impl_, address, memory::AccessWidth::Halfword);
     }
+    if (is_expansion_one(address, memory::AccessWidth::Halfword)) {
+        return {AccessFault::None, 0xffffU, 0U};
+    }
     const auto result = impl_->bus.read16(address);
     return {map_bus_status(result.status), result.value, 0U};
 }
@@ -1823,6 +1879,9 @@ ReadResult Runtime::read32(AccessContext context,
     }
     if (is_cache_control(address, memory::AccessWidth::Word)) {
         return cache_read(*impl_, address, memory::AccessWidth::Word);
+    }
+    if (is_expansion_one(address, memory::AccessWidth::Word)) {
+        return {AccessFault::None, 0xffff'ffffU, 0U};
     }
     const auto result = impl_->bus.read32(address);
     return {map_bus_status(result.status), result.value, 0U};

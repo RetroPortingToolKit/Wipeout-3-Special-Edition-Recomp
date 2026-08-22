@@ -9,4 +9,7 @@ int main(){clean_aot::runtime::GeneratedCpuState state{};state.pc=0x1000U;
  if(!clean_aot_region_00001000(state)||state.pc!=0x1030U||state.gpr[2]!=0x1234U)return 3;
  Memory memory;state.pc=0x1030U;state.gpr[1]=0x1001U;state.gpr[2]=0xaabbccddU;state.memory_context=&memory;state.read32=read32;
  if(!clean_aot_region_00001000(state)||state.pc!=0x103cU||state.gpr[2]!=0x55443322U)return 4;
- return clean_aot_region_00001000(state)?5:0;}
+ if(state.issue_cycle!=11U)return 5;
+ clean_aot::runtime::GeneratedCpuState interrupt{};interrupt.pc=0x1030U;interrupt.cop0_status=0x401U;interrupt.cop0_cause=0x400U;
+ if(!clean_aot_region_00001000(interrupt)||!interrupt.exception_raised||interrupt.exception_code!=clean_aot::runtime::CpuException::Interrupt||interrupt.cop0_epc!=0x1030U||interrupt.pc!=clean_aot::runtime::kGeneralExceptionVector)return 6;
+ return clean_aot_region_00001000(state)?7:0;}
