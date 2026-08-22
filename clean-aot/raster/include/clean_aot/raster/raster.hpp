@@ -202,12 +202,31 @@ struct ScanoutResult {
   ScanoutPlan plan{};
 };
 
+enum class PresentationResolveMode : std::uint8_t {
+  Native,
+  EdgeAware,
+};
+
+struct UpscaleStats final {
+  std::uint64_t source_pixels = 0U;
+  std::uint64_t output_pixels = 0U;
+  std::uint64_t source_pixel_reads = 0U;
+  std::uint64_t color_comparisons = 0U;
+  std::uint64_t bytes_written = 0U;
+};
+
 class ScanoutMapper final {
 public:
   [[nodiscard]] static ScanoutResult plan(const ScanoutRequest &request) noexcept;
   [[nodiscard]] static EventResult decode_rgb888(
       const ScanoutPlan &plan, std::span<const VramWord> vram,
       std::span<std::uint8_t> destination) noexcept;
+  [[nodiscard]] static EventResult upscale_edge_aware_rgb888(
+      std::uint32_t source_width, std::uint32_t source_height,
+      std::uint32_t output_width, std::uint32_t output_height,
+      std::span<const std::uint8_t> source_rgb888,
+      std::span<std::uint8_t> output_rgb888,
+      UpscaleStats &stats) noexcept;
 };
 
 using BackendConsumeEvent = EventResult (*)(void *context,

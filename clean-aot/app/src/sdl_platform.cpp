@@ -18,7 +18,10 @@ host::SdlVulkanConfig make_live_graphics_config(
     return host::SdlVulkanConfig{title, graphics.output_width,
         graphics.output_height, fullscreen, aspect,
         {graphics.custom_aspect_width, graphics.custom_aspect_height},
-        host::ScaleMode::fractional, false, false};
+        host::ScaleMode::fractional, false, false,
+        graphics.presentation_resolve == raster::PresentationResolveMode::EdgeAware
+            ? host::PresentationFilter::Linear
+            : host::PresentationFilter::Nearest};
 }
 struct SdlPlatform::Impl final { SDL_Window* window=nullptr; SDL_AudioStream* audio=nullptr; SDL_Gamepad* gamepad=nullptr; std::uint64_t sample=0U; PlatformConfiguration config{}; AudioHealth health{}; };
 SdlPlatform::~SdlPlatform(){shutdown();}

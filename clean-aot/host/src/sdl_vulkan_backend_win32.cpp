@@ -367,8 +367,11 @@ HostStatus SdlVulkanPresentation::initialize() noexcept {
     SDL_ReleaseGPUShader(impl_->device, fragment_shader);
 
     SDL_GPUSamplerCreateInfo sampler_info{};
-    sampler_info.min_filter = SDL_GPU_FILTER_NEAREST;
-    sampler_info.mag_filter = SDL_GPU_FILTER_NEAREST;
+    const SDL_GPUFilter presentation_filter =
+        config_.presentation_filter == PresentationFilter::Linear
+            ? SDL_GPU_FILTER_LINEAR : SDL_GPU_FILTER_NEAREST;
+    sampler_info.min_filter = presentation_filter;
+    sampler_info.mag_filter = presentation_filter;
     sampler_info.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
     sampler_info.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
     sampler_info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;

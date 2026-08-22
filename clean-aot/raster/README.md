@@ -150,3 +150,12 @@ nearest sampling, preventing color bleed across cutout edges and preserving the
 hardware blend class. `NearestNative` remains the default and is byte-identical
 to the unenhanced path. Counters expose fragment, fetch, and fallback costs for
 deterministic performance receipts.
+
+`ScanoutMapper::upscale_edge_aware_rgb888()` is the high-resolution
+presentation resolve. It applies the Scale2x edge rules directly at an
+arbitrary 2x-or-greater target size, selecting only colors already present in
+the authoritative PS1 scanout. It therefore cannot alter VRAM blending, mask
+bits, framebuffer feedback, or 15/24-bit display decoding. Work is linear and
+bounded per output pixel: five source-pixel reads, at most three RGB
+comparisons, and one RGB write. Invalid dimensions, underscaling, oversized
+surfaces, and wrong buffer extents are rejected before output is touched.

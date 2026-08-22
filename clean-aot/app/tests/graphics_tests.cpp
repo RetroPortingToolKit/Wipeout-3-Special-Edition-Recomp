@@ -421,6 +421,56 @@ void test_runtime_scanout() {
                std::string::npos,
            "live 4K identity receipt records exact pillarboxed content");
 }
+void test_4k_edge_aware_runtime_resolve() {
+    const auto prepare = [](clean_aot::runtime::Runtime& runtime) {
+        auto& gpu = runtime.gpu();
+        (void)gpu.write_gp1(0x03000000U);
+        (void)gpu.write_gp1(0x05000000U);
+        (void)gpu.write_gp1(0x06c00200U);
+        (void)gpu.write_gp1(0x07040010U);
+        (void)gpu.write_gp1(0x08000001U);
+        (void)gpu.write_gp0(0x02ff00ffU);
+        (void)gpu.write_gp0(0U);
+        (void)gpu.write_gp0((240U << 16U) | 320U);
+    };
+    std::vector<std::uint8_t> bios(512U * 1024U, 0U);
+    clean_aot::runtime::Configuration runtime_config{};
+    runtime_config.bios = bios;
+    clean_aot::runtime::Runtime enhanced_runtime(runtime_config);
+    prepare(enhanced_runtime);
+    clean_aot::app::GraphicsConfiguration enhanced_config{};
+    enhanced_config.runtime_scanout = true;
+    enhanced_config.presentation_resolve =
+        clean_aot::raster::PresentationResolveMode::EdgeAware;
+    clean_aot::app::RuntimeGraphics enhanced(enhanced_config);
+    clean_aot::host::HeadlessBackend enhanced_host;
+    expect(enhanced.present(enhanced_runtime, enhanced_host, 0U).success(),
+           "4K edge-aware runtime resolve presents");
+    const auto& stats = enhanced.upscale_stats();
+    constexpr std::uint64_t output_pixels = 2880ULL * 2160ULL;
+    expect(stats.source_pixels == 320U * 240U &&
+           stats.output_pixels == output_pixels &&
+           stats.source_pixel_reads == output_pixels * 5U &&
+           stats.color_comparisons <= output_pixels * 3U &&
+           stats.bytes_written == output_pixels * 3U &&
+           enhanced.upscale_fallbacks() == 0U,
+           "4K resolve obeys fixed memory/comparison budgets");
+    std::cout << "4K edge resolve digest: 0x" << std::hex
+              << enhanced.visual_digest() << std::dec << '\n';
+    expect(enhanced.visual_digest() == 0x552f7b477c3b979cULL,
+           "4K edge-aware visual digest changed");
+
+    clean_aot::runtime::Runtime fallback_runtime(runtime_config);
+    prepare(fallback_runtime);
+    auto fallback_config = enhanced_config;
+    fallback_config.maximum_resolved_pixels = 1U;
+    clean_aot::app::RuntimeGraphics fallback(fallback_config);
+    clean_aot::host::HeadlessBackend fallback_host;
+    expect(fallback.present(fallback_runtime, fallback_host, 0U).success() &&
+           fallback.upscale_fallbacks() == 1U &&
+           fallback.visual_digest() == 0xa0c4b5214903b3ddULL,
+           "bounded allocation policy falls back to exact native scanout");
+}
 void test_replacement_runtime() {
     const auto root = std::filesystem::temp_directory_path() /
         "clean-aot-replacement-runtime";
@@ -590,7 +640,8 @@ int main() {
     test_precise_raster_perspective_interpolation();
     test_beetle_upload_key_derivation_and_sampling();
     test_live_replacement_pipeline();
-    test_runtime_scanout(); test_replacement_runtime(); test_native_png_decode();
+    test_runtime_scanout(); test_4k_edge_aware_runtime_resolve();
+    test_replacement_runtime(); test_native_png_decode();
     test_title_manifest_and_receipts(); test_missing_asset_native_fallback();
     test_ultrawide_visual_receipt();
     test_permitted_pack_when_available();

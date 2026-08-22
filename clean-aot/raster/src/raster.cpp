@@ -1619,6 +1619,95 @@ EventResult ScanoutMapper::decode_rgb888(
                          plan.logical_height};
 }
 
+EventResult ScanoutMapper::upscale_edge_aware_rgb888(
+    std::uint32_t source_width, std::uint32_t source_height,
+    std::uint32_t output_width, std::uint32_t output_height,
+    std::span<const std::uint8_t> source_rgb888,
+    std::span<std::uint8_t> output_rgb888,
+    UpscaleStats &stats) noexcept {
+  stats = {};
+  constexpr std::uint64_t kMaximumOutputPixels = 8192ULL * 8192ULL;
+  const std::uint64_t source_pixels =
+      static_cast<std::uint64_t>(source_width) * source_height;
+  const std::uint64_t output_pixels =
+      static_cast<std::uint64_t>(output_width) * output_height;
+  const std::uint64_t source_bytes = source_pixels * 3U;
+  const std::uint64_t output_bytes = output_pixels * 3U;
+  const std::uintptr_t source_begin =
+      reinterpret_cast<std::uintptr_t>(source_rgb888.data());
+  const std::uintptr_t output_begin =
+      reinterpret_cast<std::uintptr_t>(output_rgb888.data());
+  const bool address_overflow =
+      source_bytes > std::numeric_limits<std::uintptr_t>::max() - source_begin ||
+      output_bytes > std::numeric_limits<std::uintptr_t>::max() - output_begin;
+  const bool overlaps = !address_overflow &&
+      source_begin < output_begin + output_bytes &&
+      output_begin < source_begin + source_bytes;
+  if (source_width == 0U || source_height == 0U || output_width == 0U ||
+      output_height == 0U || output_width < source_width * 2ULL ||
+      output_height < source_height * 2ULL ||
+      output_pixels > kMaximumOutputPixels ||
+      source_bytes != source_rgb888.size() ||
+      output_bytes != output_rgb888.size() || address_overflow || overlaps) {
+    return EventResult{EventStatus::Rejected,
+                       RasterError::InvalidPresentationRequest};
+  }
+  stats.source_pixels = source_pixels;
+  stats.output_pixels = output_pixels;
+  stats.source_pixel_reads = output_pixels * 5U;
+  stats.bytes_written = output_bytes;
+  const auto pixel = [&](std::uint32_t x, std::uint32_t y) noexcept {
+    return source_rgb888.data() +
+        (static_cast<std::size_t>(y) * source_width + x) * 3U;
+  };
+  const auto equal = [&](const std::uint8_t* left,
+                         const std::uint8_t* right) noexcept {
+    ++stats.color_comparisons;
+    return left[0] == right[0] && left[1] == right[1] &&
+        left[2] == right[2];
+  };
+  for (std::uint32_t output_y = 0U; output_y < output_height; ++output_y) {
+    const std::uint64_t mapped_y =
+        static_cast<std::uint64_t>(output_y) * source_height;
+    const std::uint32_t source_y =
+        static_cast<std::uint32_t>(mapped_y / output_height);
+    const bool lower = (mapped_y % output_height) * 2U >= output_height;
+    const std::uint32_t up_y = source_y == 0U ? 0U : source_y - 1U;
+    const std::uint32_t down_y =
+        std::min(source_y + 1U, source_height - 1U);
+    for (std::uint32_t output_x = 0U; output_x < output_width; ++output_x) {
+      const std::uint64_t mapped_x =
+          static_cast<std::uint64_t>(output_x) * source_width;
+      const std::uint32_t source_x =
+          static_cast<std::uint32_t>(mapped_x / output_width);
+      const bool right = (mapped_x % output_width) * 2U >= output_width;
+      const std::uint32_t left_x = source_x == 0U ? 0U : source_x - 1U;
+      const std::uint32_t right_x =
+          std::min(source_x + 1U, source_width - 1U);
+      const std::uint8_t* center = pixel(source_x, source_y);
+      const std::uint8_t* up = pixel(source_x, up_y);
+      const std::uint8_t* left = pixel(left_x, source_y);
+      const std::uint8_t* adjacent_right = pixel(right_x, source_y);
+      const std::uint8_t* down = pixel(source_x, down_y);
+      const bool vertical_edge = !equal(up, down);
+      const bool horizontal_edge = !equal(left, adjacent_right);
+      const std::uint8_t* selected = center;
+      if (vertical_edge && horizontal_edge) {
+        if (!lower && !right && equal(left, up)) selected = left;
+        else if (!lower && right && equal(up, adjacent_right)) selected = up;
+        else if (lower && !right && equal(left, down)) selected = left;
+        else if (lower && right && equal(down, adjacent_right)) selected = down;
+      }
+      const std::size_t destination =
+          (static_cast<std::size_t>(output_y) * output_width + output_x) * 3U;
+      output_rgb888[destination] = selected[0];
+      output_rgb888[destination + 1U] = selected[1];
+      output_rgb888[destination + 2U] = selected[2];
+    }
+  }
+  return EventResult{EventStatus::Applied, RasterError::None, output_pixels};
+}
+
 bool native_backend_compatible(const NativeBackendV1 &backend) noexcept {
   return backend.abi_version == kNativeBackendAbiVersion &&
          backend.consume_event != nullptr;

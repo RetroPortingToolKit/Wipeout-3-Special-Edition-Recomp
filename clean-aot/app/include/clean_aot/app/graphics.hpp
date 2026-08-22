@@ -140,6 +140,9 @@ struct GraphicsConfiguration final {
         psx::render::CullingPolicy::NativeHardware;
     raster::TextureFilterMode texture_filter =
         raster::TextureFilterMode::NearestNative;
+    raster::PresentationResolveMode presentation_resolve =
+        raster::PresentationResolveMode::Native;
+    std::uint64_t maximum_resolved_pixels = 5120ULL * 2160ULL;
 };
 
 class IPngDecoder {
@@ -243,11 +246,14 @@ public:
     [[nodiscard]] std::uint64_t geometry_digest() const noexcept;
     [[nodiscard]] const raster::PreciseRasterStats& precise_raster_stats()
         const noexcept;
+    [[nodiscard]] const raster::UpscaleStats& upscale_stats() const noexcept;
+    [[nodiscard]] std::uint64_t upscale_fallbacks() const noexcept;
 
 private:
     GraphicsConfiguration configuration_{};
     raster::ReferenceRasterizer raster_{};
     std::vector<std::uint8_t> scanout_{};
+    std::vector<std::uint8_t> resolved_scanout_{};
     std::uint64_t sequence_ = 0U;
     std::uint64_t visual_digest_ = 0U;
     bool configured_ = false;
@@ -259,6 +265,8 @@ private:
     std::uint64_t precise_primitives_ = 0U;
     std::uint64_t precise_fallbacks_ = 0U;
     std::uint64_t geometry_digest_ = 0U;
+    raster::UpscaleStats upscale_stats_{};
+    std::uint64_t upscale_fallbacks_ = 0U;
 };
 
 } // namespace clean_aot::app

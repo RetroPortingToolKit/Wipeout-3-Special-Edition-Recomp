@@ -1,5 +1,6 @@
 #include "clean_aot/raster/raster.hpp"
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cstdint>
@@ -1373,6 +1374,52 @@ void test_precise_transparency_safe_filtering() {
           "transparent footprint was filtered across a PS1 cutout edge");
 }
 
+void test_edge_aware_4k_resolve_contract() {
+  constexpr std::uint32_t width = 3U;
+  constexpr std::uint32_t height = 3U;
+  std::array<std::uint8_t, width * height * 3U> source{};
+  const auto set = [&](std::uint32_t x, std::uint32_t y,
+                       std::array<std::uint8_t, 3U> color_value) {
+    const std::size_t offset = (static_cast<std::size_t>(y) * width + x) * 3U;
+    std::copy(color_value.begin(), color_value.end(), source.begin() +
+              static_cast<std::ptrdiff_t>(offset));
+  };
+  constexpr std::array<std::uint8_t, 3U> red{255U, 0U, 0U};
+  constexpr std::array<std::uint8_t, 3U> blue{0U, 0U, 255U};
+  set(1U, 0U, red); set(0U, 1U, red);
+  set(2U, 1U, blue); set(1U, 2U, blue);
+  std::array<std::uint8_t, 6U * 6U * 3U> output{};
+  clean_aot::raster::UpscaleStats stats{};
+  require(ScanoutMapper::upscale_edge_aware_rgb888(
+              width, height, 6U, 6U, source, output, stats).accepted(),
+          "edge-aware resolve rejected a valid 2x surface");
+  const auto output_pixel = [&](std::uint32_t x, std::uint32_t y) {
+    const std::size_t offset = (static_cast<std::size_t>(y) * 6U + x) * 3U;
+    return std::array<std::uint8_t, 3U>{
+        output[offset], output[offset + 1U], output[offset + 2U]};
+  };
+  require(output_pixel(2U, 2U) == red && output_pixel(3U, 3U) == blue &&
+              output_pixel(3U, 2U) == std::array<std::uint8_t, 3U>{} &&
+              output_pixel(2U, 3U) == std::array<std::uint8_t, 3U>{},
+          "Scale2x edge quadrants changed deterministic source-color selection");
+  require(stats.source_pixels == 9U && stats.output_pixels == 36U &&
+              stats.source_pixel_reads == stats.output_pixels * 5U &&
+              stats.color_comparisons <= stats.output_pixels * 3U &&
+              stats.bytes_written == output.size(),
+          "edge-aware resolve exceeded its fixed per-pixel performance budget");
+  output.fill(0x5aU);
+  require(!ScanoutMapper::upscale_edge_aware_rgb888(
+               width, height, 5U, 6U, source, output, stats).accepted() &&
+              output.front() == 0x5aU,
+          "underscaled resolve did not fail before touching output");
+  std::array<std::uint8_t, 6U * 6U * 3U> aliased{};
+  require(!ScanoutMapper::upscale_edge_aware_rgb888(
+               width, height, 6U, 6U,
+               std::span<const std::uint8_t>(aliased).first(source.size()),
+               aliased, stats).accepted(),
+          "overlapping resolve buffers were not rejected");
+}
+
 } // namespace
 
 int main() {
@@ -1389,6 +1436,7 @@ int main() {
     test_bounds_presentation_and_backend();
     test_adversarial_coordinates_and_budgets();
     test_precise_transparency_safe_filtering();
+    test_edge_aware_4k_resolve_contract();
     test_scanout_boundaries();
     test_golden_digest();
   } catch (const TestFailure &failure) {

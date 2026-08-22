@@ -8,6 +8,11 @@
 
 namespace clean_aot::host {
 
+enum class PresentationFilter : std::uint8_t {
+    Nearest,
+    Linear,
+};
+
 struct SdlVulkanConfig final {
     const char* title = "Clean AOT host";
     std::uint32_t width = 3840U;
@@ -18,6 +23,7 @@ struct SdlVulkanConfig final {
     ScaleMode scale = ScaleMode::fractional;
     bool debug_gpu = false;
     bool hidden = false;
+    PresentationFilter presentation_filter = PresentationFilter::Nearest;
 };
 
 // This class is only linked when CLEAN_AOT_HOST_ENABLE_SDL_VULKAN is enabled

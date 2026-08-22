@@ -8,16 +8,20 @@ int main() {
     auto native = clean_aot::app::make_live_graphics_config("live", graphics);
     if (native.width != 3840U || native.height != 2160U ||
         native.aspect != clean_aot::host::AspectPolicy::preserve_4x3 ||
-        native.fullscreen != clean_aot::host::FullscreenMode::borderless) {
+        native.fullscreen != clean_aot::host::FullscreenMode::borderless ||
+        native.presentation_filter != clean_aot::host::PresentationFilter::Nearest) {
         std::cerr << "exact 4K 4:3 live graphics default changed\n";
         return 1;
     }
     graphics.output_width = 5120U;
     graphics.output_height = 2160U;
     graphics.presentation = clean_aot::raster::PresentationMode::Generic21x9;
+    graphics.presentation_resolve =
+        clean_aot::raster::PresentationResolveMode::EdgeAware;
     native = clean_aot::app::make_live_graphics_config("live", graphics);
     if (native.width != 5120U || native.height != 2160U ||
-        native.aspect != clean_aot::host::AspectPolicy::preserve_21x9) {
+        native.aspect != clean_aot::host::AspectPolicy::preserve_21x9 ||
+        native.presentation_filter != clean_aot::host::PresentationFilter::Linear) {
         std::cerr << "5K ultrawide live graphics policy did not propagate\n";
         return 1;
     }

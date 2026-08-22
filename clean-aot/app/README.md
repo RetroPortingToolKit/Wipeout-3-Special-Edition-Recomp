@@ -9,6 +9,13 @@ GP1 display timing, decodes RGB555 or packed 24-bit VRAM, and submits the result
 to the host in the same update. The default remains exact 4:3; 16:9, 21:9,
 32:9, and custom presentation are explicit configuration choices.
 
+`PresentationResolveMode::EdgeAware` optionally resolves that authoritative
+scanout to the planned 4K or ultrawide content dimensions before submission.
+The resolve has an explicit pixel budget and falls back to the unchanged native
+frame on allocation, dimension, or budget failure. The SDL/Vulkan host selects
+linear final sampling only for an enhanced resolved frame; native mode retains
+the original nearest sampler.
+
 Replacement assets remain separated from title policy. A title-owned key
 policy may identify a texture or font while the generic runtime validates
 manifest/source generations, confines paths to the asset root, verifies

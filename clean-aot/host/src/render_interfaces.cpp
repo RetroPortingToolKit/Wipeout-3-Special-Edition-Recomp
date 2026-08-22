@@ -122,10 +122,22 @@ HostStatus bind_scanout_frame(
     std::uint64_t sequence,
     std::uint64_t update_index,
     FrameSubmission& submission) noexcept {
-    const std::uint64_t pitch = static_cast<std::uint64_t>(plan.logical_width) * 3u;
     if (plan.logical_width == 0u || plan.logical_height == 0u ||
-        plan.required_rgb_bytes != pitch * plan.logical_height ||
-        rgb888.size() != plan.required_rgb_bytes ||
+        plan.required_rgb_bytes != rgb888.size()) {
+        return HostStatus{HostCode::invalid_argument};
+    }
+    return bind_rgb888_frame(plan.logical_width, plan.logical_height, rgb888,
+                             sequence, update_index, submission);
+}
+
+HostStatus bind_rgb888_frame(
+    std::uint32_t width, std::uint32_t height,
+    std::span<const std::uint8_t> rgb888,
+    std::uint64_t sequence, std::uint64_t update_index,
+    FrameSubmission& submission) noexcept {
+    const std::uint64_t pitch = static_cast<std::uint64_t>(width) * 3u;
+    if (width == 0u || height == 0u ||
+        pitch * height != rgb888.size() ||
         pitch > std::numeric_limits<std::uint32_t>::max() ||
         rgb888.size() > std::numeric_limits<std::uint32_t>::max()) {
         return HostStatus{HostCode::invalid_argument};
@@ -133,7 +145,7 @@ HostStatus bind_scanout_frame(
     submission = FrameSubmission{
         sequence, update_index,
         FrameView{rgb888.data(), static_cast<std::uint32_t>(rgb888.size()),
-                  plan.logical_width, plan.logical_height,
+                  width, height,
                   static_cast<std::uint32_t>(pitch), PixelFormat::rgb8_unorm}};
     return HostStatus{};
 }

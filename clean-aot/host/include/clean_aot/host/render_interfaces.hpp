@@ -77,6 +77,12 @@ struct GeometryBridgeResult final {
     std::uint64_t update_index,
     FrameSubmission& submission) noexcept;
 
+[[nodiscard]] HostStatus bind_rgb888_frame(
+    std::uint32_t width, std::uint32_t height,
+    std::span<const std::uint8_t> rgb888,
+    std::uint64_t sequence, std::uint64_t update_index,
+    FrameSubmission& submission) noexcept;
+
 // These are intentionally narrow seams. They describe where the clean GPU,
 // PGXP, and replacement-texture implementations will attach without making
 // the host know anything about guest VRAM or game policy.

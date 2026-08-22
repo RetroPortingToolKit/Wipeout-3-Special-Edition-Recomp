@@ -684,7 +684,14 @@ RuntimeGraphics::RuntimeGraphics(GraphicsConfiguration configuration)
     configured_ = configuration_.output_width != 0U &&
         configuration_.output_height != 0U &&
         configuration_.custom_aspect_width != 0U &&
-        configuration_.custom_aspect_height != 0U;
+        configuration_.custom_aspect_height != 0U &&
+        (configuration_.presentation_resolve ==
+             raster::PresentationResolveMode::Native ||
+         configuration_.presentation_resolve ==
+             raster::PresentationResolveMode::EdgeAware) &&
+        (configuration_.presentation_resolve ==
+             raster::PresentationResolveMode::Native ||
+         configuration_.maximum_resolved_pixels != 0U);
     const psx::render::ProjectionResult projection =
         psx::render::ProjectionPolicyPlanner::plan({
             configuration_.projection, configuration_.culling,
@@ -851,12 +858,52 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
         const raster::EventResult decoded = raster::ScanoutMapper::decode_rgb888(
             planned.plan, raster_.vram_words(), scanout_);
         if (!decoded.accepted()) return {host::HostCode::internal_error};
+        std::span<const std::uint8_t> presented = scanout_;
+        std::uint32_t presented_width = planned.plan.logical_width;
+        std::uint32_t presented_height = planned.plan.logical_height;
+        upscale_stats_ = {};
+        if (configuration_.presentation_resolve ==
+                raster::PresentationResolveMode::EdgeAware) {
+            const std::uint32_t target_width =
+                planned.plan.presentation.destination_width;
+            const std::uint32_t target_height =
+                planned.plan.presentation.destination_height;
+            const std::uint64_t target_pixels =
+                static_cast<std::uint64_t>(target_width) * target_height;
+            bool resolved = target_pixels <= configuration_.maximum_resolved_pixels &&
+                target_pixels <= 8192ULL * 8192ULL &&
+                target_pixels <= std::numeric_limits<std::size_t>::max() / 3U;
+            if (resolved) {
+                try {
+                    resolved_scanout_.resize(
+                        static_cast<std::size_t>(target_pixels) * 3U);
+                } catch (...) {
+                    resolved = false;
+                }
+            }
+            if (resolved) {
+                const raster::EventResult upscale =
+                    raster::ScanoutMapper::upscale_edge_aware_rgb888(
+                        planned.plan.logical_width, planned.plan.logical_height,
+                        target_width, target_height, scanout_, resolved_scanout_,
+                        upscale_stats_);
+                resolved = upscale.accepted();
+            }
+            if (resolved) {
+                presented = resolved_scanout_;
+                presented_width = target_width;
+                presented_height = target_height;
+            } else {
+                ++upscale_fallbacks_;
+            }
+        }
         host::FrameSubmission submission{};
-        const host::HostStatus bound = host::bind_scanout_frame(
-            planned.plan, scanout_, sequence_, update_index, submission);
+        const host::HostStatus bound = host::bind_rgb888_frame(
+            presented_width, presented_height, presented,
+            sequence_, update_index, submission);
         if (!bound.success()) return bound;
         visual_digest_ = kFnvOffset;
-        digest_bytes(visual_digest_, scanout_);
+        digest_bytes(visual_digest_, presented);
         const std::array<std::uint64_t, 4U> metadata{
             raster_.vram_generation(), planned.plan.logical_width,
             planned.plan.logical_height,
@@ -864,6 +911,13 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
         digest_bytes(visual_digest_, std::span<const std::uint8_t>(
             reinterpret_cast<const std::uint8_t*>(metadata.data()),
             sizeof(metadata)));
+        if (presented.data() != scanout_.data()) {
+            const std::array<std::uint64_t, 2U> resolved_metadata{
+                presented_width, presented_height};
+            digest_bytes(visual_digest_, std::span<const std::uint8_t>(
+                reinterpret_cast<const std::uint8_t*>(resolved_metadata.data()),
+                sizeof(resolved_metadata)));
+        }
         const host::HostStatus submitted = host.submit_frame(submission);
         if (submitted.success()) ++sequence_;
         return submitted;
@@ -887,6 +941,14 @@ std::uint64_t RuntimeGraphics::geometry_digest() const noexcept {
 const raster::PreciseRasterStats& RuntimeGraphics::precise_raster_stats()
     const noexcept {
     return raster_.precise_stats();
+}
+
+const raster::UpscaleStats& RuntimeGraphics::upscale_stats() const noexcept {
+    return upscale_stats_;
+}
+
+std::uint64_t RuntimeGraphics::upscale_fallbacks() const noexcept {
+    return upscale_fallbacks_;
 }
 
 std::uint64_t RuntimeGraphics::visual_digest() const noexcept {
