@@ -90,3 +90,9 @@ unsafe edge backward to a fixed point, preserves delay-slot atomicity, and emits
 both compiler manifests and a fail-closed partial-coverage receipt. Its focused
 tests run with `python -m unittest
 tools.analysis.tests.test_build_game_region_shards`.
+
+`authorize_executable_regions.py` also closes exact direct-edge corridors rooted
+by authenticated main-image targets and NFE-to-main calls. Corridor decoding is
+bounded to the selected image identity, stops at every JR/JALR, hashes every
+recovered range, and excludes the overlapping NFE address epoch unless loader
+evidence selects it.

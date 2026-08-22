@@ -7,7 +7,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.analysis.authorize_executable_regions import analyze, resolve_indirect
+from tools.analysis.authorize_executable_regions import (
+    analyze,
+    corridor_evidence,
+    prove_direct_corridors,
+    resolve_indirect,
+)
 from tools.analysis.generate_finite_indirect_manifest import build_manifest
 
 
@@ -59,6 +64,34 @@ def zero_trip_loop_image() -> tuple[bytes, int]:
 
 
 class FiniteIndirectTests(unittest.TestCase):
+    def test_direct_corridor_stops_at_unresolved_indirect(self) -> None:
+        image = bytearray(32)
+        write_word(image, BASE, 0x24020001)       # addiu v0,zero,1
+        write_word(image, BASE + 4, 0x00400008)   # jr v0
+        write_word(image, BASE + 8, 0)            # delay slot
+        write_word(image, BASE + 12, 0x24030002)  # must remain unknown
+        self.assertEqual(
+            prove_direct_corridors(bytes(image), BASE, {BASE}),
+            {BASE, BASE + 4, BASE + 8},
+        )
+
+    def test_direct_corridor_rejects_ambiguous_epoch_range(self) -> None:
+        image = bytes(32)
+        self.assertEqual(
+            prove_direct_corridors(image, BASE, {BASE}, (BASE + 8, BASE + 16)),
+            {BASE, BASE + 4},
+        )
+
+    def test_direct_corridor_receipt_hashes_exact_recovered_bytes(self) -> None:
+        image = bytes(range(32))
+        receipt = corridor_evidence(image, BASE, {BASE + 4, BASE + 8}, {BASE + 4})
+        self.assertEqual(receipt["recovered_instruction_count"], 2)
+        self.assertEqual(receipt["recovered_ranges"][0]["start"], BASE + 4)
+        self.assertEqual(
+            receipt["recovered_ranges"][0]["sha256"],
+            hashlib.sha256(image[4:12]).hexdigest(),
+        )
+
     def test_authenticated_zero_trip_loop_proves_empty_target_set(self) -> None:
         image, pc = zero_trip_loop_image()
         self.assertEqual(

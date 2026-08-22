@@ -190,6 +190,51 @@ def indirect_category(image: bytes, base: int, pc: int, register: int) -> str:
     return "unresolved_register_target"
 
 
+def prove_direct_corridors(
+    image: bytes, base: int, seeds: set[int], excluded: tuple[int, int] | None = None
+) -> set[int]:
+    """Decode exact direct flow from authenticated edge targets, stopping at JR/JALR."""
+    end = base + len(image)
+    proved: set[int] = set()
+    queue = deque(sorted(seeds))
+
+    def admitted(pc: int) -> bool:
+        return (pc % 4 == 0 and base <= pc < end and
+                (excluded is None or not excluded[0] <= pc < excluded[1]))
+
+    while queue:
+        pc = queue.popleft()
+        if pc in proved or not admitted(pc):
+            continue
+        word = struct.unpack_from("<I", image, pc - base)[0]
+        kind, successors, delay, _ = decode(word, pc)
+        if delay:
+            slot = pc + 4
+            if not admitted(slot):
+                continue
+            slot_word = struct.unpack_from("<I", image, slot - base)[0]
+            if decode(slot_word, slot)[0] != "linear":
+                continue
+            proved.add(slot)
+        proved.add(pc)
+        if kind.startswith("indirect") or kind == "return":
+            continue
+        queue.extend(target for target in successors if admitted(target))
+    return proved
+
+
+def corridor_evidence(image: bytes, base: int, recovered: set[int], seeds: set[int]) -> dict[str, Any]:
+    return {
+        "proof": "authenticated-direct-edge-target plus bounded R3000A direct-flow semantics",
+        "seeds": sorted(seeds),
+        "recovered_instruction_count": len(recovered),
+        "recovered_ranges": [
+            {**item, "sha256": sha256(image[item["start"] - base:item["end_exclusive"] - base])}
+            for item in ranges(recovered)
+        ],
+    }
+
+
 def analyze(
     image: bytes,
     base: int,
@@ -415,6 +460,58 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
             break
     else:
         raise AuthorizationError("cross-image closure did not converge")
+
+    # Every seed below is already the exact target of an authenticated direct
+    # instruction. Grow only direct/linear ISA flow inside the exact image and
+    # stop at all unresolved JR/JALR sites. Main addresses overlapping the NFE
+    # epoch remain excluded because an address alone cannot select an identity.
+    main_seeds: set[int] = set()
+    for edge in exe_report["rejected_direct_edges"]:
+        target = edge["target"]
+        if (edge["reason"] == "missing_delay_slot_evidence" or
+                not args.nfe_base <= target < nfe_end):
+            if args.exe_base <= target < exe_end:
+                main_seeds.add(target)
+    for edge in nfe_report["rejected_direct_edges"]:
+        target = edge["target"]
+        if not args.nfe_base <= target < nfe_end and args.exe_base <= target < exe_end:
+            main_seeds.add(target)
+    prior_exe_allowed = set(exe_allowed)
+    recovered = prove_direct_corridors(
+        exe, args.exe_base, main_seeds, (args.nfe_base, nfe_end))
+    exe_allowed.update(recovered)
+    exe_roots.update(main_seeds)
+
+    for _ in range(8):
+        exe_report = analyze(
+            exe, args.exe_base, exe_roots, exe_allowed,
+            "authenticated PS-X EXE entry, authenticated cross-image direct targets, and exact bounded direct-edge corridors",
+        )
+        nfe_report = analyze(
+            bytes(nfe), args.nfe_base, nfe_roots, nfe_allowed,
+            "route-observed authenticated PCs plus authenticated cross-image direct targets; Ghidra bodies constrain extension but never create roots",
+        )
+        added = {edge["target"] for edge in nfe_report["rejected_direct_edges"]
+                 if not args.nfe_base <= edge["target"] < nfe_end and
+                 args.exe_base <= edge["target"] < exe_end}
+        added.update(edge["target"] for edge in exe_report["rejected_direct_edges"]
+                     if edge["reason"] == "outside_cross_evidence" and
+                     args.exe_base <= edge["target"] < exe_end and
+                     not args.nfe_base <= edge["target"] < nfe_end)
+        added -= exe_roots
+        if not added:
+            break
+        main_seeds.update(added)
+        exe_roots.update(added)
+        exe_allowed.update(prove_direct_corridors(
+            exe, args.exe_base, added, (args.nfe_base, nfe_end)))
+    else:
+        raise AuthorizationError("direct corridor recovery did not converge")
+
+    exe_report["direct_corridor_evidence"] = corridor_evidence(
+        exe, args.exe_base, exe_allowed - prior_exe_allowed, main_seeds)
+    nfe_report["direct_corridor_evidence"] = corridor_evidence(
+        bytes(nfe), args.nfe_base, set(), set())
 
     image_reports = (
         ("main-exe", exe_report, args.exe_base, exe_end),

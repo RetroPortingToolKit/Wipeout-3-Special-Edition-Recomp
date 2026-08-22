@@ -127,8 +127,9 @@ without using duplication as evidence that any identity is data. The strict raw
 MIPS ABI-shape scan finds no additional candidate beyond the already-bound NFE
 entry 5, but unknown executable risk remains open rather than treating that scan
 as proof of absence. In addition,
-140 indirect sites, 71 direct edges, and 288 unknown code ranges remain, and no
-main/NFE static region set is yet marked compiled. The 13 ISO audio pseudo-files
+152 indirect sites and six epoch-ambiguous main-image edges remain. The direct
+corridor recovery receipt authenticates 1,107 newly admitted instructions in
+22 exact hashed ranges; no unresolved indirect was relaxed. The 13 ISO audio pseudo-files
 outside the data-track image are explicitly excluded rather than silently
 treated as payloads.
 
@@ -142,7 +143,8 @@ embedded bounded PS-X EXE containers, and raw MIPS ABI candidates. A parser miss
 does not close executable risk.
 
 `evidence/generated-game-shards.json` is the first non-zero generated game-code
-coverage receipt. `tools/analysis/build_game_region_shards.py` derives it from
+coverage receipt. It currently admits 71,301 instructions in 727 regions.
+`tools/analysis/build_game_region_shards.py` derives it from
 the executable authorization and finite-target evidence as a greatest closed
 set. Sources of rejected or unresolved edges, their reverse direct closure, and
 non-atomic delay slots are excluded. The paired `*-closed-shards.manifest`
