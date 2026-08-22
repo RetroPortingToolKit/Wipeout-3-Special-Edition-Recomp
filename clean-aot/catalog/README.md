@@ -127,8 +127,11 @@ without using duplication as evidence that any identity is data. The strict raw
 MIPS ABI-shape scan finds no additional candidate beyond the already-bound NFE
 entry 5, but unknown executable risk remains open rather than treating that scan
 as proof of absence. In addition,
-106 indirect sites remain after 46 exact literal A0/B0/C0 vector exits were
-closed without admitting any computed callback. Six overlapping-address edges
+59 effective indirect sites remain after 46 exact literal A0/B0/C0 vector exits
+and 47 same-epoch bounded callbacks were closed. The remaining sites are
+return-value or unclassified computed-register transfers; no targets were
+inferred for them. A static CFI receipt also binds 955 `JR $ra` sites to finite
+compiled call-continuation universes. Six overlapping-address edges
 are now governed by the authenticated epoch-discriminator contract rather than
 remaining rejected. The direct
 corridor recovery receipt authenticates 1,107 newly admitted instructions in
@@ -146,7 +149,7 @@ embedded bounded PS-X EXE containers, and raw MIPS ABI candidates. A parser miss
 does not close executable risk.
 
 `evidence/generated-game-shards.json` is the first non-zero generated game-code
-coverage receipt. It currently admits 83,244 instructions in 583 regions.
+coverage receipt. It currently admits 93,354 instructions in 567 regions.
 `tools/analysis/build_game_region_shards.py` derives it from
 the executable authorization and finite-target evidence as a greatest closed
 set. Sources of rejected or unresolved edges, their reverse direct closure, and

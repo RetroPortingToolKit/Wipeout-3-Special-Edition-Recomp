@@ -59,6 +59,25 @@ class GameShardTests(unittest.TestCase):
         main = next(x for x in result["images"] if x["name"] == "main-exe")
         self.assertNotIn(0x1008, main["entries"])
 
+    def test_cfi_callback_source_is_admitted_only_with_exact_identity(self):
+        authority = self.authority()
+        authority["images"][0]["unresolved_indirects"] = [
+            {"pc": 0x1008, "source_register": 4,
+             "category": "argument_callback_target"}]
+        import hashlib
+        from tools.analysis.build_game_region_shards import canonical
+        cfi = {"schema": "wo3se.indirect-cfi.v1",
+               "authority_sha256": hashlib.sha256(canonical(authority)).hexdigest(),
+               "sites": [{"admit_source": True, "kind": "bounded-callback",
+                          "source_image": "main-exe", "source_pc": 0x1008,
+                          "source_identity_sha256": "a" * 64}]}
+        result = build(authority, self.finite(), cfi)
+        main = next(x for x in result["images"] if x["name"] == "main-exe")
+        self.assertIn(0x1008, main["entries"])
+        cfi["sites"][0]["source_identity_sha256"] = "b" * 64
+        with self.assertRaises(ShardError):
+            build(authority, self.finite(), cfi)
+
     def test_identity_mismatch_and_zero_output_fail_closed(self):
         finite = self.finite()
         finite["image"]["sha256"] = "c" * 64

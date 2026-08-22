@@ -99,3 +99,10 @@ The emitted `wo3se.overlapping-executable-epoch-dispatch.v1` contract records
 five capture-selected NFE sites and one load-base site that requires runtime
 selection by authenticated active-image SHA-256. Literal A0/B0/C0 constructions
 are finite external exits; every other unresolved indirect remains rejected.
+
+`build_indirect_cfi.py` derives finite per-image function-entry and
+call-continuation universes from authenticated callgraph edges intersected with
+the generated shard set. `JR $ra` uses only continuation entries; argument
+callbacks use only same-epoch function entries. Return-value, memory-loaded,
+unclassified computed, and cross-image callbacks require exact trace evidence
+and otherwise remain unresolved.

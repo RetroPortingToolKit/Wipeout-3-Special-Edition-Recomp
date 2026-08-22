@@ -72,4 +72,26 @@ private:
     GeneratedDispatcher selected_{};
 };
 
+struct GeneratedCfiTarget final {
+    std::string_view identity_sha256;
+    std::uint32_t pc = 0;
+};
+
+struct GeneratedCfiSite final {
+    std::string_view source_identity_sha256;
+    std::uint32_t source_pc = 0;
+    std::span<const GeneratedCfiTarget> targets;
+};
+
+class GeneratedCfiDispatcher final {
+public:
+    [[nodiscard]] DispatchStatus dispatch_transfer(
+        std::string_view source_identity_sha256,
+        std::uint32_t source_pc,
+        std::string_view target_identity_sha256,
+        const GeneratedExecutableBinding& target_binding,
+        GeneratedCpuState& state,
+        std::span<const GeneratedCfiSite> policies) const noexcept;
+};
+
 } // namespace clean_aot::runtime

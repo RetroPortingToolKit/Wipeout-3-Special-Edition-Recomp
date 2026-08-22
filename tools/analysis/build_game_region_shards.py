@@ -41,7 +41,8 @@ def expand(items: list[dict[str, int]]) -> set[int]:
     return result
 
 
-def build(authority: dict[str, Any], finite: dict[str, Any]) -> dict[str, Any]:
+def build(authority: dict[str, Any], finite: dict[str, Any],
+          cfi: dict[str, Any] | None = None) -> dict[str, Any]:
     if authority.get("schema") != "wo3se.executable-authorization.v1":
         raise ShardError("unsupported executable authorization schema")
     if finite.get("schema") != "wo3se.finite-indirect-targets.v1":
@@ -56,6 +57,19 @@ def build(authority: dict[str, Any], finite: dict[str, Any]) -> dict[str, Any]:
         "main-exe": evidence["exe_text_sha256"],
         "nfe-entry5-route-variant": evidence["nfe_route_variant_sha256"],
     }
+    cfi_sites: dict[str, set[int]] = {name: set() for name in selected}
+    if cfi is not None:
+        if (cfi.get("schema") != "wo3se.indirect-cfi.v1" or
+                cfi.get("authority_sha256") !=
+                hashlib.sha256(canonical(authority)).hexdigest()):
+            raise ShardError("CFI receipt is not bound to this authorization")
+        for site in cfi.get("sites", []):
+            name = site.get("source_image")
+            if (name not in selected or site.get("admit_source") is not True or
+                    site.get("source_identity_sha256") != identities[name]):
+                raise ShardError("CFI site identity is invalid")
+            if site.get("kind") == "bounded-callback":
+                cfi_sites[name].add(site["source_pc"])
     if (finite.get("image", {}).get("name") != "main-exe" or
             finite["image"].get("sha256") != identities["main-exe"]):
         raise ShardError("finite-target evidence is not bound to the main image")
@@ -72,6 +86,10 @@ def build(authority: dict[str, Any], finite: dict[str, Any]) -> dict[str, Any]:
         unsafe_indirect = {item["pc"] for item in image["unresolved_indirects"]}
         if name == "main-exe":
             unsafe_indirect -= finite_sites.keys()
+        unresolved_pcs = {item["pc"] for item in image["unresolved_indirects"]}
+        if not cfi_sites[name].issubset(unresolved_pcs):
+            raise ShardError("CFI admits a source absent from unresolved evidence")
+        unsafe_indirect -= cfi_sites[name]
         safe[name] -= rejected[name] | unsafe_indirect
         for edge in image["direct_edges"]:
             dependencies.setdefault((name, edge["source"]), set()).add((name, edge["target"]))
@@ -138,6 +156,7 @@ def build(authority: dict[str, Any], finite: dict[str, Any]) -> dict[str, Any]:
             "unresolved_edge_action": "exclude-source-and-reverse-closure",
             "delay_slots_are_atomic": True,
             "full_game_closure_claimed": False,
+            "indirect_cfi": cfi is not None,
         },
         "images": images,
     }
@@ -169,10 +188,12 @@ def main() -> int:
     parser.add_argument("--finite-targets", type=Path, required=True)
     parser.add_argument("--receipt", type=Path, required=True)
     parser.add_argument("--manifest-dir", type=Path, required=True)
+    parser.add_argument("--indirect-cfi", type=Path)
     args = parser.parse_args()
     authority = json.loads(args.authorization.read_text())
     finite = json.loads(args.finite_targets.read_text())
-    result = build(authority, finite)
+    cfi = json.loads(args.indirect_cfi.read_text()) if args.indirect_cfi else None
+    result = build(authority, finite, cfi)
     args.manifest_dir.mkdir(parents=True, exist_ok=True)
     for image in result["images"]:
         path = args.manifest_dir / f"{image['name']}-closed-shards.manifest"

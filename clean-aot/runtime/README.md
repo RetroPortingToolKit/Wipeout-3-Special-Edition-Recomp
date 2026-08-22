@@ -36,3 +36,9 @@ already-authenticated active-image SHA-256. Candidate identities must be sorted,
 unique, and match their binding identities. Unknown epochs, duplicate identity
 choices, and unknown PCs fail closed; the discriminator never decodes guest
 instructions.
+
+`GeneratedCfiDispatcher` checks the source identity and PC plus the destination
+identity and PC against a sorted finite policy before binding and entering an
+already-generated target. It never decodes or compiles guest bytes. Missing
+sites, unknown targets, malformed universes, and identity mismatches fail
+closed.

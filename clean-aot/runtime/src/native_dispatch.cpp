@@ -1,6 +1,7 @@
 #include "clean_aot/runtime/native_dispatch.hpp"
 
 #include <algorithm>
+#include <utility>
 
 namespace clean_aot::runtime {
 namespace {
@@ -119,6 +120,61 @@ DispatchStatus GeneratedEpochDispatcher::select(
         return DispatchStatus::IdentityMismatch;
     }
     return selected_.bind(authenticated_active_identity_sha256, *found->binding);
+}
+
+DispatchStatus GeneratedCfiDispatcher::dispatch_transfer(
+    std::string_view source_identity_sha256,
+    std::uint32_t source_pc,
+    std::string_view target_identity_sha256,
+    const GeneratedExecutableBinding& target_binding,
+    GeneratedCpuState& state,
+    std::span<const GeneratedCfiSite> policies) const noexcept {
+    if (!is_sha256(source_identity_sha256) || !is_sha256(target_identity_sha256) ||
+        target_binding.variant_identity_sha256 != target_identity_sha256 ||
+        state.pc % 4U != 0U) {
+        return DispatchStatus::IdentityMismatch;
+    }
+    std::pair<std::string_view, std::uint32_t> previous_site{};
+    bool first_site = true;
+    for (const auto& policy : policies) {
+        const auto key = std::pair{policy.source_identity_sha256, policy.source_pc};
+        if (!is_sha256(policy.source_identity_sha256) || policy.source_pc % 4U != 0U ||
+            policy.targets.empty() || (!first_site && key <= previous_site)) {
+            return DispatchStatus::InvalidBinding;
+        }
+        previous_site = key;
+        first_site = false;
+    }
+    const auto site = std::lower_bound(
+        policies.begin(), policies.end(), std::pair{source_identity_sha256, source_pc},
+        [](const GeneratedCfiSite& candidate,
+           const std::pair<std::string_view, std::uint32_t>& key) {
+            return std::pair{candidate.source_identity_sha256, candidate.source_pc} < key;
+        });
+    if (site == policies.end() || site->source_identity_sha256 != source_identity_sha256 ||
+        site->source_pc != source_pc || site->targets.empty()) {
+        return DispatchStatus::UnknownCode;
+    }
+    std::pair<std::string_view, std::uint32_t> previous{};
+    bool first = true;
+    bool permitted = false;
+    for (const auto& target : site->targets) {
+        const auto key = std::pair{target.identity_sha256, target.pc};
+        if (!is_sha256(target.identity_sha256) || target.pc % 4U != 0U ||
+            (!first && key <= previous)) {
+            return DispatchStatus::InvalidBinding;
+        }
+        permitted = permitted ||
+                    (target.identity_sha256 == target_identity_sha256 && target.pc == state.pc);
+        previous = key;
+        first = false;
+    }
+    if (!permitted) {
+        return DispatchStatus::UnknownCode;
+    }
+    GeneratedDispatcher selected;
+    const auto bound = selected.bind(target_identity_sha256, target_binding);
+    return bound == DispatchStatus::Bound ? selected.dispatch(state) : bound;
 }
 
 } // namespace clean_aot::runtime
