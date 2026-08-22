@@ -1994,6 +1994,17 @@ PushResult Device::push_external(
     return push_fifo(external_fifo_, samples);
 }
 
+void Device::clear_audio_input(AudioSource source) noexcept {
+    switch (source) {
+    case AudioSource::Cdda:
+        cdda_fifo_ = StereoFifo<AudioFifoCapacity>{};
+        break;
+    case AudioSource::XaResampled:
+        xa_fifo_ = StereoFifo<AudioFifoCapacity>{};
+        break;
+    }
+}
+
 InputStatus Device::input_status(AudioSource source) const noexcept {
     return source == AudioSource::Cdda ? fifo_status(cdda_fifo_)
                                        : fifo_status(xa_fifo_);

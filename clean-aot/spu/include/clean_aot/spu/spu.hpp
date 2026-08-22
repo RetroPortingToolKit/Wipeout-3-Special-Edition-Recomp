@@ -275,6 +275,7 @@ public:
         std::span<const StereoSample> samples) noexcept;
     [[nodiscard]] PushResult push_external(
         std::span<const StereoSample> samples) noexcept;
+    void clear_audio_input(AudioSource source) noexcept;
     [[nodiscard]] InputStatus input_status(AudioSource source) const noexcept;
     [[nodiscard]] InputStatus external_input_status() const noexcept;
     void clear_input_status() noexcept;

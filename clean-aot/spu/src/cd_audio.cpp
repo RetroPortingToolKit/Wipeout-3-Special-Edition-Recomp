@@ -13,12 +13,22 @@ void CdAudioSink::reset() noexcept {
     format_.reset();
     stream_active_ = false;
     next_lba_ = 0U;
+    cdda_stream_active_ = false;
+    next_cdda_lba_ = 0U;
+    device_->clear_audio_input(AudioSource::Cdda);
+    device_->clear_audio_input(AudioSource::XaResampled);
     status_ = {};
 }
 
 void CdAudioSink::receive_cdda_samples(
-    cdrom::Lba,
+    cdrom::Lba lba,
     std::span<const cdrom::StereoSample> samples) noexcept {
+    if (!cdda_stream_active_ || lba != next_cdda_lba_) {
+        device_->clear_audio_input(AudioSource::Cdda);
+        if (cdda_stream_active_) {
+            ++status_.stream_discontinuities;
+        }
+    }
     ++status_.cdda_sectors;
     const std::size_t count = std::min(samples.size(), handoff_.size());
     for (std::size_t index = 0U; index < count; ++index) {
@@ -28,6 +38,8 @@ void CdAudioSink::receive_cdda_samples(
     const PushResult pushed = device_->push_cdda(
         std::span<const StereoSample>(handoff_.data(), count));
     status_.dropped_frames += pushed.dropped + (samples.size() - count);
+    cdda_stream_active_ = true;
+    next_cdda_lba_ = lba + 1U;
 }
 
 void CdAudioSink::reject_xa() noexcept {
@@ -36,6 +48,7 @@ void CdAudioSink::reject_xa() noexcept {
     converter_.reset();
     format_.reset();
     stream_active_ = false;
+    device_->clear_audio_input(AudioSource::XaResampled);
 }
 
 void CdAudioSink::receive_xa_sector(
@@ -71,6 +84,10 @@ void CdAudioSink::receive_xa_sector(
                                metadata.file != file_ || metadata.channel != channel_ ||
                                !format_.has_value() || *format_ != sector.format;
     if (discontinuity) {
+        device_->clear_audio_input(AudioSource::XaResampled);
+        if (stream_active_) {
+            ++status_.stream_discontinuities;
+        }
         decoder_.reset();
         auto converter = media::XaRateConverter::create(sector.format.sample_rate_hz);
         if (!converter) {

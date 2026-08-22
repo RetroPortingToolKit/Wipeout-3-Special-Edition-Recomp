@@ -98,11 +98,46 @@ void test_rejection_and_cdda_handoff() {
             "CDDA enters the same bounded native-time SPU handoff");
 }
 
+void test_optical_audio_epoch_and_exact_100hz_cadence() {
+    static clean_aot::spu::Device device;
+    device.reset();
+    static clean_aot::spu::CdAudioSink sink(device);
+    sink.reset();
+    std::array<clean_aot::cdrom::StereoSample,
+               clean_aot::cdrom::CddaSamplesPerSector> sector{};
+    sector.fill({100, -100});
+
+    sink.receive_cdda_samples(10U, sector);
+    std::array<clean_aot::spu::StereoSample,
+               clean_aot::spu::SamplesPer100HzUpdate> frame{};
+    require(device.render(frame).ok(), "first 100 Hz audio frame renders");
+    require(device.input_status(clean_aot::spu::AudioSource::Cdda).queued == 147U,
+            "one sector retains the exact 588-minus-441 sample phase");
+
+    sink.receive_cdda_samples(20U, sector);
+    require(sink.status().stream_discontinuities == 1U &&
+                device.input_status(clean_aot::spu::AudioSource::Cdda).queued ==
+                    clean_aot::cdrom::CddaSamplesPerSector,
+            "seek starts a new queue epoch without stale CDDA samples");
+
+    /* Three 75 Hz sectors exactly feed four native 100 Hz updates. */
+    require(device.render(frame).ok(), "seek epoch frame one renders");
+    sink.receive_cdda_samples(21U, sector);
+    require(device.render(frame).ok(), "seek epoch frame two renders");
+    sink.receive_cdda_samples(22U, sector);
+    require(device.render(frame).ok(), "seek epoch frame three renders");
+    require(device.render(frame).ok(), "seek epoch frame four renders");
+    require(device.input_status(clean_aot::spu::AudioSource::Cdda).queued == 0U &&
+                sink.status().dropped_frames == 0U,
+            "three sectors and four 100 Hz frames close with zero phase or loss");
+}
+
 } // namespace
 
 int main() {
     test_native_handoff_and_worst_case_burst();
     test_rejection_and_cdda_handoff();
+    test_optical_audio_epoch_and_exact_100hz_cadence();
     std::cout << "clean_aot_cd_audio_tests: ok\n";
     return EXIT_SUCCESS;
 }

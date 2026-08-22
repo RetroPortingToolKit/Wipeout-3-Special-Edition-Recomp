@@ -17,6 +17,7 @@ struct CdAudioStatus final {
     std::uint64_t xa_sectors = 0U;
     std::uint64_t rejected_xa_sectors = 0U;
     std::uint64_t dropped_frames = 0U;
+    std::uint64_t stream_discontinuities = 0U;
 };
 
 /*
@@ -49,6 +50,8 @@ private:
     std::uint8_t channel_ = 0U;
     cdrom::Lba next_lba_ = 0U;
     bool stream_active_ = false;
+    cdrom::Lba next_cdda_lba_ = 0U;
+    bool cdda_stream_active_ = false;
     CdAudioStatus status_{};
     std::array<media::StereoSample, 4032U> decoded_{};
     std::array<media::StereoSample, 9408U> converted_{};
