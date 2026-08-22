@@ -44,3 +44,8 @@
   have the same instruction layout or timing constants.
 - Treating HD-pack discovery as proof of replacement: live substitution was
   separately measured and is now confirmed only for the observed 299 entries.
+- Repeating an unbounded PAL-100 search without a preserved PAL executable,
+  generated dispatch, and trace receipt: the latest bounded investigation
+  produced neither a candidate nor evidence suitable for enabling the mode.
+  Keep PAL x2 disabled until those authoritative inputs and the required
+  simulation/SPU/CDDA/media comparisons exist.
