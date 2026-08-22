@@ -26,6 +26,12 @@ if (-not (Test-Path -LiteralPath $skipManifest)) { throw "Missing staged skip-op
 if ((Get-Content -Raw -LiteralPath $skipManifest) -notmatch '(?m)^default_enabled\s*=\s*false\r?$') {
     throw 'Skip-opening-sequence is enabled by default; it must remain user-controlled.'
 }
+$fr120 = Join-Path $build 'mods/packages/wipeout3.enhancement.framerate-120/1.0.0/manifest.toml'
+if (Test-Path -LiteralPath $fr120) {
+    if ((Get-Content -Raw -LiteralPath $fr120) -match '(?m)^default_enabled\s*=\s*true\r?$') {
+        throw 'Experimental NTSC-120 package is enabled by default for a PAL release.'
+    }
+}
 if ($cacheText -notmatch '(?m)^PSX_SETUP_WIZARD:BOOL=OFF\r?$') {
     throw 'Setup wizard is enabled or not explicitly disabled.'
 }
