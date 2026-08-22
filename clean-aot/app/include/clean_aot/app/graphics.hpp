@@ -18,6 +18,15 @@ namespace clean_aot::app {
 
 class ReplacementAssetRuntime;
 
+struct ReplacementMatch final {
+    psx::render::ReplacementAssetKind kind =
+        psx::render::ReplacementAssetKind::Texture;
+    psx::render::ReplacementKey key{};
+    raster::VramRect source{};
+    gpu::TextureDepth depth = gpu::TextureDepth::Indexed4;
+    std::uint64_t source_generation = 0U;
+};
+
 class IReplacementKeyPolicy {
 public:
     virtual ~IReplacementKeyPolicy() = default;
@@ -25,9 +34,13 @@ public:
     // the immutable packet and current VRAM generation.
     [[nodiscard]] virtual bool identify(
         const gpu::Event& event,
+        std::span<const raster::VramWord> vram,
         std::uint64_t source_generation,
-        psx::render::ReplacementAssetKind& kind,
-        psx::render::ReplacementKey& key) noexcept = 0;
+        ReplacementMatch& match) noexcept = 0;
+    virtual void observe(const gpu::Event& event,
+                         std::span<const raster::VramWord> vram,
+                         std::uint64_t source_generation) noexcept = 0;
+    [[nodiscard]] virtual std::uint64_t invalidation_serial() const noexcept = 0;
 };
 
 enum class FontManifestPolicy : std::uint8_t {
@@ -53,6 +66,39 @@ struct LoadedTitleManifest final {
 
     [[nodiscard]] std::optional<TitleAssetClass> classify(
         psx::render::ReplacementKey key) const noexcept;
+};
+
+class Wip3outUploadKeyPolicy final : public IReplacementKeyPolicy {
+public:
+    explicit Wip3outUploadKeyPolicy(
+        std::span<const TitleAssetMapping> mappings);
+    ~Wip3outUploadKeyPolicy() override;
+    [[nodiscard]] bool identify(
+        const gpu::Event& event,
+        std::span<const raster::VramWord> vram,
+        std::uint64_t source_generation,
+        ReplacementMatch& match) noexcept override;
+    void observe(const gpu::Event& event,
+                 std::span<const raster::VramWord> vram,
+                 std::uint64_t source_generation) noexcept override;
+
+    struct Stats final {
+        std::uint64_t uploads_hashed = 0U;
+        std::uint64_t upload_bytes_hashed = 0U;
+        std::uint64_t palette_hashes = 0U;
+        std::uint64_t palette_cache_hits = 0U;
+        std::uint64_t palette_bytes_hashed = 0U;
+        std::uint64_t draw_queries = 0U;
+        std::uint64_t identified = 0U;
+        std::uint64_t ambiguous_fallbacks = 0U;
+        std::uint64_t invalidated_uploads = 0U;
+    };
+    [[nodiscard]] const Stats& stats() const noexcept;
+    [[nodiscard]] std::uint64_t invalidation_serial() const noexcept override;
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
 [[nodiscard]] std::optional<LoadedTitleManifest> load_wip3out_hd_manifest(
@@ -122,6 +168,9 @@ public:
     };
     [[nodiscard]] const Stats& stats() const noexcept { return stats_; }
     [[nodiscard]] host::HostStatus invalidate_all() noexcept;
+    [[nodiscard]] bool sampling_texture(
+        std::uint64_t handle, const ReplacementMatch& match,
+        raster::ReplacementTexture& texture) const noexcept;
 
 private:
     psx::render::ReplacementManifest manifest_;
@@ -132,6 +181,9 @@ private:
     struct CachedAsset final {
         psx::render::ReplacementIdentity identity{};
         std::uint64_t handle = 0U;
+        std::uint32_t width = 0U;
+        std::uint32_t height = 0U;
+        std::vector<std::uint8_t> rgba8{};
     };
     std::vector<CachedAsset> cache_{};
     Stats stats_{};
@@ -173,6 +225,7 @@ private:
     raster::ScanoutPlan last_plan_{};
     std::uint64_t replacement_hits_ = 0U;
     std::uint64_t native_fallbacks_ = 0U;
+    std::uint64_t policy_invalidation_serial_ = 0U;
 };
 
 } // namespace clean_aot::app

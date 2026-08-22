@@ -53,6 +53,15 @@ struct RasterLimits {
   std::uint64_t max_work_units_per_event = kDefaultMaxWorkUnits;
 };
 
+struct ReplacementTexture final {
+  std::uint64_t handle = 0;
+  VramRect source{};
+  gpu::TextureDepth depth = gpu::TextureDepth::Indexed4;
+  std::uint32_t width = 0;
+  std::uint32_t height = 0;
+  std::span<const std::uint8_t> rgba8{};
+};
+
 struct EventResult {
   EventStatus status = EventStatus::Rejected;
   RasterError error = RasterError::MalformedEvent;
@@ -209,6 +218,9 @@ public:
   void reset(VramWord value = 0) noexcept;
 
   [[nodiscard]] EventResult consume(const gpu::Event &event) noexcept;
+  [[nodiscard]] EventResult consume(
+      const gpu::Event &event,
+      const ReplacementTexture *replacement) noexcept;
   [[nodiscard]] EventResult consume(const gpu::Event &event,
                                     WorkBudget &budget) noexcept;
   [[nodiscard]] BatchResult

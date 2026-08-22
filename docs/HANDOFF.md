@@ -260,8 +260,14 @@ probe are recorded in `clean-aot/app/evidence/hd-assets-visual-receipt.json`.
 Permission metadata has a fail-visible `pending-details` receipt; creator,
 date, scope, attribution, and evidence remain null until supplied rather than
 being inferred. Next graphics work is the independently validated producer-side
-VRAM texture/palette key derivation and binding uploaded handles into primitive
-sampling; the current title key-policy seam deliberately does not guess it.
+VRAM texture/palette producer contract is now independently pinned to Beetle
+PSX HW source and implemented over clean GPU/raster state: upload-rectangle and
+CLUT CRCs identify manifest entries, resolved generation-safe handles feed
+primitive sampling, and every unsupported or stale case remains native. The
+derivation and deterministic live digest are recorded in
+`clean-aot/app/evidence/beetle-upload-key-contract.json`. Next graphics work is
+capturing broader clean game routes to measure manifest coverage and adding
+hardware geometry sampling so the Vulkan path need not depend on CPU scanout.
 
 Reconcile and commit the shared cleanroom integration as one reviewed product
 state. First close or explicitly defer the known SIO, host, CD-ROM, SoC and
@@ -419,9 +425,20 @@ instruction and fails closed on every unknown PC or executable identity.
   `0xBFC03978` and `0xBFC00420` advance the deterministic real BIOS frontier to
   71,501 instructions across 12,282 dispatches. The canonical receipt is
   `clean-aot/catalog/evidence/bios-frontier-00071501.json`: 9,023 memory reads,
-  13,452 memory writes, one device read, and 30 device writes. It stops without
-  an exception at uncatalogued RAM alias `0xA0000080`; the next tranche must
-  authenticate the copied RAM execution epoch before binding that PC.
+  13,452 memory writes, one device read, and 30 device writes. Its numeric stop
+  PC is `0xA0000500` (an earlier handoff revision incorrectly rendered it as
+  `0xA0000080`); the next tranche must authenticate the copied RAM execution
+  epoch before binding that PC.
+- The exact initial 64-KiB RAM epoch is SHA-256 `63dc69dd...a901c`; its bounded
+  executable page `[0x500,0x1000)` is SHA-256 `99d536ee...e9570`. Distinct
+  uncached and cached bindings preserve the BIOS transition
+  `0xA0000500 -> 0x00000598` and invalidate on code-page mutation. After the RAM
+  clear returns to BIOS and the proved `0xBFC042D0` root executes, the repeated
+  frontier reaches 79,218 instructions and 13,830 dispatches, with 9,229 reads,
+  14,991 writes, one device read, and 31 device writes. Receipt
+  `clean-aot/catalog/evidence/bios-frontier-00079218.json` records the next RAM
+  epoch SHA-256 `c1d13084...6b1744` and fail-closed PC `0x000000C0`, where the
+  BIOS-installed low-RAM vector trampoline now begins.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control

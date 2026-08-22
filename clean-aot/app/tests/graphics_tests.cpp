@@ -26,6 +26,18 @@ public:
     }
     std::uint32_t calls = 0U;
 };
+class SolidRedDecoder final : public clean_aot::app::IPngDecoder {
+public:
+    bool decode(std::span<const std::uint8_t>, std::uint32_t width,
+                std::uint32_t height,
+                std::vector<std::uint8_t>& rgba8) noexcept override {
+        rgba8.assign(static_cast<std::size_t>(width) * height * 4U, 0U);
+        for (std::size_t i = 0U; i < rgba8.size(); i += 4U) {
+            rgba8[i] = 255U; rgba8[i + 3U] = 255U;
+        }
+        return true;
+    }
+};
 class FakeUploader final : public clean_aot::host::IReplacementUploader {
 public:
     clean_aot::host::HostStatus upload_replacement(
@@ -46,14 +58,162 @@ public:
 };
 class MissingPolicy final : public clean_aot::app::IReplacementKeyPolicy {
 public:
-    bool identify(const clean_aot::gpu::Event&, std::uint64_t,
-                  psx::render::ReplacementAssetKind& kind,
-                  psx::render::ReplacementKey& key) noexcept override {
-        kind = psx::render::ReplacementAssetKind::Texture;
-        key = {0xdeadbeefU, 0x12345678U};
+    bool identify(const clean_aot::gpu::Event&,
+                  std::span<const clean_aot::raster::VramWord>, std::uint64_t,
+                  clean_aot::app::ReplacementMatch& match) noexcept override {
+        match.kind = psx::render::ReplacementAssetKind::Texture;
+        match.key = {0xdeadbeefU, 0x12345678U};
+        match.source_generation = 1U;
         return true;
     }
+    void observe(const clean_aot::gpu::Event&,
+                 std::span<const clean_aot::raster::VramWord>,
+                 std::uint64_t) noexcept override {}
+    std::uint64_t invalidation_serial() const noexcept override { return 0U; }
 };
+
+void test_beetle_upload_key_derivation_and_sampling() {
+    using namespace clean_aot;
+    const psx::render::ReplacementKey expected{0x8043be1bU, 0xd03041bdU};
+    const std::array mappings{app::TitleAssetMapping{
+        expected, app::TitleAssetClass::Banner}};
+    app::Wip3outUploadKeyPolicy policy(mappings);
+    raster::ReferenceRasterizer raster;
+    gpu::VramUploadEvent upload{};
+    upload.destination = {0U, 0U}; upload.extent = {4U, 1U};
+    upload.pixel_count = 4U; upload.padded_word_count = 2U;
+    upload.data_words = {0xabcd1234U, 0xffff0000U};
+    expect(raster.consume(upload).accepted(), "key-vector upload applies");
+    policy.observe(upload, raster.vram_words(), raster.vram_generation());
+    gpu::VramUploadEvent palette{};
+    palette.destination = {16U, 0U}; palette.extent = {16U, 1U};
+    palette.pixel_count = 16U; palette.padded_word_count = 8U;
+    for (std::uint32_t value = 0U; value < 16U; value += 2U) {
+        palette.data_words.push_back(value | ((value + 1U) << 16U));
+    }
+    expect(raster.consume(palette).accepted(), "key-vector CLUT applies");
+    policy.observe(palette, raster.vram_words(), raster.vram_generation());
+    gpu::RectangleEvent draw{};
+    draw.textured = true; draw.raw_texture = true;
+    draw.texture_coordinate = gpu::TextureCoordinate{};
+    draw.clut = gpu::ClutAttribute{0U, 16U, 0U};
+    draw.width = 16U; draw.height = 1U; draw.origin = {0U, 0, 10};
+    draw.state.draw_mode.depth = gpu::TextureDepth::Indexed4;
+    draw.state.draw_area.left = 0U; draw.state.draw_area.top = 0U;
+    draw.state.draw_area.right = 1023U; draw.state.draw_area.bottom = 511U;
+    app::ReplacementMatch match{};
+    expect(policy.identify(draw, raster.vram_words(), raster.vram_generation(),
+                           match) && match.key == expected &&
+           match.source_generation != 0U &&
+           policy.stats().upload_bytes_hashed == 40U &&
+           policy.stats().palette_bytes_hashed == 32U,
+           "stock Beetle CRC32 upload and CLUT vectors identify manifest key");
+    app::ReplacementMatch cached_match{};
+    bool memoized = true;
+    for (std::size_t query = 0U; query < 100U; ++query) {
+        memoized = memoized && policy.identify(
+            draw, raster.vram_words(), raster.vram_generation(), cached_match) &&
+            cached_match.key == expected;
+    }
+    expect(memoized && policy.stats().palette_hashes == 1U &&
+           policy.stats().palette_cache_hits == 100U &&
+           policy.stats().upload_bytes_hashed == 40U,
+           "100 unchanged draws perform no repeated upload or CLUT hashing");
+    std::vector<std::uint8_t> red(16U * 4U, 0U);
+    for (std::size_t i = 0U; i < 16U; ++i) {
+        red[i * 4U] = 255U; red[i * 4U + 3U] = 255U;
+    }
+    const raster::ReplacementTexture replacement{
+        7U, match.source, match.depth, 16U, 1U, red};
+    expect(raster.consume(draw, &replacement).accepted() &&
+           (raster.read_vram(0U, 10U) & 0x7fffU) == 0x001fU,
+           "resolved replacement handle drives primitive texel sampling");
+    gpu::VramFillEvent overwrite{};
+    overwrite.origin = {0U, 0U}; overwrite.extent = {4U, 1U};
+    overwrite.color = {0U, 0U, 0U, 0U};
+    expect(raster.consume(overwrite).accepted(), "overlap invalidation applies");
+    policy.observe(overwrite, raster.vram_words(), raster.vram_generation());
+    expect(!policy.identify(draw, raster.vram_words(), raster.vram_generation(),
+                            match) && policy.stats().invalidated_uploads == 1U,
+           "overlapping VRAM mutation invalidates producer identity");
+
+    policy.observe(upload, raster.vram_words(), raster.vram_generation());
+    gpu::LineEvent line{};
+    line.vertices = {{0, 0}, {3, 0}};
+    line.state.draw_area.right = 1023U;
+    line.state.draw_area.bottom = 511U;
+    policy.observe(line, raster.vram_words(), raster.vram_generation());
+    expect(!policy.identify(draw, raster.vram_words(), raster.vram_generation(),
+                            match) && policy.stats().invalidated_uploads == 2U,
+           "line destination invalidates an overlapping texture upload");
+
+    policy.observe(upload, raster.vram_words(), raster.vram_generation());
+    gpu::VramFillEvent wrapped{};
+    wrapped.origin = {1023U, 0U}; wrapped.extent = {2U, 1U};
+    policy.observe(wrapped, raster.vram_words(), raster.vram_generation());
+    expect(!policy.identify(draw, raster.vram_words(), raster.vram_generation(),
+                            match) && policy.stats().invalidated_uploads == 4U,
+           "wrapped VRAM mutation conservatively retires producer identities");
+}
+
+void test_live_replacement_pipeline() {
+    using namespace clean_aot;
+    const psx::render::ReplacementKey key{0x8043be1bU, 0xd03041bdU};
+    const auto root = std::filesystem::temp_directory_path() /
+        "clean-aot-live-replacement";
+    std::filesystem::remove_all(root); std::filesystem::create_directories(root);
+    const std::array<std::uint8_t, 4U> bytes{1U, 2U, 3U, 4U};
+    { std::ofstream file(root / "replacement.png", std::ios::binary);
+      file.write(reinterpret_cast<const char*>(bytes.data()), 4); }
+    const std::array entries{psx::render::ReplacementManifestEntry{
+        psx::render::ReplacementAssetKind::Texture, key, "replacement.png",
+        app::detail::sha256(bytes), 16U, 1U}};
+    auto manifest = psx::render::ReplacementManifest::create(entries, 1U);
+    SolidRedDecoder decoder; host::HeadlessBackend host;
+    app::ReplacementAssetRuntime assets(std::move(*manifest), root, decoder, host);
+    const std::array mappings{app::TitleAssetMapping{
+        key, app::TitleAssetClass::Banner}};
+    app::Wip3outUploadKeyPolicy policy(mappings);
+    std::vector<std::uint8_t> bios(512U * 1024U, 0U);
+    runtime::Configuration config{}; config.bios = bios;
+    runtime::Runtime runtime(config); auto& gpu = runtime.gpu();
+    const auto send = [&](std::uint32_t word) {
+        expect(gpu.write_gp0(word).accepted, "live replacement GP0 word accepts");
+    };
+    expect(gpu.write_gp1(0x03000000U).accepted &&
+           gpu.write_gp1(0x05000000U).accepted &&
+           gpu.write_gp1(0x06c00200U).accepted &&
+           gpu.write_gp1(0x07040010U).accepted &&
+           gpu.write_gp1(0x08000001U).accepted,
+           "live replacement display configures");
+    send(0xa0000000U); send(0U); send((1U << 16U) | 4U);
+    send(0xabcd1234U); send(0xffff0000U);
+    send(0xa0000000U); send(16U); send((1U << 16U) | 16U);
+    for (std::uint32_t value = 0U; value < 16U; value += 2U) {
+        send(value | ((value + 1U) << 16U));
+    }
+    send(0xe1000000U); send(0xe3000000U);
+    send(0xe4000000U | (511U << 10U) | 1023U);
+    send(0x65000000U); send(10U << 16U); send(1U << 16U);
+    send((1U << 16U) | 16U);
+    app::RuntimeGraphics graphics({true, 3840U, 2160U,
+        raster::PresentationMode::Identity4x3, 4U, 3U,
+        app::FontManifestPolicy::ManifestOnly, &assets, &policy});
+    expect(graphics.present(runtime, host, 0U).success() && host.service().success() &&
+           graphics.visual_receipt().replacement_hits == 1U &&
+           assets.stats().uploaded == 1U && policy.stats().identified == 1U,
+           "live GPU queue hashes, resolves, samples, and presents replacement");
+    expect(host.stats().frame_digest == 0x333c8703b0e2e1e8ULL,
+           "live replacement frame digest remains deterministic");
+    std::cout << "replacement frame digest: 0x" << std::hex
+              << host.stats().frame_digest << std::dec << '\n';
+    send(0x02000000U); send(0U); send((1U << 16U) | 4U);
+    expect(graphics.present(runtime, host, 1U).success() && host.service().success() &&
+           host.stats().replacements_released == 1U &&
+           assets.stats().invalidated == 1U,
+           "live overlapping VRAM write immediately retires stale GPU handle");
+    std::filesystem::remove_all(root);
+}
 void test_runtime_scanout() {
     std::vector<std::uint8_t> bios(512U * 1024U, 0U);
     clean_aot::runtime::Configuration config{}; config.bios = bios;
@@ -254,6 +414,8 @@ void test_native_png_decode() {
 }
 } // namespace
 int main() {
+    test_beetle_upload_key_derivation_and_sampling();
+    test_live_replacement_pipeline();
     test_runtime_scanout(); test_replacement_runtime(); test_native_png_decode();
     test_title_manifest_and_receipts(); test_missing_asset_native_fallback();
     test_ultrawide_visual_receipt();

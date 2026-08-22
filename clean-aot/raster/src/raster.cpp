@@ -429,6 +429,7 @@ struct ReferenceRasterizer::Impl {
   std::array<VramWord, kVramWordCount> vram{};
   RasterLimits limits{};
   std::uint64_t vram_generation = 0u;
+  const ReplacementTexture *replacement = nullptr;
 
   [[nodiscard]] EventResult reject(RasterError error) const noexcept {
     return EventResult{EventStatus::Rejected, error, 0, {}};
@@ -513,6 +514,49 @@ struct ReferenceRasterizer::Impl {
     const std::int64_t page_x =
         static_cast<std::int64_t>(state.draw_mode.x_base) * 64;
     const std::int64_t page_y = state.draw_mode.y_base;
+
+    if (replacement != nullptr && replacement->handle != 0u &&
+        replacement->depth == state.draw_mode.depth &&
+        replacement->width != 0u && replacement->height != 0u &&
+        replacement->rgba8.size() ==
+            static_cast<std::size_t>(replacement->width) *
+                replacement->height * 4u) {
+      const std::int64_t pixels_per_word =
+          state.draw_mode.depth == gpu::TextureDepth::Indexed4 ? 4 :
+          state.draw_mode.depth == gpu::TextureDepth::Indexed8 ? 2 : 1;
+      const std::int64_t source_word_x = page_x + windowed_u / pixels_per_word;
+      const std::int64_t source_y = page_y + windowed_v;
+      const std::int64_t native_width =
+          static_cast<std::int64_t>(replacement->source.width) * pixels_per_word;
+      const std::int64_t native_height = replacement->source.height;
+      const std::int64_t native_x =
+          (source_word_x - replacement->source.x) * pixels_per_word +
+          (windowed_u % pixels_per_word);
+      const std::int64_t native_y = source_y - replacement->source.y;
+      if (native_x >= 0 && native_y >= 0 && native_x < native_width &&
+          native_y < native_height &&
+          replacement->width % static_cast<std::uint32_t>(native_width) == 0u &&
+          replacement->height % static_cast<std::uint32_t>(native_height) == 0u) {
+        const std::uint32_t sample_x = static_cast<std::uint32_t>(native_x) *
+            replacement->width / static_cast<std::uint32_t>(native_width);
+        const std::uint32_t sample_y = static_cast<std::uint32_t>(native_y) *
+            replacement->height / static_cast<std::uint32_t>(native_height);
+        const std::size_t offset =
+            (static_cast<std::size_t>(sample_y) * replacement->width + sample_x) * 4u;
+        const std::uint8_t alpha = replacement->rgba8[offset + 3u];
+        const auto channel = [](std::uint8_t value) noexcept -> std::int64_t {
+          return value == 0u ? 0 : std::max<std::int64_t>(1, value >> 3u);
+        };
+        Color color{channel(replacement->rgba8[offset]),
+                    channel(replacement->rgba8[offset + 1u]),
+                    channel(replacement->rgba8[offset + 2u])};
+        if (alpha != 0u && color.red == 0 && color.green == 0 && color.blue == 0) {
+          color = Color{1, 1, 1};
+        }
+        return TextureSample{color,
+            alpha == 0u, alpha != 0u && alpha != 255u};
+      }
+    }
 
     std::uint16_t texel = 0;
     if (state.draw_mode.depth == gpu::TextureDepth::Indexed4) {
@@ -1415,6 +1459,15 @@ void ReferenceRasterizer::reset(VramWord value) noexcept {
 EventResult ReferenceRasterizer::consume(const gpu::Event &event) noexcept {
   WorkBudget budget{};
   return impl_->consume(event, budget);
+}
+
+EventResult ReferenceRasterizer::consume(
+    const gpu::Event &event, const ReplacementTexture *replacement) noexcept {
+  WorkBudget budget{};
+  impl_->replacement = replacement;
+  const EventResult result = impl_->consume(event, budget);
+  impl_->replacement = nullptr;
+  return result;
 }
 
 EventResult ReferenceRasterizer::consume(const gpu::Event &event,

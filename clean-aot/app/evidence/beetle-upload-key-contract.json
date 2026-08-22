@@ -1,0 +1,32 @@
+{
+  "algorithm": {
+    "byte_order": "little-endian uint16 VRAM words in row-major upload-rectangle order",
+    "direct_color_secondary": 0,
+    "palette_secondary": "CRC-32 over 16 (4bpp) or 256 (8bpp) live CLUT words",
+    "polynomial_reflected": "0xedb88320",
+    "primary": "CRC-32 over the exact VRAM upload rectangle",
+    "seed_and_final_xor": "0xffffffff"
+  },
+  "clean_validation": {
+    "generation_invalidation": "overlapping upload, fill, copy, or primitive destination invalidates tracked identities",
+    "hot_path": "CLUT CRC is memoized until an intersecting VRAM mutation",
+    "live_replacement_frame_digest": "333c8703b0e2e1e8",
+    "native_fallback": "missing, ambiguous, windowed, wrapped, stale, or malformed matches use native VRAM sampling",
+    "palette_vector": {"crc32": "d03041bd", "words": "0000..000f"},
+    "primitive_sampling": "passed",
+    "texture_vector": {"crc32": "8043be1b", "words": [4660, 43981, 0, 65535]}
+  },
+  "pack": {
+    "available_assets": 292,
+    "manifest_sha256": "6578cc4f9e35adccacb751abe3e29c1d640acc6b624b881e0556ab9485ad4c9d",
+    "schema": "wo3se.external-texture-pack.v1"
+  },
+  "producer_source": {
+    "commit": "e04a67f058cfa25d3267a94cf34b24c9a8fbb621",
+    "file": "rhi/rhi_tt.c",
+    "file_sha256": "a5e3f1534bc61514dbc0c32f2f2e7eff7da774cda33c9690a4bcae9af9b304aa",
+    "repository": "libretro/beetle-psx-libretro"
+  },
+  "schema": "clean-aot.beetle-upload-key-contract.v1",
+  "status": "validated"
+}

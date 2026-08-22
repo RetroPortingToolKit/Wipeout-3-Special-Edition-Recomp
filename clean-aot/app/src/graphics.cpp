@@ -84,7 +84,319 @@ void digest_bytes(std::uint64_t& digest,
     return psx::render::parse_replacement_key(canonical);
 }
 
+[[nodiscard]] std::uint32_t crc32_words(
+    std::span<const raster::VramWord> words, raster::VramRect rect) noexcept {
+    std::uint32_t crc = 0xffffffffU;
+    for (std::uint32_t y = 0U; y < rect.height; ++y) {
+        for (std::uint32_t x = 0U; x < rect.width; ++x) {
+            const std::uint32_t vx = (static_cast<std::uint32_t>(rect.x) + x) %
+                raster::kVramWidth;
+            const std::uint32_t vy = (static_cast<std::uint32_t>(rect.y) + y) %
+                raster::kVramHeight;
+            const std::uint16_t word = words[static_cast<std::size_t>(vy) *
+                raster::kVramWidth + vx];
+            for (const std::uint8_t byte : {
+                     static_cast<std::uint8_t>(word & 0xffU),
+                     static_cast<std::uint8_t>(word >> 8U)}) {
+                crc ^= byte;
+                for (unsigned bit = 0U; bit < 8U; ++bit) {
+                    crc = (crc >> 1U) ^
+                        (0xedb88320U & (0U - (crc & 1U)));
+                }
+            }
+        }
+    }
+    return crc ^ 0xffffffffU;
+}
+
+[[nodiscard]] bool intersects(raster::VramRect left,
+                              raster::VramRect right) noexcept {
+    return static_cast<std::uint32_t>(left.x) + left.width > right.x &&
+        static_cast<std::uint32_t>(right.x) + right.width > left.x &&
+        static_cast<std::uint32_t>(left.y) + left.height > right.y &&
+        static_cast<std::uint32_t>(right.y) + right.height > left.y;
+}
+
+[[nodiscard]] bool contains(raster::VramRect outer,
+                            raster::VramRect inner) noexcept {
+    return inner.x >= outer.x && inner.y >= outer.y &&
+        static_cast<std::uint32_t>(inner.x) + inner.width <=
+            static_cast<std::uint32_t>(outer.x) + outer.width &&
+        static_cast<std::uint32_t>(inner.y) + inner.height <=
+            static_cast<std::uint32_t>(outer.y) + outer.height;
+}
+
+[[nodiscard]] bool wraps_vram(raster::VramRect rect) noexcept {
+    return static_cast<std::uint32_t>(rect.x) + rect.width > raster::kVramWidth ||
+        static_cast<std::uint32_t>(rect.y) + rect.height > raster::kVramHeight;
+}
+
+[[nodiscard]] std::optional<raster::VramRect> draw_destination(
+    const gpu::Event& event) noexcept {
+    const gpu::RenderStateSnapshot* state = nullptr;
+    std::int32_t left = 0, top = 0, right = -1, bottom = -1;
+    if (const auto* polygon = std::get_if<gpu::PolygonEvent>(&event)) {
+        if (polygon->vertex_count == 0U) return std::nullopt;
+        state = &polygon->state;
+        left = right = polygon->vertices[0].x;
+        top = bottom = polygon->vertices[0].y;
+        for (std::size_t i = 1U; i < polygon->vertex_count; ++i) {
+            left = std::min(left, static_cast<std::int32_t>(polygon->vertices[i].x));
+            right = std::max(right, static_cast<std::int32_t>(polygon->vertices[i].x));
+            top = std::min(top, static_cast<std::int32_t>(polygon->vertices[i].y));
+            bottom = std::max(bottom, static_cast<std::int32_t>(polygon->vertices[i].y));
+        }
+    } else if (const auto* rectangle = std::get_if<gpu::RectangleEvent>(&event)) {
+        if (rectangle->width == 0U || rectangle->height == 0U) return std::nullopt;
+        state = &rectangle->state;
+        left = rectangle->origin.x; top = rectangle->origin.y;
+        right = left + rectangle->width - 1; bottom = top + rectangle->height - 1;
+    } else if (const auto* line = std::get_if<gpu::LineEvent>(&event)) {
+        if (line->vertices.empty()) return std::nullopt;
+        state = &line->state;
+        left = right = line->vertices[0].x;
+        top = bottom = line->vertices[0].y;
+        for (std::size_t i = 1U; i < line->vertices.size(); ++i) {
+            left = std::min(left, static_cast<std::int32_t>(line->vertices[i].x));
+            right = std::max(right, static_cast<std::int32_t>(line->vertices[i].x));
+            top = std::min(top, static_cast<std::int32_t>(line->vertices[i].y));
+            bottom = std::max(bottom, static_cast<std::int32_t>(line->vertices[i].y));
+        }
+    } else {
+        return std::nullopt;
+    }
+    left += state->draw_offset.x; right += state->draw_offset.x;
+    top += state->draw_offset.y; bottom += state->draw_offset.y;
+    left = std::max(left, static_cast<std::int32_t>(state->draw_area.left));
+    top = std::max(top, static_cast<std::int32_t>(state->draw_area.top));
+    right = std::min(right, static_cast<std::int32_t>(state->draw_area.right));
+    bottom = std::min(bottom, static_cast<std::int32_t>(state->draw_area.bottom));
+    left = std::max(left, 0); top = std::max(top, 0);
+    right = std::min(right, static_cast<std::int32_t>(raster::kVramWidth - 1U));
+    bottom = std::min(bottom, static_cast<std::int32_t>(raster::kVramHeight - 1U));
+    if (right < left || bottom < top) return std::nullopt;
+    return raster::VramRect{static_cast<std::uint16_t>(left),
+        static_cast<std::uint16_t>(top),
+        static_cast<std::uint16_t>(right - left + 1),
+        static_cast<std::uint16_t>(bottom - top + 1)};
+}
+
 } // namespace
+
+struct Wip3outUploadKeyPolicy::Impl final {
+    struct Upload final {
+        raster::VramRect rect{};
+        std::uint32_t hash = 0U;
+        std::uint64_t generation = 0U;
+    };
+    std::vector<TitleAssetMapping> mappings{};
+    std::vector<Upload> uploads{};
+    struct PaletteHash final {
+        raster::VramRect rect{};
+        std::uint32_t hash = 0U;
+    };
+    std::vector<PaletteHash> palettes{};
+    Stats stats{};
+    std::uint64_t invalidation_serial = 0U;
+
+    [[nodiscard]] std::optional<TitleAssetClass> classify(
+        psx::render::ReplacementKey key) const noexcept {
+        const auto found = std::lower_bound(mappings.begin(), mappings.end(), key,
+            [](const TitleAssetMapping& item, psx::render::ReplacementKey sought) {
+                return item.key < sought;
+            });
+        if (found == mappings.end() || found->key != key) return std::nullopt;
+        return found->asset_class;
+    }
+
+    void invalidate(raster::VramRect rect) noexcept {
+        const auto first = std::remove_if(uploads.begin(), uploads.end(),
+            [&](const Upload& upload) { return intersects(upload.rect, rect); });
+        const std::uint64_t removed =
+            static_cast<std::uint64_t>(uploads.end() - first);
+        stats.invalidated_uploads += removed;
+        if (removed != 0U && invalidation_serial !=
+                std::numeric_limits<std::uint64_t>::max()) {
+            ++invalidation_serial;
+        }
+        uploads.erase(first, uploads.end());
+        const auto palette_first = std::remove_if(
+            palettes.begin(), palettes.end(),
+            [&](const PaletteHash& palette) {
+                return intersects(palette.rect, rect);
+            });
+        palettes.erase(palette_first, palettes.end());
+    }
+
+
+    void invalidate_all() noexcept {
+        const std::uint64_t removed = static_cast<std::uint64_t>(uploads.size());
+        stats.invalidated_uploads += removed;
+        if (removed != 0U && invalidation_serial !=
+                std::numeric_limits<std::uint64_t>::max()) {
+            ++invalidation_serial;
+        }
+        uploads.clear();
+        palettes.clear();
+    }
+
+    [[nodiscard]] std::uint32_t palette_hash(
+        raster::VramRect rect,
+        std::span<const raster::VramWord> vram) {
+        const auto found = std::find_if(palettes.begin(), palettes.end(),
+            [&](const PaletteHash& item) {
+                return item.rect.x == rect.x && item.rect.y == rect.y &&
+                    item.rect.width == rect.width && item.rect.height == rect.height;
+            });
+        if (found != palettes.end()) {
+            ++stats.palette_cache_hits;
+            return found->hash;
+        }
+        const std::uint32_t hash = crc32_words(vram, rect);
+        try {
+            palettes.push_back({rect, hash});
+        } catch (...) {
+            return hash;
+        }
+        ++stats.palette_hashes;
+        stats.palette_bytes_hashed +=
+            static_cast<std::uint64_t>(rect.width) * rect.height * 2U;
+        return hash;
+    }
+};
+
+Wip3outUploadKeyPolicy::Wip3outUploadKeyPolicy(
+    std::span<const TitleAssetMapping> mappings)
+    : impl_(std::make_unique<Impl>()) {
+    impl_->mappings.assign(mappings.begin(), mappings.end());
+    std::sort(impl_->mappings.begin(), impl_->mappings.end(),
+        [](const TitleAssetMapping& left, const TitleAssetMapping& right) {
+            return left.key < right.key;
+        });
+}
+
+Wip3outUploadKeyPolicy::~Wip3outUploadKeyPolicy() = default;
+
+const Wip3outUploadKeyPolicy::Stats& Wip3outUploadKeyPolicy::stats() const noexcept {
+    return impl_->stats;
+}
+
+std::uint64_t Wip3outUploadKeyPolicy::invalidation_serial() const noexcept {
+    return impl_->invalidation_serial;
+}
+
+void Wip3outUploadKeyPolicy::observe(
+    const gpu::Event& event, std::span<const raster::VramWord> vram,
+    std::uint64_t source_generation) noexcept {
+    try {
+        if (const auto* upload = std::get_if<gpu::VramUploadEvent>(&event)) {
+            const raster::VramRect rect{upload->destination.x,
+                upload->destination.y, upload->extent.width, upload->extent.height};
+            if (wraps_vram(rect)) {
+                impl_->invalidate_all();
+                return;
+            }
+            impl_->invalidate(rect);
+            impl_->uploads.push_back({rect, crc32_words(vram, rect), source_generation});
+            ++impl_->stats.uploads_hashed;
+            impl_->stats.upload_bytes_hashed +=
+                static_cast<std::uint64_t>(rect.width) * rect.height * 2U;
+        } else if (const auto* fill = std::get_if<gpu::VramFillEvent>(&event)) {
+            const raster::VramRect rect{fill->origin.x, fill->origin.y,
+                                        fill->extent.width, fill->extent.height};
+            if (wraps_vram(rect)) impl_->invalidate_all();
+            else impl_->invalidate(rect);
+        } else if (const auto* copy = std::get_if<gpu::VramCopyEvent>(&event)) {
+            const raster::VramRect rect{copy->destination.x, copy->destination.y,
+                                        copy->extent.width, copy->extent.height};
+            if (wraps_vram(rect)) impl_->invalidate_all();
+            else impl_->invalidate(rect);
+        } else if (const auto destination = draw_destination(event);
+                   destination.has_value()) {
+            impl_->invalidate(*destination);
+        }
+    } catch (...) {
+        impl_->invalidate_all();
+    }
+}
+
+bool Wip3outUploadKeyPolicy::identify(
+    const gpu::Event& event, std::span<const raster::VramWord> vram,
+    std::uint64_t source_generation, ReplacementMatch& match) noexcept {
+    (void)source_generation;
+    ++impl_->stats.draw_queries;
+    const gpu::RenderStateSnapshot* state = nullptr;
+    const gpu::ClutAttribute* clut = nullptr;
+    std::uint32_t min_u = 0U, max_u = 0U, min_v = 0U, max_v = 0U;
+    if (const auto* polygon = std::get_if<gpu::PolygonEvent>(&event)) {
+        if (!polygon->textured || polygon->state.draw_mode.texture_disable ||
+            polygon->vertex_count == 0U) return false;
+        state = &polygon->state;
+        if (polygon->clut.has_value()) clut = &*polygon->clut;
+        min_u = max_u = polygon->texture_coordinates[0].u;
+        min_v = max_v = polygon->texture_coordinates[0].v;
+        for (std::size_t i = 1U; i < polygon->vertex_count; ++i) {
+            min_u = std::min(min_u, static_cast<std::uint32_t>(polygon->texture_coordinates[i].u));
+            max_u = std::max(max_u, static_cast<std::uint32_t>(polygon->texture_coordinates[i].u));
+            min_v = std::min(min_v, static_cast<std::uint32_t>(polygon->texture_coordinates[i].v));
+            max_v = std::max(max_v, static_cast<std::uint32_t>(polygon->texture_coordinates[i].v));
+        }
+    } else if (const auto* rectangle = std::get_if<gpu::RectangleEvent>(&event)) {
+        if (!rectangle->textured || rectangle->state.draw_mode.texture_disable ||
+            !rectangle->texture_coordinate.has_value() || rectangle->width == 0U ||
+            rectangle->height == 0U || rectangle->state.draw_mode.rectangle_flip_x ||
+            rectangle->state.draw_mode.rectangle_flip_y) return false;
+        state = &rectangle->state;
+        if (rectangle->clut.has_value()) clut = &*rectangle->clut;
+        min_u = rectangle->texture_coordinate->u;
+        min_v = rectangle->texture_coordinate->v;
+        max_u = min_u + rectangle->width - 1U;
+        max_v = min_v + rectangle->height - 1U;
+        if (max_u > 255U || max_v > 255U) return false;
+    } else {
+        return false;
+    }
+    if (state->texture_window.mask_x != 0U || state->texture_window.mask_y != 0U ||
+        state->texture_window.offset_x != 0U || state->texture_window.offset_y != 0U) {
+        ++impl_->stats.ambiguous_fallbacks; return false;
+    }
+    const std::uint32_t pixels_per_word =
+        state->draw_mode.depth == gpu::TextureDepth::Indexed4 ? 4U :
+        state->draw_mode.depth == gpu::TextureDepth::Indexed8 ? 2U : 1U;
+    const std::uint32_t page_x = static_cast<std::uint32_t>(state->draw_mode.x_base) * 64U;
+    const std::uint32_t page_y = state->draw_mode.y_base;
+    const raster::VramRect used{
+        static_cast<std::uint16_t>(page_x + min_u / pixels_per_word),
+        static_cast<std::uint16_t>(page_y + min_v),
+        static_cast<std::uint16_t>(max_u / pixels_per_word - min_u / pixels_per_word + 1U),
+        static_cast<std::uint16_t>(max_v - min_v + 1U)};
+    const Impl::Upload* selected = nullptr;
+    for (const Impl::Upload& upload : impl_->uploads) {
+        if (!contains(upload.rect, used)) continue;
+        if (selected != nullptr && selected->hash != upload.hash) {
+            ++impl_->stats.ambiguous_fallbacks; return false;
+        }
+        selected = &upload;
+    }
+    if (selected == nullptr) return false;
+    std::uint32_t palette_hash = 0U;
+    if (state->draw_mode.depth != gpu::TextureDepth::Direct15) {
+        if (clut == nullptr) return false;
+        const std::uint16_t entries = state->draw_mode.depth ==
+            gpu::TextureDepth::Indexed8 ? 256U : 16U;
+        palette_hash = impl_->palette_hash(
+            {clut->x, clut->y, entries, 1U}, vram);
+    }
+    const psx::render::ReplacementKey key{selected->hash, palette_hash};
+    const auto asset_class = impl_->classify(key);
+    if (!asset_class.has_value()) return false;
+    match = {asset_class == TitleAssetClass::Font
+            ? psx::render::ReplacementAssetKind::Font
+            : psx::render::ReplacementAssetKind::Texture,
+        key, selected->rect, state->draw_mode.depth, selected->generation};
+    ++impl_->stats.identified;
+    return true;
+}
 
 std::optional<TitleAssetClass> LoadedTitleManifest::classify(
     psx::render::ReplacementKey key) const noexcept {
@@ -335,8 +647,10 @@ host::HostStatus ReplacementAssetRuntime::resolve_and_upload(
             }
             ++stats_.invalidated;
         }
-        if (cached == cache_.end()) cache_.push_back(CachedAsset{*identity, uploaded});
-        else *cached = CachedAsset{*identity, uploaded};
+        CachedAsset resident{*identity, uploaded, entry->width, entry->height,
+                             std::move(rgba8)};
+        if (cached == cache_.end()) cache_.push_back(std::move(resident));
+        else *cached = std::move(resident);
         ++stats_.uploaded;
         handle = uploaded;
         return {};
@@ -345,12 +659,30 @@ host::HostStatus ReplacementAssetRuntime::resolve_and_upload(
     }
 }
 
+bool ReplacementAssetRuntime::sampling_texture(
+    std::uint64_t handle, const ReplacementMatch& match,
+    raster::ReplacementTexture& texture) const noexcept {
+    const auto found = std::find_if(cache_.begin(), cache_.end(),
+        [handle](const CachedAsset& item) { return item.handle == handle; });
+    if (handle == 0U || found == cache_.end() ||
+        !manifest_.is_current(found->identity, match.source_generation)) {
+        return false;
+    }
+    texture = {handle, match.source, match.depth, found->width, found->height,
+               found->rgba8};
+    return true;
+}
+
 RuntimeGraphics::RuntimeGraphics(GraphicsConfiguration configuration)
     : configuration_(configuration) {
     configured_ = configuration_.output_width != 0U &&
         configuration_.output_height != 0U &&
         configuration_.custom_aspect_width != 0U &&
         configuration_.custom_aspect_height != 0U;
+    if (configuration_.replacement_policy != nullptr) {
+        policy_invalidation_serial_ =
+            configuration_.replacement_policy->invalidation_serial();
+    }
 }
 
 bool RuntimeGraphics::configured() const noexcept { return configured_; }
@@ -365,28 +697,49 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
             if (++drained > gpu::kEventQueueCapacity) {
                 return {host::HostCode::internal_error};
             }
+            raster::ReplacementTexture sampling{};
+            bool use_replacement = false;
             if (configuration_.replacement_assets != nullptr &&
                 configuration_.replacement_policy != nullptr) {
-                psx::render::ReplacementAssetKind kind =
-                    psx::render::ReplacementAssetKind::Texture;
-                psx::render::ReplacementKey key{};
+                ReplacementMatch match{};
                 if (configuration_.replacement_policy->identify(
-                        *event, raster_.vram_generation(), kind, key)) {
+                        *event, raster_.vram_words(),
+                        raster_.vram_generation(), match)) {
                     std::uint64_t handle = 0U;
                     const host::HostStatus replacement =
                         configuration_.replacement_assets->resolve_and_upload(
-                            kind, key, raster_.vram_generation(), handle);
+                            match.kind, match.key, match.source_generation, handle);
                     if (!replacement.success() &&
                         replacement.code != host::HostCode::not_ready &&
                         replacement.code != host::HostCode::unsupported) {
                         return replacement;
                     }
-                    if (replacement.success()) ++replacement_hits_;
+                    if (replacement.success() &&
+                        configuration_.replacement_assets->sampling_texture(
+                            handle, match, sampling)) {
+                        ++replacement_hits_;
+                        use_replacement = true;
+                    }
                     else ++native_fallbacks_;
                 }
             }
-            if (!raster_.consume(*event).accepted()) {
+            if (!raster_.consume(*event,
+                    use_replacement ? &sampling : nullptr).accepted()) {
                 return {host::HostCode::unsupported};
+            }
+            if (configuration_.replacement_policy != nullptr) {
+                configuration_.replacement_policy->observe(
+                    *event, raster_.vram_words(), raster_.vram_generation());
+                const std::uint64_t invalidation =
+                    configuration_.replacement_policy->invalidation_serial();
+                if (invalidation != policy_invalidation_serial_) {
+                    policy_invalidation_serial_ = invalidation;
+                    if (configuration_.replacement_assets != nullptr) {
+                        const host::HostStatus retired =
+                            configuration_.replacement_assets->invalidate_all();
+                        if (!retired.success()) return retired;
+                    }
+                }
             }
         }
         const gpu::DisplayTiming& display = runtime.gpu().control().display;
