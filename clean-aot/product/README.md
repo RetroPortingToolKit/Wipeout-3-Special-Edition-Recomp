@@ -169,7 +169,7 @@ python tools/product/build_product.py install `
 ```
 
 This creates two exact 128-KiB memory cards and the bounded modern controller,
-44.1-kHz audio-buffer/underrun, 4K/ultrawide display configuration using atomic
+44.1-kHz bounded audio-buffer/underrun-counting, 4K/ultrawide display configuration using atomic
 write-through replacement. Its receipt remains
 `awaiting-authenticated-media-import`; the portable `Wipeout3SE.cmd` resolves
 the package from its own location and refuses to launch until the existing

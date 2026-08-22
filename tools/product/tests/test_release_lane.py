@@ -73,7 +73,7 @@ class ReleaseLaneTests(unittest.TestCase):
         self.assertEqual(config["schema"], CONFIG_SCHEMA)
         self.assertEqual(config["audio"]["sample_rate_hz"], 44100)
         self.assertEqual(config["video"]["update_rate_hz"], 100)
-        self.assertEqual(config["audio"]["underrun"], "insert-silence-and-count")
+        self.assertEqual(config["audio"]["underrun"], "count-and-resume-next-batch")
         self.assertEqual(config["input"]["mapping"]["cross"], "south")
         setup = json.loads((relocated / "policy" / "first-run-setup.json").read_text())
         self.assertEqual(setup["mode"], "one-time-first-run")

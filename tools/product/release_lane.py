@@ -123,7 +123,7 @@ def default_config() -> dict[str, Any]:
                               "start": "start", "select": "back"}},
         "audio": {"sample_rate_hz": 44100, "channels": 2,
                   "buffer_frames": 882, "exclusive_mode": False,
-                  "underrun": "insert-silence-and-count", "max_queued_frames": 3528},
+                  "underrun": "count-and-resume-next-batch", "max_queued_frames": 3528},
         "video": {"update_rate_hz": 100, "fullscreen": "borderless",
                   "aspect": "auto-ultrawide", "render_scale": "native-4k",
                   "window_width": 3840, "window_height": 2160},
@@ -323,7 +323,7 @@ def _validate_config(config: dict[str, Any]) -> None:
             or config.get("audio", {}).get("channels") != 2
             or not 441 <= config.get("audio", {}).get("buffer_frames", 0) <= 8192
             or config.get("video", {}).get("update_rate_hz") != 100
-            or config.get("audio", {}).get("underrun") != "insert-silence-and-count"
+            or config.get("audio", {}).get("underrun") != "count-and-resume-next-batch"
             or config.get("audio", {}).get("max_queued_frames", 0) < 882
             or not 0.0 <= config.get("input", {}).get("deadzone", -1.0) <= 0.5
             or config.get("input", {}).get("profile") != "modern-gamepad"
