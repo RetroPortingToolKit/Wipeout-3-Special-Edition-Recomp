@@ -12,6 +12,9 @@ if (-not (Test-Path -LiteralPath $cache)) { throw "Missing CMakeCache.txt: $buil
 if ($null -eq $exe) { throw "No executable staged in: $build" }
 
 $cacheText = Get-Content -Raw -LiteralPath $cache
+$buildGraph = Join-Path $build 'build.ninja'
+if (-not (Test-Path -LiteralPath $buildGraph)) { throw "Missing generated build graph: $buildGraph" }
+$buildGraphText = Get-Content -Raw -LiteralPath $buildGraph
 $config = Join-Path $build 'game.toml'
 if (-not (Test-Path -LiteralPath $config)) { throw "Missing staged game.toml: $build" }
 $configText = Get-Content -Raw -LiteralPath $config
@@ -48,6 +51,9 @@ if ($cacheText -notmatch '(?m)^PSX_SETUP_WIZARD:BOOL=OFF\r?$') {
 }
 if ($cacheText -notmatch '(?m)^PSXRECOMP_BIOS_STEMS:STRING=SCPH1001\r?$') {
     throw 'Build is not restricted to the retail SCPH1001 backend.'
+}
+if ($buildGraphText -match '(?i)(psx_interpreter\.c|psx_interpreter\.c\.obj)') {
+    throw 'Release build graph links the real interpreter; native builds must use stub_interpreter.c.'
 }
 
 $staged = Get-ChildItem -LiteralPath $build -Recurse -File
