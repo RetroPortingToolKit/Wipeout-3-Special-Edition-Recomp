@@ -60,10 +60,26 @@ def _installed_setup(user_data: Path, version: str, payload: bytes) -> dict[str,
 
 
 def run_persistence_acceptance(*, package: Path, memory_card_test: Path, policy_path: Path,
+                               link_map: Path,
                                receipt_path: Path | None = None) -> dict[str, Any]:
     package = package.resolve()
     validation = validate_release(package)
     executable = package / "bin" / "Wipeout3SE.exe"
+    link_map = link_map.resolve()
+    try:
+        link_text = link_map.read_text(encoding="utf-8", errors="replace")
+    except OSError as error:
+        raise PersistenceAcceptanceError("installed-product link map is unavailable") from error
+    required_symbols = (
+        "clean_aot::app::MemoryCard::load_or_create",
+        "clean_aot::app::MemoryCard::write",
+        "clean_aot::app::MemoryCard::flush",
+    )
+    missing_symbols = [symbol for symbol in required_symbols if symbol not in link_text]
+    if missing_symbols:
+        raise PersistenceAcceptanceError(
+            "installed product does not link the persistence implementation: "
+            + ", ".join(missing_symbols))
     try:
         native = subprocess.run([str(memory_card_test.resolve())], stdin=subprocess.DEVNULL,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -104,11 +120,14 @@ def run_persistence_acceptance(*, package: Path, memory_card_test: Path, policy_
     document = {"schema": SCHEMA, "status": "passed", "game_ready": False,
                 "package_manifest_sha256": validation["manifest_sha256"],
                 "runtime_executable_sha256": _sha(executable),
+                "runtime_link_map_sha256": _sha(link_map),
+                "runtime_persistence_symbols": list(required_symbols),
                 "native_memory_card_test_sha256": _sha(memory_card_test),
                 "scenario_plan_sha256": hashlib.sha256(
                     canonical_json_bytes(plan) + b"\n").hexdigest(),
                 "persistence_model": "dual-128k-memory-cards-only",
-                "emulator_save_states": False, "save_state_leaks": leaked,
+                "emulator_save_states": False, "runtime_snapshots": False,
+                "save_state_formats": [], "save_state_leaks": leaked,
                 "cards": {"slots": 2, "bytes_each": CARD_SIZE, "formatted": True,
                           "transactional_replace": True, "backup_rotation_depth": 2,
                           "corruption_detection": True, "automatic_recovery": True},

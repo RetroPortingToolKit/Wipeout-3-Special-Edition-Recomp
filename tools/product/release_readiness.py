@@ -202,7 +202,10 @@ def audit_release_readiness(package: Path, evidence_root: Path,
         persistence.get("runtime_executable_sha256") == _sha(executable) and
         persistence.get("persistence_model") == "dual-128k-memory-cards-only" and
         persistence.get("emulator_save_states") is False and
+        persistence.get("runtime_snapshots") is False and
+        persistence.get("save_state_formats") == [] and
         persistence.get("save_state_leaks") == [] and
+        len(persistence.get("runtime_persistence_symbols", [])) == 3 and
         persistence_cards.get("slots") == 2 and
         persistence_cards.get("bytes_each") == 128 * 1024 and
         persistence_cards.get("transactional_replace") is True and

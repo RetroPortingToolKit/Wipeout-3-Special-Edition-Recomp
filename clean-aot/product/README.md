@@ -361,6 +361,7 @@ binds the result to the installed executable and 100-Hz behavioral plan:
 python tools/product/build_product.py persistence-acceptance `
   --package build-product-runtime-135829 `
   --memory-card-test build-app-input-save/clean_aot_memory_card_tests.exe `
+  --link-map build-release/Wipeout3SE.map `
   --policy clean-aot/product/content-coverage-policy.json `
   --receipt clean-aot/product/evidence/persistence-acceptance.json
 ```

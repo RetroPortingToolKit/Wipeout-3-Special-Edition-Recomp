@@ -3,8 +3,10 @@
 #include "clean_aot/host/sdl_vulkan.hpp"
 #include "clean_aot/runtime/runtime.hpp"
 #include "clean_aot/app/graphics.hpp"
+#include "clean_aot/app/memory_card.hpp"
 #include "clean_aot/app/settings.hpp"
 #include "clean_aot/app/settings_ui.hpp"
+#include "sio.hpp"
 
 #include <array>
 #include <algorithm>
@@ -32,6 +34,21 @@ CLEAN_AOT_PRODUCT_BINDING_SYMBOL() noexcept;
 #endif
 
 namespace {
+struct DurableCard final {
+    clean_aot::app::MemoryCard storage{};
+    std::array<std::uint8_t, clean_aot::app::kMemoryCardBytes> image{};
+    bool durability_failed = false;
+};
+
+void persist_card_write(void* opaque, const clean_aot::sio::WriteReceipt& receipt) noexcept {
+    auto& card = *static_cast<DurableCard*>(opaque);
+    constexpr std::size_t sector_bytes = clean_aot::sio::MemoryCard::kSectorSize;
+    const auto offset = static_cast<std::size_t>(receipt.sector) * sector_bytes;
+    if (offset > card.image.size() || sector_bytes > card.image.size() - offset) return;
+    if (!card.storage.write(offset, std::span<const std::uint8_t>(card.image).subspan(
+            offset, sector_bytes)) || !card.storage.flush()) card.durability_failed = true;
+}
+
 struct Receipt final {
     std::string bios_identity_sha256, bios_sha256, workload_profile;
     std::string graphics_feature_matrix = "null";
@@ -285,6 +302,28 @@ int main(int argc, char** argv) {
     configuration.bios = bios;
     configuration.initial_vblank_rate = clean_aot::machine::VBlankRate::Hz100;
     clean_aot::runtime::Runtime runtime(configuration);
+    std::array<DurableCard, 2> durable_cards{};
+    std::array<clean_aot::sio::MemoryCard, 2> sio_cards{
+        clean_aot::sio::MemoryCard(std::span<std::uint8_t>(durable_cards[0].image)),
+        clean_aot::sio::MemoryCard(std::span<std::uint8_t>(durable_cards[1].image))};
+    if (!user_data.empty()) {
+        for (std::size_t index = 0; index < durable_cards.size(); ++index) {
+            const auto path = user_data / "saves" /
+                (index == 0U ? "card1.mcd" : "card2.mcd");
+            auto& durable = durable_cards[index];
+            if (!durable.storage.load_or_create(path)) {
+                receipt.reason = "memory-card-load-or-recovery-failed";
+                host->shutdown(); receipt.print(); return 74;
+            }
+            std::ranges::copy(durable.storage.bytes(), durable.image.begin());
+            sio_cards[index].set_write_callback(&persist_card_write, &durable);
+            const auto port = index == 0U ? clean_aot::sio::Port::One : clean_aot::sio::Port::Two;
+            if (!runtime.sio0().attach_memory_card(port, sio_cards[index])) {
+                receipt.reason = "memory-card-attach-failed";
+                host->shutdown(); receipt.print(); return 74;
+            }
+        }
+    }
     if (runtime.bind_authenticated_bios(binding->variant_identity_sha256, *binding) !=
         clean_aot::runtime::DispatchStatus::Bound) {
         receipt.reason = "authenticated-bios-bind-rejected"; host->shutdown(); receipt.print(); return 65;
@@ -381,6 +420,12 @@ int main(int argc, char** argv) {
             receipt.graphics_feature_matrix =
                 settings.graphics_feature_receipt(graphics, &presentation).canonical_json();
         }
+    }
+    if (std::ranges::any_of(durable_cards, [](const DurableCard& card) {
+            return card.durability_failed;
+        })) {
+        receipt.stage = "persistence-rejected";
+        receipt.reason = "memory-card-atomic-flush-failed";
     }
     host->shutdown(); receipt.print();
     return (receipt.stage == "bios-slice-stopped" || receipt.stage == "game-shard-stopped") ? 0 : 69;

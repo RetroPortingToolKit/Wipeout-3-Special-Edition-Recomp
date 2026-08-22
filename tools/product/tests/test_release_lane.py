@@ -14,6 +14,7 @@ from tools.product.release_lane import (
     create_release,
     generate_graphics_matrix_receipt,
     initialize_install,
+    _new_memory_card,
     run_installed_product_soak,
     run_soak,
     validate_release,
@@ -158,6 +159,9 @@ class ReleaseLaneTests(unittest.TestCase):
         with self.assertRaisesRegex(ReleaseError, "memory card slot 1 is malformed"):
             initialize_install(package, user_data)
         card1.write_bytes(bytes(128 * 1024))
+        with self.assertRaisesRegex(ReleaseError, "memory card slot 1 is malformed"):
+            initialize_install(package, user_data)
+        card1.write_bytes(_new_memory_card())
         (user_data / "config.json").write_text("{}", encoding="utf-8")
         with self.assertRaisesRegex(ReleaseError, "configuration boundary"):
             initialize_install(package, user_data)

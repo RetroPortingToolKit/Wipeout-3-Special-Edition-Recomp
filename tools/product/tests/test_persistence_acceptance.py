@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from tools.product.release_lane import CARD_SIZE, _new_memory_card
+from tools.product.release_lane import CARD_SIZE, _new_memory_card, _valid_memory_card
 
 
 class PersistenceAcceptanceTests(unittest.TestCase):
@@ -16,6 +16,12 @@ class PersistenceAcceptanceTests(unittest.TestCase):
             checksum = 0
             for byte in block: checksum ^= byte
             self.assertEqual(checksum, 0)
+        self.assertTrue(_valid_memory_card(image))
+
+    def test_setup_rejects_size_correct_corruption(self) -> None:
+        image = bytearray(_new_memory_card())
+        image[129] ^= 1
+        self.assertFalse(_valid_memory_card(bytes(image)))
 
 
 if __name__ == "__main__":

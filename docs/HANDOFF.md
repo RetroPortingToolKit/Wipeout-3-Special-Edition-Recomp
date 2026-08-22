@@ -14,17 +14,20 @@
 
 ## Memory-card persistence and recovery acceptance (2026-08-22)
 
-- Setup now creates canonical formatted 128-KiB PS1 images for both card slots.
-  The native card host transactionally replaces dirty images, rotates two
-  backups, detects malformed header/directory frames, and recovers the newest
-  valid generation. Unicode paths and bounded writes are covered natively.
-- Product acceptance binds native proof to the installed package, preserves
+- `Wipeout3SE.exe` now loads or recovers both durable 128-KiB card images,
+  attaches them to SIO0 ports one and two, and atomically flushes each committed
+  sector with two-generation backup rotation. Setup now rejects size-correct
+  cards with malformed PS1 header/directory checksums as well as bad sizes.
+- Product acceptance binds native proof and required persistence symbols to the
+  installed package/link map, preserves
   both exact card hashes through real setup upgrade/rollback functions, checks
   all 64 scripted scenarios remain at 100 Hz, and rejects save-state material.
   This is memory-card persistence only; no emulator save states were added.
-- `memory-card-persistence-recovery` passes. Overall readiness remains blocked
-  only by direct game execution, behavioral-route execution, and authenticated
-  media execution.
+- Canonical acceptance is bound to package manifest `018f4712...`, executable
+  `2dfcca55...`, and link map `9d96abea...`. The persistence release gate passes.
+  Overall readiness remains fail-closed at 9/15 because the new executable also
+  invalidates older setup/graphics/soak package bindings, alongside the three
+  genuine game/media/behavior blockers.
 
 ## Behavioral route verification harness (2026-08-22)
 

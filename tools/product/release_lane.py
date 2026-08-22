@@ -173,6 +173,20 @@ def _new_memory_card() -> bytes:
     return bytes(image)
 
 
+def _valid_memory_card(image: bytes) -> bool:
+    """Validate the formatted header and directory frames used by real PS1 cards."""
+    if len(image) != CARD_SIZE or image[:2] != b"MC":
+        return False
+    for index in range(36):
+        frame = image[index * 128:(index + 1) * 128]
+        checksum = 0
+        for byte in frame:
+            checksum ^= byte
+        if checksum != 0:
+            return False
+    return image[63 * 128:64 * 128] == image[:128]
+
+
 def initialize_install(package: Path, user_data: Path) -> dict[str, Any]:
     """Create durable per-user state without asserting that media is authorized."""
     validation = validate_release(package)
@@ -202,7 +216,7 @@ def initialize_install(package: Path, user_data: Path) -> dict[str, Any]:
         card = user_data / "saves" / f"card{slot}.mcd"
         if not card.exists():
             _atomic_write(card, _new_memory_card())
-        if card.is_symlink() or card.stat().st_size != CARD_SIZE:
+        if card.is_symlink() or not _valid_memory_card(card.read_bytes()):
             raise ReleaseError(f"memory card slot {slot} is malformed")
     receipt = {
         "schema": INSTALL_SCHEMA,

@@ -220,6 +220,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "persistence-acceptance", help="exercise dual-card durability and recovery boundaries")
     persistence.add_argument("--package", type=Path, required=True)
     persistence.add_argument("--memory-card-test", type=Path, required=True)
+    persistence.add_argument("--link-map", type=Path, required=True)
     persistence.add_argument("--policy", type=Path, required=True)
     persistence.add_argument("--receipt", type=Path, required=True)
     settings_ui_acceptance = subparsers.add_parser(
@@ -373,7 +374,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "persistence-acceptance":
             document = run_persistence_acceptance(
                 package=args.package, memory_card_test=args.memory_card_test,
-                policy_path=args.policy, receipt_path=args.receipt)
+                policy_path=args.policy, link_map=args.link_map,
+                receipt_path=args.receipt)
         elif args.command == "settings-ui-acceptance":
             document = run_settings_ui_acceptance(args.package, args.receipt)
         elif args.command == "package-installer":
