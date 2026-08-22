@@ -78,6 +78,11 @@ void write_semantic(std::ostringstream& out, const Instruction& instruction) {
     else if(op==0x10U&&rs==0U)out<<"        cpu_ops::mfc0(state,"<<rt<<","<<rd<<");\n";
     else if(op==0x10U&&rs==4U)out<<"        cpu_ops::mtc0(state,"<<rt<<","<<rd<<");\n";
     else if(raw==0x42000010U)out<<"        cpu_ops::rfe(state);\n";
+    else if(op==0x12U&&rs==0U)out<<"        cpu_ops::mfc2(state,"<<rt<<","<<rd<<",false);\n";
+    else if(op==0x12U&&rs==2U)out<<"        cpu_ops::mfc2(state,"<<rt<<","<<rd<<",true);\n";
+    else if(op==0x12U&&rs==4U)out<<"        cpu_ops::mtc2(state,"<<rt<<","<<rd<<",false);\n";
+    else if(op==0x12U&&rs==6U)out<<"        cpu_ops::mtc2(state,"<<rt<<","<<rd<<",true);\n";
+    else if(op==0x12U&&(rs&0x10U)!=0U)out<<"        cpu_ops::cop2_command(state,0x"<<std::hex<<raw<<"u);\n"<<std::dec;
     else if(!instruction.has_delay_slot)out<<"        cpu_ops::raise_exception(state, CpuException::ReservedInstruction);\n";
 }
 

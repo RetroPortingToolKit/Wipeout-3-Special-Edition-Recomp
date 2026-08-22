@@ -2,6 +2,7 @@
 #include "clean_aot/runtime/native_dispatch.hpp"
 #include "clean_aot/runtime/generated_cpu.hpp"
 #include "r3000a/reference.hpp"
+#include "gte.hpp"
 
 #include "clean_aot_soc.hpp"
 
@@ -83,6 +84,7 @@ bool generated_write32(void* context,std::uint32_t address,std::uint32_t value) 
     const auto i=address-0x1000U;for(unsigned lane=0;lane<4U;++lane)memory.bytes[i+lane]=static_cast<std::uint8_t>(value>>(lane*8U));return true;
 }
 bool rejected_read32(void*,std::uint32_t,std::uint32_t&) noexcept{return false;}
+std::uint32_t cop2_read_data(void*c,std::uint8_t r)noexcept{return static_cast<clean_aot::gte::Gte*>(c)->read_data(r);}std::uint32_t cop2_read_control(void*c,std::uint8_t r)noexcept{return static_cast<clean_aot::gte::Gte*>(c)->read_control(r);}void cop2_write_data(void*c,std::uint8_t r,std::uint32_t v)noexcept{static_cast<clean_aot::gte::Gte*>(c)->write_data(r,v);}void cop2_write_control(void*c,std::uint8_t r,std::uint32_t v)noexcept{static_cast<clean_aot::gte::Gte*>(c)->write_control(r,v);}std::uint8_t cop2_execute(void*c,std::uint32_t raw,bool&recognized)noexcept{auto receipt=static_cast<clean_aot::gte::Gte*>(c)->execute(raw);recognized=receipt.recognized;return receipt.cycles;}
 
 void test_authenticated_bios_reset_contract(Runner& runner) {
     using namespace clean_aot::runtime;
@@ -211,8 +213,11 @@ void test_generated_unaligned_memory_differential(Runner& runner) {
     GeneratedCpuState exception{};exception.cop0_status=clean_aot::runtime::kStatusBev|3U;exception.gpr[1]=0x1001U;ops::begin(exception,0x3004U,true,0x3000U);ops::lw(exception,1,2,0);ops::end(exception);
     EXPECT(runner,exception.exception_raised);EXPECT(runner,exception.exception_code==clean_aot::runtime::CpuException::AddressErrorLoad);EXPECT(runner,exception.cop0_epc==0x3000U);EXPECT(runner,(exception.cop0_cause&clean_aot::runtime::kCauseBd)!=0U);EXPECT(runner,exception.cop0_bad_vaddr==0x1001U);EXPECT(runner,exception.pc==clean_aot::runtime::kBootExceptionVector);EXPECT(runner,(exception.cop0_status&0x3FU)==12U);
     GeneratedCpuState bus_error{};bus_error.gpr[1]=0x1000U;bus_error.read32=rejected_read32;ops::begin(bus_error,0x4000U);ops::lw(bus_error,1,2,0);ops::end(bus_error);EXPECT(runner,bus_error.fault==clean_aot::runtime::CpuFault::None);EXPECT(runner,bus_error.exception_raised);EXPECT(runner,bus_error.exception_code==clean_aot::runtime::CpuException::BusErrorData);EXPECT(runner,bus_error.cop0_epc==0x4000U);
+    GeneratedCpuState debug{};debug.gpr[1]=0x12345678U;ops::mtc0(debug,1,3);ops::mtc0(debug,1,5);ops::mtc0(debug,1,7);ops::mtc0(debug,1,9);ops::mtc0(debug,1,11);EXPECT(runner,ops::read_cop0(debug,3)==0x12345678U);EXPECT(runner,ops::read_cop0(debug,5)==0x12345678U);EXPECT(runner,ops::read_cop0(debug,7)==0x12345678U);EXPECT(runner,ops::read_cop0(debug,9)==0x12345678U);EXPECT(runner,ops::read_cop0(debug,11)==0x12345678U);EXPECT(runner,!debug.exception_raised);
     GeneratedCpuState missing_abi{};missing_abi.gpr[1]=0x1000U;ops::begin(missing_abi,0x5000U);ops::lw(missing_abi,1,2,0);ops::end(missing_abi);EXPECT(runner,missing_abi.fault==clean_aot::runtime::CpuFault::MemoryAccess);EXPECT(runner,!missing_abi.exception_raised);EXPECT(runner,missing_abi.pc==0U);
 }
+
+void test_generated_cop2_binding_and_latency(Runner&runner){using clean_aot::runtime::GeneratedCpuState;namespace ops=clean_aot::runtime::cpu_ops;clean_aot::gte::Gte generated_gte,oracle;GeneratedCpuState cpu{};cpu.cop0_status=1U<<30U;cpu.cop2_context=&generated_gte;cpu.cop2_read_data=cop2_read_data;cpu.cop2_read_control=cop2_read_control;cpu.cop2_write_data=cop2_write_data;cpu.cop2_write_control=cop2_write_control;cpu.cop2_execute=cop2_execute;cpu.gpr[1]=192U;ops::mtc2(cpu,1,9,false);oracle.write_data(9U,192U);cpu.gpr[1]=256U;ops::mtc2(cpu,1,10,false);oracle.write_data(10U,256U);cpu.gpr[1]=320U;ops::mtc2(cpu,1,11,false);oracle.write_data(11U,320U);constexpr std::uint32_t command=0x4a000028U;const auto receipt=oracle.execute(command);ops::cop2_command(cpu,command);EXPECT(runner,cpu.cop2_ready_cycle==receipt.cycles);ops::mfc2(cpu,2,9,false);EXPECT(runner,cpu.issue_cycle==receipt.cycles);ops::end(cpu);ops::begin(cpu,4U);ops::end(cpu);EXPECT(runner,cpu.gpr[2]==oracle.read_data(9U));GeneratedCpuState disabled{};ops::begin(disabled,0x100U);ops::cop2_command(disabled,command);EXPECT(runner,disabled.exception_raised);EXPECT(runner,disabled.exception_code==clean_aot::runtime::CpuException::CoprocessorUnusable);EXPECT(runner,(disabled.cop0_cause&(3U<<28U))==(2U<<28U));}
 
 void test_authenticated_load_and_first_dispatch(Runner& runner) {
     using clean_aot::runtime::DispatchStatus;
@@ -487,6 +492,7 @@ int main() {
     test_authenticated_bios_reset_contract(runner);
     test_generated_integer_differential(runner);
     test_generated_unaligned_memory_differential(runner);
+    test_generated_cop2_binding_and_latency(runner);
     test_authenticated_load_and_first_dispatch(runner);
     test_retirement_clock(runner);
     test_configuration_and_plain_memory(runner);

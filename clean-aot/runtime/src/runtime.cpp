@@ -496,6 +496,8 @@ struct Runtime::Impl final {
     static bool generated_read32(void* c,std::uint32_t a,std::uint32_t& v) noexcept{auto*s=static_cast<Impl*>(c);if(!s||!s->active_generated_cpu)return false;AccessFault f=AccessFault::None;if(!s->sync_for_access({s->active_generated_cpu->issue_cycle,s->active_generated_cpu->instruction_pc,s->active_generated_cpu->in_delay_slot},a,memory::AccessWidth::Word,f))return false;++s->generated_memory_reads;if(is_device_access(a,memory::AccessWidth::Word)||is_expansion_one(a,memory::AccessWidth::Word))++s->generated_device_reads;if(is_expansion_one(a,memory::AccessWidth::Word)){v=0xffff'ffffU;return true;}auto r=s->bus.read32(a);v=r.value;return r.ok();}
     static bool generated_write8(void* c,std::uint32_t a,std::uint8_t v) noexcept{auto*s=static_cast<Impl*>(c);if(!s||!s->active_generated_cpu)return false;AccessFault f=AccessFault::None;if(!s->sync_for_access({s->active_generated_cpu->issue_cycle,s->active_generated_cpu->instruction_pc,s->active_generated_cpu->in_delay_slot},a,memory::AccessWidth::Byte,f))return false;++s->generated_memory_writes;if(is_device_access(a,memory::AccessWidth::Byte))++s->generated_device_writes;return s->bus.write8(a,v).ok();}
     static bool generated_write16(void* c,std::uint32_t a,std::uint16_t v) noexcept{auto*s=static_cast<Impl*>(c);if(!s||!s->active_generated_cpu)return false;AccessFault f=AccessFault::None;if(!s->sync_for_access({s->active_generated_cpu->issue_cycle,s->active_generated_cpu->instruction_pc,s->active_generated_cpu->in_delay_slot},a,memory::AccessWidth::Halfword,f))return false;++s->generated_memory_writes;if(is_device_access(a,memory::AccessWidth::Halfword))++s->generated_device_writes;return s->bus.write16(a,v).ok();}
+    static std::uint32_t generated_cop2_read_data(void*c,std::uint8_t r)noexcept{auto*s=static_cast<Impl*>(c);return s?s->gte.read_data(r):0U;}static std::uint32_t generated_cop2_read_control(void*c,std::uint8_t r)noexcept{auto*s=static_cast<Impl*>(c);return s?s->gte.read_control(r):0U;}static void generated_cop2_write_data(void*c,std::uint8_t r,std::uint32_t v)noexcept{auto*s=static_cast<Impl*>(c);if(s)s->gte.write_data(r,v);}static void generated_cop2_write_control(void*c,std::uint8_t r,std::uint32_t v)noexcept{auto*s=static_cast<Impl*>(c);if(s)s->gte.write_control(r,v);}static std::uint8_t generated_cop2_execute(void*c,std::uint32_t raw,bool&recognized)noexcept{auto*s=static_cast<Impl*>(c);if(!s){recognized=false;return 0U;}const auto receipt=s->gte.execute(raw);recognized=receipt.recognized;return receipt.cycles;}
+    static void bind_generated_cop2(Impl&self,GeneratedCpuState&cpu)noexcept{cpu.cop2_context=&self;cpu.cop2_read_data=&generated_cop2_read_data;cpu.cop2_read_control=&generated_cop2_read_control;cpu.cop2_write_data=&generated_cop2_write_data;cpu.cop2_write_control=&generated_cop2_write_control;cpu.cop2_execute=&generated_cop2_execute;}
 
     class CdScheduler final : public cdrom::MachineScheduler {
     public:
@@ -1662,6 +1664,7 @@ Status Runtime::reset() noexcept {
     impl_->bios_cpu.read8=&Impl::generated_read8;impl_->bios_cpu.read16=&Impl::generated_read16;impl_->bios_cpu.read32=&Impl::generated_read32;
     impl_->bios_cpu.write8=&Impl::generated_write8;impl_->bios_cpu.write16=&Impl::generated_write16;
     impl_->bios_cpu.write32 = &Impl::generated_write32;
+    Impl::bind_generated_cop2(*impl_,impl_->bios_cpu);
     impl_->bios_bound = false;
     impl_->generated_memory_reads = 0U;
     impl_->generated_memory_writes = 0U;
@@ -1702,6 +1705,7 @@ DispatchStatus Runtime::bind_authenticated_bios(
     impl_->bios_cpu.read8=&Impl::generated_read8;impl_->bios_cpu.read16=&Impl::generated_read16;impl_->bios_cpu.read32=&Impl::generated_read32;
     impl_->bios_cpu.write8=&Impl::generated_write8;impl_->bios_cpu.write16=&Impl::generated_write16;
     impl_->bios_cpu.write32 = &Impl::generated_write32;
+    Impl::bind_generated_cop2(*impl_,impl_->bios_cpu);
     impl_->bios_bound = true;
     impl_->generated_memory_reads = 0U;
     impl_->generated_memory_writes = 0U;
@@ -1786,6 +1790,7 @@ DispatchStatus Runtime::load_authenticated_executable(
     impl_->generated_cpu.read8=&Impl::generated_read8;impl_->generated_cpu.read16=&Impl::generated_read16;impl_->generated_cpu.read32=&Impl::generated_read32;
     impl_->generated_cpu.write8=&Impl::generated_write8;impl_->generated_cpu.write16=&Impl::generated_write16;
     impl_->generated_cpu.write32 = &Impl::generated_write32;
+    Impl::bind_generated_cop2(*impl_,impl_->generated_cpu);
     impl_->executable_loaded = true;
     return DispatchStatus::Bound;
 }
