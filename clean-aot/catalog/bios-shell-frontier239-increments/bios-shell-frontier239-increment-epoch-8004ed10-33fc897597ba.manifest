@@ -1,0 +1,9 @@
+schema=clean-aot-compiler-manifest-v1
+image_kind=raw-payload
+symbol_namespace=variant
+variant_sha256=33fc897597bace73de6dd68b998aafa437673246bc5d0d81cd8e92361bef2f38
+image_sha256=184bb13c35b23903142b44fa80a101860f8e29c6b6891a5b83bd269664963cfc
+load_start=0x8004ED10
+load_end_exclusive=0x8004ED14
+entry=0x8004ED10
+code=0x8004ED10-0x8004ED14

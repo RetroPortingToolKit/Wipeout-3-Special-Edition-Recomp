@@ -1,0 +1,9 @@
+schema=clean-aot-compiler-manifest-v1
+image_kind=raw-payload
+symbol_namespace=variant
+variant_sha256=779fcae92419e2dd54ea2048b88a837b327ccd39ac91aebeb991c0c9ed79f9d5
+image_sha256=38f7d77218c1280ad1664ab89cae0b1bacb7de9c73008b70e4cc94feb744ab47
+load_start=0x8004ECFC
+load_end_exclusive=0x8004ED00
+entry=0x8004ECFC
+code=0x8004ECFC-0x8004ED00

@@ -1,0 +1,9 @@
+schema=clean-aot-compiler-manifest-v1
+image_kind=raw-payload
+symbol_namespace=variant
+variant_sha256=1b3b171b7eaa31db81e27f7efead6d067071611e1a2776375d189912a21586f6
+image_sha256=855ef8d59114e3d36215c5c54e398601f3d23e2bf6d5279a315897f17fe1dc06
+load_start=0x00002700
+load_end_exclusive=0x00002704
+entry=0x00002700
+code=0x00002700-0x00002704

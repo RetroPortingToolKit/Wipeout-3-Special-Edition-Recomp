@@ -37,4 +37,5 @@ class Tests(unittest.TestCase):
  def test_epoch_manifest_separates_context_and_payload_identity(self):
   variant={"identity_sha256":"a"*64,"image_sha256":"b"*64,"load_start":0x1800,"load_end_exclusive":0x1804,"roots":[0x1800],"ranges":[{"start":0x1800,"end_exclusive":0x1804}]}
   text=m.epoch_manifest(variant); self.assertIn("variant_sha256="+"a"*64,text); self.assertIn("image_sha256="+"b"*64,text)
+  self.assertIn("symbol_namespace=variant",text)
 if __name__=="__main__": unittest.main()

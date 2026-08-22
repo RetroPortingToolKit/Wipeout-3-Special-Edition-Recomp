@@ -1,0 +1,9 @@
+schema=clean-aot-compiler-manifest-v1
+image_kind=raw-payload
+symbol_namespace=variant
+variant_sha256=f09a34632715865a10a55483ba2a85637efe340672b47360f0dfd78801fa881f
+image_sha256=f5e2a6100c32d16d53bff878884ef11e41c1a745217888553bdd57bb4c55b0e3
+load_start=0x8005A854
+load_end_exclusive=0x8005A858
+entry=0x8005A854
+code=0x8005A854-0x8005A858
