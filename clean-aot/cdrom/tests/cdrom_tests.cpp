@@ -38,6 +38,7 @@ using clean_aot::cdrom::MaximumAddressableLba;
 using clean_aot::cdrom::ModeOnePayloadBytes;
 using clean_aot::cdrom::RawSector;
 using clean_aot::cdrom::RawSectorSource;
+using clean_aot::cdrom::ResetRebootCycles;
 using clean_aot::cdrom::ScheduledEvent;
 using clean_aot::cdrom::SeekLatencyCycles;
 using clean_aot::cdrom::SingleSpeedSectorCycles;
@@ -1265,6 +1266,17 @@ void test_remaining_command_families_reset_controls_and_stream_end() {
     require(device.current_cycle() == reset_command_cycle + CommandLatencyCycles &&
                 device.mode() == 0U && !device.muted() && device.status() == 0U,
             "Reset accepts extra parameters and resets drive state without rewinding time");
+    acknowledge_one_byte(device, 0U);
+    require(!device.enqueue_command(static_cast<std::uint8_t>(Command::Nop)) &&
+                device.last_error() == ErrorCode::CommandBusy,
+            "Reset reboot interval rejects commands after INT3 acknowledgement");
+    device.advance_to(device.current_cycle() + ResetRebootCycles - 1U);
+    require(!device.enqueue_command(static_cast<std::uint8_t>(Command::Nop)),
+            "Reset remains busy one native cycle before reboot completion");
+    device.advance_to(device.current_cycle() + 1U);
+    issue(device, Command::Nop);
+    require_reason(device, Interrupt::Acknowledge,
+                   "Reset accepts commands exactly at the 1/8-second boundary");
     acknowledge_one_byte(device, 0U);
 
     require(device.enqueue_parameter(1U) && device.enqueue_parameter(2U),

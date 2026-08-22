@@ -77,7 +77,8 @@ The slice implements the boot/read/play-oriented behavior of:
 
 - `Nop`, `Setloc`, `Play`, `Forward`, `Backward`, `ReadN`, and `ReadS`;
 - `Standby`, `Stop`, `Pause`, `Init`, `SetSession`, `SeekL`, `SeekP`, `GetID`,
-  and `ReadTOC`, including distinct acknowledge and completion packets;
+  `ReadTOC`, and `Reset`, including distinct acknowledge/completion packets and
+  Reset's native 1/8-second controller-reboot busy interval;
 - `Mute`, `Demute`, `Setfilter`, `Setmode`, `Getparam`, `GetlocL`, `GetlocP`,
   `GetTN`, and `GetTD`;
 - firmware-version test subcommand `0x20` and decoder reset.

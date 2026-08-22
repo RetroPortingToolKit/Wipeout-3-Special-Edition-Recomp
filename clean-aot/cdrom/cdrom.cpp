@@ -1343,6 +1343,11 @@ void Cdrom::begin_command(std::uint8_t command,
         clear_transfer_buffers();
         data_size_ = 0U;
         data_cursor_ = 0U;
+        if (!start_phase(PhaseAction::ResetReboot, ResetRebootCycles)) {
+            queue_command_error(ErrorCode::SchedulerOverflow,
+                                CommandError::CannotRespond);
+            break;
+        }
         (void)queue_status(Interrupt::Acknowledge);
         break;
     case Command::ReadToc:
@@ -1420,6 +1425,10 @@ void Cdrom::complete_phase() noexcept {
     case PhaseAction::InitComplete:
         paused_ = true;
         (void)queue_status(Interrupt::Complete);
+        break;
+    case PhaseAction::ResetReboot:
+        /* Command 1Ch has no completion packet.  Reaching this native-time
+         * boundary only makes the controller command interface responsive. */
         break;
     case PhaseAction::SetSession:
         seeking_ = false;

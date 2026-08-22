@@ -1,5 +1,15 @@
 # Handoff
 
+## CD-ROM Reset native reboot timing (2026-08-22)
+
+- Command `0x1C` now retains its INT3-only response while holding the command
+  interface busy for exactly 4,233,600 native cycles (1/8 second). Commands are
+  rejected through deadline-minus-one and accepted exactly at the deadline;
+  no synthetic completion IRQ is emitted and CPU retirement scaling is absent.
+- Strict and sanitizer evidence is recorded in
+  `clean-aot/cdrom/evidence/reset-reboot-timing-v1.json`; analysis is in
+  `docs/CDROM_RESET_REBOOT_TIMING.md`.
+
 ## CD-ROM runtime lid accuracy (2026-08-22)
 
 - CD ShellOpen was defined but unreachable. `Cdrom::set_shell_open` now models
