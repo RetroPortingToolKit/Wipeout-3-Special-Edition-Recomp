@@ -489,6 +489,16 @@ instruction and fails closed on every unknown PC or executable identity.
   isolated-cache writes, one device read, and 44 device writes. Receipt
   `bios-frontier-00084520.json` records fail-closed status `EpochMismatch` and
   next RAM epoch SHA-256 `6f30b27d...cc50b`.
+- The `6f30b27d...cc50b` epoch is now authenticated only through exact function
+  ranges `[0x3C90,0x3E78)`, `[0x28D0,0x2908)`, `[0x4360,0x4388)`,
+  `[0x27A0,0x27BC)`, and `[0x2908,0x2958)`. The immutable BIOS return stub
+  `[0xBFC06FDC,0xBFC06FE4)` is separately rooted; no containing RAM page was
+  authorized. Two repeated probes reach 85,983 instructions and 14,874
+  dispatches with 9,382 reads, 18,339 writes, 3,720 isolated-cache writes, one
+  device read, and 48 device writes. Receipt
+  `bios-frontier-00085983.json` stops fail-closed with `UnknownCode` at the next
+  copied-RAM function `0x00002E00`; whole-RAM identity remains
+  `6f30b27d...cc50b`.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control
