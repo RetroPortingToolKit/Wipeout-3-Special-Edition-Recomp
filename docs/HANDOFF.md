@@ -510,6 +510,13 @@ instruction and fails closed on every unknown PC or executable identity.
   18,348 writes, 3,720 isolated-cache writes, one device read, and 48 device
   writes. Receipt `bios-frontier-00086062.json` records `UnknownCode` and the
   post-callback whole-RAM epoch `8af29f79...f1c9a`.
+- Exact region `[0x3060,0x30C8)` under epoch `8af29f79...f1c9a` follows its
+  observed loop and returns through the live `$ra` callback to `0x000031E8`;
+  the dormant direct edge to `0x2FC8` is not speculatively dispatched. Two
+  repeated probes reach 86,085 instructions and 14,899 dispatches with 9,391
+  reads, 18,350 writes, 3,720 isolated-cache writes, one device read, and 48
+  device writes. Receipt `bios-frontier-00086085.json` records `UnknownCode` at
+  `0x000031E8`; RAM remains epoch `8af29f79...f1c9a` and COP0 reports no fault.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control
