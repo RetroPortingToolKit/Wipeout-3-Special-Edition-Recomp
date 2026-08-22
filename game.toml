@@ -48,6 +48,7 @@ overlay_cache = false
 renderer = "opengl"
 geometry_correction = true
 supersampling = 4
+hd_textures = true
 auto_skip_fmv = false
 # Authentic 4:3 is the baseline. The Widescreen mod below activates WipEout
 # 3's game-specific native-wide hooks and chooses fixed/adaptive presentation.

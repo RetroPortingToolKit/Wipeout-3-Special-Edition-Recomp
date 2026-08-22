@@ -24,6 +24,9 @@ if ($configText -notmatch '(?m)^bios_hle\s*=\s*false\r?$') {
 if ($configText -notmatch '(?m)^supersampling\s*=\s*4\r?$') {
     throw 'The clean release does not carry the required 4x supersampling baseline.'
 }
+if ($configText -notmatch '(?m)^hd_textures\s*=\s*true\r?$') {
+    throw 'HD texture replacement is not enabled in the remaster configuration.'
+}
 $skipManifest = Join-Path $build 'mods/packages/psx.enhancement.skip-fmv/1.0.0/manifest.toml'
 if (-not (Test-Path -LiteralPath $skipManifest)) { throw "Missing staged skip-opening manifest: $skipManifest" }
 if ((Get-Content -Raw -LiteralPath $skipManifest) -notmatch '(?m)^default_enabled\s*=\s*false\r?$') {
