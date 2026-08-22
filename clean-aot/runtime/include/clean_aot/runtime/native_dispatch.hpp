@@ -33,6 +33,7 @@ enum class DispatchStatus : std::uint8_t {
     ExecutableHashMismatch,
     LoadRejected,
     CpuFault,
+    EpochMismatch,
 };
 
 class GeneratedDispatcher final {

@@ -95,6 +95,19 @@ constexpr std::uint32_t kCacheControl = 0xfffe'0130U;
     return output;
 }
 
+[[nodiscard]] bool parse_variant_identity(std::string_view text,
+                                           memory::VariantIdentity& identity) noexcept {
+    if(text.size()!=64U)return false;
+    auto nibble=[](char c)->int{if(c>='0'&&c<='9')return c-'0';if(c>='a'&&c<='f')return c-'a'+10;return -1;};
+    for(std::size_t i=0;i<identity.digest.size();++i){const int high=nibble(text[i*2U]),low=nibble(text[i*2U+1U]);if(high<0||low<0)return false;identity.digest[i]=static_cast<std::uint8_t>((high<<4)|low);}return identity.valid();
+}
+
+[[nodiscard]] bool hash_bus_range(memory::Bus& bus,std::uint32_t start,
+                                  std::uint32_t byte_count,std::string& digest){
+    if(byte_count==0U||static_cast<std::uint64_t>(start)+byte_count>(std::uint64_t{1}<<32U))return false;
+    std::vector<std::uint8_t> bytes(byte_count);for(std::uint32_t i=0;i<byte_count;++i){const auto value=bus.read8(start+i);if(!value.ok())return false;bytes[i]=value.value;}digest=sha256_hex(bytes);return true;
+}
+
 [[nodiscard]] constexpr std::uint32_t access_width_bytes(
     memory::AccessWidth width) noexcept {
     return memory::width_bytes(width);
@@ -466,11 +479,15 @@ std::uint64_t RetirementClock::phase() const noexcept {
 struct Runtime::Impl final {
     GeneratedDispatcher generated_dispatcher{};
     GeneratedDispatcher bios_dispatcher{};
+    GeneratedDispatcher copied_epoch_dispatcher{};
     GeneratedCpuState generated_cpu{};
     GeneratedCpuState bios_cpu{};
     std::string bios_sha256{};
     bool bios_bound = false;
     bool executable_loaded = false;
+    bool copied_epoch_bound = false;
+    memory::CodeRegionStamp copied_epoch_stamp{};
+    memory::VariantIdentity copied_epoch_variant{};
     GeneratedCpuState* active_generated_cpu = nullptr;
     std::uint64_t generated_memory_reads = 0U;
     std::uint64_t generated_memory_writes = 0U;
@@ -1666,6 +1683,9 @@ Status Runtime::reset() noexcept {
     impl_->bios_cpu.write32 = &Impl::generated_write32;
     Impl::bind_generated_cop2(*impl_,impl_->bios_cpu);
     impl_->bios_bound = false;
+    impl_->copied_epoch_bound = false;
+    impl_->copied_epoch_stamp = {};
+    impl_->copied_epoch_variant = {};
     impl_->generated_memory_reads = 0U;
     impl_->generated_memory_writes = 0U;
     impl_->generated_device_reads = 0U;
@@ -1718,13 +1738,33 @@ DispatchStatus Runtime::dispatch_bios() noexcept {
     if (!operational() || !impl_->bios_bound || impl_->executable_loaded) {
         return DispatchStatus::LoadRejected;
     }
+    GeneratedDispatcher* dispatcher=&impl_->bios_dispatcher;
+    if(impl_->copied_epoch_bound&&impl_->bios_cpu.pc>=impl_->copied_epoch_stamp.virtual_start&&static_cast<std::uint64_t>(impl_->bios_cpu.pc)<static_cast<std::uint64_t>(impl_->copied_epoch_stamp.virtual_start)+impl_->copied_epoch_stamp.byte_count){
+        if(impl_->bus.validate_code_region(impl_->copied_epoch_stamp,impl_->copied_epoch_variant)!=memory::CodeRegionValidity::Current)return DispatchStatus::EpochMismatch;
+        dispatcher=&impl_->copied_epoch_dispatcher;
+    }
     impl_->bios_cpu.issue_cycle=impl_->clock.retirement_total();
     impl_->bios_cpu.cop0_cause=(impl_->bios_cpu.cop0_cause&~0x0000FC00U)|((static_cast<std::uint32_t>(impl_->interrupt_lines)<<10U)&0x0000FC00U);
     impl_->active_generated_cpu=&impl_->bios_cpu;
-    const auto result=impl_->bios_dispatcher.dispatch(impl_->bios_cpu);
+    const auto result=dispatcher->dispatch(impl_->bios_cpu);
     impl_->active_generated_cpu=nullptr;
     if(result==DispatchStatus::Executed)(void)impl_->advance_to(impl_->bios_cpu.issue_cycle);
     return result;
+}
+
+DispatchStatus Runtime::bind_authenticated_copied_epoch(
+    const AuthenticatedCopiedEpochBinding& binding) noexcept {
+    if(!operational()||!impl_->bios_bound||impl_->executable_loaded||binding.variant_identity_sha256!=binding.generated.variant_identity_sha256||binding.destination_sha256!=binding.generated.executable_sha256)return DispatchStatus::InvalidBinding;
+    memory::VariantIdentity variant{};if(!parse_variant_identity(binding.variant_identity_sha256,variant))return DispatchStatus::IdentityMismatch;
+    if(binding.generated.load_end_exclusive<=binding.generated.load_start)return DispatchStatus::InvalidBinding;
+    const auto destination_bytes64=binding.generated.load_end_exclusive-binding.generated.load_start;
+    if(destination_bytes64>std::numeric_limits<std::uint32_t>::max())return DispatchStatus::InvalidBinding;
+    const auto destination_bytes=static_cast<std::uint32_t>(destination_bytes64);std::string source_hash,destination_hash;
+    try{if(!hash_bus_range(impl_->bus,binding.source_start,binding.source_byte_count,source_hash)||!hash_bus_range(impl_->bus,binding.generated.load_start,destination_bytes,destination_hash))return DispatchStatus::LoadRejected;}catch(...){return DispatchStatus::LoadRejected;}
+    if(source_hash!=binding.source_sha256||destination_hash!=binding.destination_sha256)return DispatchStatus::ExecutableHashMismatch;
+    const auto bound=impl_->copied_epoch_dispatcher.bind(binding.variant_identity_sha256,binding.generated);if(bound!=DispatchStatus::Bound)return bound;
+    const auto capture=impl_->bus.capture_code_region(binding.generated.load_start,destination_bytes,variant);if(!capture.ok())return DispatchStatus::LoadRejected;
+    impl_->copied_epoch_stamp=capture.stamp;impl_->copied_epoch_variant=variant;impl_->copied_epoch_bound=true;return DispatchStatus::Bound;
 }
 
 std::uint32_t Runtime::bios_pc() const noexcept {
@@ -1739,7 +1779,9 @@ Runtime::GeneratedExecutionSnapshot Runtime::bios_execution_snapshot() const noe
     if (impl_ == nullptr) return {};
     return {impl_->bios_cpu.pc, impl_->bios_cpu.cop0_status,
             impl_->bios_cpu.cop0_cause, impl_->bios_cpu.cop0_epc,
-            impl_->bios_cpu.cop0_bad_vaddr, impl_->generated_memory_reads,
+            impl_->bios_cpu.cop0_bad_vaddr, impl_->bios_cpu.instruction_pc,
+            impl_->bios_cpu.branch_pc, impl_->bios_cpu.in_delay_slot,
+            impl_->generated_memory_reads,
             impl_->generated_memory_writes, impl_->generated_device_reads,
             impl_->generated_device_writes};
 }

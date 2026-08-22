@@ -189,12 +189,23 @@ struct DeviceDeadline final {
  */
 class Runtime final {
 public:
+    struct AuthenticatedCopiedEpochBinding final {
+        std::string_view variant_identity_sha256;
+        std::uint32_t source_start = 0U;
+        std::uint32_t source_byte_count = 0U;
+        std::string_view source_sha256;
+        std::string_view destination_sha256;
+        GeneratedExecutableBinding generated{};
+    };
     struct GeneratedExecutionSnapshot final {
         std::uint32_t pc = 0U;
         std::uint32_t cop0_status = 0U;
         std::uint32_t cop0_cause = 0U;
         std::uint32_t cop0_epc = 0U;
         std::uint32_t cop0_bad_vaddr = 0U;
+        std::uint32_t instruction_pc = 0U;
+        std::uint32_t branch_pc = 0U;
+        bool in_delay_slot = false;
         std::uint64_t memory_reads = 0U;
         std::uint64_t memory_writes = 0U;
         std::uint64_t device_reads = 0U;
@@ -216,6 +227,8 @@ public:
         std::string_view selected_bios_identity_sha256,
         const GeneratedExecutableBinding& binding) noexcept;
     [[nodiscard]] DispatchStatus dispatch_bios() noexcept;
+    [[nodiscard]] DispatchStatus bind_authenticated_copied_epoch(
+        const AuthenticatedCopiedEpochBinding& binding) noexcept;
     [[nodiscard]] std::uint32_t bios_pc() const noexcept;
     [[nodiscard]] std::uint32_t last_bios_instruction_count() const noexcept;
     [[nodiscard]] GeneratedExecutionSnapshot bios_execution_snapshot() const noexcept;
