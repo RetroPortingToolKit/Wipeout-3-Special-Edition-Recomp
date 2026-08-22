@@ -98,6 +98,7 @@ renderer = "opengl"
 # fallback to full vsync if EXT_swap_control_tear is unsupported.
 vsync = "adaptive"
 geometry_correction = true
+auto_skip_fmv = false
 # PGXP tuning, measured live at 8K internal on this title (2026-08-17).
 # tolerance 0.5 rejected ~92k candidates per 4s and landed only ~28k
 # dataflow hits; 1.0 takes rejections to ZERO and quadruples hits to ~112k.
