@@ -1,5 +1,22 @@
 # Handoff
 
+## Exact manifest-capacity checkpoint at 0x80047728 (2026-08-22)
+
+- Exact batched bindings 432-473 advanced from `0x800502D8` through the shell
+  decision corridor. Binding 473 initially returned `LoadRejected` because the
+  diagnostic probe needed 514 exact slots (76 static plus 438 generated) but
+  retained the default 512-slot allocation.
+- `advance_live_shell_frontiers.py` now derives the exact allocation from the
+  probe's static binding operations and generated manifest lines before every
+  build. Capacity remains storage, not authorization; every range/hash/stamp
+  and the runtime's strict 4096 upper bound remain unchanged and fail-closed.
+- The same shard 473 then bound and advanced to UnknownCode `0x80047728` at
+  19,281,031 instructions / 1,790,631 dispatches. CD reads/writes/sectors are
+  `0/0/0`. Receipt:
+  `clean-aot/catalog/evidence/bios-shell-live-frontiers-800502d8-80047728.json`.
+- The requested 20,000-instruction tranche is not complete (current delta 152).
+  Resume at binding 474 / PC `0x80047728` with max batch 16.
+
 ## DMA6 CHCR deadline catch-up (2026-08-22)
 
 - Cause `0x1C` at authenticated EPC `0x8005027C` was an artificial data-bus

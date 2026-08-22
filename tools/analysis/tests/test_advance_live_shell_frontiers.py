@@ -1,12 +1,31 @@
+import tempfile
 import unittest
 from pathlib import Path
 
-from tools.analysis.advance_live_shell_frontiers import TERMINAL, instruction_span
+from tools.analysis.advance_live_shell_frontiers import (
+    TERMINAL, instruction_span, synchronize_probe_capacity)
 from tools.analysis.live_shell_frontier_batch import (
     BatchError, audit_exact_receipt, authenticated_straight_line_span)
 
 
 class LiveShellFrontierTests(unittest.TestCase):
+    def test_probe_capacity_tracks_exact_manifest_operations(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            probe = root / "probe.cpp"
+            binds = root / "binds.inc"
+            probe.write_text(
+                "auto bind=[&](auto*x){r.bind_authenticated_copied_epoch(x);};\n"
+                "bind(clean_aot_binding_a());\n"
+                "r.bind_authenticated_copied_epoch(b);\n"
+                "Configuration c{};Runtime r(c);\n",
+                encoding="utf-8")
+            binds.write_text("first\nsecond\n", encoding="utf-8")
+            self.assertEqual(synchronize_probe_capacity(probe, binds), 4)
+            self.assertIn("c.authenticated_region_capacity=4U;Runtime r(c);",
+                          probe.read_text(encoding="utf-8"))
+            self.assertEqual(synchronize_probe_capacity(probe, binds), 4)
+
     def test_delay_slot_is_atomic_only_for_control_transfer(self):
         normal = (0x24020001).to_bytes(4, "little")
         jump = (0x08000010).to_bytes(4, "little") + bytes(4)

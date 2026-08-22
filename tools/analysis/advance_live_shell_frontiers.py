@@ -15,6 +15,7 @@ from tools.analysis.live_shell_frontier_batch import authenticated_straight_line
 
 
 TERMINAL = re.compile(r"^(\d+) (\d+) (\d+) (\d+) (?:\d+ ){8}(\d+) (\d+) ", re.M)
+CAPACITY_ASSIGNMENT = re.compile(r"c\.authenticated_region_capacity=\d+U;")
 
 
 def sha(data: bytes) -> str:
@@ -24,6 +25,31 @@ def sha(data: bytes) -> str:
 def run(command: list[str], root: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(command, cwd=root, text=True, stdout=subprocess.PIPE,
                           stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+
+
+def synchronize_probe_capacity(probe: Path, binds: Path) -> int:
+    """Size storage to the exact number of binding operations in the probe."""
+    source = probe.read_text(encoding="utf-8")
+    lambda_calls = len(re.findall(r"\bbind\(clean_aot_binding_", source))
+    explicit_calls = len(re.findall(r"bind_authenticated_copied_epoch", source))
+    static_operations = lambda_calls + max(0, explicit_calls - 1)
+    generated_operations = sum(
+        1 for line in binds.read_text(encoding="utf-8").splitlines()
+        if line.strip())
+    capacity = static_operations + generated_operations
+    if capacity <= 0:
+        raise RuntimeError("probe binding manifest is empty")
+    assignment = f"c.authenticated_region_capacity={capacity}U;"
+    if CAPACITY_ASSIGNMENT.search(source):
+        updated = CAPACITY_ASSIGNMENT.sub(assignment, source, count=1)
+    else:
+        marker = "Runtime r(c);"
+        if marker not in source:
+            raise RuntimeError("probe runtime construction marker missing")
+        updated = source.replace(marker, assignment + marker, 1)
+    if updated != source:
+        probe.write_text(updated, encoding="utf-8", newline="\n")
+    return capacity
 
 
 def instruction_span(image: bytes, offset: int) -> int:
@@ -100,8 +126,10 @@ def main() -> int:
     decls = root / "build-bios-frontier-c0-src" / "auto_frontier_decls.inc"
     binds = root / "build-bios-frontier-c0-src" / "auto_frontier_binds.inc"
     bios_path = root / "build-oracle" / "goosestation" / "system" / "SCPH1001.BIN"
+    probe_source = root / "build-bios-frontier-c0-src" / "probe.cpp"
     seen: set[tuple[int, str]] = set()
 
+    synchronize_probe_capacity(probe_source, binds)
     build = run(["cmake", "--build", "build-bios-frontier-c0", "--target",
                  "bios_frontier_c0", "-j", "8"], root)
     if build.returncode:
@@ -169,6 +197,7 @@ def main() -> int:
                 f'{{x->variant_identity_sha256,0x{source_start:x}U,0x{source_count:x}U,"{source_hash}",'
                 f'x->executable_sha256,*x}};s=r.bind_authenticated_copied_epoch(e);std::cerr<<"LIVE{index} "'
                 f'<<static_cast<unsigned>(s)<<\'\\n\';run();}}\n')
+        synchronize_probe_capacity(probe_source, binds)
         build = run(["cmake", "--build", "build-bios-frontier-c0", "--target",
                      "bios_frontier_c0", "-j", "8"], root)
         if build.returncode:
