@@ -52,6 +52,7 @@ constexpr std::size_t kMaxEventsPerService = 32U;
     const bool transformed = frame.presentation_effects != 0U;
     return frame.surface.pitch >= minimum_pitch &&
         required_bytes <= frame.surface.byte_size &&
+        frame.ui_overlay_count <= kMaximumGpuUiOverlays &&
         (!transformed || (frame.presentation_width >= frame.surface.width * 2ULL &&
                           frame.presentation_height >= frame.surface.height * 2ULL));
 }
@@ -113,6 +114,8 @@ struct SdlVulkanPresentation::Impl final {
     struct ReplacementTexture final {
         SDL_GPUTexture* texture = nullptr;
         std::uint64_t handle = 0U;
+        std::uint32_t width = 0U;
+        std::uint32_t height = 0U;
     };
     std::vector<ReplacementTexture> replacements{};
     std::uint64_t next_replacement_handle = 1U;
@@ -380,13 +383,14 @@ template <typename ImplType>
     SDL_BindGPUGraphicsPipeline(pass, impl.present_pipeline);
     const SDL_GPUTextureSamplerBinding binding{impl.frame_texture, impl.present_sampler};
     SDL_BindGPUFragmentSamplers(pass, 0U, &binding, 1U);
-    const std::array<std::uint32_t, 8U> presentation{
+    const std::array<std::uint32_t, 12U> presentation{
         frame.width, frame.height,
         submission.presentation_effects == 0U ? frame.width : submission.presentation_width,
         submission.presentation_effects == 0U ? frame.height : submission.presentation_height,
         submission.presentation_effects,
         static_cast<std::uint32_t>(std::max(viewport.x, 0)),
-        static_cast<std::uint32_t>(std::max(viewport.y, 0)), 0U};
+        static_cast<std::uint32_t>(std::max(viewport.y, 0)), 0U,
+        128U, 128U, 128U, 1U};
     SDL_PushGPUFragmentUniformData(command_buffer, 0U, presentation.data(),
                                    sizeof(presentation));
     const SDL_GPUViewport gpu_viewport{static_cast<float>(viewport.x),
@@ -394,6 +398,37 @@ template <typename ImplType>
         static_cast<float>(viewport.height), 0.0F, 1.0F};
     SDL_SetGPUViewport(pass, &gpu_viewport);
     SDL_DrawGPUPrimitives(pass, 3U, 1U, 0U, 0U);
+    for (std::uint32_t index = 0U; index < submission.ui_overlay_count; ++index) {
+        const GpuUiOverlay& overlay = submission.ui_overlays[index];
+        const auto found = std::find_if(impl.replacements.begin(), impl.replacements.end(),
+            [&](const auto& item) { return item.handle == overlay.replacement_handle; });
+        if (found == impl.replacements.end() || found->texture == nullptr) {
+            ++impl.metrics.gpu_ui_stale_fallbacks;
+            SDL_EndGPURenderPass(pass);
+            return false;
+        }
+        const SDL_GPUTextureSamplerBinding ui_binding{found->texture, impl.present_sampler};
+        SDL_BindGPUFragmentSamplers(pass, 0U, &ui_binding, 1U);
+        const std::array<std::uint32_t, 12U> ui_uniform{
+            found->width, found->height, overlay.width, overlay.height,
+            4U,
+            static_cast<std::uint32_t>(std::max(viewport.x, 0)) + overlay.x,
+            static_cast<std::uint32_t>(std::max(viewport.y, 0)) + overlay.y,
+            0U, overlay.red, overlay.green, overlay.blue,
+            overlay.raw_texture ? 1U : 0U};
+        SDL_PushGPUFragmentUniformData(command_buffer, 0U, ui_uniform.data(),
+                                       sizeof(ui_uniform));
+        const SDL_GPUViewport ui_viewport{
+            static_cast<float>(std::max(viewport.x, 0) + static_cast<std::int32_t>(overlay.x)),
+            static_cast<float>(std::max(viewport.y, 0) + static_cast<std::int32_t>(overlay.y)),
+            static_cast<float>(overlay.width), static_cast<float>(overlay.height),
+            0.0F, 1.0F};
+        SDL_SetGPUViewport(pass, &ui_viewport);
+        SDL_DrawGPUPrimitives(pass, 3U, 1U, 0U, 0U);
+        ++impl.metrics.gpu_ui_draws;
+        impl.metrics.gpu_ui_pixels +=
+            static_cast<std::uint64_t>(overlay.width) * overlay.height;
+    }
     SDL_EndGPURenderPass(pass);
     impl.metrics.frame_upload_bytes +=
         static_cast<std::uint64_t>(frame.width) * frame.height * 4U;
@@ -931,7 +966,7 @@ HostStatus SdlVulkanPresentation::service() noexcept {
 PresentationCapabilities SdlVulkanPresentation::presentation_capabilities()
     const noexcept {
     return impl_ != nullptr && impl_->initialized
-        ? PresentationCapabilities{true, true} : PresentationCapabilities{};
+        ? PresentationCapabilities{true, true, true} : PresentationCapabilities{};
 }
 
 bool SdlVulkanPresentation::poll_event(HostEvent& event) noexcept {
@@ -1011,7 +1046,8 @@ HostStatus SdlVulkanPresentation::upload_replacement(
     }
     try {
         handle = impl_->next_replacement_handle++;
-        impl_->replacements.push_back(Impl::ReplacementTexture{texture, handle});
+        impl_->replacements.push_back(Impl::ReplacementTexture{
+            texture, handle, replacement.width, replacement.height});
     } catch (...) {
         SDL_ReleaseGPUTexture(impl_->device, texture);
         handle = 0U;

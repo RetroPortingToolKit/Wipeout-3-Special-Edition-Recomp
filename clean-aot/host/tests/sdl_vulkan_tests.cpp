@@ -52,7 +52,7 @@ private:
 
 int main() {
     if (std::string_view{clean_aot::host::shaders::kPresentFragmentSpirvSha256} !=
-        "ccfdfe170a126a56ff2566d8258b874e3bca59983d616ff71cb2e5338730e1f6") return 31;
+        "e6a4bb31937db8d5d986f1f9981c3b5ab0f87326460cd9c55bf91636d15415c5") return 31;
     using namespace clean_aot::host;
     SdlVulkanConfig config{};
     config.title = "clean-aot hidden 100 Hz Vulkan acceptance";
@@ -90,12 +90,19 @@ int main() {
     if (!backend.initialize().success()) return 5;
     if (!backend.submit_frame({7U,0U,surface}).success()) return 3;
     if (backend.service().code != HostCode::sequence_error) return 4;
+    const std::array<std::uint8_t, 4U> replacement{1U,2U,3U,255U};
+    ReplacementImage image{}; image.width=1U; image.height=1U; image.rgba8=replacement;
+    std::uint64_t handle=0U;
+    if (!backend.upload_replacement(image,handle).success() || handle==0U) return 15;
     const auto gpu_effect_begin = std::chrono::steady_clock::now();
     for (std::uint64_t index = 0U; index < 100U; ++index) {
         FrameSubmission transformed{index,index,surface};
         transformed.presentation_width = 2880U;
         transformed.presentation_height = 2160U;
         transformed.presentation_effects = kPresentationEffectEdgeAware;
+        transformed.ui_overlay_count = 1U;
+        transformed.ui_overlays[0] = {handle, 64U, 64U, 256U, 64U,
+                                      128U, 128U, 128U, true};
         if (!backend.submit_frame(transformed).success()) return 5;
         if (!service_until_submitted(backend,index+1U)) return 6;
     }
@@ -111,13 +118,31 @@ int main() {
         metrics.sequence_errors != 1U || metrics.queue_latency_ns_max == 0U ||
         metrics.gpu_effect_frames != 100U ||
         metrics.gpu_effect_output_pixels != 100ULL * 2880ULL * 2160ULL ||
-        metrics.frame_upload_bytes != 100U * 2U * 2U * 4U) return 7;
+        metrics.frame_upload_bytes != 100U * 2U * 2U * 4U ||
+        metrics.gpu_ui_draws != 100U ||
+        metrics.gpu_ui_pixels != 100ULL * 256ULL * 64ULL ||
+        metrics.gpu_ui_stale_fallbacks != 0U) return 7;
     if (!backend.request_window({{5120U,2160U,FullscreenMode::windowed}}).success() ||
         !backend.recreate_swapchain().success()) return 8;
-    if (!backend.submit_frame({100U,100U,surface}).success() ||
-        !service_until_submitted(backend,101U)) return 9;
+    const auto ultrawide_begin = std::chrono::steady_clock::now();
+    for (std::uint64_t index = 100U; index < 200U; ++index) {
+        FrameSubmission ultrawide{index,index,surface};
+        ultrawide.presentation_width = 5040U;
+        ultrawide.presentation_height = 2160U;
+        ultrawide.presentation_effects = kPresentationEffectEdgeAware;
+        ultrawide.ui_overlay_count = 1U;
+        ultrawide.ui_overlays[0] = {handle, 64U, 64U, 256U, 64U,
+                                    128U, 128U, 128U, true};
+        if (!backend.submit_frame(ultrawide).success() ||
+            !service_until_submitted(backend,index+1U)) return 9;
+    }
+    const auto ultrawide_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now() - ultrawide_begin).count();
+    std::cout << "real Vulkan 5120x2160 UI submissions=100 elapsed_ns="
+              << ultrawide_ns << '\n';
     metrics = backend.presentation_metrics();
-    if (metrics.swapchain_recreations < 1U || metrics.gpu_present_submissions != 101U) return 10;
+    if (metrics.swapchain_recreations < 1U || metrics.gpu_present_submissions != 200U ||
+        metrics.gpu_effect_frames != 200U || metrics.gpu_ui_draws != 200U) return 10;
 
     const std::array<std::int16_t, 882U> audio{};
     constexpr std::uint64_t kSoakUpdates = 200U;
@@ -137,11 +162,7 @@ int main() {
     const SdlAudioMetrics saturated = backend.audio_metrics();
     if (saturated.overruns == 0U || saturated.dropped_updates == 0U ||
         saturated.queued_frames > 3528U || saturated.time_stretch_used) return 14;
-    const std::array<std::uint8_t, 4U> replacement{1U,2U,3U,255U};
-    ReplacementImage image{}; image.width=1U; image.height=1U; image.rgba8=replacement;
-    std::uint64_t handle=0U;
-    if (!backend.upload_replacement(image,handle).success() || handle==0U ||
-        !backend.release_replacement(handle).success()) return 15;
+    if (!backend.release_replacement(handle).success()) return 15;
     backend.mark_device_lost();
     if (backend.service().code != HostCode::device_lost ||
         backend.presentation_metrics().device_losses != 1U) return 16;
@@ -211,7 +232,7 @@ int main() {
          (direct_metrics.completions != direct_metrics.submissions ||
           direct_metrics.last_present_id != 100U))) return 33;
     direct.shutdown(); SDL_DestroyWindow(direct_window); SDL_QuitSubSystem(SDL_INIT_VIDEO);
-    std::cout << "clean_aot_host_sdl_vulkan_tests: 101 unique GPU submissions; "
+    std::cout << "clean_aot_host_sdl_vulkan_tests: 200 unique GPU submissions; "
                  "physical presentation intentionally unclaimed\n";
     return 0;
 }

@@ -66,6 +66,20 @@ struct FrameView final {
     PixelFormat format = PixelFormat::rgba8_unorm;
 };
 
+struct GpuUiOverlay final {
+    std::uint64_t replacement_handle = 0U;
+    std::uint32_t x = 0U;
+    std::uint32_t y = 0U;
+    std::uint32_t width = 0U;
+    std::uint32_t height = 0U;
+    std::uint8_t red = 128U;
+    std::uint8_t green = 128U;
+    std::uint8_t blue = 128U;
+    bool raw_texture = true;
+};
+
+inline constexpr std::size_t kMaximumGpuUiOverlays = 64U;
+
 struct FrameSubmission final {
     std::uint64_t sequence = 0U;
     std::uint64_t update_index = 0U;
@@ -73,6 +87,8 @@ struct FrameSubmission final {
     std::uint32_t presentation_width = 0U;
     std::uint32_t presentation_height = 0U;
     std::uint32_t presentation_effects = 0U;
+    std::array<GpuUiOverlay, kMaximumGpuUiOverlays> ui_overlays{};
+    std::uint32_t ui_overlay_count = 0U;
 };
 
 inline constexpr std::uint32_t kPresentationEffectEdgeAware = 1U << 0U;
@@ -81,6 +97,7 @@ inline constexpr std::uint32_t kPresentationEffectChromaSmooth = 1U << 1U;
 struct PresentationCapabilities final {
     bool gpu_edge_aware = false;
     bool gpu_chroma_smooth = false;
+    bool gpu_hd_ui = false;
 };
 
 struct StereoAudioBatch final {

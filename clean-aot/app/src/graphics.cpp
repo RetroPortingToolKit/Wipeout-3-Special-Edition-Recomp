@@ -1023,6 +1023,9 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
         std::uint32_t presented_width = planned.plan.logical_width;
         std::uint32_t presented_height = planned.plan.logical_height;
         bool high_resolution_resolved = false;
+        std::array<host::GpuUiOverlay, host::kMaximumGpuUiOverlays>
+            gpu_ui_overlays{};
+        std::uint32_t gpu_ui_overlay_count = 0U;
         std::uint32_t gpu_presentation_effects = 0U;
         const host::PresentationCapabilities host_presentation =
             host.presentation_capabilities();
@@ -1035,7 +1038,8 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
         const bool gpu_edge_resolve =
             configuration_.presentation_resolve ==
                 raster::PresentationResolveMode::EdgeAware &&
-            host_presentation.gpu_edge_aware && ui_draws_.empty() &&
+            host_presentation.gpu_edge_aware &&
+            (ui_draws_.empty() || host_presentation.gpu_hd_ui) &&
             target_pixels <= configuration_.maximum_resolved_pixels &&
             target_width >= planned.plan.logical_width * 2ULL &&
             target_height >= planned.plan.logical_height * 2ULL;
@@ -1112,8 +1116,13 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
             }
         }
         if (configuration_.high_resolution_ui &&
-            high_resolution_resolved && !ui_draws_.empty()) {
+            (high_resolution_resolved || gpu_edge_resolve) && !ui_draws_.empty()) {
+            const std::uint32_t ui_width = gpu_edge_resolve
+                ? target_width : presented_width;
+            const std::uint32_t ui_height = gpu_edge_resolve
+                ? target_height : presented_height;
             std::span<std::uint8_t> enhanced_output =
+                gpu_edge_resolve ? std::span<std::uint8_t>{} :
                 using_postprocessed_scanout_
                     ? std::span<std::uint8_t>(postprocessed_scanout_)
                     : std::span<std::uint8_t>(resolved_scanout_);
@@ -1178,16 +1187,16 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                     }
                     const std::uint32_t output_left = ceil_scale(
                         static_cast<std::uint64_t>(left - scan_left),
-                        presented_width, planned.plan.logical_width);
+                        ui_width, planned.plan.logical_width);
                     const std::uint32_t output_top = ceil_scale(
                         static_cast<std::uint64_t>(top - scan_top),
-                        presented_height, planned.plan.logical_height);
+                        ui_height, planned.plan.logical_height);
                     const std::uint32_t output_right = ceil_scale(
                         static_cast<std::uint64_t>(right - scan_left),
-                        presented_width, planned.plan.logical_width);
+                        ui_width, planned.plan.logical_width);
                     const std::uint32_t output_bottom = ceil_scale(
                         static_cast<std::uint64_t>(bottom - scan_top),
-                        presented_height, planned.plan.logical_height);
+                        ui_height, planned.plan.logical_height);
                     const std::uint64_t pixels =
                         static_cast<std::uint64_t>(output_right - output_left) *
                         (output_bottom - output_top);
@@ -1209,9 +1218,35 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                     const std::int64_t page_y =
                         draw.event.state.draw_mode.y_base;
                     const std::int64_t denominator_x =
-                        static_cast<std::int64_t>(presented_width) * 2;
+                        static_cast<std::int64_t>(ui_width) * 2;
                     const std::int64_t denominator_y =
-                        static_cast<std::int64_t>(presented_height) * 2;
+                        static_cast<std::int64_t>(ui_height) * 2;
+                    const bool complete_mapping =
+                        left == original_left && top == original_top &&
+                        right == original_left + draw.event.width &&
+                        bottom == original_top + draw.event.height &&
+                        (page_x - draw.match.source.x) * pixels_per_word +
+                                draw.event.texture_coordinate->u == 0 &&
+                        page_y - draw.match.source.y +
+                                draw.event.texture_coordinate->v == 0 &&
+                        native_width == draw.event.width &&
+                        native_height == draw.event.height;
+                    if (gpu_edge_resolve) {
+                        if (!complete_mapping ||
+                            gpu_ui_overlay_count >= host::kMaximumGpuUiOverlays) {
+                            ++ui_stats_.native_fallbacks;
+                            continue;
+                        }
+                        gpu_ui_overlays[gpu_ui_overlay_count++] = {
+                            draw.handle, output_left, output_top,
+                            output_right - output_left, output_bottom - output_top,
+                            draw.event.color.red, draw.event.color.green,
+                            draw.event.color.blue, draw.event.raw_texture};
+                        ++ui_stats_.composited;
+                        ui_stats_.pixels_tested += pixels;
+                        ui_stats_.pixels_written += pixels;
+                        continue;
+                    }
                     bool touched = false;
                     for (std::uint32_t y = output_top; y < output_bottom; ++y) {
                         const std::int64_t local_y_numerator =
@@ -1271,7 +1306,7 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                                     std::min(255U, value * modulation / 128U));
                             };
                             const std::size_t destination =
-                                (static_cast<std::size_t>(y) * presented_width + x) * 3U;
+                                (static_cast<std::size_t>(y) * ui_width + x) * 3U;
                             enhanced_output[destination] = channel(0U);
                             enhanced_output[destination + 1U] = channel(1U);
                             enhanced_output[destination + 2U] = channel(2U);
@@ -1297,6 +1332,9 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
             submission.presentation_width = target_width;
             submission.presentation_height = target_height;
             submission.presentation_effects = gpu_presentation_effects;
+            submission.ui_overlay_count = gpu_ui_overlay_count;
+            std::copy_n(gpu_ui_overlays.begin(), gpu_ui_overlay_count,
+                        submission.ui_overlays.begin());
         }
         visual_digest_ = kFnvOffset;
         digest_bytes(visual_digest_, presented);

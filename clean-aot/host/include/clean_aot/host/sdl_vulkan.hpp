@@ -43,6 +43,9 @@ struct SdlPresentationMetrics final {
     std::uint64_t frame_upload_bytes = 0U;
     std::uint64_t gpu_effect_frames = 0U;
     std::uint64_t gpu_effect_output_pixels = 0U;
+    std::uint64_t gpu_ui_draws = 0U;
+    std::uint64_t gpu_ui_pixels = 0U;
+    std::uint64_t gpu_ui_stale_fallbacks = 0U;
     std::uint64_t display_presentations_confirmed = 0U;
     std::uint64_t acquire_not_ready = 0U;
     std::uint64_t sequence_errors = 0U;

@@ -825,6 +825,10 @@ void test_live_hd_font_and_banner_compositor() {
         expect(stats.texture_fetches <= 4096U, label);
         std::cout << label << " digest: 0x" << std::hex
                   << graphics.visual_digest() << std::dec << '\n';
+        expect(graphics.visual_digest() ==
+                   (asset_class == app::TitleAssetClass::Font
+                        ? 0x98c46da0534e0dd1ULL : 0xc834aa51ce2ff7dcULL),
+               "CPU HD UI reference digest remains pinned for GPU comparison");
         send(0x65000000U); send(10U << 16U); send(1U << 16U);
         send((1U << 16U) | 16U);
         send(0x02000000U); send(0U); send((1U << 16U) | 4U);

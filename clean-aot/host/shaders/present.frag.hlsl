@@ -7,6 +7,8 @@ cbuffer Presentation : register(b0, space3) {
     uint effects;
     uint2 output_origin;
     uint reserved;
+    uint3 modulation;
+    uint raw_texture;
 };
 
 uint3 load_rgb(uint2 p) {
@@ -47,6 +49,15 @@ uint3 resolved(uint2 p) {
 }
 
 float4 PSMain(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target0 {
+    if ((effects & 4U) != 0U) {
+        uint2 p = min(uint2(position.xy) - output_origin, output_size - 1U);
+        uint2 source = uint2((p.x * source_size.x) / output_size.x,
+                             (p.y * source_size.y) / output_size.y);
+        uint4 color = uint4(round(frame_texture.Load(int3(source, 0)) * 255.0));
+        if (color.a == 0U) discard;
+        if (raw_texture == 0U) color.rgb = min(255U, color.rgb * modulation / 128U);
+        return float4(float3(color.rgb) / 255.0, 1.0);
+    }
     if (effects == 0U) return frame_texture.Sample(frame_sampler, uv);
     uint2 p = min(uint2(position.xy) - output_origin, output_size - 1U);
     uint3 center = resolved(p);
