@@ -4,6 +4,22 @@
 #include <SDL3/SDL.h>
 
 namespace clean_aot::app {
+host::SdlVulkanConfig make_live_graphics_config(
+    const char* title, const GraphicsConfiguration& graphics,
+    host::FullscreenMode fullscreen) noexcept {
+    host::AspectPolicy aspect = host::AspectPolicy::preserve_4x3;
+    switch (graphics.presentation) {
+    case raster::PresentationMode::Identity4x3: aspect = host::AspectPolicy::preserve_4x3; break;
+    case raster::PresentationMode::Generic16x9: aspect = host::AspectPolicy::preserve_16x9; break;
+    case raster::PresentationMode::Generic21x9: aspect = host::AspectPolicy::preserve_21x9; break;
+    case raster::PresentationMode::Generic32x9: aspect = host::AspectPolicy::preserve_32x9; break;
+    case raster::PresentationMode::Custom: aspect = host::AspectPolicy::custom; break;
+    }
+    return host::SdlVulkanConfig{title, graphics.output_width,
+        graphics.output_height, fullscreen, aspect,
+        {graphics.custom_aspect_width, graphics.custom_aspect_height},
+        host::ScaleMode::fractional, false, false};
+}
 struct SdlPlatform::Impl final { SDL_Window* window=nullptr; SDL_AudioStream* audio=nullptr; SDL_Gamepad* gamepad=nullptr; std::uint64_t sample=0U; PlatformConfiguration config{}; AudioHealth health{}; };
 SdlPlatform::~SdlPlatform(){shutdown();}
 

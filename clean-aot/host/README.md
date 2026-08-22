@@ -1,5 +1,18 @@
 # Clean native host foundation
 
+## Native production presentation
+
+The Windows SDL3/Vulkan implementation is a complete host backend: it owns the
+window, Vulkan swapchain, 44.1-kHz audio stream, frame queue, controller state,
+and replacement textures. RGB scanout is converted into a reusable RGBA8
+staging texture, uploaded in a GPU copy pass, sampled by pinned SPIR-V, and
+drawn into the calculated 4K viewport. Exact 4:3 is the default; widescreen
+aspect policies must be selected explicitly.
+
+Replacement PNG pixels use the same upload contract in native and headless
+operation. Native uploads retain GPU textures while headless uploads allocate
+deterministic handles and digest the exact RGBA bytes.
+
 This directory is a platform-neutral host boundary for the clean static-AOT
 lane. It contains no guest CPU, game fix, title-specific graphics policy, or
 legacy runner dependency.

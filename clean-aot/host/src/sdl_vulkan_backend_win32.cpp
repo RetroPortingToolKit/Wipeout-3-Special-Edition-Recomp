@@ -10,6 +10,8 @@
 #include <cstdint>
 #include <limits>
 #include <new>
+#include <cstring>
+#include <vector>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
@@ -93,6 +95,20 @@ constexpr std::size_t kMaxEventsPerService = 32U;
 struct SdlVulkanPresentation::Impl final {
     SDL_Window* window = nullptr;
     SDL_GPUDevice* device = nullptr;
+    SDL_AudioStream* audio = nullptr;
+    SDL_GPUGraphicsPipeline* present_pipeline = nullptr;
+    SDL_GPUSampler* present_sampler = nullptr;
+    SDL_GPUTexture* frame_texture = nullptr;
+    SDL_GPUTransferBuffer* frame_transfer = nullptr;
+    std::uint32_t frame_width = 0U;
+    std::uint32_t frame_height = 0U;
+    std::uint32_t frame_transfer_bytes = 0U;
+    struct ReplacementTexture final {
+        SDL_GPUTexture* texture = nullptr;
+        std::uint64_t handle = 0U;
+    };
+    std::vector<ReplacementTexture> replacements{};
+    std::uint64_t next_replacement_handle = 1U;
     HMODULE vulkan_loader = nullptr;
     FixedSpscQueue<FrameSubmission, kFrameQueueDepth> frames{};
     FixedSpscQueue<HostEvent, kEventQueueDepth> events{};
@@ -110,7 +126,108 @@ struct SdlVulkanPresentation::Impl final {
     bool device_lost = false;
     bool swapchain_recreation_requested = false;
     std::uint64_t next_sequence = 0U;
+    std::uint64_t next_audio_update = 0U;
+    ControllerState controller{};
 };
+
+namespace {
+
+template <typename ImplType>
+[[nodiscard]] bool create_texture_upload_resources(
+    ImplType& impl, std::uint32_t width,
+    std::uint32_t height) noexcept {
+    const std::uint64_t bytes64 = static_cast<std::uint64_t>(width) * height * 4U;
+    if (width == 0U || height == 0U || bytes64 > std::numeric_limits<Uint32>::max()) {
+        return false;
+    }
+    if (impl.frame_texture != nullptr && impl.frame_width == width &&
+        impl.frame_height == height) return true;
+    if (impl.frame_texture != nullptr) SDL_ReleaseGPUTexture(impl.device, impl.frame_texture);
+    if (impl.frame_transfer != nullptr) SDL_ReleaseGPUTransferBuffer(impl.device, impl.frame_transfer);
+    impl.frame_texture = nullptr; impl.frame_transfer = nullptr;
+    const SDL_GPUTextureCreateInfo texture_info{SDL_GPU_TEXTURETYPE_2D,
+        SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM, SDL_GPU_TEXTUREUSAGE_SAMPLER,
+        width, height, 1U, 1U, SDL_GPU_SAMPLECOUNT_1, 0U};
+    impl.frame_texture = SDL_CreateGPUTexture(impl.device, &texture_info);
+    const SDL_GPUTransferBufferCreateInfo transfer_info{
+        SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, static_cast<Uint32>(bytes64), 0U};
+    impl.frame_transfer = SDL_CreateGPUTransferBuffer(impl.device, &transfer_info);
+    if (impl.frame_texture == nullptr || impl.frame_transfer == nullptr) return false;
+    impl.frame_width = width; impl.frame_height = height;
+    impl.frame_transfer_bytes = static_cast<std::uint32_t>(bytes64);
+    return true;
+}
+
+[[nodiscard]] bool copy_frame_rgba(const FrameView& frame,
+                                   std::uint8_t* output) noexcept {
+    for (std::uint32_t y = 0U; y < frame.height; ++y) {
+        const std::uint8_t* source = frame.pixels + static_cast<std::size_t>(y) * frame.pitch;
+        std::uint8_t* destination = output +
+            static_cast<std::size_t>(y) * frame.width * 4U;
+        for (std::uint32_t x = 0U; x < frame.width; ++x) {
+            switch (frame.format) {
+            case PixelFormat::rgba8_unorm:
+                std::memcpy(destination, source, 4U); source += 4U; break;
+            case PixelFormat::bgra8_unorm:
+                destination[0] = source[2]; destination[1] = source[1];
+                destination[2] = source[0]; destination[3] = source[3]; source += 4U; break;
+            case PixelFormat::rgb8_unorm:
+                destination[0] = source[0]; destination[1] = source[1];
+                destination[2] = source[2]; destination[3] = 255U; source += 3U; break;
+            case PixelFormat::rgb565: {
+                const std::uint16_t value = static_cast<std::uint16_t>(source[0]) |
+                    static_cast<std::uint16_t>(static_cast<std::uint16_t>(source[1]) << 8U);
+                destination[0] = static_cast<std::uint8_t>(((value >> 11U) & 31U) * 255U / 31U);
+                destination[1] = static_cast<std::uint8_t>(((value >> 5U) & 63U) * 255U / 63U);
+                destination[2] = static_cast<std::uint8_t>((value & 31U) * 255U / 31U);
+                destination[3] = 255U; source += 2U; break;
+            }
+            case PixelFormat::indexed8:
+                return false;
+            }
+            destination += 4U;
+        }
+    }
+    return true;
+}
+
+template <typename ImplType>
+[[nodiscard]] bool encode_default_frame(ImplType& impl,
+    SDL_GPUCommandBuffer* command_buffer, SDL_GPUTexture* swapchain_texture,
+    const FrameView& frame, const Viewport& viewport) noexcept {
+    if (!create_texture_upload_resources(impl, frame.width, frame.height)) return false;
+    auto* mapped = static_cast<std::uint8_t*>(
+        SDL_MapGPUTransferBuffer(impl.device, impl.frame_transfer, true));
+    if (mapped == nullptr || !copy_frame_rgba(frame, mapped)) {
+        if (mapped != nullptr) SDL_UnmapGPUTransferBuffer(impl.device, impl.frame_transfer);
+        return false;
+    }
+    SDL_UnmapGPUTransferBuffer(impl.device, impl.frame_transfer);
+    SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(command_buffer);
+    if (copy == nullptr) return false;
+    const SDL_GPUTextureTransferInfo source{impl.frame_transfer, 0U, frame.width, frame.height};
+    const SDL_GPUTextureRegion destination{impl.frame_texture, 0U, 0U, 0U, 0U, 0U,
+                                            frame.width, frame.height, 1U};
+    SDL_UploadToGPUTexture(copy, &source, &destination, true);
+    SDL_EndGPUCopyPass(copy);
+    SDL_GPUColorTargetInfo target{}; target.texture = swapchain_texture;
+    target.clear_color = SDL_FColor{0.0F, 0.0F, 0.0F, 1.0F};
+    target.load_op = SDL_GPU_LOADOP_CLEAR; target.store_op = SDL_GPU_STOREOP_STORE;
+    SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(command_buffer, &target, 1U, nullptr);
+    if (pass == nullptr) return false;
+    SDL_BindGPUGraphicsPipeline(pass, impl.present_pipeline);
+    const SDL_GPUTextureSamplerBinding binding{impl.frame_texture, impl.present_sampler};
+    SDL_BindGPUFragmentSamplers(pass, 0U, &binding, 1U);
+    const SDL_GPUViewport gpu_viewport{static_cast<float>(viewport.x),
+        static_cast<float>(viewport.y), static_cast<float>(viewport.width),
+        static_cast<float>(viewport.height), 0.0F, 1.0F};
+    SDL_SetGPUViewport(pass, &gpu_viewport);
+    SDL_DrawGPUPrimitives(pass, 3U, 1U, 0U, 0U);
+    SDL_EndGPURenderPass(pass);
+    return true;
+}
+
+} // namespace
 
 SdlVulkanPresentation::SdlVulkanPresentation(
     const SdlVulkanConfig& config) noexcept
@@ -134,11 +251,20 @@ HostStatus SdlVulkanPresentation::initialize() noexcept {
         config_.width, config_.height, config_.fullscreen};
     impl_->requested_fullscreen = config_.fullscreen;
 
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) {
         shutdown();
         return sdl_failure();
     }
     impl_->sdl_initialized = true;
+    const SDL_AudioSpec audio_spec{
+        SDL_AUDIO_S16, static_cast<int>(kAudioChannels),
+        static_cast<int>(kAudioSampleRateHz)};
+    impl_->audio = SDL_OpenAudioDeviceStream(
+        SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &audio_spec, nullptr, nullptr);
+    if (impl_->audio == nullptr || !SDL_ResumeAudioStreamDevice(impl_->audio)) {
+        shutdown();
+        return sdl_failure(HostCode::unsupported);
+    }
 
     // LoadLibraryExW with a system-only search policy is intentional: the
     // runtime only needs the Windows Vulkan loader. No Vulkan SDK import
@@ -156,7 +282,8 @@ HostStatus SdlVulkanPresentation::initialize() noexcept {
     }
     impl_->sdl_vulkan_loaded = true;
 
-    const SDL_WindowFlags flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE;
+    const SDL_WindowFlags flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE |
+        (config_.hidden ? SDL_WINDOW_HIDDEN : 0U);
     impl_->window = SDL_CreateWindow(
         config_.title,
         static_cast<int>(config_.width),
@@ -209,15 +336,43 @@ HostStatus SdlVulkanPresentation::initialize() noexcept {
     fragment_info.entrypoint = "PSMain";
     fragment_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
     fragment_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
+    fragment_info.num_samplers = 1U;
     SDL_GPUShader* fragment_shader =
         SDL_CreateGPUShader(impl_->device, &fragment_info);
-    if (vertex_shader != nullptr) {
-        SDL_ReleaseGPUShader(impl_->device, vertex_shader);
-    }
-    if (fragment_shader != nullptr) {
-        SDL_ReleaseGPUShader(impl_->device, fragment_shader);
-    }
     if (vertex_shader == nullptr || fragment_shader == nullptr) {
+        if (vertex_shader != nullptr) SDL_ReleaseGPUShader(impl_->device, vertex_shader);
+        if (fragment_shader != nullptr) SDL_ReleaseGPUShader(impl_->device, fragment_shader);
+        shutdown();
+        return sdl_failure(HostCode::unsupported);
+    }
+
+    SDL_GPUColorTargetDescription color_target{};
+    color_target.format = SDL_GetGPUSwapchainTextureFormat(
+        impl_->device, impl_->window);
+    SDL_GPUGraphicsPipelineCreateInfo pipeline_info{};
+    pipeline_info.vertex_shader = vertex_shader;
+    pipeline_info.fragment_shader = fragment_shader;
+    pipeline_info.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+    pipeline_info.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
+    pipeline_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
+    pipeline_info.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
+    pipeline_info.target_info.color_target_descriptions = &color_target;
+    pipeline_info.target_info.num_color_targets = 1U;
+    impl_->present_pipeline = SDL_CreateGPUGraphicsPipeline(
+        impl_->device, &pipeline_info);
+    SDL_ReleaseGPUShader(impl_->device, vertex_shader);
+    SDL_ReleaseGPUShader(impl_->device, fragment_shader);
+
+    SDL_GPUSamplerCreateInfo sampler_info{};
+    sampler_info.min_filter = SDL_GPU_FILTER_NEAREST;
+    sampler_info.mag_filter = SDL_GPU_FILTER_NEAREST;
+    sampler_info.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
+    sampler_info.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    sampler_info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    sampler_info.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    impl_->present_sampler = SDL_CreateGPUSampler(impl_->device, &sampler_info);
+    if (impl_->present_pipeline == nullptr || impl_->present_sampler == nullptr) {
         shutdown();
         return sdl_failure(HostCode::unsupported);
     }
@@ -237,6 +392,38 @@ HostStatus SdlVulkanPresentation::submit_frame(
     if (!impl_->frames.try_push(frame)) {
         return sdl_failure(HostCode::queue_full);
     }
+    return HostStatus{};
+}
+
+HostStatus SdlVulkanPresentation::submit_audio(
+    const StereoAudioBatch& audio) noexcept {
+    if (impl_ == nullptr || !impl_->initialized || impl_->shutting_down) {
+        return sdl_failure(HostCode::shutting_down);
+    }
+    if (audio.interleaved_stereo == nullptr ||
+        audio.sample_frames != kAudioFramesPerUpdate) {
+        return sdl_failure(HostCode::invalid_argument);
+    }
+    if (audio.update_index != impl_->next_audio_update) {
+        impl_->next_audio_update = audio.update_index + 1U;
+        return sdl_failure(HostCode::sequence_error);
+    }
+    const std::uint32_t byte_count = audio.sample_frames * kAudioChannels *
+        static_cast<std::uint32_t>(sizeof(std::int16_t));
+    if (!SDL_PutAudioStreamData(impl_->audio, audio.interleaved_stereo,
+                                static_cast<int>(byte_count))) {
+        return sdl_failure(HostCode::device_lost);
+    }
+    ++impl_->next_audio_update;
+    return HostStatus{};
+}
+
+HostStatus SdlVulkanPresentation::submit_controller(
+    const ControllerState& state) noexcept {
+    if (impl_ == nullptr || !impl_->initialized || impl_->shutting_down) {
+        return sdl_failure(HostCode::shutting_down);
+    }
+    impl_->controller = state;
     return HostStatus{};
 }
 
@@ -420,7 +607,7 @@ HostStatus SdlVulkanPresentation::service() noexcept {
         impl_->pending_frame.surface.width,
         impl_->pending_frame.surface.height,
         config_.aspect,
-        {},
+        config_.custom_aspect,
         config_.scale};
     const HostStatus viewport_status =
         calculate_viewport(viewport_request, viewport);
@@ -439,20 +626,9 @@ HostStatus SdlVulkanPresentation::service() noexcept {
     if (encoder_ != nullptr) {
         encode_status = encoder_->encode(
             context, impl_->pending_frame.surface);
-    } else {
-        SDL_GPUColorTargetInfo target{};
-        target.texture = swapchain_texture;
-        target.clear_color = SDL_FColor{0.0F, 0.0F, 0.0F, 1.0F};
-        target.load_op = SDL_GPU_LOADOP_CLEAR;
-        target.store_op = SDL_GPU_STOREOP_STORE;
-        SDL_GPURenderPass* pass =
-            SDL_BeginGPURenderPass(command_buffer, &target, 1U, nullptr);
-        if (pass == nullptr) {
-            SDL_CancelGPUCommandBuffer(command_buffer);
-            mark_device_lost();
-            return sdl_failure(HostCode::device_lost);
-        }
-        SDL_EndGPURenderPass(pass);
+    } else if (!encode_default_frame(*impl_, command_buffer, swapchain_texture,
+                                     impl_->pending_frame.surface, viewport)) {
+        encode_status = sdl_failure(HostCode::internal_error);
     }
     if (!encode_status.success()) {
         SDL_CancelGPUCommandBuffer(command_buffer);
@@ -487,6 +663,73 @@ void SdlVulkanPresentation::set_frame_encoder(IFrameEncoder* encoder) noexcept {
     encoder_ = encoder;
 }
 
+HostStatus SdlVulkanPresentation::upload_replacement(
+    const ReplacementImage& replacement, std::uint64_t& handle) noexcept {
+    handle = 0U;
+    if (impl_ == nullptr || !impl_->initialized || impl_->shutting_down ||
+        replacement.width == 0U || replacement.height == 0U) {
+        return sdl_failure(HostCode::not_ready);
+    }
+    const std::uint64_t bytes64 = static_cast<std::uint64_t>(replacement.width) *
+        replacement.height * 4U;
+    if (bytes64 != replacement.rgba8.size() ||
+        bytes64 > std::numeric_limits<Uint32>::max()) {
+        return sdl_failure(HostCode::invalid_argument);
+    }
+    const SDL_GPUTextureCreateInfo texture_info{SDL_GPU_TEXTURETYPE_2D,
+        SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM, SDL_GPU_TEXTUREUSAGE_SAMPLER,
+        replacement.width, replacement.height, 1U, 1U,
+        SDL_GPU_SAMPLECOUNT_1, 0U};
+    SDL_GPUTexture* texture = SDL_CreateGPUTexture(impl_->device, &texture_info);
+    const SDL_GPUTransferBufferCreateInfo transfer_info{
+        SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, static_cast<Uint32>(bytes64), 0U};
+    SDL_GPUTransferBuffer* transfer = SDL_CreateGPUTransferBuffer(
+        impl_->device, &transfer_info);
+    if (texture == nullptr || transfer == nullptr) {
+        if (texture != nullptr) SDL_ReleaseGPUTexture(impl_->device, texture);
+        if (transfer != nullptr) SDL_ReleaseGPUTransferBuffer(impl_->device, transfer);
+        return sdl_failure();
+    }
+    void* mapped = SDL_MapGPUTransferBuffer(impl_->device, transfer, false);
+    if (mapped == nullptr) {
+        SDL_ReleaseGPUTexture(impl_->device, texture);
+        SDL_ReleaseGPUTransferBuffer(impl_->device, transfer);
+        return sdl_failure();
+    }
+    std::memcpy(mapped, replacement.rgba8.data(), replacement.rgba8.size());
+    SDL_UnmapGPUTransferBuffer(impl_->device, transfer);
+    SDL_GPUCommandBuffer* command = SDL_AcquireGPUCommandBuffer(impl_->device);
+    SDL_GPUCopyPass* copy = command == nullptr ? nullptr : SDL_BeginGPUCopyPass(command);
+    if (copy == nullptr) {
+        if (command != nullptr) SDL_CancelGPUCommandBuffer(command);
+        SDL_ReleaseGPUTexture(impl_->device, texture);
+        SDL_ReleaseGPUTransferBuffer(impl_->device, transfer);
+        return sdl_failure();
+    }
+    const SDL_GPUTextureTransferInfo source{transfer, 0U, replacement.width,
+                                             replacement.height};
+    const SDL_GPUTextureRegion destination{texture, 0U, 0U, 0U, 0U, 0U,
+        replacement.width, replacement.height, 1U};
+    SDL_UploadToGPUTexture(copy, &source, &destination, false);
+    SDL_EndGPUCopyPass(copy);
+    const bool submitted = SDL_SubmitGPUCommandBuffer(command);
+    SDL_ReleaseGPUTransferBuffer(impl_->device, transfer);
+    if (!submitted) {
+        SDL_ReleaseGPUTexture(impl_->device, texture);
+        mark_device_lost();
+        return sdl_failure(HostCode::device_lost);
+    }
+    try {
+        handle = impl_->next_replacement_handle++;
+        impl_->replacements.push_back(Impl::ReplacementTexture{texture, handle});
+    } catch (...) {
+        SDL_ReleaseGPUTexture(impl_->device, texture);
+        handle = 0U;
+        return sdl_failure();
+    }
+    return HostStatus{};
+}
+
 void SdlVulkanPresentation::shutdown() noexcept {
     if (impl_ == nullptr) {
         return;
@@ -500,12 +743,36 @@ void SdlVulkanPresentation::shutdown() noexcept {
     impl_->shutting_down = true;
     if (impl_->device != nullptr) {
         (void)SDL_WaitForGPUIdle(impl_->device);
+        for (const Impl::ReplacementTexture& replacement : impl_->replacements) {
+            SDL_ReleaseGPUTexture(impl_->device, replacement.texture);
+        }
+        impl_->replacements.clear();
+        if (impl_->frame_transfer != nullptr) {
+            SDL_ReleaseGPUTransferBuffer(impl_->device, impl_->frame_transfer);
+            impl_->frame_transfer = nullptr;
+        }
+        if (impl_->frame_texture != nullptr) {
+            SDL_ReleaseGPUTexture(impl_->device, impl_->frame_texture);
+            impl_->frame_texture = nullptr;
+        }
+        if (impl_->present_sampler != nullptr) {
+            SDL_ReleaseGPUSampler(impl_->device, impl_->present_sampler);
+            impl_->present_sampler = nullptr;
+        }
+        if (impl_->present_pipeline != nullptr) {
+            SDL_ReleaseGPUGraphicsPipeline(impl_->device, impl_->present_pipeline);
+            impl_->present_pipeline = nullptr;
+        }
         if (impl_->window != nullptr && impl_->window_claimed) {
             SDL_ReleaseWindowFromGPUDevice(impl_->device, impl_->window);
             impl_->window_claimed = false;
         }
         SDL_DestroyGPUDevice(impl_->device);
         impl_->device = nullptr;
+    }
+    if (impl_->audio != nullptr) {
+        SDL_DestroyAudioStream(impl_->audio);
+        impl_->audio = nullptr;
     }
     if (impl_->window != nullptr) {
         SDL_DestroyWindow(impl_->window);
@@ -520,7 +787,7 @@ void SdlVulkanPresentation::shutdown() noexcept {
         impl_->vulkan_loader = nullptr;
     }
     if (impl_->sdl_initialized) {
-        SDL_QuitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD);
+        SDL_QuitSubSystem(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD);
         impl_->sdl_initialized = false;
     }
     delete impl_;

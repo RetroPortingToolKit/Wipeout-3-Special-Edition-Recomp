@@ -4,6 +4,7 @@
 
 #include "clean_aot/host/fixed_queue.hpp"
 #include "clean_aot/host/host.hpp"
+#include "clean_aot/host/render_interfaces.hpp"
 
 namespace clean_aot::host {
 
@@ -22,11 +23,13 @@ struct HeadlessStats final {
     std::uint64_t queue_full_errors = 0U;
     std::uint64_t frame_digest = 1469598103934665603ULL;
     std::uint64_t audio_digest = 1469598103934665603ULL;
+    std::uint64_t replacement_digest = 1469598103934665603ULL;
+    std::uint64_t replacements_uploaded = 0U;
     ControllerState controller{};
     WindowState window{640U, 480U, FullscreenMode::windowed};
 };
 
-class HeadlessBackend final : public IHostBackend {
+class HeadlessBackend final : public IHostBackend, public IReplacementUploader {
 public:
     HeadlessBackend() noexcept = default;
     ~HeadlessBackend() override { shutdown(); }
@@ -41,6 +44,9 @@ public:
         const WindowRequest& request) noexcept override;
     [[nodiscard]] HostStatus service() noexcept override;
     [[nodiscard]] bool poll_event(HostEvent& event) noexcept override;
+    [[nodiscard]] HostStatus upload_replacement(
+        const ReplacementImage& replacement,
+        std::uint64_t& handle) noexcept override;
     void shutdown() noexcept override;
     [[nodiscard]] bool shutting_down() const noexcept override {
         return shutting_down_;

@@ -216,4 +216,26 @@ if(CLEAN_AOT_HOST_ENABLE_SDL_VULKAN)
             target_compile_options(clean_aot_host_sdl_vulkan PRIVATE -Werror)
         endif()
     endif()
+    if(CLEAN_AOT_HOST_BUILD_TESTS AND BUILD_TESTING)
+        add_executable(clean_aot_host_sdl_vulkan_tests
+            tests/sdl_vulkan_tests.cpp)
+        target_link_libraries(clean_aot_host_sdl_vulkan_tests PRIVATE
+            clean_aot_host_sdl_vulkan)
+        if(MSVC)
+            target_compile_options(clean_aot_host_sdl_vulkan_tests PRIVATE
+                /W4 /WX /permissive-)
+        else()
+            target_compile_options(clean_aot_host_sdl_vulkan_tests PRIVATE
+                -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion
+                -Wshadow -Werror)
+        endif()
+        add_custom_command(TARGET clean_aot_host_sdl_vulkan_tests POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                "$<TARGET_FILE:SDL3::SDL3>"
+                "$<TARGET_FILE_DIR:clean_aot_host_sdl_vulkan_tests>")
+        add_test(NAME clean_aot_host_sdl_vulkan_tests
+            COMMAND clean_aot_host_sdl_vulkan_tests)
+        set_tests_properties(clean_aot_host_sdl_vulkan_tests PROPERTIES
+            ENVIRONMENT "SDL_AUDIODRIVER=dummy")
+    endif()
 endif()

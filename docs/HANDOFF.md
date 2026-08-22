@@ -1,5 +1,18 @@
 # Handoff
 
+## Native production presentation checkpoint (2026-08-21)
+
+- The Windows SDL3/Vulkan presenter is now a complete live host backend rather
+  than a shader-validation placeholder. It uploads raster scanout through a
+  reusable staging texture, samples it into the swapchain viewport, owns exact
+  44.1-kHz audio submission, and retains replacement RGBA textures.
+- App graphics policy maps deterministically to 3840x2160 exact-4:3 defaults or
+  explicit 16:9/21:9/32:9/custom output. The headless backend implements the
+  same replacement upload contract with pinned digest `f2a57b68e1fd4d73`.
+- The pinned DXC shader rebuild matches the checked-in SPIR-V header. Strict
+  native GCC tests pass 11/11 for the app graph and 5/5 for the host graph,
+  including a real Windows Vulkan frame/replacement upload runtime test.
+
 ## Live graphics integration checkpoint (2026-08-21)
 
 - The application has an opt-in production scanout mode which drains the

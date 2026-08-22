@@ -494,6 +494,29 @@ void test_4k_scanout_frame_binding() {
            "host frame retains scanout format, bounds, and first pixel");
 }
 
+void test_headless_replacement_upload() {
+    HeadlessBackend backend;
+    const std::array<std::uint8_t, 8U> pixels{
+        1U, 2U, 3U, 4U, 5U, 6U, 7U, 8U};
+    clean_aot::host::ReplacementImage image{};
+    image.width = 2U;
+    image.height = 1U;
+    image.rgba8 = pixels;
+    std::uint64_t handle = 0U;
+    expect(backend.upload_replacement(image, handle).success() && handle == 1U,
+           "headless replacement upload allocates deterministic handle");
+    expect(backend.stats().replacements_uploaded == 1U,
+           "headless replacement upload is counted");
+    std::cout << "replacement digest: 0x" << std::hex
+              << backend.stats().replacement_digest << std::dec << '\n';
+    expect(backend.stats().replacement_digest == 0xf2a57b68e1fd4d73ULL,
+           "headless replacement digest remains deterministic");
+    image.rgba8 = std::span<const std::uint8_t>(pixels).first(7U);
+    expect(backend.upload_replacement(image, handle).code == HostCode::invalid_argument &&
+               handle == 0U,
+           "headless replacement rejects malformed RGBA extent");
+}
+
 } // namespace
 
 int main() {
@@ -504,6 +527,7 @@ int main() {
     test_precise_geometry_bridge_visual_digest();
     test_gte_memory_gpu_host_provenance_chain();
     test_4k_scanout_frame_binding();
+    test_headless_replacement_upload();
     if (failures != 0) {
         std::cerr << failures << " host tests failed\n";
         return 1;

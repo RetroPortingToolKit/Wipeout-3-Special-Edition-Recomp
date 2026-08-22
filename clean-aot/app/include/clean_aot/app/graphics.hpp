@@ -1,6 +1,7 @@
 #pragma once
 
 #include "clean_aot/host/host.hpp"
+#include "clean_aot/host/render_interfaces.hpp"
 #include "clean_aot/raster/raster.hpp"
 #include "clean_aot/runtime/runtime.hpp"
 #include "psx_render/replacement_manifest.h"
@@ -44,13 +45,6 @@ struct GraphicsConfiguration final {
     IReplacementKeyPolicy* replacement_policy = nullptr;
 };
 
-struct DecodedReplacement final {
-    psx::render::ReplacementIdentity identity{};
-    std::uint32_t width = 0U;
-    std::uint32_t height = 0U;
-    std::vector<std::uint8_t> rgba8{};
-};
-
 class IPngDecoder {
 public:
     virtual ~IPngDecoder() = default;
@@ -73,20 +67,12 @@ public:
         std::vector<std::uint8_t>& rgba8) noexcept override;
 };
 
-class IReplacementUploader {
-public:
-    virtual ~IReplacementUploader() = default;
-    [[nodiscard]] virtual host::HostStatus upload(
-        const DecodedReplacement& replacement,
-        std::uint64_t& handle) noexcept = 0;
-};
-
 class ReplacementAssetRuntime final {
 public:
     ReplacementAssetRuntime(psx::render::ReplacementManifest manifest,
                             std::filesystem::path root,
                             IPngDecoder& decoder,
-                            IReplacementUploader& uploader,
+                            host::IReplacementUploader& uploader,
                             FontManifestPolicy font_policy =
                                 FontManifestPolicy::ManifestOnly) noexcept;
 
@@ -100,7 +86,7 @@ private:
     psx::render::ReplacementManifest manifest_;
     std::filesystem::path root_;
     IPngDecoder& decoder_;
-    IReplacementUploader& uploader_;
+    host::IReplacementUploader& uploader_;
     FontManifestPolicy font_policy_ = FontManifestPolicy::ManifestOnly;
     struct CachedAsset final {
         psx::render::ReplacementIdentity identity{};

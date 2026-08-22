@@ -209,6 +209,24 @@ bool HeadlessBackend::poll_event(HostEvent& event) noexcept {
     return events_.try_pop(event);
 }
 
+HostStatus HeadlessBackend::upload_replacement(
+    const ReplacementImage& replacement,
+    std::uint64_t& handle) noexcept {
+    handle = 0U;
+    const std::uint64_t required = static_cast<std::uint64_t>(replacement.width) *
+        replacement.height * 4U;
+    if (shutting_down_ || replacement.width == 0U || replacement.height == 0U ||
+        required != replacement.rgba8.size()) {
+        return HostStatus{shutting_down_ ? HostCode::shutting_down
+                                        : HostCode::invalid_argument};
+    }
+    stats_.replacement_digest = fnv1a(stats_.replacement_digest,
+        replacement.rgba8.data(), replacement.rgba8.size());
+    ++stats_.replacements_uploaded;
+    handle = stats_.replacements_uploaded;
+    return HostStatus{};
+}
+
 void HeadlessBackend::shutdown() noexcept {
     if (shutting_down_) {
         return;

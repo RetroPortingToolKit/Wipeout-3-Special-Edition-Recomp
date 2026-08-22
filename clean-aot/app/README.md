@@ -31,8 +31,9 @@ Startup requires all of the following external setup products:
 
 Every file is re-measured before runtime or host initialization. Unknown,
 tampered, non-finalized, path-traversing, or mismatched inputs fail closed. The
-shell contains no compiler, decoder, interpreter, JIT, capture path, game
-identity shortcut, or fallback dispatch.
+shell contains no compiler, guest-code decoder, interpreter, JIT, capture path,
+game identity shortcut, or fallback dispatch. Its narrowly scoped WIC image
+decoder accepts only hash- and dimension-pinned replacement PNGs.
 
 `Application` is platform-neutral and drives one authenticated generated
 region, deterministic runtime advancement, frame submission, exact 441-frame

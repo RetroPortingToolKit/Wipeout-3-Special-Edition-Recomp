@@ -32,6 +32,21 @@ struct RenderGeometry final {
     std::uint32_t index_count = 0U;
 };
 
+struct ReplacementImage final {
+    psx::render::ReplacementIdentity identity{};
+    std::uint32_t width = 0U;
+    std::uint32_t height = 0U;
+    std::span<const std::uint8_t> rgba8{};
+};
+
+class IReplacementUploader {
+public:
+    virtual ~IReplacementUploader() = default;
+    [[nodiscard]] virtual HostStatus upload_replacement(
+        const ReplacementImage& replacement,
+        std::uint64_t& handle) noexcept = 0;
+};
+
 struct GeometryBridgeResult final {
     HostStatus status{HostCode::invalid_argument};
     RenderGeometry geometry{};

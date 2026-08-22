@@ -25,12 +25,13 @@ public:
     }
     std::uint32_t calls = 0U;
 };
-class FakeUploader final : public clean_aot::app::IReplacementUploader {
+class FakeUploader final : public clean_aot::host::IReplacementUploader {
 public:
-    clean_aot::host::HostStatus upload(
-        const clean_aot::app::DecodedReplacement& replacement,
+    clean_aot::host::HostStatus upload_replacement(
+        const clean_aot::host::ReplacementImage& replacement,
         std::uint64_t& handle) noexcept override {
-        ++calls; last_rgba = replacement.rgba8; handle = 100U + calls; return {};
+        ++calls; last_rgba.assign(replacement.rgba8.begin(),replacement.rgba8.end());
+        handle = 100U + calls; return {};
     }
     std::uint64_t calls = 0U;
     std::vector<std::uint8_t> last_rgba{};

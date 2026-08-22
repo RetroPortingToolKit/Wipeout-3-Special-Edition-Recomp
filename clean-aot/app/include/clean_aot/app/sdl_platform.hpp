@@ -1,6 +1,8 @@
 #pragma once
 
 #include "clean_aot/host/host.hpp"
+#include "clean_aot/host/sdl_vulkan.hpp"
+#include "clean_aot/app/graphics.hpp"
 
 #include <cstdint>
 
@@ -20,6 +22,10 @@ struct AudioHealth final {
     std::uint64_t overflows = 0U;
     std::uint32_t queued_frames = 0U;
 };
+
+[[nodiscard]] host::SdlVulkanConfig make_live_graphics_config(
+    const char* title, const GraphicsConfiguration& graphics,
+    host::FullscreenMode fullscreen = host::FullscreenMode::borderless) noexcept;
 
 class SdlPlatform final {
 public:

@@ -120,7 +120,7 @@ ReplacementAssetRuntime::ReplacementAssetRuntime(
     psx::render::ReplacementManifest manifest,
     std::filesystem::path root,
     IPngDecoder& decoder,
-    IReplacementUploader& uploader,
+    host::IReplacementUploader& uploader,
     FontManifestPolicy font_policy) noexcept
     : manifest_(std::move(manifest)), root_(std::move(root)),
       decoder_(decoder), uploader_(uploader), font_policy_(font_policy) {}
@@ -167,14 +167,17 @@ host::HostStatus ReplacementAssetRuntime::resolve_and_upload(
         if (!input || detail::sha256(png) != entry->sha256) {
             return {host::HostCode::invalid_argument};
         }
-        DecodedReplacement decoded{*identity, entry->width, entry->height, {}};
-        if (!decoder_.decode(png, entry->width, entry->height, decoded.rgba8) ||
-            decoded.rgba8.size() !=
+        std::vector<std::uint8_t> rgba8;
+        if (!decoder_.decode(png, entry->width, entry->height, rgba8) ||
+            rgba8.size() !=
                 static_cast<std::size_t>(entry->width) * entry->height * 4U) {
             return {host::HostCode::invalid_argument};
         }
+        const host::ReplacementImage decoded{
+            *identity, entry->width, entry->height, rgba8};
         std::uint64_t uploaded = 0U;
-        const host::HostStatus status = uploader_.upload(decoded, uploaded);
+        const host::HostStatus status =
+            uploader_.upload_replacement(decoded, uploaded);
         if (!status.success() || uploaded == 0U) return status.success()
             ? host::HostStatus{host::HostCode::internal_error} : status;
         if (cached == cache_.end()) cache_.push_back(CachedAsset{*identity, uploaded});
