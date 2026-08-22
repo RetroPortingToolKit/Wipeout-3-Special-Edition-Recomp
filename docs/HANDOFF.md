@@ -52,6 +52,12 @@
 - A link-time-optimization experiment was ruled out by the bundled compiler:
   its `cc1` has no LTO support. The Release build was restored to its original
   `-O3 -DNDEBUG` flags; no product behavior depends on the failed experiment.
+- FMV handling was corrected separately from gameplay cadence. Depth-24/MDEC
+  presents now use a 50-Hz host period while PAL x2 gameplay remains 100 Hz,
+  and the OpenGL FMV path receives the measured valid RGB width instead of
+  forcing full-width sampling. Release rebuilt successfully and telemetry
+  showed the FMV interval at approximately 50 Hz after the PAL gameplay
+  interval; long-run audio/race verification remains open.
 
 ## Open blockers
 
