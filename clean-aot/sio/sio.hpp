@@ -366,6 +366,9 @@ private:
     [[nodiscard]] bool valid_address() const noexcept;
     [[nodiscard]] std::size_t image_offset() const noexcept;
     [[nodiscard]] std::uint64_t protocol_fingerprint() const noexcept;
+    [[nodiscard]] std::uint64_t sector_fingerprint(std::size_t sector) const noexcept;
+    [[nodiscard]] std::uint64_t calculated_image_fingerprint() const noexcept;
+    void rebuild_fingerprint_index() noexcept;
     void commit_pending_write() noexcept;
     void fail_command() noexcept;
     void clear_transaction() noexcept;
@@ -386,6 +389,8 @@ private:
     std::uint32_t write_generation_ = 0;
     std::uint32_t error_count_ = 0;
     std::array<std::uint8_t, kSectorSize> pending_data_{};
+    std::array<std::uint64_t, kSectorCount> sector_fingerprints_{};
+    std::uint64_t indexed_image_fingerprint_ = 0;
 };
 
 struct SioSnapshot {

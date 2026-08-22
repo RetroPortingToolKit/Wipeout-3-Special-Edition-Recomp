@@ -163,6 +163,7 @@ void PadDevice::start_watchdog(Cycle cycle) noexcept {
 
 void PadDevice::reset_after_watchdog() noexcept {
     const PadInput input = state_.input;
+    const bool had_configuration = configuration_used_;
     state_ = PadState{};
     state_.input = input;
     state_.rumble_map.fill(0xFFU);
@@ -176,8 +177,8 @@ void PadDevice::reset_after_watchdog() noexcept {
     transaction_done_ = false;
     watchdog_deadline_ = 0;
     watchdog_active_ = false;
-    configuration_used_ = false;
-    id_high_suppressed_ = false;
+    configuration_used_ = had_configuration;
+    id_high_suppressed_ = had_configuration;
 }
 
 void PadDevice::apply_analog_button(bool enabled) noexcept {
@@ -450,6 +451,8 @@ ByteTransfer PadDevice::exchange_configuration(std::uint8_t value,
         if (phase_ == 7U) {
             if (pending_mode_ == 0U) {
                 state_.configuration_mode = false;
+                watchdog_active_ = false;
+                watchdog_deadline_ = 0U;
             }
         }
         return response(phase_ == 1U ? response_id_high() : 0x00U, 7U);
@@ -630,12 +633,22 @@ bool PadDevice::restore(const PadSnapshot& snapshot_value) noexcept {
     if (snapshot_value.state.rumble_small > 1U) {
         return false;
     }
+    if (partial_rumble_command) {
+        const std::size_t completed = static_cast<std::size_t>(snapshot_value.phase - 2U);
+        if (snapshot_value.state.rumble_configured ||
+            !std::all_of(snapshot_value.state.rumble_map.begin() +
+                             static_cast<std::ptrdiff_t>(completed),
+                         snapshot_value.state.rumble_map.end(),
+                         [](std::uint8_t mapping) { return mapping == 0xFFU; })) {
+            return false;
+        }
+    }
     if (snapshot_value.last_cycle == kNoEventCycle ||
         (snapshot_value.watchdog_active &&
          (!snapshot_value.configuration_used ||
           snapshot_value.watchdog_deadline <= snapshot_value.last_cycle ||
           snapshot_value.watchdog_deadline >= kNoEventCycle ||
-          snapshot_value.watchdog_deadline - snapshot_value.last_cycle >
+          snapshot_value.watchdog_deadline - snapshot_value.last_cycle !=
               kPadConfigurationWatchdogCycles ||
           !cycle_add_fits(snapshot_value.last_cycle,
                           snapshot_value.watchdog_deadline - snapshot_value.last_cycle))) ||
@@ -692,6 +705,7 @@ bool PadDevice::restore(const PadSnapshot& snapshot_value) noexcept {
 MemoryCard::MemoryCard(std::span<std::uint8_t> image) noexcept
     : image_(image) {
     reset();
+    rebuild_fingerprint_index();
 }
 
 DeviceKind MemoryCard::kind() const noexcept {
@@ -743,14 +757,40 @@ bool MemoryCard::valid() const noexcept {
 }
 
 std::uint64_t MemoryCard::image_fingerprint() const noexcept {
+    return calculated_image_fingerprint();
+}
+
+std::uint64_t MemoryCard::sector_fingerprint(std::size_t sector) const noexcept {
     if (!valid()) {
         return 0;
     }
     std::uint64_t hash = fnv_offset();
-    for (const std::uint8_t byte : image_) {
+    fnv_add_u32(hash, static_cast<std::uint32_t>(sector));
+    const std::size_t offset = sector * kSectorSize;
+    for (std::size_t index = 0; index < kSectorSize; ++index) {
+        const std::uint8_t byte = image_[offset + index];
         fnv_add(hash, byte);
     }
     return hash;
+}
+
+std::uint64_t MemoryCard::calculated_image_fingerprint() const noexcept {
+    if (!valid()) {
+        return 0;
+    }
+    std::uint64_t fingerprint = fnv_offset();
+    for (std::size_t sector = 0; sector < kSectorCount; ++sector) {
+        fingerprint ^= sector_fingerprint(sector);
+    }
+    return fingerprint;
+}
+
+void MemoryCard::rebuild_fingerprint_index() noexcept {
+    indexed_image_fingerprint_ = valid() ? fnv_offset() : 0U;
+    for (std::size_t sector = 0; sector < kSectorCount; ++sector) {
+        sector_fingerprints_[sector] = sector_fingerprint(sector);
+        indexed_image_fingerprint_ ^= sector_fingerprints_[sector];
+    }
 }
 
 std::uint32_t MemoryCard::write_generation() const noexcept {
@@ -804,13 +844,18 @@ void MemoryCard::commit_pending_write() noexcept {
         return;
     }
     const std::size_t offset = image_offset();
+    const std::size_t sector = static_cast<std::size_t>(address_);
+    indexed_image_fingerprint_ ^= sector_fingerprints_[sector];
     std::copy_n(pending_data_.begin(), kSectorSize, image_.begin() + static_cast<std::ptrdiff_t>(offset));
+    sector_fingerprints_[sector] = sector_fingerprint(sector);
+    indexed_image_fingerprint_ ^= sector_fingerprints_[sector];
     if (write_generation_ != std::numeric_limits<std::uint32_t>::max()) {
         ++write_generation_;
     }
     flag_ = static_cast<std::uint8_t>(flag_ & static_cast<std::uint8_t>(~0x08U));
     pending_write_valid_ = false;
-    const WriteReceipt receipt{address_, write_generation_, image_fingerprint(), received_checksum_};
+    const WriteReceipt receipt{address_, write_generation_, indexed_image_fingerprint_,
+                               received_checksum_};
     if (write_callback_ != nullptr) {
         write_callback_(write_context_, receipt);
     }
@@ -1039,7 +1084,8 @@ MemoryCardSnapshot MemoryCard::snapshot() const noexcept {
 
 bool MemoryCard::restore(const MemoryCardSnapshot& snapshot_value) noexcept {
     constexpr std::uint8_t last_phase = static_cast<std::uint8_t>(Phase::Done);
-    if (!valid() || snapshot_value.image_fingerprint != image_fingerprint() ||
+    const std::uint64_t current_image_fingerprint = calculated_image_fingerprint();
+    if (!valid() || snapshot_value.image_fingerprint != current_image_fingerprint ||
         snapshot_value.phase > last_phase || snapshot_value.data_index > 127U) {
         return false;
     }
@@ -1279,6 +1325,10 @@ bool MemoryCard::restore(const MemoryCardSnapshot& snapshot_value) noexcept {
         pending_data_ = before.pending_data;
         return false;
     }
+    // A caller may have lawfully replaced the backing bytes between idle
+    // snapshot boundaries.  A successful restore re-synchronizes the O(1)
+    // write-receipt index after the full-image identity check above.
+    rebuild_fingerprint_index();
     return true;
 }
 
@@ -1866,6 +1916,15 @@ void Sio0::end_bus_select(Cycle cycle) noexcept {
     ack_begin_ = 0;
     ack_until_ = 0;
     ack_delay_ = 0;
+    // A byte is meaningful only within the /CS transaction in which it was
+    // queued.  Dropping /CS aborts both the shifter and holding register so a
+    // later selection cannot deliver stale command/address bytes.
+    shift_active_ = false;
+    shift_complete_ = cycle;
+    shift_bit_period_ = 0;
+    tx_head_ = 0;
+    tx_count_ = 0;
+    tx_fifo_ = {};
 }
 
 void Sio0::apply_control(std::uint16_t value, Cycle cycle) noexcept {
@@ -2216,10 +2275,13 @@ bool Sio0::restore(const SioSnapshot& snapshot_value) noexcept {
         (snapshot_value.mode & kModeParityEnable) == 0U &&
         (snapshot_value.mode & kModeClockPolarity) == 0U;
     const Cycle snapshot_baud_reload = std::max<Cycle>(snapshot_bit_period / 2U, 1U);
+    // MODE/BAUD writes affect the next byte.  An already-running byte keeps
+    // the period latched when it started, so its historical period need not
+    // equal the period derived from the current registers.
     const bool valid_shift = snapshot_value.shift_active
                                  ? snapshot_value.tx_count != 0U &&
                                         snapshot_mode_supported &&
-                                        snapshot_value.shift_bit_period == snapshot_bit_period &&
+                                        snapshot_value.shift_bit_period != 0U &&
                                         snapshot_value.shift_bit_period <= maximum_bit_period &&
                                         snapshot_value.shift_complete > snapshot_value.cycle &&
                                         snapshot_value.shift_complete - snapshot_value.cycle <=
@@ -2252,9 +2314,10 @@ bool Sio0::restore(const SioSnapshot& snapshot_value) noexcept {
     const bool valid_ack = snapshot_value.ack_pending
                                       ? !snapshot_value.dsr && target_selected && active_can_ack &&
                                       valid_ack_delay &&
-                                      snapshot_value.ack_begin > snapshot_value.cycle &&
-                                      snapshot_value.ack_begin - snapshot_value.cycle <=
-                                          maximum_ack_delay &&
+                                       snapshot_value.ack_begin > snapshot_value.cycle &&
+                                       snapshot_value.ack_begin - snapshot_value.cycle ==
+                                           snapshot_value.ack_delay &&
+                                       snapshot_value.ack_delay <= maximum_ack_delay &&
                                       valid_ack_window
                                : snapshot_value.dsr
                                       ? target_selected && active_can_ack &&
@@ -2281,11 +2344,14 @@ bool Sio0::restore(const SioSnapshot& snapshot_value) noexcept {
          (snapshot_value.mode & static_cast<std::uint16_t>(~kSio0ModeWritableMask)) != 0U ||
          !valid_shift || !valid_baud_timer || !valid_ack ||
          !valid_selection ||
+         (snapshot_value.shift_active &&
+          (snapshot_value.ack_pending || snapshot_value.dsr)) ||
+         ((snapshot_value.ack_pending || snapshot_value.dsr) &&
+          snapshot_value.tx_count > 1U) ||
          (!snapshot_value.shift_active && snapshot_value.tx_count > 1U) ||
          snapshot_value.device_conflict || snapshot_value.ack_collision ||
          snapshot_value.parity_error || snapshot_value.bad_stop ||
-         (snapshot_value.rx_overrun && snapshot_value.rx_count != kRxCapacity) ||
-        (snapshot_value.forced_receive &&
+         (snapshot_value.forced_receive &&
          (snapshot_value.control & kControlRxEnable) == 0U)) {
         last_error_ = MmioError::SnapshotInvalid;
         return false;

@@ -307,13 +307,23 @@ void test_sio_snapshot_timing_and_error_guards() {
 
     const auto in_flight = sio.snapshot();
     CHECK(in_flight.shift_active && in_flight.shift_bit_period == sio.cycles_per_bit());
-    auto unreachable_period = in_flight;
-    unreachable_period.shift_bit_period = static_cast<Cycle>(
-        unreachable_period.shift_bit_period + 2U);
-    CHECK(!sio.restore(unreachable_period));
+    auto impossible_period = in_flight;
+    impossible_period.shift_bit_period = 0U;
+    CHECK(!sio.restore(impossible_period));
     CHECK(sio.last_error() == MmioError::SnapshotInvalid);
 
-    CHECK(sio.advance_to(sio.cycles_per_byte()));
+    // MODE and BAUD changes apply to the next byte, not the byte already in
+    // the shifter.  Such snapshots are reachable and must restore exactly.
+    CHECK(sio.write(clean_aot::sio::kModeOffset, MmioWidth::Halfword,
+                    clean_aot::sio::kModeLengthMask | 0x02U, sio.cycle()).accepted);
+    CHECK(sio.write(clean_aot::sio::kBaudOffset, MmioWidth::Halfword, 7U,
+                    sio.cycle()).accepted);
+    const auto retimed_in_flight = sio.snapshot();
+    CHECK(retimed_in_flight.shift_bit_period == in_flight.shift_bit_period);
+    CHECK(retimed_in_flight.shift_bit_period != sio.cycles_per_bit());
+    CHECK(sio.restore(retimed_in_flight));
+
+    CHECK(sio.advance_to(retimed_in_flight.shift_complete));
     const auto pending_ack = sio.snapshot();
     CHECK(pending_ack.ack_pending);
     auto short_ack = pending_ack;
@@ -322,16 +332,28 @@ void test_sio_snapshot_timing_and_error_guards() {
     auto wrong_ack_delay = pending_ack;
     wrong_ack_delay.ack_delay = clean_aot::sio::kControllerAckDelayCycles - 1U;
     CHECK(!sio.restore(wrong_ack_delay));
+    auto forged_ack_start = pending_ack;
+    --forged_ack_start.ack_begin;
+    --forged_ack_start.ack_until;
+    CHECK(!sio.restore(forged_ack_start));
+    auto concurrent_shift_ack = pending_ack;
+    concurrent_shift_ack.shift_active = true;
+    concurrent_shift_ack.shift_bit_period = retimed_in_flight.shift_bit_period;
+    concurrent_shift_ack.shift_complete = pending_ack.cycle + 1U;
+    CHECK(!sio.restore(concurrent_shift_ack));
     auto impossible_parity = pending_ack;
     impossible_parity.parity_error = true;
     CHECK(!sio.restore(impossible_parity));
     auto impossible_stop = pending_ack;
     impossible_stop.bad_stop = true;
     CHECK(!sio.restore(impossible_stop));
-    auto impossible_overrun = pending_ack;
-    impossible_overrun.rx_overrun = true;
-    impossible_overrun.rx_count = 0U;
-    CHECK(!sio.restore(impossible_overrun));
+    auto sticky_overrun = pending_ack;
+    sticky_overrun.rx_overrun = true;
+    sticky_overrun.rx_count = 0U;
+    sticky_overrun.rx_head = 0U;
+    CHECK(sio.restore(sticky_overrun));
+    CHECK(sio.rx_overrun());
+    CHECK(sio.restore(pending_ack));
 
     // The second byte may occupy the holding register while the first byte's
     // ACK is pending, but it cannot begin clocking until the pulse ends.
@@ -344,6 +366,30 @@ void test_sio_snapshot_timing_and_error_guards() {
     CHECK((sio.status() & clean_aot::sio::kStatusTxReady) != 0U);
     CHECK(sio.snapshot().shift_active);
     CHECK(sio.deselect(ack_end).accepted);
+}
+
+void test_chip_select_aborts_stale_transfers() {
+    PadDevice pad;
+    Sio0 sio;
+    CHECK(sio.attach_controller(Port::One, pad));
+    begin_bus(sio);
+    CHECK(sio.write(clean_aot::sio::kDataOffset, MmioWidth::Byte, 0x01U, 0U).accepted);
+    CHECK(sio.write(clean_aot::sio::kDataOffset, MmioWidth::Byte, 0x42U, 0U).accepted);
+    CHECK(sio.snapshot().shift_active && sio.snapshot().tx_count == 2U);
+
+    CHECK(sio.deselect(1U).accepted);
+    const auto deselected = sio.snapshot();
+    CHECK(!deselected.shift_active && deselected.tx_count == 0U &&
+          deselected.shift_complete == sio.cycle());
+    CHECK(sio.select(Port::One, 2U).accepted);
+    CHECK(sio.advance_to(10'000U));
+    CHECK((sio.status() & clean_aot::sio::kStatusRxReady) == 0U);
+
+    // A fresh address after reselect starts a fresh device transaction.
+    CHECK(sio.write(clean_aot::sio::kDataOffset, MmioWidth::Byte, 0x01U,
+                    sio.cycle()).accepted);
+    CHECK(sio.advance_to(sio.cycle() + sio.cycles_per_byte()));
+    CHECK(sio.read(clean_aot::sio::kDataOffset, MmioWidth::Byte, sio.cycle()).value == 0xFFU);
 }
 
 void test_fifo_irq_and_reset() {
@@ -710,6 +756,12 @@ void test_pad_protocol_edges() {
           partial_mapping_snapshot.state.rumble_map[0] == 0x02U &&
           !partial_mapping_snapshot.state.rumble_configured);
     CHECK(partial_mapping_pad.restore(partial_mapping_snapshot));
+    auto forged_partial_tail = partial_mapping_snapshot;
+    forged_partial_tail.state.rumble_map[5] = 0x01U;
+    CHECK(!partial_mapping_pad.restore(forged_partial_tail));
+    auto forged_partial_complete = partial_mapping_snapshot;
+    forged_partial_complete.state.rumble_configured = true;
+    CHECK(!partial_mapping_pad.restore(forged_partial_complete));
     partial_mapping_pad.on_deselect(24U);
 }
 
@@ -724,6 +776,9 @@ void test_pad_watchdog_and_analog_button() {
     auto forged_watchdog = configured;
     forged_watchdog.watchdog_deadline = clean_aot::sio::kNoEventCycle;
     CHECK(!watchdog_pad.restore(forged_watchdog));
+    auto shortened_watchdog = configured;
+    --shortened_watchdog.watchdog_deadline;
+    CHECK(!watchdog_pad.restore(shortened_watchdog));
     watchdog_pad.advance_to(clean_aot::sio::kPadConfigurationWatchdogCycles - 1U);
     CHECK(watchdog_pad.state().configuration_mode);
     watchdog_pad.advance_to(configured.watchdog_deadline);
@@ -731,6 +786,24 @@ void test_pad_watchdog_and_analog_button() {
     CHECK(!watchdog_pad.state().analog_mode && !watchdog_pad.state().led_on &&
           watchdog_pad.state().mode_locked && !watchdog_pad.state().rumble_configured);
     CHECK(!watchdog_pad.snapshot().watchdog_active);
+    const std::array<std::uint8_t, 5> digital_poll = {
+        0x01U, 0x42U, 0x00U, 0x00U, 0x00U};
+    const auto expired_reply = exchange_pad_packet(watchdog_pad, digital_poll,
+                                                    configured.watchdog_deadline + 1U);
+    CHECK(expired_reply[2].value == 0x00U);
+
+    PadDevice exit_pad;
+    (void)exchange_pad_packet(exit_pad, enter_config, 40U);
+    const std::array<std::uint8_t, 9> exit_config = {
+        0x01U, 0x43U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U};
+    const auto exit_reply = exchange_pad_packet(exit_pad, exit_config, 100U);
+    CHECK(exit_reply[2].value == 0x5AU);
+    const auto exited = exit_pad.snapshot();
+    CHECK(!exited.state.configuration_mode && !exited.watchdog_active &&
+          exited.watchdog_deadline == 0U && exited.configuration_used &&
+          !exited.id_high_suppressed);
+    exit_pad.advance_to(clean_aot::sio::kPadConfigurationWatchdogCycles + 200U);
+    CHECK(!exit_pad.state().mode_locked);
 
     PadDevice button_pad;
     CHECK(button_pad.set_analog_mode(false));
@@ -741,8 +814,6 @@ void test_pad_watchdog_and_analog_button() {
           button_pad.state().mode_locked && !button_pad.state().rumble_configured);
     CHECK(!button_pad.press_analog_button(201U));
 
-    const std::array<std::uint8_t, 5> digital_poll = {
-        0x01U, 0x42U, 0x00U, 0x00U, 0x00U};
     const auto poll_reply = exchange_pad_packet(button_pad, digital_poll, 300U);
     CHECK(poll_reply[1].value == 0x73U);
     CHECK(poll_reply[2].value == 0x00U);
@@ -1078,6 +1149,7 @@ int main() {
     test_tx_holding_register_and_irq_restore();
     test_address_ack_boundary_and_cycle_bounds();
     test_sio_snapshot_timing_and_error_guards();
+    test_chip_select_aborts_stale_transfers();
     test_fifo_irq_and_reset();
     test_digital_and_dualshock_pad();
     test_rumble_and_analog_poll();
@@ -1086,6 +1158,6 @@ int main() {
     test_memory_card_protocol();
     test_invalid_card_and_snapshot_guards();
     test_snapshots_and_randomized_malformed_streams();
-    std::puts("clean_aot_sio_tests: 13 suites passed");
+    std::puts("clean_aot_sio_tests: 14 suites passed");
     return 0;
 }

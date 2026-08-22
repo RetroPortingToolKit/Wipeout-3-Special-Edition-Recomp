@@ -114,6 +114,17 @@ their bit periods, ACK widths, SIO0 error flags, FIFO bounds, and IRQ state are
 validated against reachable hardware states. They are C++ value-state
 snapshots, not a stable on-disk serialization ABI.
 
+An in-flight byte retains the bit period latched when it started even if MODE
+or BAUD changes for the next byte. Dropping `/CS` aborts the shifter and TX
+holding register, preventing a stale byte from crossing into a later device
+transaction. RX overrun remains sticky after FIFO reads and is cleared only by
+the control acknowledge strobe or reset.
+
+Memory-card write receipts use a fixed 1,024-entry sector fingerprint index,
+so committing one 128-byte sector does not rescan the 128-KiB image. Snapshot
+and restore boundaries still calculate the complete backing-image identity to
+detect caller-side mutation before accepting saved protocol state.
+
 The SIO reset strobe resets only SIO registers, FIFOs, timing, and IRQ state.
 It deliberately does not power-cycle attached caller-owned pads or cards;
 machine power-on code may reset those devices separately. Snapshot restore
