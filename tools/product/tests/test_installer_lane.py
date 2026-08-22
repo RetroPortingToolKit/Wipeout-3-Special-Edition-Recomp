@@ -92,6 +92,7 @@ class InstallerLaneTests(unittest.TestCase):
             "stop_pc":3217035264}), encoding="utf-8")
         receipt = run_installer_acceptance(package, self.runtime, frontier)
         self.assertTrue(receipt["installer"]["relocated_unicode_validation"])
+        self.assertTrue(receipt["installer"]["atomic_runtime_installation"])
         self.assertEqual(receipt["runtime_isolation"]["status"], "passed")
         self.assertEqual(receipt["game_shards"]["compiled_instruction_count"], 135829)
 

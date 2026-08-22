@@ -6,10 +6,8 @@ import argparse
 import ctypes
 import json
 import os
-import shutil
 import subprocess
 import sys
-import tempfile
 from ctypes import wintypes
 from pathlib import Path
 from typing import Callable
@@ -17,7 +15,7 @@ from typing import Callable
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tools.product.install_lane import orchestrate_first_run
-from tools.product.installer_lane import audit_installed_runtime
+from tools.product.installer_lane import install_runtime
 
 
 class SetupCancelled(RuntimeError):
@@ -48,29 +46,6 @@ def select_file(title: str, pattern: str) -> Path | None:
     if not ctypes.windll.comdlg32.GetOpenFileNameW(ctypes.byref(spec)):
         return None
     return Path(buffer.value)
-
-
-def install_runtime(runtime_payload: Path, destination: Path, *,
-                    copier: Callable[[Path, Path], None] = shutil.copytree) -> dict:
-    audit_installed_runtime(runtime_payload)
-    destination = destination.resolve(strict=False)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(prefix=f".{destination.name}-", dir=destination.parent))
-    shutil.rmtree(staging)
-    backup = destination.with_name(destination.name + ".rollback")
-    if backup.exists():
-        raise RuntimeError("stale runtime rollback directory")
-    try:
-        copier(runtime_payload, staging)
-        receipt = audit_installed_runtime(staging)
-        if destination.exists(): os.replace(destination, backup)
-        os.replace(staging, destination)
-        if backup.exists(): shutil.rmtree(backup)
-        return receipt
-    except Exception:
-        shutil.rmtree(staging, ignore_errors=True)
-        if backup.exists() and not destination.exists(): os.replace(backup, destination)
-        raise
 
 
 def run_setup(package_root: Path, install_dir: Path, user_data: Path, *,

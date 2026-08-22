@@ -75,6 +75,7 @@ def audit_release_readiness(package: Path, evidence_root: Path,
     acceptance = _load(acceptance_path) or {}
     executable = package / "bin" / "Wipeout3SE.exe"
     setup_ok = (acceptance.get("installer", {}).get("status") == "validated" and
+                acceptance.get("installer", {}).get("atomic_runtime_installation") is True and
                 acceptance.get("runtime_isolation", {}).get("status") == "passed" and
                 acceptance.get("runtime_artifact", {}).get("sha256") == _sha(executable))
     gate("lawful-two-stage-setup", setup_ok, [acceptance_path],

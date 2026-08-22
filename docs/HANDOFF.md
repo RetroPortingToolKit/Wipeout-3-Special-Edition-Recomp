@@ -1,5 +1,16 @@
 # Handoff
 
+## Atomic installed-runtime acceptance (2026-08-22)
+
+- Installer acceptance now executes the same atomic install/rollback primitive
+  used by `Wipeout3SE-Setup.exe`, targeting a separate Unicode installation
+  directory after relocating the installer archive. It independently reaudits
+  the installed bytes and rejects setup/compiler payload leakage.
+- The install primitive now lives in the installer policy module, so setup UX,
+  acceptance, and rollback tests exercise one implementation. Release readiness
+  requires this proof. The matrix remains honestly 12/15 with only the three
+  game/media/behavior execution failures.
+
 ## CD-ROM Reset native reboot timing (2026-08-22)
 
 - Command `0x1C` now retains its INT3-only response while holding the command

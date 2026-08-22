@@ -8,7 +8,7 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 if __package__ in {None, ""}:
     from release_lane import ReleaseError, validate_release  # type: ignore[import-not-found]
@@ -120,6 +120,30 @@ def audit_installed_runtime(runtime: Path) -> dict[str, Any]:
             "forbidden_classes": list(RUNTIME_FORBIDDEN), "game_ready": False}
 
 
+def install_runtime(runtime_payload: Path, destination: Path, *,
+                    copier: Callable[[Path, Path], None] = shutil.copytree) -> dict[str, Any]:
+    """Atomically install an independently audited runtime with rollback."""
+    audit_installed_runtime(runtime_payload)
+    destination = destination.resolve(strict=False)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{destination.name}-", dir=destination.parent))
+    shutil.rmtree(staging)
+    backup = destination.with_name(destination.name + ".rollback")
+    if backup.exists():
+        raise RuntimeError("stale runtime rollback directory")
+    try:
+        copier(runtime_payload, staging)
+        receipt = audit_installed_runtime(staging)
+        if destination.exists(): os.replace(destination, backup)
+        os.replace(staging, destination)
+        if backup.exists(): shutil.rmtree(backup)
+        return receipt
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        if backup.exists() and not destination.exists(): os.replace(backup, destination)
+        raise
+
+
 def create_installer(*, setup_exe: Path, runtime_payload: Path,
                      setup_payload: Sequence[tuple[str, Path]], output: Path) -> dict[str, Any]:
     """Publish setup and runtime payloads while retaining their trust boundary."""
@@ -221,7 +245,12 @@ def run_installer_acceptance(installer: Path, runtime: Path, frontier: Path,
         relocated_result = validate_installer(relocated)
         relocated_runtime = relocated / "runtime-payload"
         relocated_audit = audit_installed_runtime(relocated_runtime)
-        if (relocated_result != direct or relocated_audit != runtime_audit):
+        installed = Path(temporary) / "利用者" / "インストール済み" / "Wipeout3SE"
+        installed_audit = install_runtime(relocated_runtime, installed)
+        if (relocated_result != direct or relocated_audit != runtime_audit or
+                installed_audit != runtime_audit or
+                (installed / "setup-payload").exists() or
+                (installed / "Wipeout3SE-Setup.exe").exists()):
             raise ReleaseError("relocated installer or runtime measurement changed")
     executable = runtime / "bin" / "Wipeout3SE.exe"
     nested_executable = installer / "runtime-payload" / "bin" / "Wipeout3SE.exe"
@@ -235,7 +264,8 @@ def run_installer_acceptance(installer: Path, runtime: Path, frontier: Path,
         "status": "complete-shards-packaged-not-game-ready", "game_ready": False,
         "installer": {"status": direct["status"], "files": direct["files"],
                       "manifest_sha256": direct["manifest_sha256"],
-                      "relocated_unicode_validation": True},
+                      "relocated_unicode_validation": True,
+                      "atomic_runtime_installation": True},
         "runtime_artifact": {"sha256": _hash(executable)},
         "runtime_isolation": {"status": "passed", "compiler_linked": False,
                               "forbidden_classes": runtime_audit["forbidden_classes"],
