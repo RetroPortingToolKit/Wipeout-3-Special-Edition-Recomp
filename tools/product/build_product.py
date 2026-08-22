@@ -22,7 +22,7 @@ if __package__ in {None, ""}:
     from release_lane import (  # type: ignore[import-not-found]
         ReleaseError, create_release, initialize_install, run_installed_product_soak,
         run_soak, validate_release)
-    from install_lane import (InstallError, launch_and_record, migrate_upgrade,
+    from install_lane import (InstallError, launch_and_record, migrate_upgrade, rollback_upgrade,
                               orchestrate_first_run)  # type: ignore[import-not-found]
     from windows_audit import audit_windows_package, smoke_windows_product  # type: ignore[import-not-found]
 else:
@@ -37,7 +37,7 @@ else:
     )
     from .release_lane import (ReleaseError, create_release, initialize_install,
                                run_installed_product_soak, run_soak, validate_release)
-    from .install_lane import (InstallError, launch_and_record, migrate_upgrade,
+    from .install_lane import (InstallError, launch_and_record, migrate_upgrade, rollback_upgrade,
                                orchestrate_first_run)
     from .windows_audit import audit_windows_package, smoke_windows_product
 
@@ -130,6 +130,9 @@ def _build_parser() -> argparse.ArgumentParser:
     upgrade = subparsers.add_parser("upgrade", help="atomically activate a new setup version")
     upgrade.add_argument("--user-data", type=Path, required=True)
     upgrade.add_argument("--active-receipt", type=Path, required=True)
+    rollback = subparsers.add_parser("rollback", help="atomically reactivate an intact prior setup")
+    rollback.add_argument("--user-data", type=Path, required=True)
+    rollback.add_argument("--version", required=True)
 
     audit = subparsers.add_parser(
         "audit-windows", help="verify PE dependency closure, link map, and BIOS frontier")
@@ -252,6 +255,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "upgrade":
             document = migrate_upgrade(args.user_data, json.loads(
                 args.active_receipt.read_text(encoding="utf-8")))
+        elif args.command == "rollback":
+            document = rollback_upgrade(args.user_data, args.version)
         elif args.command == "smoke-windows":
             document = smoke_windows_product(
                 args.package, bios=args.bios, receipt_path=args.receipt,

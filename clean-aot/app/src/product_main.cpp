@@ -4,11 +4,14 @@
 #include "clean_aot/runtime/runtime.hpp"
 
 #include <array>
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #ifdef CLEAN_AOT_PRODUCT_BINDING_SYMBOL
@@ -56,6 +59,29 @@ std::vector<std::uint8_t> read_bios(const std::filesystem::path& path) {
     std::ifstream input(path, std::ios::binary);
     input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
     return input ? bytes : std::vector<std::uint8_t>{};
+}
+
+std::filesystem::path read_user_bios_reference(const std::filesystem::path& user_data) {
+    const auto reference = user_data / "receipts" / "active-setup.json";
+    if (!std::filesystem::is_regular_file(reference) || std::filesystem::is_symlink(reference))
+        return {};
+    std::ifstream receipt_stream(reference);
+    const std::string receipt_text((std::istreambuf_iterator<char>(receipt_stream)), {});
+    constexpr std::string_view key = "\"setup_root\":\"";
+    const auto begin = receipt_text.find(key);
+    if (begin == std::string::npos) return {};
+    const auto value_begin = begin + key.size();
+    const auto value_end = receipt_text.find('"', value_begin);
+    if (value_end == std::string::npos) return {};
+    const std::filesystem::path relative(receipt_text.substr(value_begin, value_end - value_begin));
+    if (relative.is_absolute() || relative.empty() ||
+        std::find(relative.begin(), relative.end(), std::filesystem::path("..")) != relative.end()) return {};
+    const auto selected = user_data / relative / "runtime" / "user-bios.path";
+    if (!std::filesystem::is_regular_file(selected) || std::filesystem::is_symlink(selected)) return {};
+    std::ifstream stream(selected);
+    std::string value;
+    std::getline(stream, value);
+    return stream && !value.empty() ? std::filesystem::path(value) : std::filesystem::path{};
 }
 
 class DeterministicClock final : public clean_aot::host::IMonotonicClock {
@@ -121,9 +147,17 @@ int main(int argc, char** argv) {
     if (workload && ((!p4k && !puw) || workload_updates == 0U || workload_updates > 1000U)) {
         receipt.reason = "invalid-bounded-workload-profile"; receipt.print(); return 64;
     }
-    if (bios_path.empty() && !user_data.empty()) bios_path = user_data / "runtime" / "bios.bin";
+    if (bios_path.empty() && !user_data.empty()) bios_path = read_user_bios_reference(user_data);
     const auto bios = read_bios(bios_path);
-    if (bios.empty()) { receipt.print(); return 78; }
+    if (bios.empty()) {
+        if (!user_data.empty()) {
+            receipt.stage = "setup-required";
+            receipt.reason = "select-and-verify-user-bios-and-retail-media";
+            std::cerr << "First run requires verified user BIOS and retail CUE/BIN media; "
+                         "follow policy/first-run-setup.json.\n";
+        }
+        receipt.print(); return 78;
+    }
 #ifdef CLEAN_AOT_PRODUCT_BINDING_SYMBOL
     const auto* binding = CLEAN_AOT_PRODUCT_BINDING_SYMBOL();
 #else

@@ -26,6 +26,7 @@ class InstallError(RuntimeError):
 ACTIVE_SCHEMA = "wipeout3se.clean-aot.active-setup.v1"
 BOOT_SCHEMA = "wipeout3se.clean-aot.boot-frontier.v1"
 CRASH_SCHEMA = "wipeout3se.clean-aot.launch-diagnostic.v1"
+ROLLBACK_SCHEMA = "wipeout3se.clean-aot.rollback.v1"
 
 
 def _hash(path: Path) -> str:
@@ -110,6 +111,12 @@ def orchestrate_first_run(*, cue: Path, bios: Path, patch: Path, xdelta3: Path,
         lock = generation_lock(prepared / "receipt.json",
                                prepared / "finalize-receipt.json",
                                prepared / "catalog.json", prepared / "artifacts")
+        # Keep only a private pointer to the independently verified user BIOS.
+        # Source BIOS/media bytes are never copied into the installed setup.
+        runtime = prepared / "runtime"
+        runtime.mkdir(exist_ok=True)
+        bios_reference = runtime / "user-bios.path"
+        bios_reference.write_text(str(bios.resolve(strict=True)) + "\n", encoding="utf-8")
         version = lock["setup_sha256"][:16]
         destination = user_data / "setups" / version
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -203,6 +210,10 @@ def migrate_upgrade(user_data: Path, new_active: dict[str, Any]) -> dict[str, An
         raise InstallError("upgrade must select a new setup version")
     destination = user_data / str(new_active.get("setup_root", ""))
     if not destination.is_dir(): raise InstallError("upgrade setup directory is missing")
+    current = generation_lock(destination / "receipt.json", destination / "finalize-receipt.json",
+                              destination / "catalog.json", destination / "artifacts")
+    if current != new_active.get("generation_lock"):
+        raise InstallError("upgrade generated artifacts are stale")
     receipt = {"schema": "wipeout3se.clean-aot.upgrade.v1", "status": "activated-not-game-ready",
                "from_version": previous["version"], "to_version": new_active["version"],
                "preserved": ["config.json", "saves/card1.mcd", "saves/card2.mcd"],
@@ -210,4 +221,28 @@ def migrate_upgrade(user_data: Path, new_active: dict[str, Any]) -> dict[str, An
     history = user_data / "receipts" / "upgrades" / f"{previous['version']}-to-{new_active['version']}.json"
     _atomic(history, receipt)
     _atomic(active_path, new_active)
+    return receipt
+
+
+def rollback_upgrade(user_data: Path, version: str) -> dict[str, Any]:
+    """Atomically reactivate an intact prior setup without changing saves/config."""
+    if not version or any(character not in "0123456789abcdef" for character in version):
+        raise InstallError("rollback version is invalid")
+    active_path = user_data / "receipts" / "active-setup.json"
+    previous = load_json(active_path)
+    if previous.get("schema") != ACTIVE_SCHEMA or previous.get("version") == version:
+        raise InstallError("rollback active setup is invalid")
+    setup_root = user_data / "setups" / version
+    lock = generation_lock(setup_root / "receipt.json", setup_root / "finalize-receipt.json",
+                           setup_root / "catalog.json", setup_root / "artifacts")
+    restored = {"schema": ACTIVE_SCHEMA, "status": "active-not-game-ready",
+                "version": version, "setup_root": f"setups/{version}",
+                "generation_lock": lock, "game_ready": False}
+    receipt = {"schema": ROLLBACK_SCHEMA, "status": "restored-not-game-ready",
+               "from_version": previous["version"], "to_version": version,
+               "preserved": ["config.json", "saves/card1.mcd", "saves/card2.mcd"],
+               "game_ready": False}
+    _atomic(user_data / "receipts" / "rollbacks" /
+            f"{previous['version']}-to-{version}.json", receipt)
+    _atomic(active_path, restored)
     return receipt

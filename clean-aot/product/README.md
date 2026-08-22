@@ -193,7 +193,9 @@ python tools/product/build_product.py first-run `
 Disc, patch, compiler, and source BIOS bytes remain outside the portable
 package. Locally generated BIOS/game regions are copied into the versioned
 per-user setup and locked to exact setup, finalize, catalog, artifact hashes,
-and sizes. Launch remeasures that entire lock before starting the app and
+and sizes. Setup retains no disc, patch, executable-image, or BIOS bytes; it
+stores only a private path to the exact verified external user BIOS. Launch
+remeasures that entire lock before starting the app and
 atomically records the canonical bootstrap frontier:
 
 ```powershell
@@ -208,6 +210,11 @@ active lock fails before launch. A recorded BIOS frontier remains explicitly
 Failed processes and bounded launch timeouts write hash-only diagnostics to
 `receipts/launch-diagnostic.json`. Setup upgrades atomically switch the active
 version while preserving global configuration and both memory cards.
+`rollback --user-data ... --version <prior-version>` remeasures an intact prior
+generation before restoring it; stale generations leave the active setup
+unchanged. After activation, relocated `Wipeout3SE.cmd` launches
+`Wipeout3SE.exe --user-data` directly. Before activation it fails closed and
+points to the BIOS/media selection contract in `policy/first-run-setup.json`.
 
 The Windows package audit parses each PE import table directly, requires every
 non-system DLL to exist in the package, reruns the shipping link-map leakage

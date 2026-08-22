@@ -97,15 +97,19 @@ def default_setup_contract(executable_name: str) -> dict[str, Any]:
         "user_data_root": "${USER_DATA}/Wipeout3SE",
         "required_imports": [
             {"id": "retail-disc", "kind": "cue-bin", "retained": "never"},
-            {"id": "retail-bios", "kind": "bios", "retained": "user-data-only"},
+            {"id": "retail-bios", "kind": "bios", "retained": "external-path-only"},
             {"id": "pal-patch", "kind": "xdelta3", "retained": "never"},
         ],
         "generated_user_data": [
-            "receipts/setup.json", "receipts/finalize.json", "catalog/catalog.json",
-            "catalog/selection.json", "runtime/executable.bin", "runtime/bios.bin",
+            "receipts/active-setup.json", "setups/<version>/receipt.json",
+            "setups/<version>/finalize-receipt.json", "setups/<version>/catalog.json",
+            "setups/<version>/artifacts", "setups/<version>/runtime/user-bios.path",
         ],
         "package_must_not_contain": ["media", "bios", "setup receipts", "compiler"],
         "unknown_identity": "reject-before-runtime-initialization",
+        "setup_command": "build_product.py first-run --cue <WIP3OUT_SE.cue> --bios <SCPH1001.bin> --patch <pal_track01.xdelta3> --xdelta3 <xdelta3.exe> --compiler <clean-aot-compiler.exe> --regions <product-regions.json> --artifacts <artifacts.json> --artifact-root <native-build> --user-data <USER_DATA>",
+        "subsequent_launch": "Wipeout3SE.exe --user-data <USER_DATA>",
+        "activation": "compile-finalize-copy-generated-artifacts-atomic-switch",
     }
 
 
@@ -186,8 +190,9 @@ def portable_launcher() -> bytes:
             "set \"PACKAGE_ROOT=%~dp0\"\r\n"
             "if not defined LOCALAPPDATA exit /b 64\r\n"
             "set \"USER_DATA=%LOCALAPPDATA%\\Wipeout3SE\"\r\n"
-            "if not exist \"%USER_DATA%\\receipts\\finalize.json\" (\r\n"
-            "  echo First-run media import is incomplete. 1>&2\r\n"
+            "if not exist \"%USER_DATA%\\receipts\\active-setup.json\" (\r\n"
+            "  echo First run requires your WipEout 3 SE CUE/BIN set and PlayStation BIOS. 1>&2\r\n"
+            "  echo Use the authenticated first-run setup command documented in policy\\first-run-setup.json. 1>&2\r\n"
             "  exit /b 78\r\n"
             ")\r\n"
             "\"%PACKAGE_ROOT%bin\\Wipeout3SE.exe\" --user-data \"%USER_DATA%\"\r\n"
@@ -307,6 +312,8 @@ def validate_release(package: Path) -> dict[str, Any]:
     if (setup.get("schema") != SETUP_SCHEMA or setup.get("mode") != "one-time-first-run"
             or setup.get("unknown_identity") != "reject-before-runtime-initialization"
             or len(setup.get("required_imports", [])) != 3
+            or "first-run" not in setup.get("setup_command", "")
+            or setup.get("activation") != "compile-finalize-copy-generated-artifacts-atomic-switch"
             or not str(setup.get("user_data_root", "")).startswith("${USER_DATA}/")):
         raise ReleaseError("first-run setup UX contract is invalid")
     _validate_config(config)

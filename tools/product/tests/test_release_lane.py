@@ -18,7 +18,7 @@ from tools.product.release_lane import (
     validate_release,
 )
 from tools.product.install_lane import (ACTIVE_SCHEMA, InstallError, generation_lock,
-                                        launch_and_record, migrate_upgrade)
+                                        launch_and_record, migrate_upgrade, rollback_upgrade)
 from tools.product.pipeline import canonical_json_bytes
 from tools.product.windows_audit import pe_imports
 
@@ -50,6 +50,30 @@ class ReleaseLaneTests(unittest.TestCase):
             " 0001:00000000 shipping_entry 0000000140001000 f app.obj\n",
             encoding="utf-8",
         )
+
+    def _installed_setup(self, user_data: Path, version: str, payload: bytes) -> dict:
+        root = user_data / "setups" / version
+        artifact_root = root / "artifacts"
+        artifact = artifact_root / "regions" / "main.native"
+        artifact.parent.mkdir(parents=True)
+        artifact.write_bytes(payload)
+        digest = hashlib.sha256(payload).hexdigest()
+        catalog = {"schema": "psxrecomp.clean-aot.catalog.v1", "variants": [
+            {"artifact": {"path": "regions/main.native", "sha256": digest}}]}
+        catalog_hash = hashlib.sha256(canonical_json_bytes(catalog)).hexdigest()
+        setup = {"schema": "psxrecomp.clean-aot.product-receipt.v1",
+                 "status": "setup-complete", "catalog": {"input_sha256": version * 64}}
+        final = {"schema": "psxrecomp.clean-aot.product-finalize-receipt.v1",
+                 "status": "catalog-finalized", "catalog_input_sha256": version * 64,
+                 "catalog_sha256": catalog_hash}
+        for name, document in (("receipt.json", setup), ("finalize-receipt.json", final),
+                               ("catalog.json", catalog)):
+            (root / name).write_bytes(canonical_json_bytes(document) + b"\n")
+        lock = generation_lock(root / "receipt.json", root / "finalize-receipt.json",
+                               root / "catalog.json", artifact_root)
+        return {"schema": ACTIVE_SCHEMA, "status": "active-not-game-ready",
+                "version": version, "setup_root": f"setups/{version}",
+                "generation_lock": lock, "game_ready": False}
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -85,6 +109,8 @@ class ReleaseLaneTests(unittest.TestCase):
         self.assertNotIn(str(package), json.dumps(setup))
         launcher = (relocated / "Wipeout3SE.cmd").read_text()
         self.assertIn("%~dp0", launcher)
+        self.assertIn("receipts\\active-setup.json", launcher)
+        self.assertIn("--user-data", launcher)
         self.assertNotIn(str(package), launcher)
 
     def test_install_creates_durable_cards_and_remains_fail_closed(self) -> None:
@@ -251,20 +277,25 @@ class ReleaseLaneTests(unittest.TestCase):
     def test_upgrade_migrates_active_version_without_touching_saves(self) -> None:
         user_data = self.root / "upgrade-user"
         (user_data / "receipts").mkdir(parents=True)
-        (user_data / "setups" / "v2").mkdir(parents=True)
+        (user_data / "setups").mkdir(parents=True)
         (user_data / "saves").mkdir()
         card = user_data / "saves" / "card1.mcd"
         card.write_bytes(b"preserve-me")
-        previous = {"schema": ACTIVE_SCHEMA, "version": "v1", "setup_root": "setups/v1",
-                    "game_ready": False}
+        previous = self._installed_setup(user_data, "a", b"first generated region")
         active_path = user_data / "receipts" / "active-setup.json"
         active_path.write_bytes(canonical_json_bytes(previous) + b"\n")
-        upgraded = {"schema": ACTIVE_SCHEMA, "version": "v2", "setup_root": "setups/v2",
-                    "game_ready": False}
+        upgraded = self._installed_setup(user_data, "b", b"second generated region")
         receipt = migrate_upgrade(user_data, upgraded)
-        self.assertEqual(receipt["from_version"], "v1")
+        self.assertEqual(receipt["from_version"], "a")
         self.assertEqual(card.read_bytes(), b"preserve-me")
-        self.assertEqual(json.loads(active_path.read_text())["version"], "v2")
+        self.assertEqual(json.loads(active_path.read_text())["version"], "b")
+        rolled_back = rollback_upgrade(user_data, "a")
+        self.assertEqual(rolled_back["from_version"], "b")
+        self.assertEqual(json.loads(active_path.read_text())["version"], "a")
+        self.assertEqual(card.read_bytes(), b"preserve-me")
+        (user_data / "setups" / "b" / "artifacts" / "regions" / "main.native").write_bytes(b"stale")
+        with self.assertRaisesRegex(InstallError, "stale"):
+            migrate_upgrade(user_data, upgraded)
 
     @unittest.skipUnless(sys.platform == "win32", "PE dependency test is Windows-only")
     def test_windows_pe_dependency_reader_is_deterministic(self) -> None:
