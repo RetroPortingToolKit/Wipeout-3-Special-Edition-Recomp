@@ -197,6 +197,14 @@
   is diagnostic evidence only; it is not yet a causal guest-state divergence
   because the route ended before the menu/load boundary. Extend the same probe
   through card and race loading and identify the first common-frame mismatch.
+- The extended 6,000-frame paired route now reaches the media path. The retained
+  memory-card summaries match exactly in normal and accelerated runs. The guest
+  fingerprint still fails (3,597 normal entries versus 3,604 accelerated),
+  proving that host-only loading acceleration has not yet earned the timing
+  equivalence gate. The CD trace is not yet a semantic pass: the current
+  comparator includes debug-global `seq` and reports an early sequence/frame
+  offset, so it must be normalized to compare command/sector/IRQ content and
+  ordering without treating run-local sequence numbers as guest state.
 
 ## Ruled out
 
