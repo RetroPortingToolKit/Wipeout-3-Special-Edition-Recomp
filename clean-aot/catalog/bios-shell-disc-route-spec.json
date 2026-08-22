@@ -1,0 +1,69 @@
+{
+  "schema": "clean-aot-shell-disc-route-spec-v1",
+  "resident_image_sha256": "f1efc425ba6d920d3a59cc154ee832ae71eaf36e9a1c30d938879d651cc37ea3",
+  "load_start": "0x80010000",
+  "shell_init_entry": "0x80030000",
+  "goal_call_site": "0x80030120",
+  "frontier": {
+    "number": 239,
+    "terminal_pc": "0x80050F8C",
+    "ram_epoch_sha256": "4d47363787443ae126ec36bf7dfff5c77d2cf500c643904c495be3d2f4b74b7a"
+  },
+  "direct_calls": [
+    {"pc":"0x80030008","target":"0x8005A8D0","role":"A0/72 shell setup"},
+    {"pc":"0x80030024","target":"0x8005A8E0","role":"A0/39 heap setup"},
+    {"pc":"0x8003002C","target":"0x80030798","role":"shell allocator initialization"},
+    {"pc":"0x80030058","target":"0x800403F0","role":"shell state initialization"},
+    {"pc":"0x80030060","target":"0x8004EF90","role":"graphics/event initialization"},
+    {"pc":"0x80030068","target":"0x8003FDB0","role":"SPU initialization mode 6"},
+    {"pc":"0x8003FDBC","target":"0x8003FCC8","role":"SPU pre-initialization when a0 is nonzero"},
+    {"pc":"0x8003FDC4","target":"0x8003FEB4","role":"SPU mode selector"},
+    {"pc":"0x80040004","target":"0x80054710","role":"SPU transfer setup in outer clear loop"},
+    {"pc":"0x80040010","target":"0x80054428","role":"4 KiB SPU clear transfer"},
+    {"pc":"0x800513A0","target":"0x8005A910","role":"A0/3F callback service"},
+    {"pc":"0x800513A8","target":"0x80050F8C","role":"resume frontier routine with a0=1"},
+    {"pc":"0x80030070","target":"0x8003FE88","role":"SPU callback initialization"},
+    {"pc":"0x80030080","target":"0x8003F910","role":"SPU state binding"},
+    {"pc":"0x80030088","target":"0x80040490","role":"graphics initialization"},
+    {"pc":"0x80030090","target":"0x80030788","role":"shell stage 0"},
+    {"pc":"0x80030098","target":"0x80059C80","role":"root-counter synchronization"},
+    {"pc":"0x800300A0","target":"0x8004ED1C","role":"event subsystem mode 3"},
+    {"pc":"0x800300A8","target":"0x80035BF4","role":"CD subsystem initialization without status query"},
+    {"pc":"0x800300B0","target":"0x80030788","role":"shell stage 1"},
+    {"pc":"0x800300B8","target":"0x80035DD8","role":"CD callback installation"},
+    {"pc":"0x800300F4","target":"0x80035F50","role":"pre-query CD initialization result"},
+    {"pc":"0x80030118","target":"0x80030788","role":"shell stage 2"},
+    {"pc":"0x80030120","target":"0x800359C4","role":"first disc-status call; goal boundary"}
+  ],
+  "branches": [
+    {"pc":"0x80050F8C","target":"0x80051018","prerequisite":"unconditional resume edge proven by frontier-239 terminal bytes"},
+    {"pc":"0x80051018","target":"0x80050F94","prerequisite":"not taken when authenticated caller supplies a0=1"},
+    {"pc":"0x80051020","target":"0x80050FCC","prerequisite":"taken when a0=1, established by JAL delay slot at 0x800513AC"},
+    {"pc":"0x8003FDB4","target":"0x8003FDC4","prerequisite":"not taken because shell entry calls with a0=1"},
+    {"pc":"0x8003FECC","target":"0x8004004C","prerequisite":"not taken because mode 6 is in range"},
+    {"pc":"0x8003FFD4","target":"0x8003FFC4","prerequisite":"repeat until zero-buffer cursor reaches sp+0x2038"},
+    {"pc":"0x8004001C","target":"0x8003FFF8","prerequisite":"repeat until s0 advances from 0xE000 to 0x10000"},
+    {"pc":"0x800300FC","target":"0x8003010C","prerequisite":"pre-query initializer return v0 >= 0 selects state-word one; either outcome rejoins at 0x80030118"}
+  ],
+  "finite_returns": [
+    {"pc":"0x80051078","callee":"0x80050F8C","call_sites":["0x800513A8"]},
+    {"pc":"0x800513C4","callee":"0x80051300","call_sites":["0x80050290","0x80050690","0x8005091C","0x80050CA8","0x80050E68","0x800510CC","0x8005113C","0x800511DC"]},
+    {"pc":"0x8003FE60","callee":"0x8003FDB0","call_sites":["0x80030068","0x80030718"]}
+  ],
+  "loops": [
+    {"name":"spu_zero_source_buffer","start":"0x8003FFC4","end_exclusive":"0x8003FFDC","bound":256,"exit_prerequisite":"cursor starts sp+0x1038, advances 16 bytes, and exits at sp+0x2038"},
+    {"name":"spu_ram_outer_clear","start":"0x8003FFF8","end_exclusive":"0x80040024","bound":16,"exit_prerequisite":"s0 starts 0xE000, advances 0x200, and exits at 0x10000; each iteration requests exactly 0x1000 bytes"},
+    {"name":"gpu_event_callback_scan","start":"0x80050DFC","end_exclusive":"0x80050F3C","bound":64,"exit_prerequisite":"ring index is masked with 0x3F; callbacks are finite table entries and empty slots advance"}
+  ],
+  "ordered_top_level_calls": [
+    "0x8005A8D0","0x8005A8E0","0x80030798","0x800403F0","0x8004EF90",
+    "0x8003FDB0","0x8003FE88","0x8003F910","0x80040490","0x80030788",
+    "0x80059C80","0x8004ED1C","0x80035BF4","0x80030788","0x80035DD8",
+    "0x80035F50","0x80030788","0x800359C4"
+  ],
+  "unresolved_prerequisites": [
+    "Frontier 239 contains no register or stack payload. The normal return from 0x80051300 is therefore restricted to eight byte-proven JAL continuations but cannot honestly be reduced to one from that receipt alone.",
+    "Authorization must resume at 0x80050F8C and preserve the authenticated machine stack; it must not synthesize a return target from this static receipt.",
+    "The first hardware-dependent boot decision is after the goal call returns at 0x80030128; no disc-status result or post-call branch is authorized by this pre-call slice."
+  ]
+}

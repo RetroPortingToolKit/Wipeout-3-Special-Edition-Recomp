@@ -1,5 +1,25 @@
 # Handoff
 
+## Goal-directed shell disc route at frontier 239 (2026-08-22)
+
+- Authenticated resident bytes and the committed frontier-239 receipt now bind
+  a deterministic pre-disc route from shell entry `0x80030000`, through the
+  live `0x80050F8C` initializer/callback corridor, to the first disc-status call
+  at `0x80030120 -> 0x800359C4`. The receipt verifies 24 direct calls, eight
+  branch prerequisites, three bounded loops, all named delay slots, and three
+  finite return contracts without executing guest code or changing boot runtime.
+- The SPU path retains its real finite work: 256 source-buffer iterations and
+  sixteen 4-KiB transfers (64 KiB total). The pre-query `0x80035F50` result
+  only changes state and both signs rejoin before the goal call. No disc branch
+  and no independently proven hardware defect occurs in this slice.
+- Frontier 239 carries no stack/register payload. The return from
+  `0x80051300` is narrowed to eight byte-proven direct-JAL continuations but
+  cannot honestly select one. Resume the authenticated machine stack to choose
+  that member; do not synthesize `$ra`. Canonical receipt:
+  `clean-aot/catalog/evidence/bios-shell-disc-route-frontier239.json` (SHA-256
+  `d9b7d422...52c0`); analysis:
+  `docs/SHELL_DISC_ROUTE_FRONTIER239.md`.
+
 ## Dual-card product evidence rebinding (2026-08-22)
 
 - The genuine dual-card `Wipeout3SE.exe` is packaged at executable SHA-256
@@ -865,3 +885,14 @@ instruction and fails closed on every unknown PC or executable identity.
   namespace modes fail closed. Continue by authenticating only the live path
   at `0x80050F8C`. Receipt:
   `clean-aot/catalog/evidence/bios-shell-exact-frontiers-00000239.json`.
+- Frontiers 240 through 267 advance from `0x80050F8C` through copied RAM and
+  the exact immutable BIOS return at `[0xBFC0D8E0,0xBFC0D8EC)`. Context-aware
+  generation now sources BFC addresses from the verified BIOS identity rather
+  than the RAM aperture. The BIOS return reaches the already-authenticated
+  low-RAM vector-handler entry `0x000005C4` and remains continuously
+  executable until the unchanged three-million-dispatch diagnostic bound.
+  Two probes match at 23,515,329 instructions, 3,000,000 dispatches, RAM epoch
+  `46ae2725...d52f`, and zero CD MMIO/raw sectors. This materially different
+  live-handler state is not `UnknownCode`; diagnose its indirect vector target
+  and interrupt/event source before extending frontiers or bounds. Receipt:
+  `clean-aot/catalog/evidence/bios-shell-exact-frontiers-00000267.json`.
