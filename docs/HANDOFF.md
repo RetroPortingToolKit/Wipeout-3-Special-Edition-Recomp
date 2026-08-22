@@ -1,5 +1,23 @@
 # Handoff
 
+## BIOS shell/CD diagnosis (2026-08-21)
+
+- The verified European Track 01 sector 4 contains the authentic spaced Sony
+  Europe license banner. `DiscSource` previously discarded that identity and
+  left GetID neutral; it now derives `disc_type=0x20` and `SCEE` strictly from
+  those mounted bytes. Unknown media remains neutral and ambiguous banners
+  fail closed.
+- Zero reads had an additional control-flow cause: `0x80030000` is copied BIOS
+  shell code (byte-identical to BIOS offset `0x18000`), not a game boundary.
+  Executing only newly authenticated live shell regions reaches
+  `0x80030000 -> 0x8005A8D0 -> 0xBFC072B8`, then the exception vector at
+  `0x80000080` with Cause `0x20` and EPC `0xBFC0D964`. CD MMIO remains empty;
+  no sector-read claim is made. The deterministic diagnosis is
+  `clean-aot/catalog/evidence/bios-shell-cd-diagnosis.json`.
+- Next: reauthenticate the exception-vector epoch reached by shell syscall,
+  return through the exact shell callback, and continue live shell regions to
+  the first GetID/ReadN. Do not bind the game registry at `0x80030000`.
+
 ## Authenticated game-bind rejection (2026-08-21)
 
 - The real transition probe now mounts the verified BIN/CUE and links the
