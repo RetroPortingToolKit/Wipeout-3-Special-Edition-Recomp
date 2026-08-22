@@ -144,11 +144,12 @@
   underruns) than the normal route, and the paired card/CD summaries have not
   yet been captured. Fast Loading therefore remains disabled and equivalence
   is not declared.
-- The accelerated-load transition now primes the host-only DRC ring with
-  bounded silence before unmuting. This avoids an empty-ring callback pull
-  after the discard sink without calling `spu_render` or changing guest state.
-  The Release rebuild and static guard pass; the full paired runtime route
-  must still be rerun to confirm the underrun reduction.
+- A runtime probe of host-only DRC priming showed that it did not solve the
+  accelerated transition: the bounded version reached zero overflow drops but
+  still produced substantially worse bridge underruns. That experiment was
+  removed; the original overflow-safe discard sink remains the baseline. The
+  debug-only probe also exposed a missing Windows `iphlpapi` link dependency,
+  which is now fixed in the runtime link line.
 - Runtime still links generic overlay/autocompile/interpreter plumbing even
   though the release configuration disables its behavior; strict link-surface
   removal remains unfinished.
