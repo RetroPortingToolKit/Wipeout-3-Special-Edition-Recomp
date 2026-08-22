@@ -1,0 +1,26 @@
+format_version = 5
+id = "wipeout3.enhancement.framerate-pal100"
+version = "1.0.0"
+name = "WipEout 3 PAL x2 / 100 Hz (Experimental)"
+author = "WipEout 3 SE refactor"
+description = "Activates PAL CRTC x2 and 100 Hz host pacing for the authenticated PAL 25/50/100 title build. The title transformation is already present in the user-provided media; this package does not redistribute a disc, BIOS, or patch payload. Experimental and default-off until gameplay timing is verified."
+license = "Project integration; title transformation remains user-media derived."
+resolver = "declarative"
+save_compatibility = "isolated"
+conflicts = ["wipeout3.enhancement.framerate", "wipeout3.enhancement.framerate-120"]
+
+[[target]]
+game_id = "SCES-02845"
+disc_sha256 = "397b8a30f401bbd9d12904d6054946474ce4746bdf19565a8db534d65ba179e1"
+exe_sha256 = "7004d1400015fe1466131fa3f31b529cc6e544d30efe7cbfadc69dcb34b3d7ac"
+
+[[feature]]
+id = "framerate-pal100"
+name = "PAL x2 100 Hz (Experimental)"
+description = "Select only with an authenticated PAL 25/50/100 title build. Requires the title-side 100 Hz transformation and runtime timing verification."
+group = "Gameplay"
+default_enabled = false
+
+[[plugin]]
+feature = "framerate-pal100"
+id = "wipeout3.framerate.pal-x2"
