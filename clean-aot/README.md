@@ -13,6 +13,11 @@ cmake --build build-clean-aot --config Release
 ctest --test-dir build-clean-aot --build-config Release --output-on-failure
 ```
 
+The aggregate includes the media reader, composed machine runtime, and
+display-free host contract in addition to the individual compiler/device
+libraries. A successful aggregate receipt must therefore include their test
+targets; silently omitting those integration layers is a failed verification.
+
 The generic directories contain platform/compiler mechanisms only. Game IDs,
 guest addresses, enhancement choices, media identities, and other title policy
 belong in the product layer outside this tree. A release is not accepted until

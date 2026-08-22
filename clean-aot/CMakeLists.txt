@@ -19,12 +19,15 @@ set(CLEAN_AOT_COMPONENTS
     gpu
     machine
     mdec
+    media
     memory
     raster
     render
     sio
     soc
     spu
+    runtime
+    host
 )
 
 foreach(component IN LISTS CLEAN_AOT_COMPONENTS)
