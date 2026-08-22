@@ -356,6 +356,60 @@ void same_address_memory_copy_keeps_live_provenance() {
     EXPECT(!state.is_current(*loaded->storage));
 }
 
+void ram_alias_overwrite_forces_native_fallback() {
+    ProvenanceState state;
+    EXPECT(ProvenanceState::canonical_memory_address(0x00000100u) == 0x100u);
+    EXPECT(ProvenanceState::canonical_memory_address(0x80200100u) == 0x100u);
+    EXPECT(ProvenanceState::canonical_memory_address(0xa0400100u) == 0x100u);
+    EXPECT(ProvenanceState::canonical_memory_address(0x00800100u) == 0x00800100u);
+
+    const GteRegisterValue first = state.write_gte(
+        GteRegister::ScreenVertex0, NativePosition{4, 5},
+        precise(4.25, 5.5, 2.0, 3.0));
+    const MemoryStoreResult stored = state.store_memory(
+        0x80000100u, xy(4, 5), first.candidate().enhancement);
+    EXPECT(stored.carried_precise());
+    const auto aliased = state.load_memory(0xa0000100u);
+    EXPECT(aliased.has_value() && aliased->candidate().enhancement.has_value());
+    if (!aliased.has_value() || !aliased->candidate().enhancement.has_value()) return;
+    EXPECT(aliased->storage->source.location == 0x100u);
+    const ProvenanceStamp forged_alias_key{
+        ProvenanceSource{ProvenanceSourceKind::MemoryWord, 0x80000100u},
+        aliased->storage->generation};
+    EXPECT(!state.is_current(forged_alias_key));
+    const VertexCandidate stale_candidate = aliased->candidate();
+
+    // Model a CPU or DMA native-only store through a different 2 MiB mirror.
+    const MemoryStoreResult overwritten = state.store_memory(0x00200100u, xy(4, 5));
+    EXPECT(overwritten.enhancement == MemoryStoreEnhancement::NativeOnly);
+    EXPECT(!state.is_current(stale_candidate.enhancement->storage));
+    EXPECT(!state.load_memory(0x100u)->candidate().enhancement.has_value());
+
+    const GteRegisterValue second = state.write_gte(
+        GteRegister::ScreenVertex1, NativePosition{10, 0}, precise(10.0, 0.0));
+    const GteRegisterValue third = state.write_gte(
+        GteRegister::ScreenVertex2, NativePosition{0, 10}, precise(0.0, 10.0));
+    const std::array<std::uint32_t, 4> words{
+        0x20000000u, xy(4, 5), xy(10, 0), xy(0, 10)};
+    const PolygonPacket packet = GpuPacketParser::parse_polygon(words).packet.value();
+    const std::array<VertexCandidate, 3> candidates{
+        stale_candidate, candidate(second), candidate(third)};
+    const AssembledPolygon assembled = PolygonAssembler::assemble(packet, candidates, &state);
+    EXPECT(assembled.triangles[0].fallback_reason == FallbackReason::StaleGeneration);
+    EXPECT(!assembled.triangles[0].uses_precise_geometry());
+    for (const EmittedVertex& vertex : assembled.triangles[0].vertices) {
+        EXPECT(!vertex.precise.has_value());
+        EXPECT(std::holds_alternative<NativeFallbackIdentity>(vertex.identity));
+    }
+
+    const GteRegisterValue replacement = state.write_gte(
+        GteRegister::ScreenVertex0, NativePosition{4, 5}, precise(4.5, 5.75));
+    EXPECT(state.store_memory(0x100u, xy(4, 5), replacement.candidate().enhancement)
+        .carried_precise());
+    EXPECT(state.invalidate_memory(0x80400102u, 1u) == 1u);
+    EXPECT(!state.load_memory(0xa0000100u).has_value());
+}
+
 void provenance_invalidation_is_overlap_safe_and_deterministic() {
     ProvenanceState first_state;
     ProvenanceState second_state;
@@ -874,6 +928,7 @@ int main() {
     parser_decodes_signed_11_bit_coordinates();
     gte_value_survives_memory_store_and_load();
     same_address_memory_copy_keeps_live_provenance();
+    ram_alias_overwrite_forces_native_fallback();
     provenance_invalidation_is_overlap_safe_and_deterministic();
     provenance_rejects_unknown_origins_and_invalid_values();
     gte_invalidation_and_copy_identity_fail_closed();

@@ -8,6 +8,7 @@ project(psx_render_geometry
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+option(PSX_RENDER_ENABLE_SANITIZERS "Enable ASan and UBSan for render tests" OFF)
 
 add_library(psx_render_geometry STATIC
     src/gpu_packet.cpp
@@ -36,6 +37,16 @@ add_executable(psx_render_geometry_tests
 )
 
 target_link_libraries(psx_render_geometry_tests PRIVATE psx_render_geometry)
+
+if(PSX_RENDER_ENABLE_SANITIZERS AND NOT MSVC)
+    foreach(target psx_render_geometry psx_render_geometry_tests)
+        target_compile_options(${target} PRIVATE
+            -fsanitize=address,undefined -fno-sanitize-recover=all
+            -fno-omit-frame-pointer)
+        target_link_options(${target} PRIVATE
+            -fsanitize=address,undefined -fno-sanitize-recover=all)
+    endforeach()
+endif()
 
 if(MSVC)
     target_compile_options(psx_render_geometry_tests PRIVATE /W4 /permissive-)

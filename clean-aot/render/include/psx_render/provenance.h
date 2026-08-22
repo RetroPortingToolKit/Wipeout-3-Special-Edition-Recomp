@@ -70,6 +70,11 @@ struct MemoryStoreResult {
 
 class ProvenanceState final {
 public:
+    // Canonicalizes only PS1 RAM/KSEG aliases. Non-RAM addresses retain their
+    // full identity so generic external packet buffers cannot collide.
+    [[nodiscard]] static std::uint32_t canonical_memory_address(
+        std::uint32_t byte_address) noexcept;
+
     [[nodiscard]] GteRegisterValue write_gte(
         GteRegister reg,
         NativePosition native,

@@ -7,6 +7,13 @@
 namespace psx::render {
 namespace {
 
+constexpr std::uint32_t kSegmentMask = 0xe0000000u;
+constexpr std::uint32_t kPhysicalMask = 0x1fffffffu;
+constexpr std::uint32_t kKseg0 = 0x80000000u;
+constexpr std::uint32_t kKseg1 = 0xa0000000u;
+constexpr std::uint32_t kRamBytes = 2u << 20u;
+constexpr std::uint32_t kRamMirrorBytes = 8u << 20u;
+
 [[nodiscard]] std::size_t gte_index(GteRegister reg) {
     const std::size_t index = static_cast<std::size_t>(reg);
     if (index >= 3u) {
@@ -90,6 +97,7 @@ MemoryStoreResult ProvenanceState::store_memory(
         return MemoryStoreResult{MemoryStoreEnhancement::RejectedUnalignedAddress, std::nullopt};
     }
 
+    byte_address = canonical_memory_address(byte_address);
     const NativePosition native = decode_native_position(raw);
     const VertexEnhancement source_value = source.value_or(VertexEnhancement{});
     const bool source_current = source.has_value() && is_current(source_value.storage);
@@ -127,6 +135,7 @@ MemoryStoreResult ProvenanceState::store_memory(
 }
 
 std::optional<MemoryWordValue> ProvenanceState::load_memory(std::uint32_t byte_address) const {
+    byte_address = canonical_memory_address(byte_address);
     const auto found = memory_.find(byte_address);
     if (found == memory_.end() || !found->second.value.has_value()) {
         return std::nullopt;
@@ -141,6 +150,7 @@ std::size_t ProvenanceState::invalidate_memory(
         return 0u;
     }
 
+    byte_address = canonical_memory_address(byte_address);
     const std::uint64_t write_begin = byte_address;
     const std::uint64_t write_end = write_begin + byte_count;
     const std::uint32_t first_word = byte_address & ~0x3u;
@@ -241,8 +251,19 @@ ProvenanceSource ProvenanceState::gte_source(GteRegister reg) noexcept {
     return ProvenanceSource{ProvenanceSourceKind::GteRegister, static_cast<std::uint32_t>(reg)};
 }
 
+std::uint32_t ProvenanceState::canonical_memory_address(
+    std::uint32_t byte_address) noexcept {
+    const std::uint32_t segment = byte_address & kSegmentMask;
+    if (segment != 0u && segment != kKseg0 && segment != kKseg1) {
+        return byte_address;
+    }
+    const std::uint32_t physical = byte_address & kPhysicalMask;
+    return physical < kRamMirrorBytes ? physical % kRamBytes : byte_address;
+}
+
 ProvenanceSource ProvenanceState::memory_source(std::uint32_t byte_address) noexcept {
-    return ProvenanceSource{ProvenanceSourceKind::MemoryWord, byte_address};
+    return ProvenanceSource{ProvenanceSourceKind::MemoryWord,
+                            canonical_memory_address(byte_address)};
 }
 
 std::uint64_t ProvenanceState::next_gte_generation(GteRegister reg) {
@@ -254,6 +275,7 @@ std::uint64_t ProvenanceState::next_gte_generation(GteRegister reg) {
 }
 
 std::uint64_t ProvenanceState::next_memory_generation(std::uint32_t byte_address) {
+    byte_address = canonical_memory_address(byte_address);
     MemorySlot& slot = memory_[byte_address];
     if (slot.generation == std::numeric_limits<std::uint64_t>::max()) {
         throw std::overflow_error("memory provenance generation exhausted");

@@ -12,7 +12,12 @@ UV word, including the CLUT and texture-page attribute halves.
 word-addressed memory copies. Native positions stored in RAM are decoded from
 the stored word rather than supplied separately. Full-word copies can carry a
 live precise coordinate; overlapping writes and explicit GTE invalidation make
-old storage stamps unusable.
+old storage stamps unusable. PS1 RAM addresses are canonicalized across the
+KUSEG/KSEG0/KSEG1 views and all four 2 MiB mirrors before memory generations
+are assigned. A CPU or DMA overwrite through any alias therefore invalidates
+the same precise candidate. Addresses outside the architectural 8 MiB RAM
+aperture retain their full identity, avoiding collisions with MMIO or generic
+external packet storage.
 
 `PolygonAssembler` splits a quad into the PS1 GPU's `(0, 1, 2)` and
 `(1, 2, 3)` triangles. Each triangle is enhanced only when all three candidates
