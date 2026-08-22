@@ -1,5 +1,24 @@
 # Handoff
 
+## SPU shell initialization frontier (2026-08-21)
+
+- Four newly authenticated copied-shell tranches advance the real path from
+  `0x8003FDB0` through `0x8003FCC8`, `0x80054060`, and `0x800544E0`.
+- At `0x80054384`, the shell legally reads SPU KON (`0x1F801D88`) before
+  read/modify/write initialization. Treating the write-only latch read as an
+  unmapped MMIO fault incorrectly raised Cause `0x1C`. KON/KOFF now expose the
+  hardware-visible zero value on reads; an adversarial test covers both halves.
+- The corrected probe reaches UnknownCode `0x80054710` after 2,767,140
+  instructions / 462,105 dispatches, 455,346 reads, 459,322 writes, 7,680
+  isolated writes, and device totals 60/259. Repeated probes agree. There is
+  still no CD MMIO, GetID, ReadN, or raw-sector activity.
+- The next exact range overlaps an already bound tranche: the current compiler
+  emits an entry for `0x80054710`, but runtime lookup retains the earlier
+  bounded region, whose live graph did not include this indirect return entry.
+  Reconcile overlapping same-epoch registries without widening authorization;
+  do not infer dormant entries. Canonical evidence is
+  `clean-aot/catalog/evidence/bios-shell-cd-execution-02767140.json`.
+
 ## BIOS shell/CD diagnosis (2026-08-21)
 
 - The syscall exception now returns correctly. Exact live authentication follows

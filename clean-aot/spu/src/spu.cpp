@@ -1654,7 +1654,10 @@ MmioReadResult Device::read_mmio16(std::uint32_t offset) noexcept {
     case KeyOn + 2u:
     case KeyOff:
     case KeyOff + 2u:
-        return MmioReadResult{MmioFault::WriteOnly, 0u};
+        // The shell performs read/modify/write initialization on KON/KOFF.
+        // These write-only latches read as zero on the bus; rejecting the read
+        // incorrectly turns a legal SPU access into a CPU data-bus exception.
+        return MmioReadResult{MmioFault::None, 0u};
     case PitchModulation:
         return MmioReadResult{MmioFault::None,
                               static_cast<std::uint16_t>(pitch_modulation_mask_)};

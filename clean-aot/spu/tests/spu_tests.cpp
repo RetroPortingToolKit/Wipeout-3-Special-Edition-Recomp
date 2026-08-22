@@ -309,8 +309,11 @@ void test_irq_and_mmio_boundaries() {
     require(device.write_mmio(Device::Control, 0x1'0000u, kWord).fault ==
                 MmioFault::ValueOutOfRange,
             "reject value wider than 16 bits");
-    require(device.read_mmio(Device::KeyOn, kWord).fault == MmioFault::WriteOnly,
-            "key-on is write-only");
+    const auto key_on = device.read_mmio(Device::KeyOn, kWord);
+    const auto key_off_high = device.read_mmio(Device::KeyOff + 2u, kWord);
+    require(key_on.ok() && key_on.value == 0u && key_off_high.ok() &&
+                key_off_high.value == 0u,
+            "write-only key latches expose zero on reads");
     require(device.write_mmio(Device::EndFlags, 1u, kWord).fault ==
                 MmioFault::ReadOnly,
             "ENDX is read-only");
