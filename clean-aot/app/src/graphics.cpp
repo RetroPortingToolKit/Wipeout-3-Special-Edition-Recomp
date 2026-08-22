@@ -818,12 +818,43 @@ RuntimeGraphics::RuntimeGraphics(GraphicsConfiguration configuration)
     }
 }
 
+RuntimeGraphics::~RuntimeGraphics() {
+    if (attached_frontend_ != nullptr) attached_frontend_->set_event_executor(nullptr);
+}
+
+bool RuntimeGraphics::attach(runtime::Runtime& runtime) noexcept {
+    if (attached_frontend_ != nullptr) return attached_frontend_ == &runtime.gpu();
+    try {
+        native_raster_ = std::make_unique<raster::ReferenceRasterizer>(
+            runtime.gpu().vram().mutable_words());
+    } catch (...) {
+        return false;
+    }
+    attached_frontend_ = &runtime.gpu();
+    attached_frontend_->set_event_executor(this);
+    return true;
+}
+
+bool RuntimeGraphics::execute(const gpu::Event& event) noexcept {
+    if (native_raster_ == nullptr) return false;
+    // Transfer commands have already committed into the shared FrontEnd VRAM
+    // before enqueue reaches this boundary. Reapplying overlap copies would be
+    // observably wrong; only raster primitives require execution here.
+    if (std::holds_alternative<gpu::PolygonEvent>(event) ||
+        std::holds_alternative<gpu::LineEvent>(event) ||
+        std::holds_alternative<gpu::RectangleEvent>(event)) {
+        return native_raster_->consume(event).accepted();
+    }
+    return true;
+}
+
 bool RuntimeGraphics::configured() const noexcept { return configured_; }
 
 host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                                           host::IHostBackend& host,
                                           std::uint64_t update_index) noexcept {
     if (!configuration_.runtime_scanout) return {host::HostCode::not_ready};
+    if (!attach(runtime)) return {host::HostCode::internal_error};
     try {
         ui_draws_.clear();
         resolved_width_ = 0U;
@@ -1429,6 +1460,14 @@ std::uint64_t RuntimeGraphics::visual_digest() const noexcept {
 
 std::uint64_t RuntimeGraphics::vram_generation() const noexcept {
     return raster_.vram_generation();
+}
+
+std::uint64_t RuntimeGraphics::native_vram_digest() const noexcept {
+    return attached_frontend_ == nullptr ? 0U : attached_frontend_->vram().digest();
+}
+
+std::uint64_t RuntimeGraphics::enhanced_vram_digest() const noexcept {
+    return raster_.digest();
 }
 
 VisualReceipt RuntimeGraphics::visual_receipt() const noexcept {

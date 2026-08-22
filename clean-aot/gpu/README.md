@@ -116,6 +116,14 @@ exact raw attributes; the renderer must not re-read mutable `control()` state.
 This package performs no clipping, rasterization, texture sampling, blending,
 dithering, mask application for primitives, or PGXP projection.
 
+The optional `IEventExecutor` is the live ordering boundary. When attached,
+completed events execute synchronously before their immutable receipt is
+queued. Production binds a native rasterizer directly to this front-end's
+VRAM, so primitive writes precede immediate GPUREAD and VRAM-copy feedback.
+The frame loop consumes receipts into a separate enhanced visual raster and
+does not apply native primitives twice. Snapshot assignment preserves both the
+attached executor and the address of shared VRAM.
+
 Display control is intentionally synchronous rather than event-queued. The
 SoC/scanout owner must inspect or snapshot `control()` immediately after each
 accepted GP1 display write if intermediate register transitions matter. A

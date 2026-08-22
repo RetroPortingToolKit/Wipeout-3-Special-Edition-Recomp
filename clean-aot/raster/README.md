@@ -1,7 +1,8 @@
 # Clean AOT PS1 reference raster and presentation component
 
 This directory is a standalone C++20 reference implementation for the clean
-GPU event contract. It owns an exact 1024x512 array of 16-bit VRAM words and
+GPU event contract. It owns an exact 1024x512 array of 16-bit VRAM words, or
+can bind a caller-owned exact-size VRAM span for synchronous execution, and
 consumes `const clean_aot::gpu::Event&` values without retaining or mutating
 them. It has no window-system, SDL, Vulkan, or D3D dependency.
 

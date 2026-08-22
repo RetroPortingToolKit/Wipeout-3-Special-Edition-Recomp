@@ -348,15 +348,20 @@ public:
             raster::PreciseColorMode::NativeRgb555) noexcept;
 };
 
-class RuntimeGraphics final {
+class RuntimeGraphics final : public gpu::IEventExecutor {
 public:
     explicit RuntimeGraphics(GraphicsConfiguration configuration);
+    ~RuntimeGraphics() override;
+    [[nodiscard]] bool attach(runtime::Runtime& runtime) noexcept;
+    [[nodiscard]] bool execute(const gpu::Event& event) noexcept override;
     [[nodiscard]] bool configured() const noexcept;
     [[nodiscard]] host::HostStatus present(runtime::Runtime& runtime,
                                            host::IHostBackend& host,
                                            std::uint64_t update_index) noexcept;
     [[nodiscard]] std::uint64_t visual_digest() const noexcept;
     [[nodiscard]] std::uint64_t vram_generation() const noexcept;
+    [[nodiscard]] std::uint64_t native_vram_digest() const noexcept;
+    [[nodiscard]] std::uint64_t enhanced_vram_digest() const noexcept;
     [[nodiscard]] VisualReceipt visual_receipt() const noexcept;
     [[nodiscard]] std::uint64_t precise_primitives() const noexcept;
     [[nodiscard]] std::uint64_t precise_fallbacks() const noexcept;
@@ -386,6 +391,8 @@ public:
 private:
     GraphicsConfiguration configuration_{};
     raster::ReferenceRasterizer raster_{};
+    std::unique_ptr<raster::ReferenceRasterizer> native_raster_{};
+    gpu::FrontEnd* attached_frontend_ = nullptr;
     std::vector<std::uint8_t> scanout_{};
     std::vector<std::uint8_t> true_color_scanout_{};
     std::vector<std::uint8_t> resolved_scanout_{};

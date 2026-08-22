@@ -294,6 +294,8 @@ native_backend_compatible(const NativeBackendV1 &backend) noexcept;
 class ReferenceRasterizer final {
 public:
   explicit ReferenceRasterizer(RasterLimits limits = {});
+  ReferenceRasterizer(std::span<VramWord> authoritative_vram,
+                      RasterLimits limits = {});
   ~ReferenceRasterizer() noexcept;
 
   ReferenceRasterizer(const ReferenceRasterizer &) = delete;

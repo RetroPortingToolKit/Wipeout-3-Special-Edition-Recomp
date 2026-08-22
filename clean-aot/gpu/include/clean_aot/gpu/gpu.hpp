@@ -3,7 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
+#include <list>
 #include <memory>
 #include <optional>
 #include <span>
@@ -409,10 +409,19 @@ class Vram final {
                      std::uint16_t value) noexcept;
 
   [[nodiscard]] std::span<const std::uint16_t> words() const noexcept;
+  [[nodiscard]] std::span<std::uint16_t> mutable_words() noexcept;
   [[nodiscard]] std::uint64_t digest() const noexcept;
 
  private:
   std::array<std::uint16_t, kVramWordCount> words_{};
+};
+
+class IEventExecutor {
+ public:
+  virtual ~IEventExecutor() = default;
+  // Called synchronously at command commit, before the event becomes visible
+  // to receipt consumers. False rejects the command without queueing it.
+  [[nodiscard]] virtual bool execute(const Event& event) noexcept = 0;
 };
 
 class FrontEnd final {
@@ -439,6 +448,7 @@ class FrontEnd final {
 
   void clear_command_buffer() noexcept;
   void set_scanout_state(bool odd_field, bool in_vblank) noexcept;
+  void set_event_executor(IEventExecutor* executor) noexcept;
 
   [[nodiscard]] std::optional<Event> pop_event() noexcept;
   [[nodiscard]] std::size_t event_count() const noexcept;
@@ -449,6 +459,7 @@ class FrontEnd final {
   [[nodiscard]] Gp0InputPhase input_phase() const noexcept;
   [[nodiscard]] std::uint32_t status() const noexcept;
   [[nodiscard]] const GpuControlState& control() const noexcept;
+  [[nodiscard]] Vram& vram() noexcept;
   [[nodiscard]] const Vram& vram() const noexcept;
   [[nodiscard]] std::uint64_t state_digest() const noexcept;
 
@@ -539,8 +550,9 @@ class FrontEnd final {
   std::vector<std::uint32_t> download_words_;
   std::uint8_t download_final_word_valid_halfwords_ = 2;
   std::size_t download_index_ = 0;
-  std::deque<Event> events_;
+  std::list<Event> events_;
   std::size_t queued_event_words_ = 0;
+  IEventExecutor* event_executor_ = nullptr;
 };
 
 }  // namespace clean_aot::gpu

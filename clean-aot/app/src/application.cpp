@@ -26,6 +26,7 @@ AppCode Application::initialize(Authorization authorization,
         return AppCode::DispatchRejected;
     auto runtime_graphics=std::make_unique<RuntimeGraphics>(graphics);
     if(!runtime_graphics->configured())return AppCode::RuntimeRejected;
+    if(!runtime_graphics->attach(*runtime))return AppCode::RuntimeRejected;
     if(!host_.request_window(host::WindowRequest{initial_window}).success())return AppCode::HostRejected;
     authorization_=std::move(authorization);runtime_=std::move(runtime);
     graphics_=std::move(runtime_graphics);initialized_=true;return AppCode::Ok;

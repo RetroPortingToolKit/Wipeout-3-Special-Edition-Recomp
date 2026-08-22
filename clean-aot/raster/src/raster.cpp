@@ -139,7 +139,7 @@ wrap_coordinate(std::int64_t value, std::int64_t size) noexcept {
 }
 
 [[nodiscard]] constexpr std::uint16_t
-read_wrapped(const std::array<VramWord, kVramWordCount> &vram, std::int64_t x,
+read_wrapped(std::span<const VramWord> vram, std::int64_t x,
              std::int64_t y) noexcept {
   const std::size_t wrapped_x = static_cast<std::size_t>(
       wrap_coordinate(x, static_cast<std::int64_t>(kVramWidth)));
@@ -148,7 +148,7 @@ read_wrapped(const std::array<VramWord, kVramWordCount> &vram, std::int64_t x,
   return vram[wrapped_y * static_cast<std::size_t>(kVramWidth) + wrapped_x];
 }
 
-void write_wrapped(std::array<VramWord, kVramWordCount> &vram, std::int64_t x,
+void write_wrapped(std::span<VramWord> vram, std::int64_t x,
                    std::int64_t y, std::uint16_t value) noexcept {
   const std::size_t wrapped_x = static_cast<std::size_t>(
       wrap_coordinate(x, static_cast<std::int64_t>(kVramWidth)));
@@ -425,9 +425,16 @@ transfer_half(std::uint32_t word, std::size_t index) noexcept {
 } // namespace
 
 struct ReferenceRasterizer::Impl {
-  explicit Impl(RasterLimits value) noexcept : limits(value) {}
+  explicit Impl(RasterLimits value) noexcept
+      : vram(owned_vram), limits(value) {}
+  Impl(std::span<VramWord> external, RasterLimits value) noexcept
+      : vram(external.size() == kVramWordCount
+                 ? external
+                 : std::span<VramWord>(owned_vram)),
+        limits(value) {}
 
-  std::array<VramWord, kVramWordCount> vram{};
+  std::array<VramWord, kVramWordCount> owned_vram{};
+  std::span<VramWord> vram{};
   std::array<std::uint32_t, kVramWordCount> true_color{};
   std::array<std::uint8_t, kVramWordCount> true_color_valid{};
   RasterLimits limits{};
@@ -1923,10 +1930,14 @@ ReferenceRasterizer::ReferenceRasterizer(RasterLimits limits)
   reset();
 }
 
+ReferenceRasterizer::ReferenceRasterizer(
+    std::span<VramWord> authoritative_vram, RasterLimits limits)
+    : impl_(std::make_unique<Impl>(authoritative_vram, limits)) {}
+
 ReferenceRasterizer::~ReferenceRasterizer() noexcept = default;
 
 void ReferenceRasterizer::reset(VramWord value) noexcept {
-  impl_->vram.fill(value);
+  std::fill(impl_->vram.begin(), impl_->vram.end(), value);
   impl_->true_color.fill(0U);
   impl_->true_color_valid.fill(0U);
   impl_->precise_stats = {};

@@ -125,6 +125,10 @@ std::span<const std::uint16_t> Vram::words() const noexcept {
   return std::span<const std::uint16_t>(words_.data(), words_.size());
 }
 
+std::span<std::uint16_t> Vram::mutable_words() noexcept {
+  return std::span<std::uint16_t>(words_.data(), words_.size());
+}
+
 std::uint64_t Vram::digest() const noexcept {
   std::uint64_t hash = kFnvOffset;
   for (const std::uint16_t word : words_) {
@@ -164,7 +168,19 @@ FrontEnd& FrontEnd::operator=(const FrontEnd& other) {
   }
   // Allocate and clone first. A failed snapshot leaves live GPU state intact.
   FrontEnd snapshot(other);
-  *this = std::move(snapshot);
+  *vram_ = *snapshot.vram_;
+  control_ = snapshot.control_;
+  parser_kind_ = snapshot.parser_kind_;
+  expected_words_ = snapshot.expected_words_;
+  packet_words_ = std::move(snapshot.packet_words_);
+  line_builder_ = std::move(snapshot.line_builder_);
+  upload_builder_ = std::move(snapshot.upload_builder_);
+  download_words_ = std::move(snapshot.download_words_);
+  download_final_word_valid_halfwords_ =
+      snapshot.download_final_word_valid_halfwords_;
+  download_index_ = snapshot.download_index_;
+  events_ = std::move(snapshot.events_);
+  queued_event_words_ = snapshot.queued_event_words_;
   return *this;
 }
 
@@ -750,6 +766,9 @@ WriteResult FrontEnd::enqueue(Event event) {
   if (!can_enqueue(event)) {
     return WriteResult::fail(WriteError::EventQueueFull);
   }
+  if (event_executor_ != nullptr && !event_executor_->execute(event)) {
+    return WriteResult::fail(WriteError::MalformedPacket);
+  }
   queued_event_words_ += event_word_cost(event);
   events_.push_back(std::move(event));
   return WriteResult::ok();
@@ -970,6 +989,10 @@ void FrontEnd::set_scanout_state(bool odd_field, bool in_vblank) noexcept {
   control_.display.in_vblank = in_vblank;
 }
 
+void FrontEnd::set_event_executor(IEventExecutor* executor) noexcept {
+  event_executor_ = executor;
+}
+
 std::optional<Event> FrontEnd::pop_event() noexcept {
   if (events_.empty()) {
     return std::nullopt;
@@ -1009,6 +1032,8 @@ Gp0InputPhase FrontEnd::input_phase() const noexcept {
 std::uint32_t FrontEnd::status() const noexcept { return build_status(); }
 
 const GpuControlState& FrontEnd::control() const noexcept { return control_; }
+
+Vram& FrontEnd::vram() noexcept { return *vram_; }
 
 const Vram& FrontEnd::vram() const noexcept { return *vram_; }
 

@@ -1409,6 +1409,75 @@ void test_missing_asset_native_fallback() {
            uploader.calls == 0U,
            "missing HD asset preserves byte-exact native 4:3 output");
 }
+void test_immediate_gpu_feedback_execution_order() {
+    std::vector<std::uint8_t> bios(512U * 1024U, 0U);
+    clean_aot::runtime::Configuration runtime_configuration{};
+    runtime_configuration.bios = bios;
+    clean_aot::runtime::Runtime runtime(runtime_configuration);
+    clean_aot::app::RuntimeGraphics graphics({
+        true, 320U, 240U,
+        clean_aot::raster::PresentationMode::Identity4x3});
+    expect(graphics.attach(runtime), "authoritative GPU executor attaches");
+    auto& gpu = runtime.gpu();
+    const auto send_word = [&](std::uint32_t word, const char* label) {
+        expect(gpu.write_gp0(word).accepted, label);
+    };
+    send_word(0xe3000000U, "feedback draw area top-left");
+    send_word(0xe4000000U | (511U << 10U) | 1023U,
+              "feedback draw area bottom-right");
+    send_word(0x600000ffU, "feedback red rectangle command");
+    send_word((10U << 16U) | 10U, "feedback rectangle origin");
+    send_word((2U << 16U) | 2U, "feedback rectangle extent");
+
+    send_word(0xc0000000U, "immediate readback command");
+    send_word((10U << 16U) | 10U, "immediate readback source");
+    send_word((1U << 16U) | 1U, "immediate readback extent");
+    const auto direct = gpu.read_gpuread();
+    expect(direct.ready && direct.valid_halfwords == 1U &&
+               (direct.word & 0xffffU) == 0x001fU,
+           "draw followed by GPUREAD observes rasterized VRAM");
+
+    send_word(0x80000000U, "feedback copy command");
+    send_word((10U << 16U) | 10U, "feedback copy source");
+    send_word((20U << 16U) | 20U, "feedback copy destination");
+    send_word((1U << 16U) | 1U, "feedback copy extent");
+    send_word(0xc0000000U, "copied readback command");
+    send_word((20U << 16U) | 20U, "copied readback source");
+    send_word((1U << 16U) | 1U, "copied readback extent");
+    const auto copied = gpu.read_gpuread();
+    expect(copied.ready && (copied.word & 0xffffU) == 0x001fU,
+           "VRAM copy observes immediately rasterized source");
+
+    expect(gpu.write_gp1(0x04000003U).accepted,
+           "feedback GPUREAD DMA direction accepts");
+    send_word(0xc0000000U, "DMA feedback readback command");
+    send_word((20U << 16U) | 20U, "DMA feedback readback source");
+    send_word((1U << 16U) | 1U, "DMA feedback readback extent");
+    expect((gpu.status() & ((1U << 25U) | (1U << 27U))) ==
+               ((1U << 25U) | (1U << 27U)),
+           "immediate raster feedback asserts DMA/read readiness");
+    const auto dma = gpu.read_dma_word();
+    expect(dma.ready && dma.valid_halfwords == 1U &&
+               (dma.word & 0xffffU) == 0x001fU,
+           "DMA read observes authoritative rasterized VRAM");
+
+    clean_aot::gpu::FrontEnd snapshot(gpu);
+    const std::uint64_t pinned_state = gpu.state_digest();
+    gpu = snapshot;
+    expect(gpu.state_digest() == pinned_state &&
+               gpu.vram().read_wrapped(20U, 20U) == 0x001fU,
+           "attached GPU snapshot restore preserves authoritative VRAM");
+
+    clean_aot::host::HeadlessBackend host;
+    expect(graphics.present(runtime, host, 0U).success(),
+           "enhanced receipt drain presents after synchronous native execution");
+    expect(graphics.native_vram_digest() == graphics.enhanced_vram_digest(),
+           "native and enhanced VRAM digests agree without duplicate execution");
+    expect(graphics.native_vram_digest() == 0x0bf92ba598bdee4aULL,
+           "pinned immediate-feedback native digest changed");
+    std::cout << "immediate GPU feedback digest: 0x" << std::hex
+              << graphics.native_vram_digest() << std::dec << '\n';
+}
 void test_ultrawide_visual_receipt() {
     std::vector<std::uint8_t> bios(512U * 1024U, 0U);
     clean_aot::runtime::Configuration config{}; config.bios = bios;
@@ -1503,6 +1572,12 @@ void test_native_png_decode() {
 }
 } // namespace
 int main(int argc, char** argv) {
+    if (argc == 2 && std::string_view(argv[1]) == "--feedback-only") {
+        test_immediate_gpu_feedback_execution_order();
+        if (failures != 0) return 1;
+        std::cout << "clean_aot_app_graphics_tests: GPU feedback checks passed\n";
+        return 0;
+    }
     if (argc == 2 && std::string_view(argv[1]) == "--mdec-fmv-only") {
         test_mdec_gpu_fmv_presentation_and_cadence();
         if (failures != 0) return 1;
@@ -1523,6 +1598,7 @@ int main(int argc, char** argv) {
     test_live_24bit_chroma_postprocess();
     test_replacement_runtime(); test_native_png_decode();
     test_title_manifest_and_receipts(); test_missing_asset_native_fallback();
+    test_immediate_gpu_feedback_execution_order();
     test_ultrawide_visual_receipt();
     test_permitted_pack_when_available();
     if (failures != 0) return 1;
