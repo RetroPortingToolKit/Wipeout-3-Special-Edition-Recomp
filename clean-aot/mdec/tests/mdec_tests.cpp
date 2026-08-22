@@ -381,10 +381,10 @@ void test_color_conversion_and_flags()
     const auto words24 = drain(color24);
     require_equal(words24.size(), 192U, "24-bit color output size");
     const std::uint32_t first24 = words24.front();
-    require_equal(first24 & 0xFFU, 0xFFU, "B channel saturates in unsigned 24-bit output");
+    require_equal(first24 & 0xFFU, 0xFFU, "R channel saturates in unsigned 24-bit output");
     require(((first24 >> 8U) & 0xFFU) < 0xFFU,
             "G channel retains the independent chroma conversion");
-    require_equal((first24 >> 16U) & 0xFFU, 0xFFU, "R channel saturates in unsigned output");
+    require_equal((first24 >> 16U) & 0xFFU, 0xFFU, "B channel saturates in unsigned output");
 
     Device color15_clear;
     send_direct(color15_clear, command(1U, OutputDepth::FifteenBit, false, false, 6U), stream);
@@ -424,14 +424,14 @@ void test_color_macroblock_raster_order()
             bytes[index * 4U + lane] = static_cast<std::uint8_t>(words[index] >> (lane * 8U));
         }
     }
-    const auto blue = [&bytes](std::size_t x, std::size_t y) {
+    const auto red = [&bytes](std::size_t x, std::size_t y) {
         return bytes[(y * 16U + x) * 3U];
     };
-    require(blue(0U, 0U) == blue(7U, 0U), "top-left luma block continuity");
-    require(blue(8U, 0U) == blue(15U, 0U), "top-right luma block continuity");
-    require(blue(0U, 0U) != blue(8U, 0U), "top row crosses Y1 to Y2 at x=8");
-    require(blue(0U, 8U) != blue(8U, 8U), "bottom row crosses Y3 to Y4 at x=8");
-    require(blue(0U, 0U) != blue(0U, 8U), "left column crosses Y1 to Y3 at y=8");
+    require(red(0U, 0U) == red(7U, 0U), "top-left luma block continuity");
+    require(red(8U, 0U) == red(15U, 0U), "top-right luma block continuity");
+    require(red(0U, 0U) != red(8U, 0U), "top row crosses Y1 to Y2 at x=8");
+    require(red(0U, 8U) != red(8U, 8U), "bottom row crosses Y3 to Y4 at x=8");
+    require(red(0U, 0U) != red(0U, 8U), "left column crosses Y1 to Y3 at y=8");
 
     Device replay;
     send_direct(replay, command(1U, OutputDepth::TwentyFourBit, false, false,

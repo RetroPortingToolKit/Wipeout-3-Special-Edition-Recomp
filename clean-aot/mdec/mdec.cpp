@@ -930,11 +930,12 @@ bool Device::emit_color() noexcept
                 }
 
                 if (state_.depth == OutputDepth::TwentyFourBit) {
-                    // The MDEC byte stream is B, G, R, matching the PS1
-                    // renderer's 24-bit upload order.
-                    packed[output_offset++] = as_byte(blue);
-                    packed[output_offset++] = as_byte(green);
+                    // The GP0(A0h) packed-24 display stream is R, G, B in
+                    // increasing VRAM byte order. MDEC output is DMA'd into
+                    // that stream without a channel swizzle.
                     packed[output_offset++] = as_byte(red);
+                    packed[output_offset++] = as_byte(green);
+                    packed[output_offset++] = as_byte(blue);
                 } else {
                     const std::uint32_t packed_pixel =
                         static_cast<std::uint32_t>(component5(red)) |

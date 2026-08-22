@@ -41,7 +41,8 @@ hardware documentation leaves some silicon details under-specified. Scale
 values use the upper 13 bits, each IDCT pass uses the documented matrix indexing
 and deterministic `floor((sum + 0x0fff) / 0x2000)` rounding, and YUV conversion uses signed Q12
 coefficients (`1.402`, `0.34375`, `0.71436`, and `1.772`). Color bytes are
-emitted in BGR order, and 15-bit pixels use PS1 BGR555 bit placement with the
+emitted in increasing-address RGB order for direct GP0(A0h) upload, and 15-bit
+pixels use PS1 RGB555 bit placement with the
 command-controlled bit 15. These choices are deterministic implementation
 behavior, not a claim that every undocumented revision has identical rounding.
 

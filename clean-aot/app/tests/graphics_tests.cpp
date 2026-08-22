@@ -1,5 +1,6 @@
 #include "clean_aot/app/graphics.hpp"
 #include "clean_aot/host/headless.hpp"
+#include "mdec.hpp"
 #include "../src/sha256.hpp"
 
 #include <array>
@@ -16,12 +17,77 @@ int failures = 0;
 void expect(bool condition, const char* message) {
     if (!condition) { ++failures; std::cerr << "FAIL: " << message << '\n'; }
 }
+
+constexpr std::uint16_t mdec_header(std::int32_t dc) noexcept {
+    return static_cast<std::uint16_t>(static_cast<std::uint32_t>(dc) & 0x03ffU);
+}
+
+std::vector<std::uint32_t> decode_color_macroblock(
+    clean_aot::mdec::OutputDepth depth) {
+    clean_aot::mdec::Device decoder;
+    const std::array<std::int32_t, 6U> samples{96, -48, 112, 48, -16, -80};
+    std::array<std::uint32_t, 6U> stream{};
+    for (std::size_t index = 0U; index < samples.size(); ++index) {
+        stream[index] = static_cast<std::uint32_t>(mdec_header(samples[index])) |
+            (0xfe00U << 16U);
+    }
+    const std::uint32_t command = (1U << 29U) |
+        (static_cast<std::uint32_t>(depth) << 27U) |
+        static_cast<std::uint32_t>(stream.size());
+    expect(decoder.write_command_word(command).complete,
+           "MDEC color command accepts");
+    for (const std::uint32_t word : stream) {
+        expect(decoder.write_command_word(word).complete,
+               "MDEC color payload accepts");
+    }
+    std::vector<std::uint32_t> output;
+    output.reserve(depth == clean_aot::mdec::OutputDepth::TwentyFourBit
+                       ? 192U : 128U);
+    while (decoder.output_words_available() != 0U) {
+        std::uint32_t word = 0U;
+        const auto result = decoder.read_data_word(word);
+        expect(result.complete, "MDEC color output drains");
+        output.push_back(word);
+    }
+    return output;
+}
+
+bool upload_mdec_macroblock(clean_aot::gpu::FrontEnd& gpu,
+                            clean_aot::mdec::OutputDepth depth,
+                            std::span<const std::uint32_t> words) {
+    const std::uint32_t width_words =
+        depth == clean_aot::mdec::OutputDepth::TwentyFourBit ? 24U : 16U;
+    const std::size_t expected = depth ==
+        clean_aot::mdec::OutputDepth::TwentyFourBit ? 192U : 128U;
+    if (words.size() != expected || !gpu.write_gp0(0xa0000000U).accepted ||
+        !gpu.write_gp0(0U).accepted ||
+        !gpu.write_gp0((16U << 16U) | width_words).accepted) return false;
+    for (const std::uint32_t word : words) {
+        if (!gpu.write_gp0(word).accepted) return false;
+    }
+    return true;
+}
+
+bool configure_fmv_display(clean_aot::gpu::FrontEnd& gpu, bool packed24) {
+    return gpu.write_gp1(0x03000000U).accepted &&
+        gpu.write_gp1(0x05000000U).accepted &&
+        gpu.write_gp1(0x06c00200U).accepted &&
+        gpu.write_gp1(0x07040010U).accepted &&
+        gpu.write_gp1(packed24 ? 0x08000011U : 0x08000001U).accepted;
+}
 class AcceleratedCaptureHost final : public clean_aot::host::IHostBackend,
                                      public clean_aot::host::IReplacementUploader {
 public:
     clean_aot::host::HostStatus submit_frame(
         const clean_aot::host::FrameSubmission& value) noexcept override {
-        frame = value; return {};
+        if (submissions != 0U &&
+            (value.sequence != last_sequence + 1U ||
+             value.update_index != last_update + 1U)) cadence_valid = false;
+        frame = value;
+        last_sequence = value.sequence;
+        last_update = value.update_index;
+        ++submissions;
+        return {};
     }
     clean_aot::host::HostStatus submit_audio(const clean_aot::host::StereoAudioBatch&) noexcept override { return {}; }
     clean_aot::host::HostStatus submit_controller(const clean_aot::host::ControllerState&) noexcept override { return {}; }
@@ -44,6 +110,10 @@ public:
     clean_aot::host::FrameSubmission frame{};
     bool down = false;
     std::uint64_t next_handle = 0U;
+    std::uint64_t submissions = 0U;
+    std::uint64_t last_sequence = 0U;
+    std::uint64_t last_update = 0U;
+    bool cadence_valid = true;
 };
 class FakePngDecoder final : public clean_aot::app::IPngDecoder {
 public:
@@ -1184,6 +1254,90 @@ void test_live_24bit_chroma_postprocess() {
            fallback.visual_digest() == control.visual_digest(),
            "postprocess budget failure preserves exact resolved native frame");
 }
+
+void test_mdec_gpu_fmv_presentation_and_cadence() {
+    using namespace clean_aot;
+    const auto words24 = decode_color_macroblock(
+        mdec::OutputDepth::TwentyFourBit);
+    const auto words15 = decode_color_macroblock(
+        mdec::OutputDepth::FifteenBit);
+    expect(words24.size() == 192U && words15.size() == 128U,
+           "MDEC emits exact packed 24-bit and RGB555 macroblock sizes");
+    expect((words24.front() & 0xffU) >
+               ((words24.front() >> 16U) & 0xffU),
+           "positive Cr MDEC fixture reaches packed VRAM as R,G,B, not B,G,R");
+
+    std::vector<std::uint8_t> bios(512U * 1024U, 0U);
+    runtime::Configuration runtime_config{};
+    runtime_config.bios = bios;
+    const auto verify_frame = [&](mdec::OutputDepth depth,
+                                  std::span<const std::uint32_t> words,
+                                  std::uint64_t expected_digest,
+                                  const char* label) {
+        runtime::Runtime runtime(runtime_config);
+        expect(configure_fmv_display(runtime.gpu(),
+                   depth == mdec::OutputDepth::TwentyFourBit) &&
+               upload_mdec_macroblock(runtime.gpu(), depth, words), label);
+        app::GraphicsConfiguration configuration{};
+        configuration.runtime_scanout = true;
+        configuration.output_width = 3840U;
+        configuration.output_height = 2160U;
+        configuration.presentation = raster::PresentationMode::Identity4x3;
+        configuration.presentation_resolve =
+            raster::PresentationResolveMode::EdgeAware;
+        if (depth == mdec::OutputDepth::TwentyFourBit) {
+            configuration.display_postprocess =
+                raster::DisplayPostprocessMode::ChromaSmooth24Bit;
+        }
+        app::RuntimeGraphics graphics(configuration);
+        host::HeadlessBackend host;
+        expect(graphics.present(runtime, host, 0U).success() &&
+               host.service().success() &&
+               graphics.resolved_width() == 2880U &&
+               graphics.resolved_height() == 2160U &&
+               graphics.visual_digest() == expected_digest, label);
+        std::cout << label << " digest: 0x" << std::hex
+                  << graphics.visual_digest() << std::dec << '\n';
+    };
+    verify_frame(mdec::OutputDepth::FifteenBit, words15,
+                 0x3eb79d47d95b49dcULL,
+                 "MDEC RGB555 to GPU to 4K frame is deterministic");
+    verify_frame(mdec::OutputDepth::TwentyFourBit, words24,
+                 0xb54daa206d40e09cULL,
+                 "MDEC RGB888 to GPU to 4K chroma frame is deterministic");
+
+    runtime::Runtime cadence_runtime(runtime_config);
+    expect(configure_fmv_display(cadence_runtime.gpu(), true),
+           "100 Hz FMV display configures");
+    app::GraphicsConfiguration cadence_configuration{};
+    cadence_configuration.runtime_scanout = true;
+    cadence_configuration.output_width = 5120U;
+    cadence_configuration.output_height = 2160U;
+    cadence_configuration.presentation = raster::PresentationMode::Generic21x9;
+    cadence_configuration.presentation_resolve =
+        raster::PresentationResolveMode::EdgeAware;
+    cadence_configuration.display_postprocess =
+        raster::DisplayPostprocessMode::ChromaSmooth24Bit;
+    app::RuntimeGraphics cadence(cadence_configuration);
+    AcceleratedCaptureHost cadence_host;
+    for (std::uint64_t update = 0U; update < 100U; ++update) {
+        expect(upload_mdec_macroblock(cadence_runtime.gpu(),
+                   mdec::OutputDepth::TwentyFourBit, words24) &&
+               cadence.present(cadence_runtime, cadence_host, update).success(),
+               "100 Hz MDEC frame submits");
+    }
+    expect(cadence_host.submissions == 100U && cadence_host.cadence_valid &&
+           cadence_host.last_sequence == 99U &&
+           cadence_host.last_update == 99U &&
+           cadence_host.frame.presentation_width == 5040U &&
+           cadence_host.frame.presentation_height == 2160U &&
+           cadence_host.frame.presentation_effects ==
+               (host::kPresentationEffectEdgeAware |
+                host::kPresentationEffectChromaSmooth) &&
+           cadence_host.frame.ui_overlay_count == 0U &&
+           cadence.visual_digest() != 0U,
+           "100 unique FMV updates retain ultrawide/chroma cadence and overlay ordering");
+}
 void test_replacement_runtime() {
     const auto root = std::filesystem::temp_directory_path() /
         "clean-aot-replacement-runtime";
@@ -1348,8 +1502,15 @@ void test_native_png_decode() {
 #endif
 }
 } // namespace
-int main() {
+int main(int argc, char** argv) {
+    if (argc == 2 && std::string_view(argv[1]) == "--mdec-fmv-only") {
+        test_mdec_gpu_fmv_presentation_and_cadence();
+        if (failures != 0) return 1;
+        std::cout << "clean_aot_app_graphics_tests: MDEC FMV checks passed\n";
+        return 0;
+    }
     test_wipeout_like_100_frame_performance_receipt();
+    test_mdec_gpu_fmv_presentation_and_cadence();
     test_live_verified_camera_plane_clipping();
     test_live_pgxp_projection_pipeline();
     test_live_gp0_primitive_compatibility_matrix();
