@@ -1,0 +1,8 @@
+schema=clean-aot-compiler-manifest-v1
+image_kind=raw-payload
+variant_sha256=e734ab595a644fbe204e2a24b1195d3c6fe0093494e3817491fe3871dab3b4fa
+image_sha256=e734ab595a644fbe204e2a24b1195d3c6fe0093494e3817491fe3871dab3b4fa
+load_start=0x000018BC
+load_end_exclusive=0x00001CBC
+entry=0x000018BC
+code=0x000018BC-0x00001CBC

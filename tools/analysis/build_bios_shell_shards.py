@@ -111,7 +111,7 @@ def epoch_variants(items):
  for row in out.values():
   row["roots"]=sorted(row["roots"]); row["ranges"]=[{"start":a,"end_exclusive":b} for a,b in sorted(row["ranges"])]; row["source_manifests"]=sorted(row["source_manifests"]); result.append(row)
  return sorted(result,key=lambda x:(x["load_start"],x["identity_sha256"]))
-def incremental_variants(receipt,baseline,max_entries):
+def incremental_variants(receipt,baseline,max_entries,label="frontier-increment"):
  if baseline.get("schema")!=SCHEMA or baseline.get("resident_identity_sha256")!=receipt["resident_identity_sha256"]: raise ShellShardError("incremental baseline identity/schema mismatch")
  current={pc for x in receipt["ranges"] for pc in range(x["start"],x["end_exclusive"],4)}; prior={pc for x in baseline["ranges"] for pc in range(x["start"],x["end_exclusive"],4)}; delta=current-prior
  # Never split architectural delay ownership across registry variants.
@@ -126,19 +126,27 @@ def incremental_variants(receipt,baseline,max_entries):
  seen=set(); variants=[]
  for index,pcs in enumerate(chunks,1):
   if seen.intersection(pcs): raise ShellShardError("incremental variants duplicate PCs")
-  seen.update(pcs); variants.append({"name":f"bios-shell-frontier84-increment-{index:03d}","entries":pcs,"ranges":[{"start":a,"end_exclusive":b} for a,b in ranges(set(pcs))],"instruction_count":len(pcs),"unknown_pc_action":"reject"})
+  seen.update(pcs); variants.append({"name":f"bios-shell-{label}-{index:03d}","entries":pcs,"ranges":[{"start":a,"end_exclusive":b} for a,b in ranges(set(pcs))],"instruction_count":len(pcs),"unknown_pc_action":"reject"})
  return variants
 def variant_manifest(receipt,variant):
  view=dict(receipt); view["ranges"]=variant["ranges"]; return manifest(view)
+def epoch_manifest(variant):
+ lines=[f"schema={MANIFEST_SCHEMA}","image_kind=raw-payload",f"variant_sha256={variant['identity_sha256']}",f"image_sha256={variant['identity_sha256']}",f"load_start=0x{variant['load_start']:08X}",f"load_end_exclusive=0x{variant['load_end_exclusive']:08X}"]
+ lines += [f"entry=0x{x:08X}" for x in variant["roots"]]; lines += [f"code=0x{x['start']:08X}-0x{x['end_exclusive']:08X}" for x in variant["ranges"]]; return "\n".join(lines)+"\n"
 def main(argv=None):
- p=argparse.ArgumentParser(); p.add_argument("--image",type=Path,required=True); p.add_argument("--identity",required=True); p.add_argument("--load-start",type=lambda x:int(x,0),required=True); p.add_argument("--frontier-manifest",type=Path,action="append",required=True); p.add_argument("--epoch-frontier",action="append",default=[],metavar="MANIFEST=BIN"); p.add_argument("--baseline-receipt",type=Path); p.add_argument("--incremental-manifest-dir",type=Path); p.add_argument("--max-increment-entries",type=int,default=256); p.add_argument("--receipt",type=Path,required=True); p.add_argument("--manifest-out",type=Path,required=True); a=p.parse_args(argv)
+ p=argparse.ArgumentParser(); p.add_argument("--image",type=Path,required=True); p.add_argument("--identity",required=True); p.add_argument("--load-start",type=lambda x:int(x,0),required=True); p.add_argument("--frontier-manifest",type=Path,action="append",required=True); p.add_argument("--epoch-frontier",action="append",default=[],metavar="MANIFEST=BIN"); p.add_argument("--frontier-trace",type=Path,action="append",default=[]); p.add_argument("--baseline-receipt",type=Path); p.add_argument("--incremental-manifest-dir",type=Path); p.add_argument("--increment-label",default="frontier-increment"); p.add_argument("--max-increment-entries",type=int,default=256); p.add_argument("--receipt",type=Path,required=True); p.add_argument("--manifest-out",type=Path,required=True); a=p.parse_args(argv)
  try:
   image=a.image.read_bytes()
   if sha(image)!=a.identity: raise ShellShardError("resident image identity mismatch")
   if not 1<=a.max_increment_entries<=1024: raise ShellShardError("invalid incremental manifest bound")
-  parsed=[(x,parse_manifest(x)) for x in a.frontier_manifest]; result=build(image,a.load_start,parsed); result["exact_epoch_variants"]=epoch_variants([(Path(x.split("=",1)[0]),Path(x.split("=",1)[1])) for x in a.epoch_frontier]); text=manifest(result); result["compiler_manifest_sha256"]=sha(text.encode())
+  parsed=[(x,parse_manifest(x)) for x in a.frontier_manifest]; result=build(image,a.load_start,parsed); result["exact_epoch_variants"]=epoch_variants([(Path(x.split("=",1)[0]),Path(x.split("=",1)[1])) for x in a.epoch_frontier]); result["frontier_traces"]=[]
+  for path in a.frontier_trace:
+   raw=path.read_bytes(); trace=json.loads(raw)
+   if trace.get("schema") not in {"clean-aot.real-bios-shell-frontier-capacity.v1","clean-aot.bios-shell-registry-frontier.v1"}: raise ShellShardError("unsupported shell frontier trace schema")
+   result["frontier_traces"].append({"path":path.name,"schema":trace["schema"],"sha256":sha(raw)})
+  text=manifest(result); result["compiler_manifest_sha256"]=sha(text.encode())
   if a.baseline_receipt:
-   baseline=json.loads(a.baseline_receipt.read_text(encoding="utf-8")); variants=incremental_variants(result,baseline,a.max_increment_entries); result["incremental_variants"]=[]
+   baseline=json.loads(a.baseline_receipt.read_text(encoding="utf-8")); variants=incremental_variants(result,baseline,a.max_increment_entries,a.increment_label); result["incremental_variants"]=[]
    if a.incremental_manifest_dir is None: raise ShellShardError("incremental manifest directory is required with baseline")
    a.incremental_manifest_dir.mkdir(parents=True,exist_ok=True)
    for variant in variants:
@@ -146,6 +154,15 @@ def main(argv=None):
     if path.exists(): raise ShellShardError(f"refusing to overwrite {path}")
     path.write_text(payload,encoding="utf-8",newline="\n"); row={k:v for k,v in variant.items() if k!="entries"}; row.update(manifest=path.name,manifest_sha256=sha(payload.encode())); result["incremental_variants"].append(row)
    result["incremental_instruction_count"]=sum(x["instruction_count"] for x in result["incremental_variants"])
+   old_epochs={(x["identity_sha256"],x["load_start"],x["load_end_exclusive"]) for x in baseline.get("exact_epoch_variants",[])}; result["incremental_epoch_variants"]=[]; epoch_bindings=set()
+   for variant in result["exact_epoch_variants"]:
+    key=(variant["identity_sha256"],variant["load_start"],variant["load_end_exclusive"])
+    if key in old_epochs: continue
+    bindings={(variant["identity_sha256"],pc) for x in variant["ranges"] for pc in range(x["start"],x["end_exclusive"],4)}
+    if epoch_bindings.intersection(bindings): raise ShellShardError("incremental epoch variants duplicate identity/PC bindings")
+    epoch_bindings.update(bindings); name=f"bios-shell-{a.increment_label}-epoch-{variant['load_start']:08x}-{variant['identity_sha256'][:12]}"; path=a.incremental_manifest_dir/(name+".manifest"); payload=epoch_manifest(variant)
+    if path.exists(): raise ShellShardError(f"refusing to overwrite {path}")
+    path.write_text(payload,encoding="utf-8",newline="\n"); result["incremental_epoch_variants"].append({"name":name,"identity_sha256":variant["identity_sha256"],"load_start":variant["load_start"],"load_end_exclusive":variant["load_end_exclusive"],"manifest":path.name,"manifest_sha256":sha(payload.encode())})
    result["incremental_registry_contract"]={"baseline_receipt_sha256":baseline.get("receipt_sha256"),"maximum_entries_per_manifest":a.max_increment_entries,"duplicate_pc_count":0,"selection_key":"authenticated-resident-identity-plus-exact-pc","unknown_pc_action":"reject"}
   result["receipt_sha256"]=sha(canonical(result))
   for path,payload in ((a.manifest_out,text),(a.receipt,json.dumps(result,sort_keys=True,separators=(",",":"))+"\n")):

@@ -27,8 +27,11 @@ class Tests(unittest.TestCase):
   td,image,items=self.fixture()
   try:
    current=m.build(image,0x1000,items); baseline=dict(current); baseline["ranges"]=[{"start":0x1000,"end_exclusive":0x1008}]
-   variants=m.incremental_variants(current,baseline,2); pcs=[pc for v in variants for pc in v["entries"]]; self.assertEqual(len(pcs),len(set(pcs))); self.assertTrue(all(v["instruction_count"]<=2 for v in variants))
+   variants=m.incremental_variants(current,baseline,2,"frontier90-increment"); pcs=[pc for v in variants for pc in v["entries"]]; self.assertEqual(len(pcs),len(set(pcs))); self.assertTrue(all(v["instruction_count"]<=2 for v in variants)); self.assertTrue(all("frontier90" in v["name"] for v in variants))
    bad=dict(baseline); bad["resident_identity_sha256"]="0"*64
    with self.assertRaises(m.ShellShardError): m.incremental_variants(current,bad,2)
   finally: td.cleanup()
+ def test_epoch_manifest_keeps_identity_and_range_exact(self):
+  variant={"identity_sha256":"a"*64,"load_start":0x1800,"load_end_exclusive":0x1810,"roots":[0x1804],"ranges":[{"start":0x1804,"end_exclusive":0x180c}]}
+  text=m.epoch_manifest(variant); self.assertIn("variant_sha256="+"a"*64,text); self.assertIn("entry=0x00001804",text); self.assertIn("code=0x00001804-0x0000180C",text)
 if __name__=="__main__": unittest.main()
