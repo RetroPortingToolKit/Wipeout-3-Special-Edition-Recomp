@@ -91,7 +91,8 @@ build-clean-spu-gcc/clean_aot_spu_benchmark
 
 The independent test executable covers ADPCM predictor vectors, loop and IRQ
 edges, exact Gaussian phase anchors, all envelope phases and rate freezes,
-the inverted all-ones sweep, continuously clocked noise, modulation ordering,
+the inverted all-ones sweep, phase-invariant exponential decrease,
+continuously clocked noise, modulation ordering,
 saturation, masks and malformed MMIO, transfer FIFO/DMA modes,
 always-on capture and IRQ gates, CD/XA/external routing, chunking, adversarial
 snapshot validation, 39-tap reverb FIR phase and combined-delay behavior, long

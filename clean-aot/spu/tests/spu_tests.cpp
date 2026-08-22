@@ -785,6 +785,56 @@ void test_adsr_sweep_noise_and_modulation() {
     require(frozen_sweep.ok() && frozen_sweep.value == 0x2000u,
             "all-ones inverted sweep never steps or saturates");
 
+    const auto configure_exponential_decrease = [](Device& target,
+                                                    bool inverted) {
+        target.reset();
+        load_block(target, make_constant_block(6, 0x03u));
+        put(target, Device::MainVolume, 0x3FFFu);
+        put(target, Device::MainVolume + 2u, 0x3FFFu);
+        configure_voice(target, 0u, 0x1000u, 0u, 0x007Fu);
+        put(target, 0u, 0x3000u);
+        put(target, 2u, 0x3000u);
+        put(target, Device::KeyOn, 1u);
+        render_count(target, 1u, "apply exponential-decrease initial volume");
+        const std::uint16_t phase = inverted ? 0x1000u : 0u;
+        put(target, 0u, static_cast<std::uint16_t>(0xE02Cu | phase));
+        put(target, 2u, static_cast<std::uint16_t>(0xE02Cu | phase));
+    };
+    static Device exponential_plain;
+    static Device exponential_inverted;
+    configure_exponential_decrease(exponential_plain, false);
+    configure_exponential_decrease(exponential_inverted, true);
+    std::array<StereoSample, 73u> exponential_prefix_plain{};
+    std::array<StereoSample, 73u> exponential_prefix_inverted{};
+    require(exponential_plain.render(exponential_prefix_plain).ok() &&
+                exponential_inverted.render(exponential_prefix_inverted).ok() &&
+                exponential_prefix_plain == exponential_prefix_inverted,
+            "exponential decrease ignores phase inversion at native edges");
+    static std::array<std::byte, Device::SnapshotBytes>
+        exponential_snapshot{};
+    require(exponential_inverted.save_snapshot(exponential_snapshot).ok(),
+            "snapshot phase-inverted exponential decrease");
+    static Device exponential_replay;
+    exponential_replay.reset();
+    require(exponential_replay.restore_snapshot(exponential_snapshot).ok(),
+            "restore phase-inverted exponential decrease");
+    std::array<StereoSample, 368u> exponential_tail_plain{};
+    std::array<StereoSample, 368u> exponential_tail_inverted{};
+    std::array<StereoSample, 368u> exponential_tail_replay{};
+    require(exponential_plain.render(exponential_tail_plain).ok() &&
+                exponential_inverted.render(exponential_tail_inverted).ok() &&
+                exponential_replay.render(exponential_tail_replay).ok(),
+            "render exponential-decrease replay tails");
+    const std::uint64_t exponential_tail_digest =
+        audio_digest(exponential_tail_inverted);
+    require(exponential_tail_plain == exponential_tail_inverted &&
+                exponential_tail_inverted == exponential_tail_replay &&
+                exponential_inverted.deterministic_digest() ==
+                    exponential_replay.deterministic_digest() &&
+                exponential_tail_digest ==
+                    3'042'691'447'776'982'565ull,
+            "exponential decrease phase rule is snapshot-exact for 441 edges");
+
     static Device inverted_increase;
     inverted_increase.reset();
     put(inverted_increase, 0u, 0x0001u);

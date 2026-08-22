@@ -545,8 +545,11 @@ void Device::advance_volume(VolumeControl& volume) noexcept {
     const bool exponential = (volume.raw & 0x4000u) != 0u;
     const bool decreasing = (volume.raw & 0x2000u) != 0u;
     const bool negative_phase = (volume.raw & 0x1000u) != 0u;
+    /* Hardware ignores phase inversion for exponential decrease. */
+    const bool effective_negative_phase =
+        negative_phase && !(exponential && decreasing);
 
-    if (decreasing != negative_phase) {
+    if (decreasing != effective_negative_phase) {
         step = -step - 1;
     }
     if (shift < 11u) {
@@ -585,7 +588,7 @@ void Device::advance_volume(VolumeControl& volume) noexcept {
     std::int32_t level = static_cast<std::int32_t>(volume.current) + step;
     if (!decreasing) {
         level = std::clamp(level, -32768, 32767);
-    } else if (negative_phase) {
+    } else if (effective_negative_phase) {
         level = std::clamp(level, -32768, 0);
     } else {
         level = std::max(level, 0);
