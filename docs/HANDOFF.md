@@ -29,10 +29,12 @@
 
 ## Open blockers
 
-- PAL 100 Hz is not implemented. Runtime PAL refresh multiplier support exists,
-  but the PAL game timing loop is structurally different from the NTSC-120
-  patch. Do not guess constants or enable PAL x2 without simulation, SPU/CDDA,
-  timeout, and media-load equivalence traces.
+- PAL100 title timing is now authenticated for the supplied PAL target: the
+  title selector/state path at 0x8017BB8C–0x8017BBAC maps selector 2 to
+  gSimVblankSkip=1 and PAL-x2 state=1. The opt-in PAL-x2 hook and target-only
+  package are present, with `tools/verify_pal100_title.py` covering the exact
+  local bytes and hashes. End-to-end PAL-x2 simulation, SPU/CDDA, timeout,
+  media-load, and race traces remain open; keep the feature default-off.
 - Normal-vs-accelerated memory-card and race-load equivalence is not proven;
   acceleration remains disabled by default.
 - Runtime still links generic overlay/autocompile/interpreter plumbing even
@@ -43,8 +45,8 @@
 
 ## Next concrete work
 
-1. Map PAL frame-gate/time-scale sites from the verified PAL executable and
-   generated dispatch, then build a trace-backed PAL-100 candidate.
+1. Run the opt-in PAL100 title path and capture simulation, SPU/CDDA,
+   timeout, media-load, and race equivalence traces.
 2. Compare normal and accelerated load traces (CD command/sector/DMA,
    memcard writes, state fingerprints, and audio timing) before enabling it.
 3. Remove or prove dead all runtime compiler/interpreter paths in the release
@@ -54,11 +56,10 @@
 ## Ruled out
 
 - Reusing the existing NTSC-120 package as a PAL-100 patch: PAL sites do not
-  have the same instruction layout or timing constants.
+  have the same instruction layout or timing constants; PAL100 now uses its
+  authenticated title-side selector path and a separate PAL-x2 hook.
 - Treating HD-pack discovery as proof of replacement: live substitution was
   separately measured and is now confirmed only for the observed 299 entries.
-- Repeating an unbounded PAL-100 search without a preserved PAL executable,
-  generated dispatch, and trace receipt: the latest bounded investigation
-  produced neither a candidate nor evidence suitable for enabling the mode.
-  Keep PAL x2 disabled until those authoritative inputs and the required
-  simulation/SPU/CDDA/media comparisons exist.
+- Repeating an unbounded PAL-100 search without stronger runtime traces: the
+  title-side candidate is now authenticated, but PAL x2 remains default-off
+  until simulation/SPU/CDDA/media comparisons exist.
