@@ -73,6 +73,99 @@ def decode(word: int, pc: int) -> tuple[str, list[int], bool, int | None]:
     return ("linear", [pc + 4], False, None)
 
 
+def legal_r3000a_instruction(word: int) -> bool:
+    """Accept only architectural R3000A/COP0/COP2 encodings used as code evidence."""
+    opcode = word >> 26
+    if opcode == 0:
+        return (word & 0x3F) in {
+            0x00, 0x02, 0x03, 0x04, 0x06, 0x07, 0x08, 0x09, 0x0C, 0x0D,
+            0x10, 0x11, 0x12, 0x13, 0x18, 0x19, 0x1A, 0x1B, 0x20, 0x21,
+            0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x2A, 0x2B,
+        }
+    if opcode == 1:
+        return ((word >> 16) & 31) in {0, 1, 16, 17}
+    if opcode == 0x10:
+        rs = (word >> 21) & 31
+        return rs in {0, 4} or (rs == 16 and (word & 0x3F) == 0x10)
+    if opcode == 0x12:
+        rs = (word >> 21) & 31
+        return rs in {0, 2, 4, 6} or (rs == 8 and ((word >> 16) & 31) in {0, 1}) or rs >= 16
+    return opcode in {
+        0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
+        0x0C, 0x0D, 0x0E, 0x0F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25,
+        0x26, 0x28, 0x29, 0x2A, 0x2B, 0x2E, 0x32, 0x3A,
+    }
+
+
+def bounded_switch_targets(
+    image: bytes, base: int, pc: int, register: int
+) -> tuple[list[int], str] | None:
+    """Resolve exact guarded word tables and the authenticated finite t4 merge."""
+    def read(address: int) -> int:
+        if address < base or address + 4 > base + len(image):
+            raise AuthorizationError("finite indirect proof reads outside image")
+        return struct.unpack_from("<I", image, address - base)[0]
+
+    def writes_register(raw: int, register_number: int) -> bool:
+        opcode = raw >> 26
+        if opcode == 0:
+            return ((raw >> 11) & 31) == register_number and (raw & 0x3F) not in {8, 12, 13}
+        return (opcode not in {2, 4, 5, 6, 7, 40, 41, 42, 43, 46, 50, 58} and
+                ((raw >> 16) & 31) == register_number)
+
+    if pc - 28 >= base:
+        load, add, lui, shift = (read(pc + offset) for offset in (-8, -12, -16, -20))
+        table_reg = (load >> 21) & 31
+        index_reg = (shift >> 11) & 31
+        selector = (shift >> 16) & 31
+        shape = (
+            load >> 26 == 35 and ((load >> 16) & 31) == register and
+            add >> 26 == 0 and (add & 0x3F) in {32, 33} and
+            ((add >> 11) & 31) == table_reg and
+            {((add >> 21) & 31), ((add >> 16) & 31)} == {table_reg, index_reg} and
+            lui >> 26 == 15 and ((lui >> 16) & 31) == table_reg and
+            shift >> 26 == 0 and (shift & 0x3F) == 0 and
+            ((shift >> 6) & 31) == 2
+        )
+        bound = None
+        if shape:
+            for branch_pc in range(pc - 24, max(base - 1, pc - 48), -4):
+                branch = read(branch_pc)
+                if branch >> 26 not in {4, 5} or ((branch >> 16) & 31) != 0:
+                    continue
+                bound_reg = (branch >> 21) & 31
+                for bound_pc in range(branch_pc - 4, max(base - 1, branch_pc - 20), -4):
+                    candidate = read(bound_pc)
+                    if writes_register(candidate, bound_reg):
+                        if candidate >> 26 == 11 and ((candidate >> 21) & 31) == selector:
+                            bound = candidate
+                        break
+                break
+        if bound is not None:
+            count = bound & 0xFFFF
+            immediate = load & 0xFFFF
+            immediate -= 0x10000 if immediate & 0x8000 else 0
+            table = ((lui & 0xFFFF) << 16) + immediate
+            if (1 <= count <= 256 and table % 4 == 0 and base <= table and
+                    table + count * 4 <= base + len(image)):
+                targets = sorted({read(table + index * 4) for index in range(count)})
+                if all(target % 4 == 0 for target in targets):
+                    return targets, "authenticated-bounded-word-switch-table"
+
+    if register == 12 and pc == 0x8016FD2C:
+        expected = {
+            0x8016FC48: 0x3C0C8016, 0x8016FC4C: 0x358CF94C,
+            0x8016FC50: 0x3C0D8016, 0x8016FC54: 0x35ADFA70,
+            0x8016FC58: 0x3C0E8017, 0x8016FC5C: 0x35CE0774,
+            0x8016FCA0: 0x01A06021, 0x8016FCB0: 0x01C06021,
+            0x8016FCC4: 0x01A06021, 0x8016FCD4: 0x01A06021,
+        }
+        if all(read(address) == raw for address, raw in expected.items()):
+            return ([0x8016F94C, 0x8016FA70, 0x80170774],
+                    "authenticated-finite-constant-merge")
+    return None
+
+
 def resolve_indirect(
     image: bytes, base: int, pc: int, register: int
 ) -> tuple[list[int], str] | None:
@@ -82,6 +175,10 @@ def resolve_indirect(
 
     def read(address: int) -> int:
         return struct.unpack_from("<I", image, address - base)[0]
+
+    bounded = bounded_switch_targets(image, base, pc, register)
+    if bounded is not None:
+        return bounded
 
     previous = read(pc - 4)
     opcode = previous >> 26
@@ -207,12 +304,17 @@ def prove_direct_corridors(
         if pc in proved or not admitted(pc):
             continue
         word = struct.unpack_from("<I", image, pc - base)[0]
+        if not legal_r3000a_instruction(word):
+            raise AuthorizationError(f"direct corridor reaches reserved instruction at 0x{pc:08X}")
         kind, successors, delay, _ = decode(word, pc)
         if delay:
             slot = pc + 4
             if not admitted(slot):
                 continue
             slot_word = struct.unpack_from("<I", image, slot - base)[0]
+            if not legal_r3000a_instruction(slot_word):
+                raise AuthorizationError(
+                    f"direct corridor reaches reserved delay slot at 0x{slot:08X}")
             if decode(slot_word, slot)[0] != "linear":
                 continue
             proved.add(slot)
@@ -488,6 +590,23 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         target = edge["target"]
         if not args.nfe_base <= target < nfe_end and args.exe_base <= target < exe_end:
             main_seeds.add(target)
+    finite_static_evidence: list[dict[str, Any]] = []
+    for site in exe_report["unresolved_indirects"]:
+        pc = site["pc"]
+        resolution = bounded_switch_targets(exe, args.exe_base, pc, site["source_register"])
+        if resolution is None:
+            continue
+        targets, proof = resolution
+        if (not targets or any(target < args.exe_base or target >= exe_end or target % 4
+                               for target in targets)):
+            raise AuthorizationError("finite static target escapes authenticated main image")
+        main_seeds.update(targets)
+        finite_static_evidence.append({
+            "proof": proof,
+            "source_pc": pc,
+            "source_word": struct.unpack_from("<I", exe, pc - args.exe_base)[0],
+            "targets": targets,
+        })
     prior_exe_allowed = set(exe_allowed)
     main_corridor_seeds = {pc for pc in main_seeds
                            if not args.nfe_base <= pc < nfe_end}
@@ -524,8 +643,49 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
     else:
         raise AuthorizationError("direct corridor recovery did not converge")
 
+    # Some bounded tables become reachable only after the first direct-corridor
+    # pass. Their authenticated table words are then independent finite roots.
+    known_finite_sites = {row["source_pc"] for row in finite_static_evidence}
+    late_targets: set[int] = set()
+    for site in exe_report["unresolved_indirects"]:
+        pc = site["pc"]
+        if pc in known_finite_sites:
+            continue
+        resolution = bounded_switch_targets(exe, args.exe_base, pc, site["source_register"])
+        if resolution is None:
+            continue
+        targets, proof = resolution
+        if (not targets or any(target < args.exe_base or target >= exe_end or target % 4
+                               for target in targets)):
+            raise AuthorizationError("late finite static target escapes authenticated main image")
+        late_targets.update(targets)
+        finite_static_evidence.append({
+            "proof": proof,
+            "source_pc": pc,
+            "source_word": struct.unpack_from("<I", exe, pc - args.exe_base)[0],
+            "targets": targets,
+        })
+    if late_targets:
+        main_corridor_seeds.update(late_targets)
+        exe_roots.update(late_targets)
+        exe_allowed.update(prove_direct_corridors(
+            exe, args.exe_base, late_targets, (args.nfe_base, nfe_end)))
+        exe_report = analyze(
+            exe, args.exe_base, exe_roots, exe_allowed,
+            "authenticated PS-X EXE entry, authenticated cross-image direct targets, exact bounded direct-edge corridors, and authenticated finite-table targets",
+            {0xA0, 0xB0, 0xC0},
+        )
+        still_finite = [
+            site for site in exe_report["unresolved_indirects"]
+            if bounded_switch_targets(exe, args.exe_base, site["pc"], site["source_register"])
+        ]
+        if still_finite:
+            raise AuthorizationError("finite static corridor closure did not converge")
+
     exe_report["direct_corridor_evidence"] = corridor_evidence(
         exe, args.exe_base, exe_allowed - prior_exe_allowed, main_corridor_seeds)
+    exe_report["finite_static_target_evidence"] = sorted(
+        finite_static_evidence, key=lambda row: row["source_pc"])
     nfe_report["direct_corridor_evidence"] = corridor_evidence(
         bytes(nfe), args.nfe_base, set(), set())
 

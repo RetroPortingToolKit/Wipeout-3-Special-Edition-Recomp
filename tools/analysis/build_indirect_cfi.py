@@ -116,6 +116,36 @@ def fixed_dispatch_targets(data: bytes, base: int, pc: int, register: int) -> li
     return [0x8016F94C, 0x8016FA70, 0x80170774]
 
 
+def renderer_callback_contract(
+    data: bytes, base: int, pc: int, register: int
+) -> tuple[str, list[int] | None] | None:
+    """Bind callbacks exposed only by the authenticated renderer corridors."""
+    early_t5 = {0x8016FA04, 0x8016FB6C, 0x8016FB84}
+    inherited_k1 = {0x8016FB9C, 0x8016FBB4}
+    table_sites = {
+        0x801708B8: 13, 0x801708D0: 13, 0x801708E8: 27, 0x80170900: 27,
+        0x80170958: 13, 0x80170970: 13, 0x80170988: 27, 0x801709A0: 27,
+        0x80170A04: 13, 0x80170A1C: 13, 0x80170A34: 27, 0x80170A4C: 27,
+        0x80170A9C: 13, 0x80170AB4: 13, 0x80170ACC: 27, 0x80170AE4: 27,
+    }
+    if pc in early_t5 and register == 13:
+        expected = {0x8016FC50: 0x3C0D8016, 0x8016FC54: 0x35ADFA70}
+        if all(word(data, base, address) == raw for address, raw in expected.items()):
+            return "finite-constant-set", [0x8016FA70]
+    if pc in inherited_k1 and register == 27:
+        if (word(data, base, 0x8017025C) == 0x03600013 and
+                word(data, base, 0x801704EC) == 0x0000D812):
+            return "bounded-inherited-callback", None
+    if table_sites.get(pc) == register:
+        expected_loads = {
+            0x80170868: 0x8C8D0000, 0x8017086C: 0x8C9B0004,
+            0x801709B0: 0x8C8D0008, 0x801709B4: 0x8C9B000C,
+        }
+        if all(word(data, base, address) == raw for address, raw in expected_loads.items()):
+            return "bounded-memory-callback", None
+    return None
+
+
 def build(authority: dict[str, Any], shards: dict[str, Any], images: dict[str, bytes]) -> dict[str, Any]:
     if authority.get("schema") != "wo3se.executable-authorization.v1":
         raise CfiError("unsupported authorization schema")
@@ -169,7 +199,12 @@ def build(authority: dict[str, Any], shards: dict[str, Any], images: dict[str, b
                 data, report["base"], site["pc"], register)
             fixed_targets = fixed_dispatch_targets(
                 data, report["base"], site["pc"], register)
-            exact_targets = table_targets if table_targets is not None else fixed_targets
+            renderer_contract = renderer_callback_contract(
+                data, report["base"], site["pc"], register)
+            renderer_targets = (renderer_contract[1] if renderer_contract is not None and
+                                renderer_contract[0] == "finite-constant-set" else None)
+            exact_targets = (table_targets if table_targets is not None else
+                             fixed_targets if fixed_targets is not None else renderer_targets)
             if exact_targets is not None:
                 admitted = sorted(set(exact_targets) & authorized)
                 if admitted != exact_targets:
@@ -191,7 +226,14 @@ def build(authority: dict[str, Any], shards: dict[str, Any], images: dict[str, b
                               "source_identity_sha256": identities[name],
                               "source_image": name, "source_pc": site["pc"],
                               "universe": f"{name}:function-entry"})
-            elif ((raw & 0x3F) == 9 and raw >> 26 == 0 and function_entries and
+            elif (renderer_contract is not None and function_entries and
+                  renderer_contract[0] in {"bounded-memory-callback",
+                                           "bounded-inherited-callback"}):
+                sites.append({"admit_source": True, "kind": renderer_contract[0],
+                              "source_identity_sha256": identities[name],
+                              "source_image": name, "source_pc": site["pc"],
+                              "universe": f"{name}:function-entry"})
+            elif ((raw & 0x3F) in {8, 9} and raw >> 26 == 0 and function_entries and
                   memory_loaded_callback(data, report["base"], site["pc"], register)):
                 sites.append({"admit_source": True, "kind": "bounded-memory-callback",
                               "source_identity_sha256": identities[name],

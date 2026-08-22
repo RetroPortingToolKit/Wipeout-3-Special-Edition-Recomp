@@ -73,7 +73,8 @@ def build(authority: dict[str, Any], finite: dict[str, Any],
                     site.get("source_identity_sha256") != identities[name]):
                 raise ShardError("CFI site identity is invalid")
             if site.get("kind") in {"bounded-callback", "bounded-memory-callback",
-                                     "finite-table", "finite-constant-set"}:
+                                     "bounded-inherited-callback", "finite-table",
+                                     "finite-constant-set"}:
                 cfi_sites[name].add(site["source_pc"])
                 if site.get("kind") in {"finite-table", "finite-constant-set"}:
                     universe = universes.get(site.get("universe"))

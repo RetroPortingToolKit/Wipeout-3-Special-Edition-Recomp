@@ -93,7 +93,8 @@ tools.analysis.tests.test_build_game_region_shards`.
 
 `authorize_executable_regions.py` also closes exact direct-edge corridors rooted
 by authenticated main-image targets and NFE-to-main calls. Corridor decoding is
-bounded to the selected image identity, stops at every JR/JALR, hashes every
+bounded to the selected image identity, rejects reserved R3000A encodings,
+stops at every JR/JALR, hashes every
 recovered range, and excludes overlapping bytes from the wrong static image.
 The emitted `wo3se.overlapping-executable-epoch-dispatch.v1` contract records
 five capture-selected NFE sites and one load-base site that requires runtime
@@ -104,8 +105,9 @@ are finite external exits; every other unresolved indirect remains rejected.
 call-continuation universes from authenticated callgraph edges intersected with
 the generated shard set. `JR $ra` uses only continuation entries; argument and
 locally proved memory-loaded callbacks use only same-epoch function entries.
-It also recognizes bounded `SLTIU`/indexed-word switch tables and one exact
-constant-set dispatcher, emitting per-site universes only when every target is
-executable-authorized. The shard builder turns those universes into mandatory
-precompiled dependencies. Unknown values, unauthenticated table targets,
-unclassified computed transfers, and cross-image callbacks remain rejected.
+It also recognizes bounded `SLTIU`/indexed-word switch tables, exact constant
+sets, authenticated renderer pointer tables, and preserved inherited callbacks,
+emitting per-site universes only when every target corridor is executable-
+authorized. The shard builder turns those universes into mandatory precompiled
+dependencies. Unknown values, unauthenticated table targets, unclassified
+computed transfers, and cross-image callbacks remain rejected.

@@ -8,6 +8,7 @@ from tools.analysis.build_indirect_cfi import (
     build,
     fixed_dispatch_targets,
     memory_loaded_callback,
+    renderer_callback_contract,
 )
 
 
@@ -110,6 +111,18 @@ class IndirectCfiTests(unittest.TestCase):
                          [0x8016F94C, 0x8016FA70, 0x80170774])
         struct.pack_into("<I", data, 0x8016FCC4 - base, 0)
         self.assertIsNone(fixed_dispatch_targets(bytes(data), base, pc, 12))
+
+    def test_renderer_inherited_callback_requires_exact_save_restore(self):
+        base = 0x80160000
+        data = bytearray(0x11000)
+        struct.pack_into("<I", data, 0x8017025C - base, 0x03600013)
+        struct.pack_into("<I", data, 0x801704EC - base, 0x0000D812)
+        self.assertEqual(renderer_callback_contract(
+            bytes(data), base, 0x8016FB9C, 27),
+            ("bounded-inherited-callback", None))
+        struct.pack_into("<I", data, 0x801704EC - base, 0)
+        self.assertIsNone(renderer_callback_contract(
+            bytes(data), base, 0x8016FB9C, 27))
 
 
 if __name__ == "__main__":

@@ -26,13 +26,15 @@ entry-5 bytes and hash-named captured slices. It differs at exactly four words:
 
 | Image | Authorized instructions | Authorized bytes | Unknown bytes | Unresolved indirects | Rejected direct edges |
 |---|---:|---:|---:|---:|---:|
-| Main EXE | 101,033 | 404,132 | 1,086,812 | 132 | 17 |
-| NFE entry-5 route variant | 31,719 | 126,876 | 10,032 | 10 | 54 |
+| Main EXE | 104,002 | 416,008 | 1,074,936 | 110 | 0 |
+| NFE entry-5 route variant | 31,719 | 126,876 | 10,032 | 10 | 0 |
 | Verified retail BIOS direct frontier | 3,013 | 12,052 | 512,236 | 27 | 0 |
 
-No indirect target currently satisfies the narrow local-literal proof rule.
-Therefore the finite indirect-target arrays are empty and all 142 indirect
-sites remain explicitly unresolved. Unknown PCs and executable writes must be
+The raw authorization graph records 120 dynamic indirect sites. The separate
+identity-bound CFI receipt closes all of them against finite precompiled
+universes: returns use call continuations, callbacks use authenticated
+same-image function entries, and exact switch/constant sets use per-site target
+sets. Unknown PCs, identities, target values, and executable writes remain
 rejected.
 
 Global content-epoch-aware closure proves 1,166 NFE-to-main direct calls that
@@ -49,7 +51,7 @@ The deterministic 17,353-instruction execution receipt additionally proves the
 runtime return target `0xBFC0703C`. Manifest generation preserves that root even
 though its bytes coalesce with the surrounding authorized range.
 
-The exact 270 main-image unknown ranges and 18 NFE unknown ranges are recorded
+The exact 273 main-image unknown ranges and 18 NFE unknown ranges are recorded
 under each image's `unknown_ranges` array in the receipt. The NFE ranges are:
 
 ```text

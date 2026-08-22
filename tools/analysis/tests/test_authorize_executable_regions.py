@@ -8,8 +8,11 @@ import unittest
 from pathlib import Path
 
 from tools.analysis.authorize_executable_regions import (
+    AuthorizationError,
     analyze,
+    bounded_switch_targets,
     corridor_evidence,
+    legal_r3000a_instruction,
     prove_direct_corridors,
     resolve_indirect,
 )
@@ -81,6 +84,30 @@ class FiniteIndirectTests(unittest.TestCase):
             prove_direct_corridors(image, BASE, {BASE}, (BASE + 8, BASE + 16)),
             {BASE, BASE + 4},
         )
+
+    def test_direct_corridor_rejects_reserved_instruction(self) -> None:
+        image = bytearray(8)
+        write_word(image, BASE, 0x7C000000)
+        self.assertFalse(legal_r3000a_instruction(0x7C000000))
+        with self.assertRaisesRegex(AuthorizationError, "reserved instruction"):
+            prove_direct_corridors(bytes(image), BASE, {BASE})
+
+    def test_bounded_switch_targets_are_exact_and_near_match_rejects(self) -> None:
+        image = bytearray(0x100)
+        pc = BASE + 0x20
+        words = (
+            0x2C820003, 0x10400008, 0x00042080, 0x3C028016,
+            0x00441021, 0x8C420080, 0x00000000, 0x00400008,
+        )
+        for index, word in enumerate(words):
+            write_word(image, pc - 28 + index * 4, word)
+        targets = [BASE + 0x40, BASE + 0x50, BASE + 0x60]
+        for index, target in enumerate(targets):
+            write_word(image, BASE + 0x80 + index * 4, target)
+        self.assertEqual(bounded_switch_targets(bytes(image), BASE, pc, 2),
+                         (targets, "authenticated-bounded-word-switch-table"))
+        write_word(image, pc - 20, 0x00042040)
+        self.assertIsNone(bounded_switch_targets(bytes(image), BASE, pc, 2))
 
     def test_direct_corridor_receipt_hashes_exact_recovered_bytes(self) -> None:
         image = bytes(range(32))
