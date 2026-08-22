@@ -25,9 +25,20 @@ host::SdlVulkanConfig make_live_graphics_config(
             ? host::PresentationFilter::Linear
             : host::PresentationFilter::Nearest};
 }
-struct SdlPlatform::Impl final { SDL_Window* window=nullptr; SDL_AudioStream* audio=nullptr; SDL_Gamepad* gamepad=nullptr; std::uint64_t sample=0U; PlatformConfiguration config{}; AudioHealth health{}; };
+struct SdlPlatform::Impl final { SDL_Window* window=nullptr; SDL_AudioStream* audio=nullptr; SDL_Gamepad* gamepad=nullptr; std::uint64_t sample=0U; std::uint64_t gamepad_generation=0U; bool focused=true; RumbleBridge rumble{}; PlatformConfiguration config{}; AudioHealth health{}; };
 
 namespace {
+
+class SdlRumbleSink final : public IRumbleSink {
+public:
+    explicit SdlRumbleSink(SDL_Gamepad* gamepad) noexcept : gamepad_(gamepad) {}
+    bool set_rumble(std::uint16_t low, std::uint16_t high,
+                    std::uint32_t duration_ms) noexcept override {
+        return gamepad_ != nullptr && SDL_RumbleGamepad(gamepad_, low, high, duration_ms);
+    }
+private:
+    SDL_Gamepad* gamepad_ = nullptr;
+};
 
 void open_first_gamepad(SDL_Gamepad*& gamepad) noexcept {
     if (gamepad != nullptr) return;
@@ -82,6 +93,7 @@ bool SdlPlatform::initialize(const char* title,PlatformConfiguration configurati
     impl_->audio=SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,nullptr,nullptr);
     if(impl_->window==nullptr||impl_->audio==nullptr||!SDL_ResumeAudioStreamDevice(impl_->audio)){shutdown();return false;}
     open_first_gamepad(impl_->gamepad);
+    if (impl_->gamepad != nullptr) ++impl_->gamepad_generation;
     return true;
 }
 
@@ -93,10 +105,11 @@ bool SdlPlatform::pump(host::ControllerState& state,bool& quit) noexcept {
     SDL_Event event{};
     std::size_t count=0U;
     while(count<64U&&SDL_PollEvent(&event)){++count;if(event.type==SDL_EVENT_QUIT||event.type==SDL_EVENT_WINDOW_CLOSE_REQUESTED)quit=true;
-        if(event.type==SDL_EVENT_GAMEPAD_ADDED&&impl_->gamepad==nullptr)impl_->gamepad=SDL_OpenGamepad(event.gdevice.which);
-        if(event.type==SDL_EVENT_GAMEPAD_REMOVED&&impl_->gamepad!=nullptr&&SDL_GetGamepadID(impl_->gamepad)==event.gdevice.which){SDL_CloseGamepad(impl_->gamepad);impl_->gamepad=nullptr;open_first_gamepad(impl_->gamepad);}}
+        if(event.type==SDL_EVENT_GAMEPAD_ADDED&&impl_->gamepad==nullptr){impl_->gamepad=SDL_OpenGamepad(event.gdevice.which);if(impl_->gamepad!=nullptr)++impl_->gamepad_generation;}
+        if(event.type==SDL_EVENT_GAMEPAD_REMOVED&&impl_->gamepad!=nullptr&&SDL_GetGamepadID(impl_->gamepad)==event.gdevice.which){SdlRumbleSink sink(impl_->gamepad);impl_->rumble.device_will_close(impl_->gamepad_generation,sink);SDL_CloseGamepad(impl_->gamepad);impl_->gamepad=nullptr;open_first_gamepad(impl_->gamepad);if(impl_->gamepad!=nullptr)++impl_->gamepad_generation;}}
     state={};state.sample_index=impl_->sample++;
     const bool focused=(SDL_GetWindowFlags(impl_->window)&SDL_WINDOW_INPUT_FOCUS)!=0U;
+    impl_->focused=focused;
     if(!focused)return true;
     state.buttons=keyboard_buttons(SDL_GetKeyboardState(nullptr));
     if(state.buttons!=0U)state.connected_mask|=2U;
@@ -130,7 +143,16 @@ bool SdlPlatform::queue_audio(const host::StereoAudioBatch& audio) noexcept {
     const int bytes=static_cast<int>(audio.sample_frames*host::kAudioChannels*sizeof(std::int16_t));return SDL_PutAudioStreamData(impl_->audio,audio.interleaved_stereo,bytes);
 }
 
+bool SdlPlatform::apply_rumble(const sio::PadState& state,
+                               std::uint64_t sample_index) noexcept {
+    if (impl_ == nullptr) return false;
+    SdlRumbleSink sink(impl_->gamepad);
+    return impl_->rumble.update(sample_index, impl_->gamepad_generation,
+        impl_->gamepad != nullptr, impl_->focused,
+        state.rumble_small, state.rumble_large, sink);
+}
+
 AudioHealth SdlPlatform::audio_health() const noexcept{return impl_==nullptr?AudioHealth{}:impl_->health;}
 
-void SdlPlatform::shutdown() noexcept {if(impl_==nullptr)return;if(impl_->gamepad!=nullptr)SDL_CloseGamepad(impl_->gamepad);if(impl_->audio!=nullptr)SDL_DestroyAudioStream(impl_->audio);if(impl_->window!=nullptr)SDL_DestroyWindow(impl_->window);SDL_QuitSubSystem(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_GAMEPAD);delete impl_;impl_=nullptr;}
+void SdlPlatform::shutdown() noexcept {if(impl_==nullptr)return;if(impl_->gamepad!=nullptr){SdlRumbleSink sink(impl_->gamepad);impl_->rumble.device_will_close(impl_->gamepad_generation,sink);SDL_CloseGamepad(impl_->gamepad);}if(impl_->audio!=nullptr)SDL_DestroyAudioStream(impl_->audio);if(impl_->window!=nullptr)SDL_DestroyWindow(impl_->window);SDL_QuitSubSystem(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_GAMEPAD);delete impl_;impl_=nullptr;}
 } // namespace clean_aot::app

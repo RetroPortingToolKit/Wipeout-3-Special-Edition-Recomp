@@ -41,4 +41,39 @@ std::pair<std::int16_t, std::int16_t> apply_radial_deadzone(
     return {convert(dx), convert(dy)};
 }
 
+bool RumbleBridge::update(std::uint64_t sample_index,
+                          std::uint64_t device_generation,
+                          bool available, bool focused,
+                          std::uint8_t small_motor,
+                          std::uint8_t large_motor,
+                          IRumbleSink& sink) noexcept {
+    if (sampled_ && sample_index <= last_sample_) return false;
+    sampled_ = true;
+    last_sample_ = sample_index;
+    const bool usable = available && focused && device_generation != 0U;
+    const std::uint16_t desired_low = usable
+        ? static_cast<std::uint16_t>(static_cast<std::uint16_t>(large_motor) * 257U) : 0U;
+    const std::uint16_t desired_high = usable && small_motor != 0U ? 0xffffU : 0U;
+    const bool generation_changed = generation_ != device_generation;
+    if (!generation_changed && commanded_ && low_ == desired_low && high_ == desired_high)
+        return true;
+    generation_ = device_generation;
+    low_ = desired_low;
+    high_ = desired_high;
+    commanded_ = true;
+    if (desired_low == 0U && desired_high == 0U && generation_changed) return true;
+    // Unsupported haptics are a host capability miss, not a guest timing error.
+    (void)sink.set_rumble(desired_low, desired_high, 10U);
+    return true;
+}
+
+void RumbleBridge::device_will_close(std::uint64_t device_generation,
+                                     IRumbleSink& sink) noexcept {
+    if (commanded_ && generation_ == device_generation && (low_ != 0U || high_ != 0U))
+        (void)sink.set_rumble(0U, 0U, 0U);
+    commanded_ = false;
+    low_ = 0U;
+    high_ = 0U;
+}
+
 } // namespace clean_aot::app

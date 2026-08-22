@@ -3,6 +3,7 @@
 #include "clean_aot/host/host.hpp"
 #include "clean_aot/host/sdl_vulkan.hpp"
 #include "clean_aot/app/graphics.hpp"
+#include "sio.hpp"
 
 #include <cstdint>
 
@@ -40,6 +41,8 @@ public:
                             bool& quit) noexcept;
     [[nodiscard]] bool queue_audio(
         const host::StereoAudioBatch& audio) noexcept;
+    [[nodiscard]] bool apply_rumble(const sio::PadState& state,
+                                    std::uint64_t sample_index) noexcept;
     [[nodiscard]] AudioHealth audio_health() const noexcept;
     void shutdown() noexcept;
 

@@ -23,4 +23,32 @@ inline constexpr std::size_t kMappedGamepadButtonCount = 14U;
 [[nodiscard]] std::pair<std::int16_t, std::int16_t> apply_radial_deadzone(
     std::int16_t x, std::int16_t y, std::int16_t deadzone) noexcept;
 
+class IRumbleSink {
+public:
+    virtual ~IRumbleSink() = default;
+    [[nodiscard]] virtual bool set_rumble(std::uint16_t low_frequency,
+                                          std::uint16_t high_frequency,
+                                          std::uint32_t duration_ms) noexcept = 0;
+};
+
+class RumbleBridge final {
+public:
+    [[nodiscard]] bool update(std::uint64_t sample_index,
+                              std::uint64_t device_generation,
+                              bool available, bool focused,
+                              std::uint8_t small_motor,
+                              std::uint8_t large_motor,
+                              IRumbleSink& sink) noexcept;
+    void device_will_close(std::uint64_t device_generation,
+                           IRumbleSink& sink) noexcept;
+
+private:
+    std::uint64_t last_sample_ = 0U;
+    std::uint64_t generation_ = 0U;
+    std::uint16_t low_ = 0U;
+    std::uint16_t high_ = 0U;
+    bool sampled_ = false;
+    bool commanded_ = false;
+};
+
 } // namespace clean_aot::app

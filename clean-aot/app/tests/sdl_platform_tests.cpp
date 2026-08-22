@@ -47,6 +47,13 @@ int main() {
             return 1;
         }
     }
+    clean_aot::sio::PadState pad{};
+    pad.rumble_small = 1U;
+    pad.rumble_large = 0xffU;
+    if (!platform.apply_rumble(pad, 0U) || platform.apply_rumble(pad, 0U)) {
+        std::cerr << "SDL rumble bridge sample sequencing failed\n";
+        return 1;
+    }
     std::array<std::int16_t,
                clean_aot::host::kAudioFramesPerUpdate *
                    clean_aot::host::kAudioChannels> silence{};
