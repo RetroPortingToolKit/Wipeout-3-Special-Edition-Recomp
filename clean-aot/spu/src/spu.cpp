@@ -11,6 +11,7 @@ namespace {
 constexpr std::uint64_t kFnvOffset = 14695981039346656037ull;
 constexpr std::uint64_t kFnvPrime = 1099511628211ull;
 constexpr std::uint16_t kTransferControlMask = 0x000Eu;
+constexpr std::uint16_t kNormalTransferControl = 0x0004u;
 constexpr std::uint32_t kBlockSpanFixed =
     static_cast<std::uint32_t>(AdpcmSamplesPerBlock << 12u);
 constexpr std::array<std::int16_t, 5u> kPredictorOne = {
@@ -2186,7 +2187,8 @@ RenderResult Device::render(std::span<StereoSample> output) noexcept {
         const std::int16_t filtered_right =
             reverb_fir_sample(reverb_input_right_, false);
         const bool write_reverb =
-            (effective_control_ & ControlReverbEnable) != 0u;
+            (effective_control_ & ControlReverbEnable) != 0u &&
+            transfer_control_ == kNormalTransferControl;
         const StereoSample core_output =
             (sample_counter_ & 1u) == 0u
                 ? process_reverb_side(false, filtered_left, write_reverb)

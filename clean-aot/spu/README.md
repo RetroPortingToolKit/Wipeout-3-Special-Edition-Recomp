@@ -56,7 +56,9 @@ Implemented surface
 - A fixed-point, register-driven reverb path with same-side reflection,
   cross-side reflection, four comb stages, two all-pass stages, wet output,
   intermediate saturation, and the documented alternate left/right 22,050 Hz
-  work-area cadence. The documented 39-tap input and output FIRs are modeled
+  work-area cadence. Work-area writes require the documented normal sound-RAM
+  transfer-control value; other values retain reads/output and cursor cadence
+  without mutating RAM. The documented 39-tap input and output FIRs are modeled
   with their 19-sample causal delays, giving the documented 38-sample combined
   delay at the 44,100 Hz output. Reverb writes are saturated at the documented
   datapath boundaries, including the documented `vIIR=-8000h` behavior.
@@ -97,7 +99,8 @@ continuously clocked noise, modulation ordering,
 saturation, masks and malformed MMIO, transfer FIFO/DMA modes,
 always-on capture and IRQ gates, CD/XA/external routing, chunking, adversarial
 snapshot validation, 39-tap reverb FIR phase and combined-delay behavior, long
-deterministic generation, and a fixed 441-sample 100 Hz boundary under varying
+transfer-gated reverb writes, deterministic generation, and a fixed
+441-sample 100 Hz boundary under varying
 simulated CPU retirement multipliers. The benchmark runs a representative
 24-voice/reverb workload and reports measured samples per second; its timing is
 evidence only and is not a correctness gate.

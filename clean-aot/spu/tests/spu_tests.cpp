@@ -1220,6 +1220,7 @@ void test_mix_capture_and_input_fifos() {
 
     static Device reverb_delay;
     reverb_delay.reset();
+    put(reverb_delay, Device::TransferControl, kNormalTransfer);
     put(reverb_delay, Device::ReverbBase, 0x1000u);
     put(reverb_delay, Device::ReverbOutputVolume, 0u);
     put(reverb_delay, Device::ReverbOutputVolume + 2u, 0x7FFFu);
@@ -1251,6 +1252,7 @@ void test_mix_capture_and_input_fifos() {
             "input and output reverb FIRs preserve their combined 38-sample delay");
 
     const auto configure_reverb_route = [](Device& routed) {
+        put(routed, Device::TransferControl, kNormalTransfer);
         put(routed, Device::ReverbBase, 0x1000u);
         put(routed, Device::ReverbRegisterBase + 2u * 2u, 0x7FFFu);
         for (std::size_t index = 10u; index <= 29u; ++index) {
@@ -1280,6 +1282,52 @@ void test_mix_capture_and_input_fifos() {
     require(passive_output[0u] == StereoSample{0, 0} &&
                 ram_word(cd_reverb_only, 0x8000u) != 0u,
             "CD dry and reverb route bits are independent");
+
+    static Device gated_reverb;
+    gated_reverb.reset();
+    configure_reverb_route(gated_reverb);
+    put(gated_reverb, Device::TransferControl, 0u);
+    put(gated_reverb, Device::CdVolume, 0x7FFFu);
+    put(gated_reverb, Device::CdVolume + 2u, 0x7FFFu);
+    put(gated_reverb, Device::Control,
+        static_cast<std::uint16_t>(kLive | Device::ControlCdReverb |
+                                   Device::ControlReverbEnable));
+    require(gated_reverb.push_cdda(reverb_input).accepted == 1u &&
+                gated_reverb.render(passive_output).ok() &&
+                ram_word(gated_reverb, 0x8000u) == 0u,
+            "reset transfer control blocks reverb work-area writes");
+    static std::array<std::byte, Device::SnapshotBytes>
+        gated_reverb_snapshot{};
+    require(gated_reverb.save_snapshot(gated_reverb_snapshot).ok(),
+            "snapshot transfer-gated reverb boundary");
+    static Device gated_reverb_replay;
+    gated_reverb_replay.reset();
+    require(gated_reverb_replay.restore_snapshot(gated_reverb_snapshot).ok(),
+            "restore transfer-gated reverb boundary");
+    put(gated_reverb, Device::TransferControl, kNormalTransfer);
+    put(gated_reverb_replay, Device::TransferControl, kNormalTransfer);
+    std::array<StereoSample, 40u> gated_input{};
+    gated_input.fill(reverb_input[0u]);
+    require(gated_reverb.push_cdda(gated_input).accepted == gated_input.size() &&
+                gated_reverb_replay.push_cdda(gated_input).accepted ==
+                    gated_input.size(),
+            "queue reverb input through the FIR boundary");
+    std::array<StereoSample, 40u> gated_output{};
+    std::array<StereoSample, 40u> gated_replay_output{};
+    require(gated_reverb.render(gated_output).ok() &&
+                gated_reverb_replay.render(gated_replay_output).ok(),
+            "render opened reverb gate through both native sides and FIR delay");
+    require(gated_output == gated_replay_output,
+            "opened reverb gate reproduces snapshot audio");
+    const auto gated_ram = gated_reverb.sound_ram();
+    const bool gated_ram_written = std::any_of(
+        gated_ram.begin() + 0x8000u, gated_ram.end(),
+        [](std::uint8_t value) { return value != 0u; });
+    require(gated_ram_written,
+            "normal transfer gate resumes reverb work-area writes");
+    require(gated_reverb.deterministic_digest() ==
+                gated_reverb_replay.deterministic_digest(),
+            "opened reverb gate reproduces complete snapshot state");
 
     static Device external_reverb_only;
     external_reverb_only.reset();
