@@ -1209,6 +1209,7 @@ struct Runtime::Impl final {
             const std::uint32_t written = lane_merge(
                 0xffff'ffffU, address, width, value);
             soc.interrupts().write_status(written);
+            soc.counters().resample_irq_lines();
             update_interrupt_lines();
             return handled_write();
         }

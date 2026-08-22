@@ -443,6 +443,13 @@ void test_counters(TestRunner& runner) {
                                                &report) == SocStatus::ok);
     EXPECT(runner, chip.counters().irq_level(0U));
     chip.interrupts().acknowledge(InterruptSource::counter0);
+    EXPECT(runner, !chip.interrupts().pending(InterruptSource::counter0));
+    const CounterSnapshot asserted_snapshot = chip.counters().snapshot(0U);
+    chip.counters().resample_irq_lines();
+    EXPECT(runner, chip.interrupts().pending(InterruptSource::counter0));
+    EXPECT(runner, equal_counter_snapshot(asserted_snapshot,
+                                           chip.counters().snapshot(0U)));
+    chip.interrupts().acknowledge(InterruptSource::counter0);
     EXPECT(runner, chip.counters().advance_cpu(CycleDelta::whole(3U),
                                                &report) == SocStatus::ok);
     EXPECT(runner, !chip.counters().irq_level(0U));
@@ -457,6 +464,8 @@ void test_counters(TestRunner& runner) {
                                                &report) == SocStatus::ok);
     EXPECT(runner, chip.interrupts().pending(InterruptSource::counter0));
     chip.interrupts().acknowledge(InterruptSource::counter0);
+    chip.counters().resample_irq_lines();
+    EXPECT(runner, !chip.interrupts().pending(InterruptSource::counter0));
     EXPECT(runner, chip.counters().advance_cpu(CycleDelta::whole(0x1'0000U),
                                                &report) == SocStatus::ok);
     EXPECT(runner, !chip.interrupts().pending(InterruptSource::counter0));

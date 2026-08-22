@@ -182,6 +182,9 @@ public:
                           CounterAdvanceReport* report = nullptr) noexcept;
     SocStatus input_edge(CounterEdge edge,
                          CounterAdvanceReport* report = nullptr) noexcept;
+    // Re-drive level-sensitive timer requests after the interrupt controller
+    // has been acknowledged. Pulse requests have already returned inactive.
+    void resample_irq_lines() noexcept;
 
     [[nodiscard]] bool running(std::size_t index) const noexcept;
     [[nodiscard]] bool irq_level(std::size_t index) const noexcept;

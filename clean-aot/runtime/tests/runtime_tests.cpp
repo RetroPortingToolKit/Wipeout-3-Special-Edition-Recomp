@@ -479,6 +479,36 @@ void test_interrupt_latch(Runner& runner) {
                        .ok());
     EXPECT(runner, !runtime->cpu_interrupt_line());
     EXPECT(runner, runtime->hardware_interrupt_lines() == 0U);
+
+    auto timer_runtime = make_runtime(1U, 1U);
+    const AccessContext at_zero{0U, 0x8001'0100U, false};
+    const std::uint32_t counter0 = clean_aot::soc::interrupt_bit(
+        clean_aot::soc::InterruptSource::counter0);
+    EXPECT(runner,
+           timer_runtime->write32(at_zero, 0x1f80'1074U, counter0).ok());
+    EXPECT(runner,
+           timer_runtime->write16(at_zero, 0x1f80'1108U, 1U).ok());
+    EXPECT(runner,
+           timer_runtime->write16(at_zero, 0x1f80'1104U, 0x00d8U).ok());
+
+    const AccessContext first_target{1U, 0x8001'0104U, false};
+    EXPECT(runner,
+           timer_runtime->read32(first_target, 0x1f80'1070U).ok());
+    EXPECT(runner, timer_runtime->cpu_interrupt_line());
+    EXPECT(runner, timer_runtime->write32(
+                       first_target, 0x1f80'1070U, ~counter0)
+                       .ok());
+    EXPECT(runner, timer_runtime->cpu_interrupt_line());
+    EXPECT(runner, timer_runtime->soc().interrupts().pending(
+                       clean_aot::soc::InterruptSource::counter0));
+
+    const AccessContext second_target{2U, 0x8001'0108U, false};
+    EXPECT(runner,
+           timer_runtime->read32(second_target, 0x1f80'1070U).ok());
+    EXPECT(runner, timer_runtime->write32(
+                       second_target, 0x1f80'1070U, ~counter0)
+                       .ok());
+    EXPECT(runner, !timer_runtime->cpu_interrupt_line());
 }
 
 void test_device_deadlines(Runner& runner) {

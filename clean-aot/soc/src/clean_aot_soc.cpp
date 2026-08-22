@@ -791,6 +791,17 @@ bool RootCounters::running(const std::size_t index) const noexcept {
     return counter != nullptr && counter->running;
 }
 
+void RootCounters::resample_irq_lines() noexcept {
+    if (interrupt_sink_ == nullptr) {
+        return;
+    }
+    for (std::size_t index = 0U; index < kCount; ++index) {
+        if (state_storage_[index].irq_level) {
+            interrupt_sink_->raise(counter_interrupt_source(index));
+        }
+    }
+}
+
 bool RootCounters::irq_level(const std::size_t index) const noexcept {
     const CounterState* const counter = state(index);
     return counter != nullptr && counter->irq_level;
