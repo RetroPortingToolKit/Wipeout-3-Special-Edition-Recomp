@@ -3,6 +3,8 @@
 #include <array>
 #include <cstdint>
 #include <iostream>
+#include <thread>
+#include <chrono>
 
 int main() {
     using namespace clean_aot::host;
@@ -24,7 +26,24 @@ int main() {
         2U,2U,6U,PixelFormat::rgb8_unorm}};
     if (!backend.submit_frame(frame).success()) return 2;
     const std::array<std::int16_t, 882U> audio{};
-    if (!backend.submit_audio({0U,audio.data(),441U}).success()) return 3;
+    constexpr std::uint64_t kSoakUpdates = 200U;
+    for (std::uint64_t update = 0U; update < kSoakUpdates; ++update) {
+        if (!backend.submit_audio({update,audio.data(),441U}).success()) return 3;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    const SdlAudioMetrics metrics = backend.audio_metrics();
+    if (metrics.submitted_updates != kSoakUpdates ||
+        metrics.submitted_frames != kSoakUpdates * 441U ||
+        metrics.dropped_updates != 0U || metrics.overruns != 0U ||
+        !metrics.playback_started || !metrics.exact_44100_stereo ||
+        metrics.time_stretch_used || metrics.peak_queued_frames > 3528U) return 8;
+    for (std::uint64_t update = kSoakUpdates;
+         update < kSoakUpdates + 32U; ++update) {
+        if (!backend.submit_audio({update,audio.data(),441U}).success()) return 9;
+    }
+    const SdlAudioMetrics saturated = backend.audio_metrics();
+    if (saturated.overruns == 0U || saturated.dropped_updates == 0U ||
+        saturated.queued_frames > 3528U || saturated.time_stretch_used) return 10;
     if (!backend.submit_controller({}).success()) return 4;
     if (!backend.service().success()) return 5;
     const std::array<std::uint8_t, 4U> replacement{1U,2U,3U,255U};

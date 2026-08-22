@@ -95,6 +95,7 @@ constexpr std::size_t kMaxEventsPerService = 32U;
 } // namespace
 
 struct SdlVulkanPresentation::Impl final {
+    struct QueuedFrame final { FrameSubmission frame{}; std::uint64_t accepted_ns = 0U; };
     SDL_Window* window = nullptr;
     SDL_GPUDevice* device = nullptr;
     SDL_AudioStream* audio = nullptr;
@@ -112,9 +113,10 @@ struct SdlVulkanPresentation::Impl final {
     std::vector<ReplacementTexture> replacements{};
     std::uint64_t next_replacement_handle = 1U;
     HMODULE vulkan_loader = nullptr;
-    FixedSpscQueue<FrameSubmission, kFrameQueueDepth> frames{};
+    FixedSpscQueue<QueuedFrame, kFrameQueueDepth> frames{};
     FixedSpscQueue<HostEvent, kEventQueueDepth> events{};
     FrameSubmission pending_frame{};
+    std::uint64_t pending_frame_accepted_ns = 0U;
     HostEvent pending_event{};
     WindowState window_state{};
     FullscreenMode requested_fullscreen = FullscreenMode::windowed;
@@ -128,11 +130,79 @@ struct SdlVulkanPresentation::Impl final {
     bool device_lost = false;
     bool swapchain_recreation_requested = false;
     std::uint64_t next_sequence = 0U;
+    std::uint64_t next_update_index = 0U;
     std::uint64_t next_audio_update = 0U;
+    SdlAudioMetrics audio_metrics{};
     ControllerState controller{};
+    SdlPresentationMetrics metrics{};
 };
 
 namespace {
+
+template <typename ImplType>
+[[nodiscard]] bool configure_presentation(ImplType& impl,
+    const SdlVulkanConfig& config) noexcept {
+    SDL_GPUPresentMode selected = SDL_GPU_PRESENTMODE_VSYNC;
+    switch (config.present_policy) {
+    case SdlPresentPolicy::vsync: break;
+    case SdlPresentPolicy::immediate:
+        if (!SDL_WindowSupportsGPUPresentMode(impl.device, impl.window,
+                SDL_GPU_PRESENTMODE_IMMEDIATE)) return false;
+        selected = SDL_GPU_PRESENTMODE_IMMEDIATE; break;
+    case SdlPresentPolicy::mailbox:
+        if (!SDL_WindowSupportsGPUPresentMode(impl.device, impl.window,
+                SDL_GPU_PRESENTMODE_MAILBOX)) return false;
+        selected = SDL_GPU_PRESENTMODE_MAILBOX; break;
+    case SdlPresentPolicy::low_latency_100hz:
+        if (SDL_WindowSupportsGPUPresentMode(impl.device, impl.window,
+                SDL_GPU_PRESENTMODE_MAILBOX)) selected = SDL_GPU_PRESENTMODE_MAILBOX;
+        else if (SDL_WindowSupportsGPUPresentMode(impl.device, impl.window,
+                     SDL_GPU_PRESENTMODE_IMMEDIATE)) selected = SDL_GPU_PRESENTMODE_IMMEDIATE;
+        break;
+    }
+    if (!SDL_SetGPUSwapchainParameters(impl.device, impl.window,
+            SDL_GPU_SWAPCHAINCOMPOSITION_SDR, selected)) return false;
+    impl.metrics.active_present_mode = selected == SDL_GPU_PRESENTMODE_MAILBOX
+        ? SdlActivePresentMode::mailbox : selected == SDL_GPU_PRESENTMODE_IMMEDIATE
+            ? SdlActivePresentMode::immediate : SdlActivePresentMode::vsync;
+    const SDL_DisplayID display = SDL_GetDisplayForWindow(impl.window);
+    const SDL_DisplayMode* mode = display == 0U ? nullptr : SDL_GetCurrentDisplayMode(display);
+    if (mode != nullptr && mode->refresh_rate_numerator > 0 &&
+        mode->refresh_rate_denominator > 0) {
+        impl.metrics.display_refresh_numerator = static_cast<std::uint32_t>(mode->refresh_rate_numerator);
+        impl.metrics.display_refresh_denominator = static_cast<std::uint32_t>(mode->refresh_rate_denominator);
+        impl.metrics.exact_target_refresh =
+            static_cast<std::uint64_t>(mode->refresh_rate_numerator) ==
+            static_cast<std::uint64_t>(config.target_refresh_hz) *
+            static_cast<std::uint64_t>(mode->refresh_rate_denominator);
+    }
+    return true;
+}
+
+template <typename ImplType>
+[[nodiscard]] bool open_audio_stream(ImplType& impl) noexcept {
+    const SDL_AudioSpec audio_spec{SDL_AUDIO_S16,
+        static_cast<int>(kAudioChannels), static_cast<int>(kAudioSampleRateHz)};
+    impl.audio = SDL_OpenAudioDeviceStream(
+        SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &audio_spec, nullptr, nullptr);
+    if (impl.audio == nullptr || !SDL_PauseAudioStreamDevice(impl.audio)) {
+        if (impl.audio != nullptr) SDL_DestroyAudioStream(impl.audio);
+        impl.audio = nullptr;
+        return false;
+    }
+    impl.audio_metrics.playback_started = false;
+    impl.audio_metrics.queued_frames = 0U;
+    return true;
+}
+
+template <typename ImplType>
+[[nodiscard]] bool reopen_audio_stream(ImplType& impl) noexcept {
+    if (impl.audio != nullptr) SDL_DestroyAudioStream(impl.audio);
+    impl.audio = nullptr;
+    if (!open_audio_stream(impl)) return false;
+    ++impl.audio_metrics.device_reopens;
+    return true;
+}
 
 template <typename ImplType>
 [[nodiscard]] bool create_texture_upload_resources(
@@ -240,7 +310,9 @@ SdlVulkanPresentation::~SdlVulkanPresentation() {
 }
 
 HostStatus SdlVulkanPresentation::initialize() noexcept {
-    if (impl_ != nullptr || config_.width == 0U || config_.height == 0U) {
+    if (impl_ != nullptr || config_.width == 0U || config_.height == 0U ||
+        config_.target_refresh_hz == 0U || config_.allowed_frames_in_flight < 1U ||
+        config_.allowed_frames_in_flight > 3U) {
         return sdl_failure(HostCode::invalid_argument);
     }
 
@@ -252,18 +324,17 @@ HostStatus SdlVulkanPresentation::initialize() noexcept {
     impl_->window_state = WindowState{
         config_.width, config_.height, config_.fullscreen};
     impl_->requested_fullscreen = config_.fullscreen;
+    impl_->metrics.target_refresh_hz = config_.target_refresh_hz;
+    impl_->metrics.allowed_frames_in_flight = config_.allowed_frames_in_flight;
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) {
         shutdown();
         return sdl_failure();
     }
     impl_->sdl_initialized = true;
-    const SDL_AudioSpec audio_spec{
-        SDL_AUDIO_S16, static_cast<int>(kAudioChannels),
-        static_cast<int>(kAudioSampleRateHz)};
-    impl_->audio = SDL_OpenAudioDeviceStream(
-        SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &audio_spec, nullptr, nullptr);
-    if (impl_->audio == nullptr || !SDL_ResumeAudioStreamDevice(impl_->audio)) {
+    if (config_.audio_target_buffer_frames < kAudioFramesPerUpdate ||
+        config_.audio_max_buffer_frames < config_.audio_target_buffer_frames ||
+        !open_audio_stream(*impl_)) {
         shutdown();
         return sdl_failure(HostCode::unsupported);
     }
@@ -313,7 +384,9 @@ HostStatus SdlVulkanPresentation::initialize() noexcept {
         return sdl_failure(HostCode::unsupported);
     }
     impl_->window_claimed = true;
-    if (!SDL_SetGPUAllowedFramesInFlight(impl_->device, 2U)) {
+    if (!configure_presentation(*impl_, config_) ||
+        !SDL_SetGPUAllowedFramesInFlight(impl_->device,
+            config_.allowed_frames_in_flight)) {
         shutdown();
         return sdl_failure(HostCode::unsupported);
     }
@@ -394,9 +467,11 @@ HostStatus SdlVulkanPresentation::submit_frame(
     if (!valid_frame(frame)) {
         return sdl_failure(HostCode::invalid_argument);
     }
-    if (!impl_->frames.try_push(frame)) {
+    const Impl::QueuedFrame queued{frame, SDL_GetTicksNS()};
+    if (!impl_->frames.try_push(queued)) {
         return sdl_failure(HostCode::queue_full);
     }
+    ++impl_->metrics.frames_accepted;
     return HostStatus{};
 }
 
@@ -413,11 +488,46 @@ HostStatus SdlVulkanPresentation::submit_audio(
         impl_->next_audio_update = audio.update_index + 1U;
         return sdl_failure(HostCode::sequence_error);
     }
+    const int queued_bytes = SDL_GetAudioStreamQueued(impl_->audio);
+    if (queued_bytes < 0) {
+        if (!reopen_audio_stream(*impl_)) return sdl_failure(HostCode::device_lost);
+    }
+    const std::uint32_t bytes_per_frame = kAudioChannels *
+        static_cast<std::uint32_t>(sizeof(std::int16_t));
+    const std::uint32_t queued_frames = queued_bytes < 0 ? 0U :
+        static_cast<std::uint32_t>(queued_bytes) / bytes_per_frame;
+    if (impl_->audio_metrics.playback_started && queued_frames == 0U) {
+        ++impl_->audio_metrics.underruns;
+    }
+    if (queued_frames > config_.audio_max_buffer_frames - audio.sample_frames) {
+        ++impl_->audio_metrics.overruns;
+        ++impl_->audio_metrics.dropped_updates;
+        ++impl_->next_audio_update;
+        impl_->audio_metrics.queued_frames = queued_frames;
+        return HostStatus{};
+    }
     const std::uint32_t byte_count = audio.sample_frames * kAudioChannels *
         static_cast<std::uint32_t>(sizeof(std::int16_t));
     if (!SDL_PutAudioStreamData(impl_->audio, audio.interleaved_stereo,
                                 static_cast<int>(byte_count))) {
-        return sdl_failure(HostCode::device_lost);
+        if (!reopen_audio_stream(*impl_) ||
+            !SDL_PutAudioStreamData(impl_->audio, audio.interleaved_stereo,
+                                    static_cast<int>(byte_count))) {
+            return sdl_failure(HostCode::device_lost);
+        }
+    }
+    ++impl_->audio_metrics.submitted_updates;
+    impl_->audio_metrics.submitted_frames += audio.sample_frames;
+    impl_->audio_metrics.queued_frames = queued_frames + audio.sample_frames;
+    impl_->audio_metrics.peak_queued_frames = std::max(
+        impl_->audio_metrics.peak_queued_frames,
+        impl_->audio_metrics.queued_frames);
+    if (!impl_->audio_metrics.playback_started &&
+        impl_->audio_metrics.queued_frames >= config_.audio_target_buffer_frames) {
+        if (!SDL_ResumeAudioStreamDevice(impl_->audio)) {
+            return sdl_failure(HostCode::device_lost);
+        }
+        impl_->audio_metrics.playback_started = true;
     }
     ++impl_->next_audio_update;
     return HostStatus{};
@@ -455,6 +565,7 @@ void SdlVulkanPresentation::mark_device_lost() noexcept {
         return;
     }
     impl_->device_lost = true;
+    ++impl_->metrics.device_losses;
     const HostEvent event{
         HostEventKind::device_lost,
         impl_->window_state,
@@ -480,7 +591,12 @@ HostStatus SdlVulkanPresentation::recreate_swapchain() noexcept {
         return sdl_failure(HostCode::device_lost);
     }
     impl_->window_claimed = true;
+    if (!configure_presentation(*impl_, config_)) {
+        mark_device_lost();
+        return sdl_failure(HostCode::device_lost);
+    }
     impl_->swapchain_recreation_requested = false;
+    ++impl_->metrics.swapchain_recreations;
     return HostStatus{};
 }
 
@@ -533,6 +649,17 @@ HostStatus SdlVulkanPresentation::service() noexcept {
                     break;
                 }
                 impl_->swapchain_recreation_requested = true;
+            }
+        } else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+            ++impl_->audio_metrics.focus_lost_events;
+        } else if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED) {
+            ++impl_->audio_metrics.focus_gained_events;
+        } else if (!event.adevice.recording &&
+                   (event.type == SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED ||
+                    event.type == SDL_EVENT_AUDIO_DEVICE_REMOVED) &&
+                   event.adevice.which == SDL_GetAudioStreamDevice(impl_->audio)) {
+            if (!reopen_audio_stream(*impl_)) {
+                return sdl_failure(HostCode::device_lost);
             }
         } else if (event.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN) {
             impl_->window_state.fullscreen = impl_->requested_fullscreen ==
@@ -830,6 +957,19 @@ bool SdlVulkanPresentation::shutting_down() const noexcept {
 
 WindowState SdlVulkanPresentation::window_state() const noexcept {
     return impl_ == nullptr ? WindowState{} : impl_->window_state;
+}
+
+SdlAudioMetrics SdlVulkanPresentation::audio_metrics() const noexcept {
+    if (impl_ == nullptr) return SdlAudioMetrics{};
+    SdlAudioMetrics metrics = impl_->audio_metrics;
+    if (impl_->audio != nullptr) {
+        const int bytes = SDL_GetAudioStreamQueued(impl_->audio);
+        if (bytes >= 0) {
+            metrics.queued_frames = static_cast<std::uint32_t>(bytes) /
+                (kAudioChannels * static_cast<std::uint32_t>(sizeof(std::int16_t)));
+        }
+    }
+    return metrics;
 }
 
 } // namespace clean_aot::host

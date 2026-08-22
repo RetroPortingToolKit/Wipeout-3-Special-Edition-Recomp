@@ -13,6 +13,32 @@ enum class PresentationFilter : std::uint8_t {
     Linear,
 };
 
+enum class SdlPresentPolicy : std::uint8_t { vsync, low_latency_100hz, immediate, mailbox };
+enum class SdlActivePresentMode : std::uint8_t { unknown, vsync, immediate, mailbox };
+
+// SDL confirms GPU queue submission, not compositor or scanout completion.
+struct SdlPresentationMetrics final {
+    std::uint64_t frames_accepted = 0U;
+    std::uint64_t swapchain_images_acquired = 0U;
+    std::uint64_t gpu_present_submissions = 0U;
+    std::uint64_t display_presentations_confirmed = 0U;
+    std::uint64_t acquire_not_ready = 0U;
+    std::uint64_t sequence_errors = 0U;
+    std::uint64_t swapchain_recreations = 0U;
+    std::uint64_t device_losses = 0U;
+    std::uint64_t queue_latency_ns_total = 0U;
+    std::uint64_t queue_latency_ns_max = 0U;
+    std::uint64_t next_sequence = 0U;
+    std::uint64_t next_update_index = 0U;
+    std::uint32_t display_refresh_numerator = 0U;
+    std::uint32_t display_refresh_denominator = 0U;
+    std::uint32_t target_refresh_hz = 100U;
+    std::uint8_t allowed_frames_in_flight = 1U;
+    SdlActivePresentMode active_present_mode = SdlActivePresentMode::unknown;
+    bool exact_target_refresh = false;
+    bool vrr_status_known = false;
+};
+
 struct SdlVulkanConfig final {
     const char* title = "Clean AOT host";
     std::uint32_t width = 3840U;
@@ -24,6 +50,27 @@ struct SdlVulkanConfig final {
     bool debug_gpu = false;
     bool hidden = false;
     PresentationFilter presentation_filter = PresentationFilter::Nearest;
+    SdlPresentPolicy present_policy = SdlPresentPolicy::low_latency_100hz;
+    std::uint32_t target_refresh_hz = 100U;
+    std::uint8_t allowed_frames_in_flight = 1U;
+    std::uint32_t audio_target_buffer_frames = 882U;
+    std::uint32_t audio_max_buffer_frames = 3528U;
+};
+
+struct SdlAudioMetrics final {
+    std::uint64_t submitted_updates = 0U;
+    std::uint64_t submitted_frames = 0U;
+    std::uint64_t dropped_updates = 0U;
+    std::uint64_t underruns = 0U;
+    std::uint64_t overruns = 0U;
+    std::uint64_t device_reopens = 0U;
+    std::uint64_t focus_lost_events = 0U;
+    std::uint64_t focus_gained_events = 0U;
+    std::uint32_t queued_frames = 0U;
+    std::uint32_t peak_queued_frames = 0U;
+    bool playback_started = false;
+    bool exact_44100_stereo = true;
+    bool time_stretch_used = false;
 };
 
 // This class is only linked when CLEAN_AOT_HOST_ENABLE_SDL_VULKAN is enabled
@@ -62,6 +109,8 @@ public:
     [[nodiscard]] bool initialized() const noexcept;
     [[nodiscard]] bool shutting_down() const noexcept override;
     [[nodiscard]] WindowState window_state() const noexcept;
+    [[nodiscard]] SdlPresentationMetrics presentation_metrics() const noexcept;
+    [[nodiscard]] SdlAudioMetrics audio_metrics() const noexcept;
 
 private:
     struct Impl;
