@@ -1065,12 +1065,13 @@ void Cdrom::begin_command(std::uint8_t command,
         muted_ = false;
         motor_on_ = true;
         paused_ = true;
-        if (!start_phase(PhaseAction::Init, SeekLatencyCycles)) {
+        if (!start_phase(
+                PhaseAction::InitAcknowledge,
+                InitFirstResponseCycles - CommandLatencyCycles)) {
             queue_command_error(ErrorCode::SchedulerOverflow,
                                 CommandError::CannotRespond);
             break;
         }
-        (void)queue_status(Interrupt::Acknowledge);
         break;
     case Command::Mute:
         if (!exact_parameter_count(parameters, 0U)) {
@@ -1380,7 +1381,14 @@ void Cdrom::complete_phase() noexcept {
         paused_ = true;
         (void)queue_status(Interrupt::Complete);
         break;
-    case PhaseAction::Init:
+    case PhaseAction::InitAcknowledge:
+        (void)queue_status(Interrupt::Acknowledge);
+        if (!start_phase(PhaseAction::InitComplete, SeekLatencyCycles)) {
+            queue_command_error(ErrorCode::SchedulerOverflow,
+                                CommandError::CannotRespond);
+        }
+        break;
+    case PhaseAction::InitComplete:
         paused_ = true;
         (void)queue_status(Interrupt::Complete);
         break;

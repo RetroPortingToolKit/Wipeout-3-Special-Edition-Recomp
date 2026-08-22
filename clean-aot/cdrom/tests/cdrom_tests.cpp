@@ -31,6 +31,7 @@ using clean_aot::cdrom::ErrorCode;
 using clean_aot::cdrom::FormOnePayloadBytes;
 using clean_aot::cdrom::FormTwoPayloadBytes;
 using clean_aot::cdrom::Interrupt;
+using clean_aot::cdrom::InitFirstResponseCycles;
 using clean_aot::cdrom::Lba;
 using clean_aot::cdrom::MachineScheduler;
 using clean_aot::cdrom::MaximumAddressableLba;
@@ -1197,6 +1198,17 @@ void test_remaining_command_families_reset_controls_and_stream_end() {
     acknowledge_one_byte(device, 0x02U);
 
     issue(device, Command::Init);
+    require_reason(device, Interrupt::None,
+                   "Init withholds INT3 during controller initialization");
+    require(device.response_count() == 0U,
+            "Init exposes no response bytes before its late INT3");
+    require(!device.enqueue_command(static_cast<std::uint8_t>(Command::Nop)),
+            "Init rejects a colliding command while first response is pending");
+    device.advance_to(device.current_cycle() +
+                      (InitFirstResponseCycles - CommandLatencyCycles - 1U));
+    require_reason(device, Interrupt::None,
+                   "Init INT3 remains absent one cycle before deadline");
+    device.advance_to(device.current_cycle() + 1U);
     require_reason(device, Interrupt::Acknowledge, "Init first response INT3");
     require(device.mode() == 0x20U && device.pop_response() == 0x02U,
             "Init sets whole-sector mode and motor state");
@@ -1204,6 +1216,31 @@ void test_remaining_command_families_reset_controls_and_stream_end() {
     device.advance_to(device.current_cycle() + SeekLatencyCycles);
     require_reason(device, Interrupt::Complete, "Init completion INT2");
     acknowledge_one_byte(device, 0x02U);
+
+    Cdrom init_collision(source.get(), data_layout());
+    issue(init_collision, Command::Init);
+    init_collision.advance_to(init_collision.current_cycle() +
+                              (InitFirstResponseCycles -
+                               CommandLatencyCycles));
+    require_reason(init_collision, Interrupt::Acknowledge,
+                   "late Init INT3 becomes active at its exact deadline");
+    init_collision.advance_to(init_collision.current_cycle() +
+                              SeekLatencyCycles);
+    require_reason(init_collision, Interrupt::Acknowledge,
+                   "unacknowledged Init INT3 retains IRQ ownership");
+    require(init_collision.pending_interrupt_count() == 2U,
+            "Init INT2 queues behind an unacknowledged INT3");
+    acknowledge_one_byte(init_collision, 0x02U);
+    require_reason(init_collision, Interrupt::Complete,
+                   "acknowledging Init INT3 exposes queued INT2");
+    acknowledge_one_byte(init_collision, 0x02U);
+    require(init_collision.current_cycle() ==
+                CommandLatencyCycles +
+                    (InitFirstResponseCycles - CommandLatencyCycles) +
+                    SeekLatencyCycles &&
+                init_collision.mode() == device.mode() &&
+                init_collision.status() == device.status(),
+            "chunked Init IRQ replay reaches the same exact drive state");
 
     issue(device, Command::Pause);
     require_reason(device, Interrupt::Acknowledge, "Pause first response INT3");

@@ -33,6 +33,8 @@ inline constexpr std::uint32_t SamplesPer50HzUpdate = SpuClockHz / 50U;
 inline constexpr std::uint32_t SamplesPer100HzUpdate = SpuClockHz / 100U;
 inline constexpr Cycle CommandLatencyCycles = 33868U;
 inline constexpr Cycle SeekLatencyCycles = 1354752U;
+inline constexpr Cycle InitFirstResponseCycles = 0x13cceU;
+static_assert(InitFirstResponseCycles > CommandLatencyCycles);
 inline constexpr std::uint8_t MaximumBcdMinute = 99U;
 inline constexpr Lba MaximumAddressableLba = 449849U;
 
@@ -345,7 +347,8 @@ private:
         MotorOn,
         Stop,
         Pause,
-        Init,
+        InitAcknowledge,
+        InitComplete,
         SetSession,
         Seek,
         Id,
