@@ -137,8 +137,13 @@
   4x host pacing produced 155,084 bridge overflow drops while the guest was
   accelerated. Fast Loading now automatically enables the existing
   discard-only turbo audio sink for multipliers above 1 and resets it on
-  session reinitialization. The static guard and rebuild pass; a post-fix full
-  route comparison is still required before equivalence is declared.
+  session reinitialization. The post-fix PAL-x2 route now completes the
+  deterministic input sequence, holds roughly 99–101 guest Hz, keeps SPU/CD/
+  host taps at 44.1 kHz, and reduces overflow drops to zero. It still reports
+  substantially higher cumulative output underruns (and 54 SPU trace
+  underruns) than the normal route, and the paired card/CD summaries have not
+  yet been captured. Fast Loading therefore remains disabled and equivalence
+  is not declared.
 - Runtime still links generic overlay/autocompile/interpreter plumbing even
   though the release configuration disables its behavior; strict link-surface
   removal remains unfinished.
@@ -152,10 +157,11 @@
 
 ## Next concrete work
 
-1. Run the opt-in PAL100 title path and capture simulation, SPU/CDDA,
+1. Diagnose the remaining accelerated-path audio underruns and capture paired
+   normal/accelerated card and CD summaries (CD command/sector/DMA, memcard
+   writes, state fingerprints, and audio timing).
+2. Run the opt-in PAL100 title path and capture simulation, SPU/CDDA,
    timeout, media-load, and race equivalence traces.
-2. Compare normal and accelerated load traces (CD command/sector/DMA,
-   memcard writes, state fingerprints, and audio timing) before enabling it.
 3. Remove or prove dead all runtime compiler/interpreter paths in the release
    link graph, then rerun the static boundary gate.
 4. Validate ultrawide/content coverage and perform a long deterministic soak.
