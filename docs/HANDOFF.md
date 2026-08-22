@@ -1,5 +1,19 @@
 # Handoff
 
+## Real BIOS-to-game transition (2026-08-21)
+
+- Authenticating only copied-RAM `[0x1508,0x15D8)` in epoch `778e17e8...`
+  advances the real SCPH1001 BIOS directly to game-space PC `0x80030000`.
+  No game bytes were authorized by this tranche; `0x80030000` remains the
+  honest fail-closed boundary for the authenticated game binding.
+- Two probes agree exactly: 2,695,618 BIOS instructions / 452,182 dispatches,
+  441,893 reads, 451,154 writes, 7,680 isolated writes, two device reads, and
+  80 device writes. The resulting RAM epoch is
+  `7301264d93bfaa6235a8655610d2674746a44d50b82645569f1e2f9b0e99a3b6`.
+- Canonical evidence is `bios-frontier-02695618.json`. Continue by proving the
+  loaded game identity at `0x80030000` against finalized game-shard authority,
+  not by extending BIOS manifests or adding fallback.
+
 ## Authenticated BIOS callback tranche (2026-08-21)
 
 - From `0x1B20` / RAM epoch `29d475f7...`, the corrected compiler advanced
