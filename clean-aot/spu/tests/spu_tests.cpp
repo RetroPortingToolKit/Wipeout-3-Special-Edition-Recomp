@@ -525,12 +525,12 @@ void test_irq_and_mmio_boundaries() {
                 "DMA fill uses the last halfword of each 32-word FIFO block");
     }
 
-    const auto verify_replication = [](std::uint16_t transfer_control,
+    const auto verify_replication = [](std::uint16_t replication_control,
                                        const std::array<std::uint16_t, 8u>&
                                            expected) {
         static Device replicated;
         replicated.reset();
-        put(replicated, Device::TransferControl, transfer_control);
+        put(replicated, Device::TransferControl, replication_control);
         put(replicated, Device::TransferAddress, 0x0200u);
         put(replicated, Device::Control,
             static_cast<std::uint16_t>(kLive | kDmaWrite));
