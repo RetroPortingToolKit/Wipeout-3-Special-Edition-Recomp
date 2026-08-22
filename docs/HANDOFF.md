@@ -415,6 +415,13 @@ instruction and fails closed on every unknown PC or executable identity.
   `clean-aot/catalog/evidence/bios-frontier-00017353.json` stops without an
   exception at `0xBFC0703C`; this is a finite runtime return target inside the
   exact BIOS and can seed the next static direct-closure pass.
+- Explicit COP0 breakpoint/debug-register state plus proved generated roots at
+  `0xBFC03978` and `0xBFC00420` advance the deterministic real BIOS frontier to
+  71,501 instructions across 12,282 dispatches. The canonical receipt is
+  `clean-aot/catalog/evidence/bios-frontier-00071501.json`: 9,023 memory reads,
+  13,452 memory writes, one device read, and 30 device writes. It stops without
+  an exception at uncatalogued RAM alias `0xA0000080`; the next tranche must
+  authenticate the copied RAM execution epoch before binding that PC.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control
