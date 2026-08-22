@@ -2,17 +2,18 @@
 
 ## Current position
 
-- Cross-evidenced executable authorization is now committed at `b6b0940` and
-  pushed. `clean-aot/catalog/evidence/executable-authorization.json` is a
-  deterministic, fail-closed receipt (SHA-256
-  `57511195433271ecbd3f3c76bc30f5aac1400964371113100a97a05cb1dc9fae`).
-  It authenticates the prepared main EXE and NFE entry 5, reconstructs the
-  four-word observed NFE runtime variant, pins the exact route/capture/hint
-  receipts, proves direct edges and delay-slot ownership within cross-evidence,
-  and rejects every uncertainty. It authorizes 98,831 main-image instructions
-  and 31,719 NFE instructions, but remains non-selectable: 137 indirect sites
-  and 1,236 rejected direct edges remain, with 1,095,620 main-image and 10,032
-  NFE bytes explicitly unknown. Exact ranges are in
+- Cross-evidenced executable authorization v2 is ready in
+  `clean-aot/catalog/evidence/executable-authorization.json` as a deterministic,
+  fail-closed receipt (SHA-256
+  `49f9ecb8f966849786b5c29370a1341018d0ec2c0bcf4af2d79787771636f83a`).
+  Its delta receipt (SHA-256
+  `941a5e8b2ab0a45b2821cbd9729c40503c78d74ba42f3b025c913e98a2f03dd1`)
+  proves 1,166 formerly rejected NFE-to-main direct calls and adds 2,202
+  authorized main-image instructions. It now authorizes 101,033 main-image,
+  31,719 NFE, and 30 exact verified-BIOS reset-corridor instructions. It remains
+  non-selectable: 71 game-image direct edges, 142 game-image indirect sites,
+  and the BIOS reset corridor's one outgoing edge remain rejected. Exact
+  categories and all 270 main, 18 NFE, and one BIOS unknown ranges are in
   `docs/EXECUTABLE_AUTHORIZATION.md` and the JSON receipt.
 
 - The original dirty checkout remains preserved at
@@ -326,9 +327,10 @@ instruction and fails closed on every unknown PC or executable identity.
   control-flow dispatch into a guest-execution claim.
 - The real executable authorization receipt is
   `clean-aot/catalog/evidence/executable-authorization.json` with status
-  `partial-fail-closed`. It records 98,831 authorized main-EXE instructions and
-  31,719 authorized NFE entry-5 instructions, but unresolved closure prevents a
-  finalized selectable catalog and generated artifact.
+  `partial-fail-closed`. It records 101,033 authorized main-EXE instructions,
+  31,719 authorized NFE entry-5 instructions, and 30 verified BIOS reset-region
+  instructions, but unresolved closure prevents a finalized selectable catalog
+  and generated artifact.
 - Consequently the deepest real product state remains authenticated evidence
   generation before runtime dispatch: BIOS instructions executed = 0 and game
   instructions executed = 0. Do not report BIOS or game boot until complete

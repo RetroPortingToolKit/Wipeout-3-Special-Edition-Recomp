@@ -97,6 +97,24 @@ def resolve_indirect(image: bytes, base: int, pc: int, register: int) -> int | N
     return None
 
 
+def indirect_category(image: bytes, base: int, pc: int, register: int) -> str:
+    if pc - 4 >= base:
+        previous = struct.unpack_from("<I", image, pc - 4 - base)[0]
+        opcode = previous >> 26
+        function = previous & 0x3F
+        rt = (previous >> 16) & 31
+        rd = (previous >> 11) & 31
+        if opcode == 35 and rt == register:
+            return "memory_loaded_target"
+        if opcode == 0 and function in {32, 33, 37} and rd == register:
+            return "register_computed_target"
+    if register == 2:
+        return "return_value_target"
+    if register in {4, 5, 6, 7}:
+        return "argument_callback_target"
+    return "unresolved_register_target"
+
+
 def analyze(
     image: bytes,
     base: int,
@@ -184,7 +202,8 @@ def analyze(
             for source, target in sorted(indirect_targets)
         ],
         "unresolved_indirects": [
-            {"pc": pc, "source_register": register}
+            {"pc": pc, "source_register": register,
+             "category": indirect_category(image, base, pc, register)}
             for pc, register in sorted(unresolved_indirect)
         ],
         "finite_indirect_closure": not unresolved_indirect,
@@ -193,19 +212,23 @@ def analyze(
             for slot, owner in sorted(owners.items())
         ],
         "unknown_ranges": complement(base, end, authorized),
+        "_authorized": authorized,
     }
 
 
 def build(args: argparse.Namespace) -> dict[str, Any]:
+    bios = args.bios.read_bytes()
     container = args.exe_container.read_bytes()
     exe = args.exe_text.read_bytes()
     nfe = bytearray(args.nfe_entry5.read_bytes())
     expansion = load_json(args.nfe_expansion_receipt)
     route = load_json(args.route_receipt)
+    broader_route = load_json(args.broader_route_receipt)
     capture = load_json(args.capture)
     exe_hints = load_json(args.exe_hints)
     hints = load_json(args.nfe_hints)
-    if sha256(container) != args.exe_container_sha256 or \
+    if sha256(bios) != args.bios_sha256 or \
+       sha256(container) != args.exe_container_sha256 or \
        sha256(exe) != args.exe_sha256 or sha256(nfe) != args.nfe_sha256:
         raise AuthorizationError("authenticated input SHA-256 mismatch")
     if len(container) < 2048 + len(exe) or container[2048 : 2048 + len(exe)] != exe:
@@ -227,6 +250,8 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         raise AuthorizationError("capture receipt is not normalized discovery evidence")
     if route.get("ok") is not True or route.get("completion") != "exact":
         raise AuthorizationError("deterministic route receipt is not exact and complete")
+    if broader_route.get("format") != "wipeout3se.goosestation-route-replay.v1":
+        raise AuthorizationError("broader route receipt has an unknown format")
 
     nfe_end = args.nfe_base + len(nfe)
     observed: set[int] = set()
@@ -272,14 +297,109 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         start = max(args.exe_base, body["start"])
         end = min(exe_end, body["end_exclusive"])
         exe_allowed.update(range(start, end, 4))
-    exe_report = analyze(
-        exe, args.exe_base, {args.exe_entry}, exe_allowed,
-        "authenticated PS-X EXE entry; closure constrained by untrusted Ghidra body bounds, which never create roots",
+    exe_roots = {args.exe_entry}
+    nfe_roots = set(observed)
+    for _ in range(8):
+        exe_allowed.update(
+            root + 4 for root in exe_roots if root + 4 < exe_end and
+            decode(struct.unpack_from("<I", exe, root - args.exe_base)[0], root)[2]
+        )
+        nfe_allowed.update(
+            root + 4 for root in nfe_roots if root + 4 < nfe_end and
+            decode(struct.unpack_from("<I", nfe, root - args.nfe_base)[0], root)[2]
+        )
+        exe_report = analyze(
+            exe, args.exe_base, exe_roots, exe_allowed,
+            "authenticated PS-X EXE entry plus authenticated cross-image direct targets; closure constrained by Ghidra body bounds, which never create roots",
+        )
+        nfe_report = analyze(
+            bytes(nfe), args.nfe_base, nfe_roots, nfe_allowed,
+            "route-observed authenticated PCs plus authenticated cross-image direct targets; Ghidra bodies constrain extension but never create roots",
+        )
+        added_exe = {
+            edge["target"] for edge in nfe_report["rejected_direct_edges"]
+            if edge["reason"] == "outside_cross_evidence" and
+            not args.nfe_base <= edge["target"] < nfe_end and
+            edge["target"] in exe_allowed
+        }
+        added_nfe: set[int] = set()
+        old_sizes = (len(exe_roots), len(nfe_roots))
+        exe_roots.update(added_exe)
+        nfe_roots.update(added_nfe)
+        if old_sizes == (len(exe_roots), len(nfe_roots)):
+            break
+    else:
+        raise AuthorizationError("cross-image closure did not converge")
+
+    image_reports = (
+        ("main-exe", exe_report, args.exe_base, exe_end),
+        ("nfe-entry5-route-variant", nfe_report, args.nfe_base, nfe_end),
     )
-    nfe_report = analyze(
-        bytes(nfe), args.nfe_base, observed, nfe_allowed,
-        "route-observed PCs whose runtime bytes were matched to authenticated NFE entry 5; Ghidra bodies constrain extension but never create roots",
+    authorized_by_name = {
+        "main-exe": exe_report["_authorized"],
+        "nfe-entry5-route-variant": nfe_report["_authorized"],
+    }
+    for name, report, _, _ in image_reports:
+        cross_edges: list[dict[str, Any]] = []
+        remaining: list[dict[str, Any]] = []
+        other_name = "main-exe"
+        other_authorized = authorized_by_name[other_name]
+        for edge in report["rejected_direct_edges"]:
+            if (
+                name == "nfe-entry5-route-variant"
+                and edge["reason"] == "outside_cross_evidence"
+                and not args.nfe_base <= edge["target"] < nfe_end
+                and edge["target"] in other_authorized
+            ):
+                cross_edges.append({**edge, "target_image": other_name})
+            else:
+                target = edge["target"]
+                if edge["reason"] != "outside_cross_evidence":
+                    category = "delay_slot_evidence_gap"
+                elif name == "main-exe" and args.nfe_base <= target < nfe_end:
+                    category = "overlapping_content_epoch_ambiguous"
+                elif args.exe_base <= target < exe_end:
+                    category = (
+                        "authenticated_main_body_gap"
+                        if name == "nfe-entry5-route-variant"
+                        else "main_body_gap"
+                    )
+                else:
+                    category = "external_unmapped_target"
+                remaining.append({**edge, "category": category})
+        report["cross_image_direct_edges"] = cross_edges
+        report["rejected_direct_edges"] = remaining
+        report["direct_closure_complete"] = not remaining
+        del report["_authorized"]
+
+    bios_allowed = set(range(args.bios_base, args.bios_base + args.bios_reset_bytes, 4))
+    bios_report = analyze(
+        bios, args.bios_base, {args.bios_base}, bios_allowed,
+        "exact verified retail BIOS reset vector; closure constrained to the declared reset corridor",
     )
+    del bios_report["_authorized"]
+
+    baseline = {
+        "main-exe": {"authorized_instruction_count": 98_831,
+                     "rejected_direct_edge_count": 16,
+                     "unresolved_indirect_count": 127},
+        "nfe-entry5-route-variant": {"authorized_instruction_count": 31_719,
+                                     "rejected_direct_edge_count": 1_220,
+                                     "unresolved_indirect_count": 10},
+    }
+    delta: dict[str, Any] = {}
+    for name, report in (("main-exe", exe_report),
+                         ("nfe-entry5-route-variant", nfe_report)):
+        prior = baseline[name]
+        delta[name] = {
+            "authorized_instruction_delta":
+                report["authorized_instruction_count"] - prior["authorized_instruction_count"],
+            "rejected_direct_edge_delta":
+                len(report["rejected_direct_edges"]) - prior["rejected_direct_edge_count"],
+            "unresolved_indirect_delta":
+                len(report["unresolved_indirects"]) - prior["unresolved_indirect_count"],
+            "proved_cross_image_direct_edges": len(report["cross_image_direct_edges"]),
+        }
     return {
         "schema": SCHEMA,
         "status": "partial-fail-closed",
@@ -291,6 +411,7 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
             "unknown_executable_write_action": "reject",
         },
         "evidence": {
+            "bios_sha256": sha256(bios),
             "exe_text_sha256": sha256(exe),
             "exe_container_sha256": sha256(container),
             "exe_hint_receipt_sha256": sha256(args.exe_hints.read_bytes()),
@@ -299,21 +420,31 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
             "nfe_route_variant_sha256": sha256(nfe),
             "normalized_capture_sha256": sha256(args.capture.read_bytes()),
             "deterministic_route_receipt_sha256": sha256(args.route_receipt.read_bytes()),
+            "broader_route_receipt_sha256": sha256(args.broader_route_receipt.read_bytes()),
+            "broader_route_classification":
+                "behavioral cross-evidence only; contains no PC/edge authority",
             "nfe_hint_receipt_sha256": sha256(args.nfe_hints.read_bytes()),
             "nfe_captured_overlap_bytes": captured_bytes,
             "nfe_runtime_variant_word_addresses": sorted(patched_words),
         },
+        "delta_from_receipt_sha256_57511195433271ecbd3f3c76bc30f5aac1400964371113100a97a05cb1dc9fae": delta,
         "images": [
             {"name": "main-exe", "base": args.exe_base,
              "end_exclusive": args.exe_base + len(exe), **exe_report},
             {"name": "nfe-entry5-route-variant", "base": args.nfe_base,
              "end_exclusive": nfe_end, **nfe_report},
+            {"name": "bios-reset-corridor", "base": args.bios_base,
+             "end_exclusive": args.bios_base + len(bios), **bios_report},
         ],
     }
 
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
+    result.add_argument("--bios", type=Path, required=True)
+    result.add_argument("--bios-sha256", required=True)
+    result.add_argument("--bios-base", type=lambda value: int(value, 0), default=0xBFC00000)
+    result.add_argument("--bios-reset-bytes", type=lambda value: int(value, 0), default=0x78)
     result.add_argument("--exe-text", type=Path, required=True)
     result.add_argument("--exe-container", type=Path, required=True)
     result.add_argument("--exe-container-sha256", required=True)
@@ -327,9 +458,11 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--nfe-base", type=lambda value: int(value, 0), default=0x800BF800)
     result.add_argument("--capture", type=Path, required=True)
     result.add_argument("--route-receipt", type=Path, required=True)
+    result.add_argument("--broader-route-receipt", type=Path, required=True)
     result.add_argument("--capture-images", type=Path, required=True)
     result.add_argument("--nfe-hints", type=Path, required=True)
     result.add_argument("--output", type=Path, required=True)
+    result.add_argument("--delta-output", type=Path)
     return result
 
 
@@ -340,6 +473,25 @@ def main(argv: list[str] | None = None) -> int:
         payload = json.dumps(report, indent=2, sort_keys=True) + "\n"
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(payload, encoding="utf-8", newline="\n")
+        if args.delta_output is not None:
+            delta_key = next(key for key in report if key.startswith("delta_from_receipt_sha256_"))
+            delta_document = {
+                "schema": "wo3se.executable-authorization-delta.v1",
+                "baseline_receipt_sha256": delta_key.removeprefix("delta_from_receipt_sha256_"),
+                "current_receipt_sha256": sha256(payload.encode()),
+                "images": report[delta_key],
+                "remaining": {
+                    image["name"]: {
+                        "rejected_direct_edges": len(image["rejected_direct_edges"]),
+                        "unresolved_indirects": len(image["unresolved_indirects"]),
+                        "unknown_ranges": len(image["unknown_ranges"]),
+                    }
+                    for image in report["images"]
+                },
+            }
+            delta_payload = json.dumps(delta_document, indent=2, sort_keys=True) + "\n"
+            args.delta_output.parent.mkdir(parents=True, exist_ok=True)
+            args.delta_output.write_text(delta_payload, encoding="utf-8", newline="\n")
         print(payload, end="")
         return 0
     except (OSError, ValueError, KeyError, json.JSONDecodeError, AuthorizationError) as error:

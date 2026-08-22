@@ -26,13 +26,22 @@ entry-5 bytes and hash-named captured slices. It differs at exactly four words:
 
 | Image | Authorized instructions | Authorized bytes | Unknown bytes | Unresolved indirects | Rejected direct edges |
 |---|---:|---:|---:|---:|---:|
-| Main EXE | 98,831 | 395,324 | 1,095,620 | 127 | 16 |
-| NFE entry-5 route variant | 31,719 | 126,876 | 10,032 | 10 | 1,220 |
+| Main EXE | 101,033 | 404,132 | 1,086,812 | 132 | 17 |
+| NFE entry-5 route variant | 31,719 | 126,876 | 10,032 | 10 | 54 |
+| Verified retail BIOS reset corridor | 30 | 120 | 524,168 | 0 | 1 |
 
 No indirect target currently satisfies the narrow local-literal proof rule.
-Therefore the finite indirect-target arrays are empty and all 137 indirect
+Therefore the finite indirect-target arrays are empty and all 142 indirect
 sites remain explicitly unresolved. Unknown PCs and executable writes must be
 rejected.
+
+Global content-epoch-aware closure proves 1,166 NFE-to-main direct calls that
+the first receipt incorrectly rejected because it analyzed images separately.
+Numeric addresses in the overlapping main/NFE range are not treated as proof
+of an epoch transition. The remaining direct-edge table classifies body gaps,
+overlapping-epoch ambiguity, delay-slot evidence gaps, and external targets.
+The exact BIOS reset corridor is `[0xBFC00000,0xBFC00078)`; its jump to
+`0xBFC00150` remains rejected until the next authenticated BIOS body is bounded.
 
 The exact 270 main-image unknown ranges and 18 NFE unknown ranges are recorded
 under each image's `unknown_ranges` array in the receipt. The NFE ranges are:

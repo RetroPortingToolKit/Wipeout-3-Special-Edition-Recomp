@@ -31,7 +31,10 @@ def test_indirect_and_missing_evidence_fail_closed() -> None:
     base = 0x80020000
     image = words(0x00800008, 0, 0)
     report = MODULE.analyze(image, base, {base}, {base, base + 4}, "test")
-    assert report["unresolved_indirects"] == [{"pc": base, "source_register": 4}]
+    assert report["unresolved_indirects"] == [
+        {"pc": base, "source_register": 4,
+         "category": "argument_callback_target"}
+    ]
     assert not report["finite_indirect_closure"]
     assert report["unknown_ranges"] == [{"start": base + 8, "end_exclusive": base + 12}]
 
