@@ -1232,3 +1232,8 @@ instruction and fails closed on every unknown PC or executable identity.
   test stub. After that one-line harness fix, all 38 enabled upstream tests
   passed; three explicitly disabled upstream tests remain unproved and must not
   be represented as coverage.
+- New acceptance requirements for startup intro skipping, memory-card startup
+  acceleration, and race-load acceleration are in
+  `docs/REFACTOR_ACCEPTANCE.md`. Each requires normal-vs-accelerated
+  byte/order/state equivalence and fail-closed fallback; generic speed claims
+  or screenshots are insufficient.
