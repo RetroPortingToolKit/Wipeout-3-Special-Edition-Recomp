@@ -72,7 +72,9 @@ def build_closure(receipt_bytes: bytes,
         raise TraceError(f"invalid trace JSON: {error}") from error
     if not isinstance(receipt, dict):
         raise TraceError("trace must be a JSON object")
-    _keys(receipt, {"capture", "images", "schema", "sites"}, "trace")
+    if set(receipt) not in ({"capture", "images", "schema", "sites"},
+                            {"capture", "images", "schema", "sites", "telemetry"}):
+        raise TraceError("trace fields differ")
     if receipt["schema"] != TRACE_SCHEMA:
         raise TraceError("unsupported trace schema")
 
@@ -119,6 +121,54 @@ def build_closure(receipt_bytes: bytes,
         images[name] = row
     if [row["id"] for row in image_rows] != sorted(images):
         raise TraceError("images must be sorted by ID")
+
+    telemetry = receipt.get("telemetry")
+    if telemetry is not None:
+        if not isinstance(telemetry, dict):
+            raise TraceError("telemetry must be an object")
+        _keys(telemetry, {"complete", "dropped_events", "event_count", "events",
+                          "first_sequence", "last_sequence"}, "telemetry")
+        if (telemetry["complete"] != capture["complete"] or
+                telemetry["dropped_events"] != capture["dropped_events"]):
+            raise TraceError("telemetry completeness disagrees with capture")
+        telemetry_count = _positive(telemetry["event_count"], "telemetry.event_count")
+        telemetry_first = _u32(telemetry["first_sequence"], "telemetry.first_sequence")
+        telemetry_last = _u32(telemetry["last_sequence"], "telemetry.last_sequence")
+        events = telemetry["events"]
+        if (not isinstance(events, list) or len(events) != telemetry_count or
+                telemetry_last < telemetry_first or
+                telemetry_last - telemetry_first + 1 != telemetry_count):
+            raise TraceError("telemetry sequence interval is not gap-free")
+        accepted_targets = 0
+        for index, event in enumerate(events):
+            if not isinstance(event, dict):
+                raise TraceError("telemetry event must be an object")
+            _keys(event, {"accepted", "active_epoch_identity_sha256",
+                          "destination_image", "destination_pc", "kind", "sequence",
+                          "source_image", "source_pc", "status", "transfer"},
+                  "telemetry event")
+            if event["sequence"] != telemetry_first + index:
+                raise TraceError("telemetry event sequence is not contiguous")
+            if (not isinstance(event["active_epoch_identity_sha256"], str) or
+                    not HEX64.fullmatch(event["active_epoch_identity_sha256"])):
+                raise TraceError("telemetry active epoch identity is invalid")
+            if event["kind"] not in {"epoch", "dispatch", "target-attempt"}:
+                raise TraceError("telemetry event kind is invalid")
+            if event["transfer"] not in {"none", "indirect-call", "indirect-jump"}:
+                raise TraceError("telemetry transfer is invalid")
+            if type(event["accepted"]) is not bool:
+                raise TraceError("telemetry accepted must be boolean")
+            _u32(event["source_pc"], "telemetry source PC")
+            _u32(event["destination_pc"], "telemetry destination PC")
+            for field in ("source_image", "destination_image"):
+                if event[field] != "unknown" and event[field] not in images:
+                    raise TraceError("telemetry event names an unknown image")
+            if event["accepted"] != (event["status"] == "executed"):
+                raise TraceError("telemetry accepted/status mismatch")
+            if event["kind"] == "target-attempt" and event["accepted"]:
+                accepted_targets += 1
+        if accepted_targets != event_count:
+            raise TraceError("telemetry accepted targets disagree with capture")
 
     sites = receipt["sites"]
     if not isinstance(sites, list) or not sites:

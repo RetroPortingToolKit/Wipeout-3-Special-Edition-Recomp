@@ -42,3 +42,12 @@ identity and PC against a sorted finite policy before binding and entering an
 already-generated target. It never decodes or compiles guest bytes. Missing
 sites, unknown targets, malformed universes, and identity mismatches fail
 closed.
+
+`RuntimeTargetTrace` is an optional fixed-capacity recorder shared by generated,
+epoch, and CFI dispatch. It records active epoch selection, executed generated
+source/destination PCs, accepted and rejected target attempts, dispatch status,
+contiguous sequences, overflow drops, and explicit finalization. It stores no
+guest bytes and performs no runtime decoding. Canonical
+`clean-aot-runtime-target-trace-v1` receipts aggregate only accepted indirect
+attempts into closure sites; execution and rejection telemetry cannot create
+compiler authority. Overflow or missing finalization marks evidence incomplete.

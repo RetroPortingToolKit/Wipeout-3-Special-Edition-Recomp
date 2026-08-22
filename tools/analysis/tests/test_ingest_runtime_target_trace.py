@@ -51,6 +51,35 @@ def encoded(receipt: dict) -> bytes:
 
 
 class RuntimeTargetTraceTests(unittest.TestCase):
+    def test_extended_runtime_telemetry_is_consumed_and_tamper_rejected(self) -> None:
+        receipt, images = fixture()
+        identity = receipt["images"][1]["variant_sha256"]
+        receipt["telemetry"] = {
+            "complete": True, "dropped_events": 0, "event_count": 3,
+            "first_sequence": 80, "last_sequence": 82,
+            "events": [
+                {"accepted": True, "active_epoch_identity_sha256": identity,
+                 "destination_image": "main", "destination_pc": 0x1008,
+                 "kind": "target-attempt", "sequence": 80,
+                 "source_image": "callback-epoch", "source_pc": 0x1004,
+                 "status": "executed", "transfer": "indirect-jump"},
+                {"accepted": True, "active_epoch_identity_sha256": identity,
+                 "destination_image": "callback-epoch", "destination_pc": 0x1000,
+                 "kind": "target-attempt", "sequence": 81,
+                 "source_image": "main", "source_pc": 0x1000,
+                 "status": "executed", "transfer": "indirect-call"},
+                {"accepted": True, "active_epoch_identity_sha256": identity,
+                 "destination_image": "callback-epoch", "destination_pc": 0x1000,
+                 "kind": "target-attempt", "sequence": 82,
+                 "source_image": "main", "source_pc": 0x1000,
+                 "status": "executed", "transfer": "indirect-call"},
+            ],
+        }
+        build_closure(encoded(receipt), images)
+        receipt["telemetry"]["events"][2]["sequence"] = 83
+        with self.assertRaisesRegex(TraceError, "sequence"):
+            build_closure(encoded(receipt), images)
+
     def test_cross_image_closure_is_identity_bound_and_deterministic(self) -> None:
         receipt, images = fixture()
         first = build_closure(encoded(receipt), images)

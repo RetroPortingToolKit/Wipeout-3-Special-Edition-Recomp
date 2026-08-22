@@ -17,6 +17,7 @@ endforeach()
 add_library(clean_aot_runtime STATIC
     src/native_dispatch.cpp
     src/runtime.cpp
+    src/target_trace.cpp
 )
 
 target_include_directories(clean_aot_runtime
@@ -68,6 +69,11 @@ if(BUILD_TESTING)
     target_link_libraries(clean_aot_runtime_cfi_tests PRIVATE clean_aot_runtime)
     target_compile_features(clean_aot_runtime_cfi_tests PRIVATE cxx_std_20)
     add_test(NAME clean_aot_runtime_cfi_tests COMMAND clean_aot_runtime_cfi_tests)
+    add_executable(clean_aot_runtime_target_trace_tests tests/target_trace_tests.cpp)
+    target_link_libraries(clean_aot_runtime_target_trace_tests PRIVATE clean_aot_runtime)
+    target_compile_features(clean_aot_runtime_target_trace_tests PRIVATE cxx_std_20)
+    add_test(NAME clean_aot_runtime_target_trace_tests
+             COMMAND clean_aot_runtime_target_trace_tests)
     add_executable(clean_aot_cdrom_bios_sequence_tests
         tests/cdrom_bios_sequence_tests.cpp)
     target_link_libraries(clean_aot_cdrom_bios_sequence_tests PRIVATE

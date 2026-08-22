@@ -7,6 +7,9 @@
 
 namespace clean_aot::runtime {
 
+class RuntimeTargetTrace;
+enum class RuntimeTraceTransfer : std::uint8_t { None, IndirectJump, IndirectCall };
+
 using GeneratedRegionFunction = bool (*)(GeneratedCpuState& state) noexcept;
 
 struct GeneratedRegionEntry final {
@@ -46,12 +49,15 @@ public:
     [[nodiscard]] std::uint32_t last_instruction_count() const noexcept {
         return last_instruction_count_;
     }
+    void set_trace(RuntimeTargetTrace* trace) noexcept { trace_ = trace; }
 
 private:
     std::uint32_t load_start_ = 0;
     std::uint64_t load_end_exclusive_ = 0;
     std::span<const GeneratedRegionEntry> entries_{};
     mutable std::uint32_t last_instruction_count_ = 0U;
+    std::string_view identity_{};
+    RuntimeTargetTrace* trace_ = nullptr;
 };
 
 struct GeneratedEpochBinding final {
@@ -67,9 +73,14 @@ public:
     [[nodiscard]] DispatchStatus dispatch(GeneratedCpuState& state) const noexcept {
         return selected_.dispatch(state);
     }
+    void set_trace(RuntimeTargetTrace* trace) noexcept {
+        trace_ = trace;
+        selected_.set_trace(trace);
+    }
 
 private:
     GeneratedDispatcher selected_{};
+    RuntimeTargetTrace* trace_ = nullptr;
 };
 
 struct GeneratedCfiTarget final {
@@ -85,13 +96,17 @@ struct GeneratedCfiSite final {
 
 class GeneratedCfiDispatcher final {
 public:
+    void set_trace(RuntimeTargetTrace* trace) noexcept { trace_ = trace; }
     [[nodiscard]] DispatchStatus dispatch_transfer(
         std::string_view source_identity_sha256,
         std::uint32_t source_pc,
         std::string_view target_identity_sha256,
         const GeneratedExecutableBinding& target_binding,
         GeneratedCpuState& state,
-        std::span<const GeneratedCfiSite> policies) const noexcept;
+        std::span<const GeneratedCfiSite> policies,
+        RuntimeTraceTransfer transfer = RuntimeTraceTransfer::IndirectCall) const noexcept;
+private:
+    RuntimeTargetTrace* trace_ = nullptr;
 };
 
 } // namespace clean_aot::runtime

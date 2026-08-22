@@ -59,6 +59,9 @@ because each edge names its image identity; missing, duplicate, ambiguous,
 unsorted, incomplete, or byte-mismatched evidence is rejected. This mechanism
 does not interpret guest code and does not claim that a partial trace is
 complete—the capture producer must explicitly finalize that claim.
+Extended v1 telemetry is checked independently: active epoch identities,
+executed PC edges, rejected attempts, statuses, drops, and contiguous sequences
+cannot alter the accepted JR/JALR observation counts used for static closure.
 
 `audit_content_static_coverage.py` builds the deterministic whole-media ledger
 used to measure content closure. It cross-checks the verified ISO inventory,
