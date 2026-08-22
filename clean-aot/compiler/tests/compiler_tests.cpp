@@ -585,16 +585,18 @@ void test_emitter_contains_compilable_graph_shape() {
 }
 
 void test_emitter_contains_cop0_semantics() {
-    std::vector<std::uint8_t> text(20U, 0U);
+    std::vector<std::uint8_t> text(24U, 0U);
     write_le32(text, 0x00U, 0x408c6000U); // mtc0 t4,status
     write_le32(text, 0x04U, 0x400d7000U); // mfc0 t5,epc
     write_le32(text, 0x08U, 0x42000010U); // rfe
     write_le32(text, 0x0cU, 0x214a0080U); // addi t2,t2,128
+    write_le32(text, 0x10U, 0x2941fff0U); // slti at,t2,-16
+    write_le32(text, 0x14U, 0x2d42fff0U); // sltiu v0,t2,-16
     const PsxExeImage image = make_image(0x00004000U, 0x00004000U, std::move(text));
     RegionBuildOptions options;
     options.entry_points = {0x00004000U};
     options.start_inclusive = 0x00004000U;
-    options.end_exclusive = 0x00004010U;
+    options.end_exclusive = 0x00004018U;
     const std::string source = clean_aot::compiler::CppEmitter::emit(
         RegionBuilder::build(image, std::move(options)));
     require(source.find("cpu_ops::mtc0(state,12,12)") != std::string::npos,
@@ -605,6 +607,10 @@ void test_emitter_contains_cop0_semantics() {
             "emitter must lower RFE status-stack restoration");
     require(source.find("cpu_ops::add(state,10,state.gpr[10],0x80u)") != std::string::npos,
             "emitter must lower ADDI with overflow semantics");
+    require(source.find("state.write(1, cpu_ops::s(state.gpr[10]) < cpu_ops::s(0xfffffff0u))") != std::string::npos,
+            "emitter must lower SLTI with a sign-extended immediate");
+    require(source.find("state.write(2, state.gpr[10] < 0xfffffff0u)") != std::string::npos,
+            "emitter must lower SLTIU with an unsigned comparison to a sign-extended immediate");
 }
 
 } // namespace

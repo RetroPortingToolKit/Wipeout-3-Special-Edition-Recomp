@@ -499,6 +499,17 @@ instruction and fails closed on every unknown PC or executable identity.
   `bios-frontier-00085983.json` stops fail-closed with `UnknownCode` at the next
   copied-RAM function `0x00002E00`; whole-RAM identity remains
   `6f30b27d...cc50b`.
+- The exact copied-RAM function `[0x2E00,0x2E98)` reaches helper
+  `[0x30C8,0x3108)`. Its first branch delay slot exposed missing static `SLTI`
+  lowering; generated SLTI/SLTIU now use signed/unsigned comparisons against a
+  sign-extended immediate instead of raising a false Reserved Instruction.
+  Execution returns exactly to `[0x2958,0x2A64)` and stops at its direct helper
+  `0x00003060`. The runtime's bounded copied-region table is 64 entries so this
+  growing exact-range chain does not weaken into page authorization. Repeated
+  probes reach 86,062 instructions and 14,893 dispatches with 9,388 reads,
+  18,348 writes, 3,720 isolated-cache writes, one device read, and 48 device
+  writes. Receipt `bios-frontier-00086062.json` records `UnknownCode` and the
+  post-callback whole-RAM epoch `8af29f79...f1c9a`.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control

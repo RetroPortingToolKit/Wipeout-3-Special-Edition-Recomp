@@ -484,7 +484,7 @@ std::uint64_t RetirementClock::phase() const noexcept {
 }
 
 struct Runtime::Impl final {
-    static constexpr std::size_t kMaximumCopiedEpochs = 16U;
+    static constexpr std::size_t kMaximumCopiedEpochs = 64U;
     struct CopiedEpoch final {
         GeneratedDispatcher dispatcher{};
         memory::CodeRegionStamp stamp{};

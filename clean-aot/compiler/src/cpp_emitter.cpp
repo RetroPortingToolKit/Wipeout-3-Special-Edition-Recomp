@@ -61,6 +61,8 @@ void write_semantic(std::ostringstream& out, const Instruction& instruction) {
     else if(op==0U&&fn==0x0dU)out<<"        cpu_ops::breakpoint(state);\n";
     else if(op==0x08U)out<<"        cpu_ops::add(state,"<<rt<<",state.gpr["<<rs<<"],0x"<<std::hex<<static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<std::int16_t>(imm)))<<"u);\n"<<std::dec;
     else if(op==0x09U)out<<"        state.write("<<rt<<", state.gpr["<<rs<<"] + 0x"<<std::hex<<static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<std::int16_t>(imm)))<<"u);\n"<<std::dec;
+    else if(op==0x0aU)out<<"        state.write("<<rt<<", cpu_ops::s(state.gpr["<<rs<<"]) < cpu_ops::s(0x"<<std::hex<<static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<std::int16_t>(imm)))<<"u));\n"<<std::dec;
+    else if(op==0x0bU)out<<"        state.write("<<rt<<", state.gpr["<<rs<<"] < 0x"<<std::hex<<static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<std::int16_t>(imm)))<<"u);\n"<<std::dec;
     else if(op==0x0cU)out<<"        cpu_ops::bit_and(state,"<<rt<<","<<rs<<",0x"<<std::hex<<imm<<"u);\n"<<std::dec;
     else if(op==0x0dU)out<<"        state.write("<<rt<<", state.gpr["<<rs<<"] | 0x"<<std::hex<<imm<<"u);\n"<<std::dec;
     else if(op==0x0eU)out<<"        state.write("<<rt<<", state.gpr["<<rs<<"] ^ 0x"<<std::hex<<imm<<"u);\n"<<std::dec;
