@@ -21,8 +21,8 @@ $configText = Get-Content -Raw -LiteralPath $config
 if ($configText -notmatch '(?m)^openbios\s*=\s*false\r?$') {
     throw 'OpenBIOS is not explicitly disabled in the staged game config.'
 }
-if ($configText -notmatch '(?m)^bios_hle\s*=\s*false\r?$') {
-    throw 'BIOS HLE is not explicitly disabled in the staged game config.'
+if ($configText -notmatch '(?m)^bios_hle\s*=\s*true\r?$') {
+    throw 'BIOS intro skip is not explicitly enabled in the staged game config.'
 }
 if ($configText -notmatch '(?m)^supersampling\s*=\s*4\r?$') {
     throw 'The clean release does not carry the required 4x supersampling baseline.'

@@ -91,8 +91,8 @@ def main() -> int:
     if target.get("exe_sha256") != EXE_SHA256:
         failures.append("PAL100 package executable hash does not match the authenticated local target")
     feature = next((item for item in manifest.get("feature", []) if item.get("id") == "framerate-pal100"), {})
-    if feature.get("default_enabled") is not False:
-        failures.append("PAL100 feature is not default-off")
+    if feature.get("default_enabled") is not True:
+        failures.append("PAL100 feature is not default-on")
     plugins = {item.get("id") for item in manifest.get("plugin", [])}
     if "wipeout3.framerate.pal-x2" not in plugins:
         failures.append("PAL100 package does not select the PAL-x2 activation hook")
