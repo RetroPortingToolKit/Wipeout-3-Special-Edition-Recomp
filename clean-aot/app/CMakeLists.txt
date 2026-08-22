@@ -163,7 +163,17 @@ if(CLEAN_AOT_APP_ENABLE_SDL)
         target_link_libraries(clean_aot_app_sdl_tests PRIVATE clean_aot_app_sdl)
         clean_aot_app_warnings(clean_aot_app_sdl_tests)
         clean_aot_colocate_sdl3(clean_aot_app_sdl_tests)
-        add_test(NAME clean_aot_app_sdl_tests COMMAND clean_aot_app_sdl_tests)
+        if(WIN32)
+            add_executable(clean_aot_windows_test_launcher
+                tests/windows_test_launcher.cpp)
+            clean_aot_app_warnings(clean_aot_windows_test_launcher)
+            add_test(NAME clean_aot_app_sdl_tests
+                COMMAND clean_aot_windows_test_launcher
+                    $<TARGET_FILE:clean_aot_app_sdl_tests>
+                    $<TARGET_FILE_DIR:SDL3::SDL3>)
+        else()
+            add_test(NAME clean_aot_app_sdl_tests COMMAND clean_aot_app_sdl_tests)
+        endif()
         set_tests_properties(clean_aot_app_sdl_tests PROPERTIES
             ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy")
     endif()
