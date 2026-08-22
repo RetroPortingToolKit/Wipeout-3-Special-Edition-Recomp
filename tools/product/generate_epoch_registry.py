@@ -62,7 +62,10 @@ def generate(evidence_dir: Path, generated_root: Path, output: Path,
         game_document = json.loads(game_shards.read_text(encoding="utf-8"))
         if (game_document.get("schema") != "wo3se.generated-game-shards.v1" or
                 game_document.get("status") != "partial-fail-closed" or
-                game_document.get("policy", {}).get("unknown_pc_action") != "reject"):
+                game_document.get("policy", {}).get("unknown_pc_action") != "reject" or
+                game_document.get("policy", {}).get("unknown_identity_action") != "reject" or
+                game_document.get("policy", {}).get("authenticated_epoch_variants") is not True or
+                game_document.get("unresolved_cfi_site_count") != 0):
             raise RegistryError("game shard authority is not the authenticated fail-closed set")
         images = game_document.get("images")
         if not isinstance(images, list) or len(images) != 2:
@@ -78,6 +81,19 @@ def generate(evidence_dir: Path, generated_root: Path, output: Path,
             if not isinstance(identity, str) or not re.fullmatch(HEX, identity):
                 raise RegistryError("game shard identity is malformed")
             game_required.append(identity)
+        if any(image.get("excluded_instruction_count") != 0 or
+               image.get("authorized_instruction_count") != image.get("compiled_instruction_count")
+               for image in images):
+            raise RegistryError("game shard authority is not complete")
+        epoch = game_document.get("epoch_dispatch", {})
+        epoch_variants = {(item.get("image"), item.get("identity_sha256"))
+                          for item in epoch.get("variants", [])}
+        expected_variants = {(item["name"], item["identity_sha256"]) for item in images}
+        if (epoch.get("schema") != "wo3se.overlapping-executable-epoch-dispatch.v1" or
+                epoch.get("selection_key") != "authenticated-active-image-sha256" or
+                epoch.get("unknown_epoch_action") != "reject" or
+                not epoch.get("sites") or epoch_variants != expected_variants):
+            raise RegistryError("game shard epoch discriminator is invalid")
     referenced = set(required) | set(game_required)
     unreferenced = sorted(set(candidates) - referenced - {bios_identity})
     if unreferenced: raise RegistryError(f"generated artifacts are absent from authenticated chain: {unreferenced}")
@@ -122,6 +138,8 @@ def generate(evidence_dir: Path, generated_root: Path, output: Path,
                 "game_shards": {"compiled_instruction_count": 0 if game_document is None else game_document["compiled_instruction_count"],
                     "compiled_region_count": 0 if game_document is None else game_document["compiled_region_count"],
                     "authority_sha256": "" if game_document is None else hashlib.sha256(game_shards.read_bytes()).hexdigest(),
+                    "unresolved_cfi_site_count": 0 if game_document is None else game_document["unresolved_cfi_site_count"],
+                    "epoch_dispatch": None if game_document is None else game_document["epoch_dispatch"],
                     "entries": [{k: v for k, v in item.items() if k != "sources"} for item in game_entries]}}
     document["registry_sha256"] = hashlib.sha256(_canonical(document)).hexdigest()
     output.mkdir(parents=True, exist_ok=True)

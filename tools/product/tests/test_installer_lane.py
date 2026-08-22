@@ -40,14 +40,23 @@ class InstallerLaneTests(unittest.TestCase):
             if relative == "policy/generated-game-shards.json":
                 path.write_text(json.dumps({"schema":"wo3se.generated-game-shards.v1",
                     "status":"partial-fail-closed", "authority_sha256":"authority",
-                    "compiled_instruction_count":83244, "compiled_region_count":583,
-                    "policy":{"unknown_pc_action":"reject"}, "images":[
+                    "compiled_instruction_count":135829, "compiled_region_count":290,
+                    "unresolved_cfi_site_count":0,
+                    "policy":{"unknown_pc_action":"reject", "unknown_identity_action":"reject",
+                              "authenticated_epoch_variants":True},
+                    "epoch_dispatch":{"schema":"wo3se.overlapping-executable-epoch-dispatch.v1",
+                        "selection_key":"authenticated-active-image-sha256", "unknown_epoch_action":"reject",
+                        "sites":[2148268032], "variants":[
+                            {"image":"main-exe","identity_sha256":"main"},
+                            {"image":"nfe-entry5-route-variant","identity_sha256":"nfe"}]}, "images":[
                         {"name":"main-exe", "identity_sha256":"main", "manifest":"main.manifest",
-                         "manifest_sha256":"main-manifest", "compiled_instruction_count":75217,
-                         "compiled_region_count":450},
+                         "manifest_sha256":"main-manifest", "authorized_instruction_count":104002,
+                         "compiled_instruction_count":104002, "excluded_instruction_count":0,
+                         "compiled_region_count":272},
                         {"name":"nfe-entry5-route-variant", "identity_sha256":"nfe",
                          "manifest":"nfe.manifest", "manifest_sha256":"nfe-manifest",
-                         "compiled_instruction_count":8027, "compiled_region_count":133}]}))
+                         "authorized_instruction_count":31827, "compiled_instruction_count":31827,
+                         "excluded_instruction_count":0, "compiled_region_count":18}]}))
             else:
                 path.write_text("{}" if relative.endswith(".json") else "clean")
             self.payload.append((relative, path))
@@ -60,10 +69,11 @@ class InstallerLaneTests(unittest.TestCase):
                          setup_payload=self.payload, output=package)
         moved = self.root / "日本語" / "relocated"; moved.parent.mkdir(); shutil.copytree(package, moved)
         receipt = validate_installer(moved)
-        self.assertEqual(receipt["game_shards"]["compiled_instruction_count"], 83244)
-        self.assertEqual(receipt["game_shards"]["compiled_region_count"], 583)
+        self.assertEqual(receipt["game_shards"]["compiled_instruction_count"], 135829)
+        self.assertEqual(receipt["game_shards"]["compiled_region_count"], 290)
         self.assertEqual([entry["compiled_instruction_count"] for entry in receipt["game_shards"]["entries"]],
-                         [75217, 8027])
+                         [104002, 31827])
+        self.assertEqual(receipt["game_shards"]["unresolved_cfi_site_count"], 0)
         self.assertEqual(receipt["runtime_audit"]["schema"], RUNTIME_AUDIT_SCHEMA)
         installed = self.root / "installed" / "Wipeout3SE"
         install_runtime(moved / "runtime-payload", installed)
@@ -81,6 +91,19 @@ class InstallerLaneTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "entry is incomplete"):
             create_installer(setup_exe=self.root / "setup.exe", runtime_payload=self.runtime,
                              setup_payload=mutated, output=self.root / "mutated-installer")
+
+    def test_epoch_discriminator_identity_mutation_is_rejected(self):
+        mutated = []
+        for relative, source in self.payload:
+            if relative == "policy/generated-game-shards.json":
+                document = json.loads(source.read_text())
+                document["epoch_dispatch"]["variants"][0]["identity_sha256"] = "other"
+                source = self.root / "mutated-epoch.json"
+                source.write_text(json.dumps(document))
+            mutated.append((relative, source))
+        with self.assertRaisesRegex(Exception, "epoch discriminator"):
+            create_installer(setup_exe=self.root / "setup.exe", runtime_payload=self.runtime,
+                             setup_payload=mutated, output=self.root / "mutated-epoch-installer")
 
     def test_cancel_is_side_effect_free_and_unicode_paths_reach_orchestrator(self):
         with self.assertRaises(SetupCancelled):

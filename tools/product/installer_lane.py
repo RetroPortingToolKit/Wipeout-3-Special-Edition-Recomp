@@ -53,6 +53,9 @@ def _game_shard_acceptance(path: Path) -> dict[str, Any]:
     if (document.get("schema") != GAME_SHARD_SCHEMA or
             document.get("status") != "partial-fail-closed" or
             document.get("policy", {}).get("unknown_pc_action") != "reject" or
+            document.get("policy", {}).get("unknown_identity_action") != "reject" or
+            document.get("policy", {}).get("authenticated_epoch_variants") is not True or
+            document.get("unresolved_cfi_site_count") != 0 or
             not isinstance(images, list) or not images):
         raise ReleaseError("packaged game-shard receipt is not fail-closed")
     entries = []
@@ -70,6 +73,9 @@ def _game_shard_acceptance(path: Path) -> dict[str, Any]:
                 any(not isinstance(entry[key], int) or entry[key] <= 0 for key in
                     ("compiled_instruction_count", "compiled_region_count"))):
             raise ReleaseError(f"packaged game-shard entry is incomplete: {name}")
+        if (image.get("excluded_instruction_count") != 0 or
+                image.get("authorized_instruction_count") != image.get("compiled_instruction_count")):
+            raise ReleaseError(f"packaged game-shard entry is not complete: {name}")
         entries.append(entry)
     entries.sort(key=lambda item: item["name"])
     instruction_count = sum(entry["compiled_instruction_count"] for entry in entries)
@@ -77,9 +83,19 @@ def _game_shard_acceptance(path: Path) -> dict[str, Any]:
     if (document.get("compiled_instruction_count") != instruction_count or
             document.get("compiled_region_count") != region_count):
         raise ReleaseError("packaged game-shard aggregate counts disagree with entries")
+    epoch = document.get("epoch_dispatch", {})
+    variants = sorted(epoch.get("variants", []), key=lambda item: item.get("image", ""))
+    expected = sorted(({"image": item["name"], "identity_sha256": item["identity_sha256"]}
+                       for item in entries), key=lambda item: item["image"])
+    if (epoch.get("schema") != "wo3se.overlapping-executable-epoch-dispatch.v1" or
+            epoch.get("selection_key") != "authenticated-active-image-sha256" or
+            epoch.get("unknown_epoch_action") != "reject" or not epoch.get("sites") or
+            variants != expected):
+        raise ReleaseError("packaged game-shard epoch discriminator is invalid")
     return {"receipt_sha256": _hash(path), "authority_sha256": document.get("authority_sha256"),
             "compiled_instruction_count": instruction_count,
-            "compiled_region_count": region_count, "entries": entries}
+            "compiled_region_count": region_count, "unresolved_cfi_site_count": 0,
+            "excluded_instruction_count": 0, "epoch_dispatch": epoch, "entries": entries}
 
 
 def audit_installed_runtime(runtime: Path) -> dict[str, Any]:

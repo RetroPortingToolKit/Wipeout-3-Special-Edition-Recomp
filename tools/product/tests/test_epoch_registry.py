@@ -33,11 +33,12 @@ class EpochRegistryTests(unittest.TestCase):
             for identity in identities:
                 directory=generated/identity[:4]; directory.mkdir(); (directory/"region.cpp").write_text("// generated\n")
                 (directory/"entry_table.cpp").write_text(f'GeneratedExecutableBinding value{{"{identity}","{identity}"\nGeneratedExecutableBinding* clean_aot_binding_{identity}() noexcept;\n')
-            authority=root/"game.json"; authority.write_text(json.dumps({"schema":"wo3se.generated-game-shards.v1","status":"partial-fail-closed","compiled_instruction_count":83244,"compiled_region_count":583,"policy":{"unknown_pc_action":"reject"},"images":[{"name":name,"identity_sha256":value,"compiled_instruction_count":count,"compiled_region_count":regions} for name,value,count,regions in zip(("main-exe","nfe"),identities,(75217,8027),(450,133))]}))
+            authority=root/"game.json"; authority.write_text(json.dumps({"schema":"wo3se.generated-game-shards.v1","status":"partial-fail-closed","compiled_instruction_count":135829,"compiled_region_count":290,"unresolved_cfi_site_count":0,"policy":{"unknown_pc_action":"reject","unknown_identity_action":"reject","authenticated_epoch_variants":True},"epoch_dispatch":{"schema":"wo3se.overlapping-executable-epoch-dispatch.v1","selection_key":"authenticated-active-image-sha256","unknown_epoch_action":"reject","sites":[0x1000],"variants":[{"image":name,"identity_sha256":value} for name,value in zip(("main-exe","nfe"),identities)]},"images":[{"name":name,"identity_sha256":value,"authorized_instruction_count":count,"compiled_instruction_count":count,"excluded_instruction_count":0,"compiled_region_count":regions} for name,value,count,regions in zip(("main-exe","nfe"),identities,(104002,31827),(272,18))]}))
             receipt=generate(evidence,generated,root/"out",authority)
             self.assertEqual(len(receipt["game_shards"]["entries"]),2)
-            self.assertEqual(receipt["game_shards"]["compiled_instruction_count"],83244)
-            self.assertEqual(receipt["game_shards"]["compiled_region_count"],583)
+            self.assertEqual(receipt["game_shards"]["compiled_instruction_count"],135829)
+            self.assertEqual(receipt["game_shards"]["compiled_region_count"],290)
+            self.assertEqual(receipt["game_shards"]["unresolved_cfi_site_count"],0)
             (generated/identities[0][:4]/"entry_table.cpp").write_text((generated/identities[0][:4]/"entry_table.cpp").read_text().replace(identities[0],"3"*64,1))
             with self.assertRaises(RegistryError): generate(evidence,generated,root/"mutated",authority)
 

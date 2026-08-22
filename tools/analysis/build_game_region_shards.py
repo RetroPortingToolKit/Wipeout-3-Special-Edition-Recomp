@@ -75,6 +75,8 @@ def build(authority: dict[str, Any], finite: dict[str, Any],
                 cfi.get("authority_sha256") !=
                 hashlib.sha256(canonical(authority)).hexdigest()):
             raise ShardError("CFI receipt is not bound to this authorization")
+        if cfi.get("remaining_unresolved", []):
+            raise ShardError("CFI receipt retains unresolved indirect sites")
         universes = {row["id"]: row for row in cfi.get("universes", [])}
         if len(universes) != len(cfi.get("universes", [])):
             raise ShardError("CFI universe identifiers are not unique")
@@ -202,6 +204,7 @@ def build(authority: dict[str, Any], finite: dict[str, Any],
             "indirect_cfi": cfi is not None,
             "authenticated_epoch_variants": True,
         },
+        "unresolved_cfi_site_count": 0 if cfi is not None else None,
         "epoch_dispatch": {
             "schema": epoch["schema"],
             "selection_key": epoch["selection_key"],

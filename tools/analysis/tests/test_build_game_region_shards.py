@@ -92,6 +92,16 @@ class GameShardTests(unittest.TestCase):
         with self.assertRaises(ShardError):
             build(authority, self.finite(), cfi)
 
+    def test_nonempty_remaining_cfi_is_rejected(self):
+        authority = self.authority()
+        import hashlib
+        from tools.analysis.build_game_region_shards import canonical
+        cfi = {"schema": "wo3se.indirect-cfi.v1",
+               "authority_sha256": hashlib.sha256(canonical(authority)).hexdigest(),
+               "remaining_unresolved": [{"source_pc": 0x1008}], "sites": []}
+        with self.assertRaisesRegex(ShardError, "retains unresolved"):
+            build(authority, self.finite(), cfi)
+
     def test_finite_cfi_target_must_be_authorized_and_is_precompiled(self):
         authority = self.authority()
         authority["images"][0]["unresolved_indirects"] = [{"pc": 0x1008}]

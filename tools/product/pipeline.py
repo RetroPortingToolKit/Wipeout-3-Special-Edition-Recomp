@@ -2234,7 +2234,10 @@ def setup_product(
                 game_shard_receipt = load_json(game_shards_path)
                 if (game_shard_receipt.get("schema") != "wo3se.generated-game-shards.v1" or
                         game_shard_receipt.get("status") != "partial-fail-closed" or
-                        game_shard_receipt.get("policy", {}).get("unknown_pc_action") != "reject"):
+                        game_shard_receipt.get("policy", {}).get("unknown_pc_action") != "reject" or
+                        game_shard_receipt.get("policy", {}).get("unknown_identity_action") != "reject" or
+                        game_shard_receipt.get("policy", {}).get("authenticated_epoch_variants") is not True or
+                        game_shard_receipt.get("unresolved_cfi_site_count") != 0):
                     raise ProductError("game shard authority is not the authenticated fail-closed set")
                 if game_shard_receipt.get("compiled_region_count") != sum(
                         image.get("compiled_region_count", -1)
@@ -2244,6 +2247,20 @@ def setup_product(
                         image.get("compiled_instruction_count", -1)
                         for image in game_shard_receipt.get("images", [])):
                     raise ProductError("game shard authority instruction count is inconsistent")
+                images = game_shard_receipt.get("images", [])
+                if any(image.get("excluded_instruction_count") != 0 or
+                       image.get("authorized_instruction_count") != image.get("compiled_instruction_count")
+                       for image in images):
+                    raise ProductError("game shard authority is not complete")
+                epoch = game_shard_receipt.get("epoch_dispatch", {})
+                expected_epochs = {(image.get("name"), image.get("identity_sha256")) for image in images}
+                actual_epochs = {(item.get("image"), item.get("identity_sha256"))
+                                 for item in epoch.get("variants", [])}
+                if (epoch.get("schema") != "wo3se.overlapping-executable-epoch-dispatch.v1" or
+                        epoch.get("selection_key") != "authenticated-active-image-sha256" or
+                        epoch.get("unknown_epoch_action") != "reject" or not epoch.get("sites") or
+                        actual_epochs != expected_epochs):
+                    raise ProductError("game shard epoch discriminator is invalid")
                 by_name = {"main-exe": media["main"], "nfe-entry5-route-variant": media["runtime"][0]}
                 for image in game_shard_receipt.get("images", []):
                     name = image.get("name")
@@ -2344,6 +2361,9 @@ def setup_product(
                             "manifest_sha256", "compiled_instruction_count", "compiled_region_count")}
                             for image in game_shard_receipt["images"]],
                         "authority_sha256": sha256_file(game_shards_path)[0],
+                        "excluded_instruction_count": 0,
+                        "unresolved_cfi_site_count": 0,
+                        "epoch_dispatch": game_shard_receipt["epoch_dispatch"],
                         "unknown_pc_action": "reject"},
                 },
                 "provenance_tools": media["run_receipts"],
