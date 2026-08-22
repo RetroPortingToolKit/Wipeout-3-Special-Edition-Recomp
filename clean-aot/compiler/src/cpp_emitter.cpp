@@ -191,6 +191,31 @@ std::string CppEmitter::emit(const Region& region) {
             else output << "0u";
             output << ");\n";
             output << "        cpu_ops::sample_interrupt(state); if(state.exception_raised) return true;\n";
+            const bool terminator = block->terminator_index.has_value() &&
+                                    instruction_index == *block->terminator_index;
+            if (terminator && (instruction.kind == InstructionKind::ConditionalBranch ||
+                               instruction.kind == InstructionKind::ConditionalCall)) {
+                const std::uint32_t raw = instruction.raw;
+                const std::uint32_t opcode = raw >> 26U;
+                const std::uint32_t rs = (raw >> 21U) & 31U;
+                const std::uint32_t rt = (raw >> 16U) & 31U;
+                output << "        const bool transfer_condition = ";
+                if (opcode == 0x04U) output << "state.gpr["<<rs<<"] == state.gpr["<<rt<<"]";
+                else if (opcode == 0x05U) output << "state.gpr["<<rs<<"] != state.gpr["<<rt<<"]";
+                else if (opcode == 0x06U) output << "cpu_ops::s(state.gpr["<<rs<<"]) <= 0";
+                else if (opcode == 0x07U) output << "cpu_ops::s(state.gpr["<<rs<<"]) > 0";
+                else if (opcode == 0x01U && (((raw >> 16U) & 1U) == 0U)) output << "cpu_ops::s(state.gpr["<<rs<<"]) < 0";
+                else if (opcode == 0x01U) output << "cpu_ops::s(state.gpr["<<rs<<"]) >= 0";
+                else if (opcode == 0x12U) output << ((((raw>>16U)&1U)!=0U)?"state.cop2_condition":"!state.cop2_condition");
+                else output << "false";
+                output << ";\n";
+            } else if (terminator &&
+                       (instruction.kind == InstructionKind::IndirectJump ||
+                        instruction.kind == InstructionKind::IndirectCall ||
+                        instruction.kind == InstructionKind::Return)) {
+                output << "        const std::uint32_t transfer_target = state.gpr["
+                       << ((instruction.raw >> 21U) & 31U) << "];\n";
+            }
             if (!is_control_transfer(instruction.kind)) write_semantic(output, instruction);
             else if(instruction.kind==InstructionKind::DirectCall||instruction.kind==InstructionKind::ConditionalCall){
                 output << "        state.write(31, "; write_address(output,instruction.address+8U); output << ");\n";
@@ -243,20 +268,7 @@ std::string CppEmitter::emit(const Region& region) {
                 !taken->target.has_value() || !fallthrough->target.has_value()) {
                 throw IrError("emitter found an invalid conditional edge shape");
             }
-            const std::uint32_t raw = block->instructions[*block->terminator_index].raw;
-            const std::uint32_t opcode = raw >> 26U;
-            const std::uint32_t rs = (raw >> 21U) & 31U;
-            const std::uint32_t rt = (raw >> 16U) & 31U;
-            output << "        state.branch_taken = ";
-            if (opcode == 0x04U) output << "state.gpr["<<rs<<"] == state.gpr["<<rt<<"]";
-            else if (opcode == 0x05U) output << "state.gpr["<<rs<<"] != state.gpr["<<rt<<"]";
-            else if (opcode == 0x06U) output << "cpu_ops::s(state.gpr["<<rs<<"]) <= 0";
-            else if (opcode == 0x07U) output << "cpu_ops::s(state.gpr["<<rs<<"]) > 0";
-            else if (opcode == 0x01U && (((raw >> 16U) & 1U) == 0U)) output << "cpu_ops::s(state.gpr["<<rs<<"]) < 0";
-            else if (opcode == 0x01U) output << "cpu_ops::s(state.gpr["<<rs<<"]) >= 0";
-            else if (opcode == 0x12U) output << ((((raw>>16U)&1U)!=0U)?"state.cop2_condition":"!state.cop2_condition");
-            else output << "false";
-            output << ";\n        state.pc = state.branch_taken ? ";
+            output << "        state.branch_taken = transfer_condition;\n        state.pc = state.branch_taken ? ";
             write_address(output, *taken->target);
             output << " : ";
             write_address(output, *fallthrough->target);
@@ -270,14 +282,13 @@ std::string CppEmitter::emit(const Region& region) {
                         InstructionKind::Return)) {
             const Instruction& transfer =
                 block->instructions[*block->terminator_index];
-            const std::uint32_t source = (transfer.raw >> 21U) & 31U;
             if (transfer.kind == InstructionKind::IndirectCall) {
                 const std::uint32_t destination = (transfer.raw >> 11U) & 31U;
                 output << "        state.write(" << destination << ", ";
                 write_address(output, transfer.address + 8U);
                 output << ");\n";
             }
-            output << "        state.pc = state.gpr[" << source << "];\n"
+            output << "        state.pc = transfer_target;\n"
                    << "        state.next_pc = state.pc + 4u;\n"
                    << "        return true;\n";
         } else {

@@ -405,6 +405,45 @@ void test_direct_call_emitter_advances_to_callee() {
             "direct call must advance to its callee rather than leave a stale PC");
 }
 
+void test_control_inputs_are_captured_before_delay_slot() {
+    std::vector<std::uint8_t> branch_text(16U, 0U);
+    write_le32(branch_text, 0x00U, 0x10200001U); // beq at,zero,+1
+    write_le32(branch_text, 0x04U, 0x0091082bU); // sltu at,a0,s1
+    const PsxExeImage branch_image = make_image(
+        0x00002d00U, 0x00002d00U, std::move(branch_text));
+    RegionBuildOptions branch_options;
+    branch_options.entry_points = {0x00002d00U};
+    const std::string branch_source = clean_aot::compiler::CppEmitter::emit(
+        RegionBuilder::build(branch_image, std::move(branch_options)));
+    const auto predicate = branch_source.find(
+        "const bool transfer_condition = state.gpr[1] == state.gpr[0]");
+    const auto delay_write = branch_source.find("cpu_ops::slt(state,1,4,17,true)");
+    const auto branch_use = branch_source.find(
+        "state.branch_taken = transfer_condition");
+    require(predicate != std::string::npos && delay_write != std::string::npos &&
+                branch_use != std::string::npos && predicate < delay_write &&
+                delay_write < branch_use,
+            "branch operands must be captured before a delay slot overwrites them");
+
+    std::vector<std::uint8_t> jump_text(8U, 0U);
+    write_le32(jump_text, 0x00U, encode_jr(8U));
+    write_le32(jump_text, 0x04U, 0x24080000U); // addiu t0,zero,0
+    const PsxExeImage jump_image = make_image(
+        0x00002e00U, 0x00002e00U, std::move(jump_text));
+    RegionBuildOptions jump_options;
+    jump_options.entry_points = {0x00002e00U};
+    const std::string jump_source = clean_aot::compiler::CppEmitter::emit(
+        RegionBuilder::build(jump_image, std::move(jump_options)));
+    const auto target = jump_source.find(
+        "const std::uint32_t transfer_target = state.gpr[8]");
+    const auto overwrite = jump_source.find("state.gpr[0] + 0x0u");
+    const auto target_use = jump_source.find("state.pc = transfer_target");
+    require(target != std::string::npos && overwrite != std::string::npos &&
+                target_use != std::string::npos && target < overwrite &&
+                overwrite < target_use,
+            "indirect targets must be captured before their delay slot executes");
+}
+
 void test_return_and_external_control_edges_are_explicit() {
     std::vector<std::uint8_t> return_text(8U, 0U);
     write_le32(return_text, 0U, encode_jr(31U));
@@ -649,6 +688,8 @@ int main(int argc, char** argv) {
          test_region_bounds_and_entries_require_instruction_alignment},
         {"direct_call_emitter_advances_to_callee",
          test_direct_call_emitter_advances_to_callee},
+        {"control_inputs_are_captured_before_delay_slot",
+         test_control_inputs_are_captured_before_delay_slot},
         {"return_and_external_control_edges_are_explicit",
          test_return_and_external_control_edges_are_explicit},
         {"delay_slot_boundaries_fail_closed", test_delay_slot_boundaries_fail_closed},

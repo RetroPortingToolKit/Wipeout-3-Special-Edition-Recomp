@@ -1,5 +1,19 @@
 # Handoff
 
+## BIOS allocator semantic fix (2026-08-21)
+
+- The `0x1274` allocator runaway was a compiler delay-slot ordering defect.
+  The live sequence computes `r1=(33 < 8193)` before `BEQ`, then its delay slot
+  computes the unrelated `r1=(8193 < 32)`. Generated code incorrectly tested
+  the second value. Conditional predicates and indirect targets are now
+  captured before their delay slots, with adversarial emitter coverage.
+- Early and 100,000th-hit state, allocator RAM words, recent PCs, and stable
+  mutation/device counters are pinned in
+  `clean-aot/catalog/evidence/bios-allocator-loop-diagnosis.json`.
+- Two corrected real probes agree exactly: 121,186 instructions / 22,272
+  dispatches, final RAM epoch `29d475f7311496a0337b75f0e7842703b62c25db595700c9a4b3abe49b1d537b`,
+  and honest UnknownCode `0x00001B20`. See `bios-frontier-00121186.json`.
+
 ## Two-stage authenticated game-shard integration (2026-08-21)
 
 - First-run setup can now consume the hash-pinned game-shard authority and its
