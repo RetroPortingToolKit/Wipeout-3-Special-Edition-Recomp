@@ -1,6 +1,6 @@
 {
   "baseline_receipt_sha256": "57511195433271ecbd3f3c76bc30f5aac1400964371113100a97a05cb1dc9fae",
-  "current_receipt_sha256": "49f9ecb8f966849786b5c29370a1341018d0ec2c0bcf4af2d79787771636f83a",
+  "current_receipt_sha256": "385f4d81198b3ae20d894a6acb3aaf9f629834dc4483f7ede78faa5423ccbc68",
   "images": {
     "main-exe": {
       "authorized_instruction_delta": 2202,
@@ -16,10 +16,10 @@
     }
   },
   "remaining": {
-    "bios-reset-corridor": {
-      "rejected_direct_edges": 1,
-      "unknown_ranges": 1,
-      "unresolved_indirects": 0
+    "bios-direct-frontier": {
+      "rejected_direct_edges": 0,
+      "unknown_ranges": 56,
+      "unresolved_indirects": 27
     },
     "main-exe": {
       "rejected_direct_edges": 17,

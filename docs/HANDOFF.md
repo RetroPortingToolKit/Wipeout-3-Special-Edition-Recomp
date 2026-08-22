@@ -26,10 +26,10 @@
   `941a5e8b2ab0a45b2821cbd9729c40503c78d74ba42f3b025c913e98a2f03dd1`)
   proves 1,166 formerly rejected NFE-to-main direct calls and adds 2,202
   authorized main-image instructions. It now authorizes 101,033 main-image,
-  31,719 NFE, and 30 exact verified-BIOS reset-corridor instructions. It remains
-  non-selectable: 71 game-image direct edges, 142 game-image indirect sites,
-  and the BIOS reset corridor's one outgoing edge remain rejected. Exact
-  categories and all 270 main, 18 NFE, and one BIOS unknown ranges are in
+  31,719 NFE, and 3,013 exact verified-BIOS direct-frontier instructions. It
+  remains non-selectable: 71 game-image direct edges, 142 game-image indirect
+  sites, and 27 BIOS indirect sites remain rejected. Exact categories and all
+  270 main, 18 NFE, and 56 BIOS unknown ranges are in
   `docs/EXECUTABLE_AUTHORIZATION.md` and the JSON receipt.
 
 - The original dirty checkout remains preserved at
@@ -344,9 +344,9 @@ instruction and fails closed on every unknown PC or executable identity.
 - The real executable authorization receipt is
   `clean-aot/catalog/evidence/executable-authorization.json` with status
   `partial-fail-closed`. It records 101,033 authorized main-EXE instructions,
-  31,719 authorized NFE entry-5 instructions, and 30 verified BIOS reset-region
-  instructions, but unresolved closure prevents a finalized selectable catalog
-  and generated artifact.
+  31,719 authorized NFE entry-5 instructions, and 3,013 verified BIOS
+  direct-frontier instructions, but unresolved closure prevents a finalized
+  selectable catalog and generated artifact.
 - Consequently the deepest real product state remains authenticated evidence
   generation before runtime dispatch: BIOS instructions executed = 0 and game
   instructions executed = 0. Do not report BIOS or game boot until complete

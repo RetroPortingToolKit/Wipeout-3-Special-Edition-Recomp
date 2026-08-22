@@ -372,11 +372,15 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         report["direct_closure_complete"] = not remaining
         del report["_authorized"]
 
-    bios_allowed = set(range(args.bios_base, args.bios_base + args.bios_reset_bytes, 4))
+    bios_allowed = set(range(args.bios_base, args.bios_base + len(bios), 4))
     bios_report = analyze(
         bios, args.bios_base, {args.bios_base}, bios_allowed,
-        "exact verified retail BIOS reset vector; closure constrained to the declared reset corridor",
+        "exact verified retail BIOS reset vector; direct closure over the authenticated BIOS image",
     )
+    reset_end = args.bios_base + args.bios_reset_bytes
+    if any(pc not in bios_report["_authorized"]
+           for pc in range(args.bios_base, reset_end, 4)):
+        raise AuthorizationError("BIOS direct closure does not contain the reset corridor")
     del bios_report["_authorized"]
 
     baseline = {
@@ -433,7 +437,7 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
              "end_exclusive": args.exe_base + len(exe), **exe_report},
             {"name": "nfe-entry5-route-variant", "base": args.nfe_base,
              "end_exclusive": nfe_end, **nfe_report},
-            {"name": "bios-reset-corridor", "base": args.bios_base,
+            {"name": "bios-direct-frontier", "base": args.bios_base,
              "end_exclusive": args.bios_base + len(bios), **bios_report},
         ],
     }
@@ -445,6 +449,8 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--bios-sha256", required=True)
     result.add_argument("--bios-base", type=lambda value: int(value, 0), default=0xBFC00000)
     result.add_argument("--bios-reset-bytes", type=lambda value: int(value, 0), default=0x78)
+    result.add_argument("--bios-variant-sha256", required=True)
+    result.add_argument("--bios-manifest-output", type=Path)
     result.add_argument("--exe-text", type=Path, required=True)
     result.add_argument("--exe-container", type=Path, required=True)
     result.add_argument("--exe-container-sha256", required=True)
@@ -473,6 +479,31 @@ def main(argv: list[str] | None = None) -> int:
         payload = json.dumps(report, indent=2, sort_keys=True) + "\n"
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(payload, encoding="utf-8", newline="\n")
+        if args.bios_manifest_output is not None:
+            bios_report = next(
+                image for image in report["images"]
+                if image["name"] == "bios-direct-frontier"
+            )
+            lines = [
+                "schema=clean-aot-compiler-manifest-v1",
+                "image_kind=raw-payload",
+                f"variant_sha256={args.bios_variant_sha256}",
+                f"image_sha256={report['evidence']['bios_sha256']}",
+                f"load_start={args.bios_base:#x}",
+                f"load_end_exclusive={args.bios_base + (args.bios.stat().st_size):#x}",
+            ]
+            for authorized_range in bios_report["authorized_ranges"]:
+                lines.append(f"entry={authorized_range['start']:#x}")
+            for authorized_range in bios_report["authorized_ranges"]:
+                lines.append(
+                    f"code={authorized_range['start']:#x}-"
+                    f"{authorized_range['end_exclusive']:#x}"
+                )
+            manifest_payload = "\n".join(lines) + "\n"
+            args.bios_manifest_output.parent.mkdir(parents=True, exist_ok=True)
+            args.bios_manifest_output.write_text(
+                manifest_payload, encoding="utf-8", newline="\n"
+            )
         if args.delta_output is not None:
             delta_key = next(key for key in report if key.startswith("delta_from_receipt_sha256_"))
             delta_document = {
