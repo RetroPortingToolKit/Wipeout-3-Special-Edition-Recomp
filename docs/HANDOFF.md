@@ -1,5 +1,19 @@
 # Handoff
 
+## Authenticated game-bind rejection (2026-08-21)
+
+- The real transition probe now mounts the verified BIN/CUE and links the
+  latest precompiled main-game shard/CFI registry. The BIOS nevertheless reads
+  zero raw sectors and reaches `0x80030000` with the same shell RAM epoch.
+- The complete resident main load contract `[0x80010000,0x8017C000)` hashes to
+  `eab668f3b877ca88b76acb2ab595009ebcdb88c8ff7d8cfe295c05ff4be086ba`,
+  not authenticated main identity `d483d384...`; `0x80030000` is also not a
+  generated registry root. Binding therefore rejects fail-closed and executes
+  zero game instructions. No shell bytes were authorized.
+- Canonical evidence is `bios-to-game-execution-00000000.json`. The next task
+  is the CD boot/device path that currently performs no sector read, not game
+  shard expansion or relaxed resident identity matching.
+
 ## Real BIOS-to-game transition (2026-08-21)
 
 - Authenticating only copied-RAM `[0x1508,0x15D8)` in epoch `778e17e8...`
@@ -46,6 +60,12 @@
   and honest UnknownCode `0x00001B20`. See `bios-frontier-00121186.json`.
 
 ## Two-stage authenticated game-shard integration (2026-08-21)
+
+- Installed direct launch now selects copied epochs by the current stopped PC
+  and retries only hash-authenticated overlapping candidates. This removes the
+  stale-registry-order rejection and matches the canonical 2,695,618-instruction,
+  452,182-dispatch BIOS frontier at `0x80030000`. The subsequent BIOS-only smoke
+  rejection is the expected resident-game identity boundary, not game execution.
 
 - First-run setup can now consume the hash-pinned game-shard authority and its
   two closed manifests, derive the exact main and route-mutated NFE images from
