@@ -15,6 +15,7 @@ foreach(component IN ITEMS machine memory soc gte gpu cdrom mdec sio spu)
 endforeach()
 
 add_library(clean_aot_runtime STATIC
+    src/game_profile_trace.cpp
     src/native_dispatch.cpp
     src/runtime.cpp
     src/target_trace.cpp
@@ -74,6 +75,13 @@ if(BUILD_TESTING)
     target_compile_features(clean_aot_runtime_target_trace_tests PRIVATE cxx_std_20)
     add_test(NAME clean_aot_runtime_target_trace_tests
              COMMAND clean_aot_runtime_target_trace_tests)
+    add_executable(clean_aot_runtime_game_profile_trace_tests
+        tests/game_profile_trace_tests.cpp)
+    target_link_libraries(clean_aot_runtime_game_profile_trace_tests PRIVATE
+        clean_aot_runtime)
+    target_compile_features(clean_aot_runtime_game_profile_trace_tests PRIVATE cxx_std_20)
+    add_test(NAME clean_aot_runtime_game_profile_trace_tests
+             COMMAND clean_aot_runtime_game_profile_trace_tests)
     add_executable(clean_aot_runtime_packed_dispatch_tests
         tests/packed_dispatch_tests.cpp)
     target_link_libraries(clean_aot_runtime_packed_dispatch_tests PRIVATE clean_aot_runtime)

@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "clean-aot-game-profile-trace-v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["candidates", "capture", "frames", "schema"],
+  "properties": {
+    "schema": { "const": "clean-aot-game-profile-trace-v1" },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["complete", "dropped_observations", "evidence", "frame_count"],
+      "properties": {
+        "complete": { "type": "boolean" },
+        "dropped_observations": { "type": "integer", "minimum": 0 },
+        "evidence": { "enum": ["synthetic", "authenticated-game"] },
+        "frame_count": { "type": "integer", "minimum": 0, "maximum": 1024 }
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["entry_pc", "exact_frame_count", "exit_pc", "id",
+          "identity_sha256", "observed_frame_count", "observed_once_per_vblank",
+          "verified_once_per_vblank"],
+        "properties": {
+          "entry_pc": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+          "exact_frame_count": { "type": "integer", "minimum": 0 },
+          "exit_pc": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+          "id": { "type": "string", "pattern": "^[a-z0-9._-]+$" },
+          "identity_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "observed_frame_count": { "type": "integer", "minimum": 0 },
+          "observed_once_per_vblank": { "type": "boolean" },
+          "verified_once_per_vblank": { "type": "boolean" }
+        }
+      }
+    },
+    "frames": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["candidates", "cpu_multiplier_denominator",
+          "cpu_multiplier_numerator", "cpu_retirement", "cpu_retirement_total",
+          "frame_index", "native_cd_sectors", "native_cd_total",
+          "native_spu_samples", "native_spu_total", "presentation_count",
+          "presentation_unique_state_count"],
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["entry_count", "entry_state_hash_digest", "exit_count",
+                "exit_state_hash_digest", "id"],
+              "properties": {
+                "entry_count": { "type": "integer", "minimum": 0 },
+                "entry_state_hash_digest": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+                "exit_count": { "type": "integer", "minimum": 0 },
+                "exit_state_hash_digest": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+                "id": { "type": "string", "pattern": "^[a-z0-9._-]+$" }
+              }
+            }
+          },
+          "cpu_multiplier_denominator": { "type": "integer", "minimum": 1 },
+          "cpu_multiplier_numerator": { "type": "integer", "minimum": 1 },
+          "cpu_retirement": { "type": "integer", "minimum": 1 },
+          "cpu_retirement_total": { "type": "integer", "minimum": 1 },
+          "frame_index": { "type": "integer", "minimum": 0 },
+          "native_cd_sectors": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "native_cd_total": { "type": "integer", "minimum": 0 },
+          "native_spu_samples": { "const": 441 },
+          "native_spu_total": { "type": "integer", "minimum": 441 },
+          "presentation_count": { "type": "integer", "minimum": 0 },
+          "presentation_unique_state_count": { "type": "integer", "minimum": 0, "maximum": 16 }
+        }
+      }
+    }
+  }
+}
