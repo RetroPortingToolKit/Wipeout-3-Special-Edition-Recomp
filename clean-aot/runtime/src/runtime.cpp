@@ -781,6 +781,8 @@ struct Runtime::Impl final {
     }
 
     void sample_device_irqs() noexcept {
+        /* Channel 3 DRQ is the live CD data-FIFO level, not a latched event. */
+        (void)soc.dma().set_request(3U, cdrom.data_count() >= 4U);
         if (soc.dma().irq_line()) {
             soc.interrupts().raise(soc::InterruptSource::dma);
         }
@@ -833,6 +835,7 @@ struct Runtime::Impl final {
             if (!succeeded(terminal_status)) {
                 return terminal_status;
             }
+            sample_device_irqs();
             if (!sio0.advance_to(active_native_cycle)) {
                 return Status::DeviceRejected;
             }

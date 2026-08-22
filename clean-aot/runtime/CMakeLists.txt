@@ -68,4 +68,18 @@ if(BUILD_TESTING)
     target_link_libraries(clean_aot_runtime_cfi_tests PRIVATE clean_aot_runtime)
     target_compile_features(clean_aot_runtime_cfi_tests PRIVATE cxx_std_20)
     add_test(NAME clean_aot_runtime_cfi_tests COMMAND clean_aot_runtime_cfi_tests)
+    add_executable(clean_aot_cdrom_bios_sequence_tests
+        tests/cdrom_bios_sequence_tests.cpp)
+    target_link_libraries(clean_aot_cdrom_bios_sequence_tests PRIVATE
+        clean_aot_runtime)
+    target_compile_features(clean_aot_cdrom_bios_sequence_tests PRIVATE cxx_std_20)
+    if(MSVC)
+        target_compile_options(clean_aot_cdrom_bios_sequence_tests PRIVATE
+            /W4 /permissive-)
+    else()
+        target_compile_options(clean_aot_cdrom_bios_sequence_tests PRIVATE
+            -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
+    endif()
+    add_test(NAME clean_aot_cdrom_bios_sequence_tests
+        COMMAND clean_aot_cdrom_bios_sequence_tests)
 endif()
