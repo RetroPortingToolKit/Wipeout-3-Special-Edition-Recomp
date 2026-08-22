@@ -160,6 +160,12 @@ budget, and check immutable replay/snapshot ownership. `state_digest()` covers
 partial transfer headers and queued render snapshots rather than hashing only
 the current register surface.
 
+`FrontEnd` copy construction captures an ownership-complete save-state image,
+and copy assignment restores it transactionally: allocation failure leaves the
+live destination unchanged. Tests resume snapshots taken during CPU-to-VRAM
+payload input, midway through GPUREAD, and inside a polyline, then compare
+pinned native state, VRAM, and queued-event digests.
+
 ## Evidence boundary and unresolved hardware risks
 
 Behavior was independently implemented from hardware-facing documentation and

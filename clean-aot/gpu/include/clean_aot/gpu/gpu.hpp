@@ -418,6 +418,12 @@ class Vram final {
 class FrontEnd final {
  public:
   explicit FrontEnd(GpuRevision revision = GpuRevision::Version2);
+  // Ownership-complete hardware snapshot. Copies include VRAM, partial GP0
+  // parsing, GPUREAD progress, queued events, and all control latches.
+  FrontEnd(const FrontEnd& other);
+  FrontEnd& operator=(const FrontEnd& other);
+  FrontEnd(FrontEnd&&) noexcept = default;
+  FrontEnd& operator=(FrontEnd&&) noexcept = default;
 
   // This deterministic cold reset clears VRAM. Physical power-on VRAM contents
   // are unspecified; callers that model boot hardware must account for that.

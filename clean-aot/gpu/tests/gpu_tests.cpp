@@ -1201,6 +1201,69 @@ void test_backpressure_state_is_transactional() {
           "post-backpressure native packet digest diverged from control");
 }
 
+void test_ownership_complete_snapshot_replay() {
+  FrontEnd live;
+  send(live, 0xe1000123u, "snapshot draw state");
+  send(live, gp0_word(0xa0u), "snapshot partial upload command");
+  send(live, point_word(40u, 50u), "snapshot partial upload destination");
+  send(live, extent_word(3u, 1u), "snapshot partial upload extent");
+  send(live, 0x22221111u, "snapshot partial upload first pair");
+
+  FrontEnd upload_snapshot(live);
+  FrontEnd restored;
+  restored = live;
+  require(upload_snapshot.state_digest() == live.state_digest() &&
+              restored.state_digest() == live.state_digest() &&
+              upload_snapshot.input_phase() == Gp0InputPhase::CpuToVramData,
+          "partial-upload snapshot was not ownership complete");
+  for (FrontEnd* candidate :
+       std::array<FrontEnd*, 3>{&live, &upload_snapshot, &restored}) {
+    send(*candidate, 0x44443333u, "snapshot partial upload final pair");
+  }
+  require(live.state_digest() == upload_snapshot.state_digest() &&
+              live.state_digest() == restored.state_digest() &&
+              live.vram().digest() == upload_snapshot.vram().digest() &&
+              live.vram().digest() == restored.vram().digest(),
+          "partial-upload snapshot replay diverged");
+
+  const auto live_events = drain_event_digests(live);
+  const auto copied_events = drain_event_digests(upload_snapshot);
+  const auto restored_events = drain_event_digests(restored);
+  require(live_events == copied_events && live_events == restored_events,
+          "snapshot did not preserve queued immutable events");
+
+  send(live, gp0_word(0xc0u), "snapshot download command");
+  send(live, point_word(40u, 50u), "snapshot download source");
+  send(live, extent_word(3u, 1u), "snapshot download extent");
+  const auto first = live.read_gpuread();
+  require(first.ready && first.word == 0x22221111u,
+          "snapshot download seed mismatch");
+  FrontEnd download_snapshot(live);
+  const auto live_tail = live.read_gpuread();
+  const auto copied_tail = download_snapshot.read_gpuread();
+  require(live_tail.ready && copied_tail.ready &&
+              live_tail.word == copied_tail.word &&
+              live_tail.valid_halfwords == 1u &&
+              copied_tail.valid_halfwords == 1u &&
+              live.state_digest() == download_snapshot.state_digest(),
+          "active GPUREAD snapshot replay diverged");
+  require(drain_event_digests(live) == drain_event_digests(download_snapshot),
+          "download event snapshot replay diverged");
+
+  send(live, 0x48010203u, "snapshot flat polyline command");
+  send(live, vertex_word(1, 2), "snapshot polyline vertex 0");
+  send(live, vertex_word(3, 4), "snapshot polyline vertex 1");
+  FrontEnd polyline_snapshot(live);
+  send(live, 0x50005000u, "snapshot polyline terminator");
+  send(polyline_snapshot, 0x50005000u, "copied polyline terminator");
+  require(live.state_digest() == polyline_snapshot.state_digest() &&
+              drain_event_digests(live) ==
+                  drain_event_digests(polyline_snapshot),
+          "in-flight polyline snapshot replay diverged");
+  require(live.state_digest() == 3998441259986554230ull,
+          "pinned snapshot replay digest changed");
+}
+
 void test_deterministic_replay() {
   const std::vector<std::uint32_t> stream{0xe1000321u,
                                           0xe2001a2bu,
@@ -1287,6 +1350,8 @@ int main() {
              test_event_payload_budget_and_snapshot_ownership);
     run_test("backpressure_state_is_transactional",
              test_backpressure_state_is_transactional);
+    run_test("ownership_complete_snapshot_replay",
+             test_ownership_complete_snapshot_replay);
     run_test("deterministic_replay", test_deterministic_replay);
   } catch (const std::exception& error) {
     std::cerr << "FAIL " << error.what() << '\n';

@@ -143,6 +143,31 @@ FrontEnd::FrontEnd(GpuRevision revision) {
   power_on_reset();
 }
 
+FrontEnd::FrontEnd(const FrontEnd& other)
+    : control_(other.control_),
+      vram_(std::make_unique<Vram>(*other.vram_)),
+      parser_kind_(other.parser_kind_),
+      expected_words_(other.expected_words_),
+      packet_words_(other.packet_words_),
+      line_builder_(other.line_builder_),
+      upload_builder_(other.upload_builder_),
+      download_words_(other.download_words_),
+      download_final_word_valid_halfwords_(
+          other.download_final_word_valid_halfwords_),
+      download_index_(other.download_index_),
+      events_(other.events_),
+      queued_event_words_(other.queued_event_words_) {}
+
+FrontEnd& FrontEnd::operator=(const FrontEnd& other) {
+  if (this == &other) {
+    return *this;
+  }
+  // Allocate and clone first. A failed snapshot leaves live GPU state intact.
+  FrontEnd snapshot(other);
+  *this = std::move(snapshot);
+  return *this;
+}
+
 void FrontEnd::power_on_reset() noexcept {
   const GpuRevision revision = control_.revision;
   control_ = GpuControlState{};
