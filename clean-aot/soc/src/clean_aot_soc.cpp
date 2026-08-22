@@ -931,6 +931,7 @@ DmaController::DmaController(InterruptController* const interrupt_sink,
 }
 
 void DmaController::reset() noexcept {
+    callback_mutated_ = callback_mutated_ || running_;
     for (ChannelState& current : channel_storage_) {
         current = ChannelState{};
     }
@@ -955,6 +956,7 @@ const DmaController::ChannelState* DmaController::channel(
 SocStatus DmaController::set_callbacks(
     const std::size_t index, const DmaBusCallbacks bus,
     const DmaDeviceCallbacks device) noexcept {
+    callback_mutated_ = callback_mutated_ || running_;
     if (index >= kChannelCount) {
         return SocStatus::invalid_argument;
     }
@@ -979,6 +981,7 @@ DmaChannelRegisters DmaController::registers(
 
 SocStatus DmaController::write_base_address(
     const std::size_t index, const std::uint32_t value) noexcept {
+    callback_mutated_ = callback_mutated_ || running_;
     ChannelState* const current = channel(index);
     if (current == nullptr) {
         return SocStatus::invalid_argument;
@@ -991,6 +994,7 @@ SocStatus DmaController::write_base_address(
 
 SocStatus DmaController::write_block_control(
     const std::size_t index, const std::uint32_t value) noexcept {
+    callback_mutated_ = callback_mutated_ || running_;
     ChannelState* const current = channel(index);
     if (current == nullptr) {
         return SocStatus::invalid_argument;
@@ -1001,6 +1005,7 @@ SocStatus DmaController::write_block_control(
 
 SocStatus DmaController::write_channel_control(
     const std::size_t index, const std::uint32_t value) noexcept {
+    callback_mutated_ = callback_mutated_ || running_;
     ChannelState* const current = channel(index);
     if (current == nullptr) {
         return SocStatus::invalid_argument;
@@ -1042,6 +1047,7 @@ SocStatus DmaController::write_channel_control(
 
 SocStatus DmaController::set_request(const std::size_t index,
                                      const bool asserted) noexcept {
+    callback_mutated_ = callback_mutated_ || running_;
     ChannelState* const current = channel(index);
     if (current == nullptr) {
         return SocStatus::invalid_argument;
@@ -1055,6 +1061,7 @@ std::uint32_t DmaController::read_priority_control() const noexcept {
 }
 
 void DmaController::write_priority_control(const std::uint32_t value) noexcept {
+    callback_mutated_ = callback_mutated_ || running_;
     priority_control_ = value;
 }
 
@@ -1068,6 +1075,7 @@ std::uint32_t DmaController::read_interrupt_control() const noexcept {
 
 void DmaController::write_interrupt_control(
     const std::uint32_t value) noexcept {
+    callback_mutated_ = callback_mutated_ || running_;
     interrupt_flags_ &= ~((value >> 24U) & kDmaChannelMask);
     interrupt_control_ = value & kDmaInterruptControlMask;
     update_irq_line();
@@ -1075,6 +1083,7 @@ void DmaController::write_interrupt_control(
 
 void DmaController::acknowledge_interrupts(
     const std::uint32_t channel_mask) noexcept {
+    callback_mutated_ = callback_mutated_ || running_;
     interrupt_flags_ &= ~(channel_mask & kDmaChannelMask);
     update_irq_line();
 }
@@ -1218,6 +1227,20 @@ bool DmaController::complete(const std::size_t index) noexcept {
 void DmaController::fail(const std::size_t index,
                          const SocStatus status) noexcept {
     ChannelState& current = channel_storage_[index];
+    if (status == SocStatus::callback_rejected) {
+        // The callback may have rewritten any public DMA state. Rebuild a
+        // canonical, snapshot-valid failed channel instead of interpreting or
+        // decrementing fields whose invariants no longer belong to this run.
+        const bool request_asserted = current.request_asserted;
+        current = ChannelState{};
+        current.request_asserted = request_asserted;
+        current.registers.block_control = 1U;
+        current.words_remaining = 1U;
+        current.block_words_remaining = 1U;
+        if (index == kOrderingTableChannel) {
+            current.registers.channel_control = kDmaStepBit;
+        }
+    }
     current.active = false;
     current.completed = false;
     current.error = true;
@@ -1272,8 +1295,12 @@ SocStatus DmaController::read_bus(const std::size_t index,
     if (bus.read_word == nullptr) {
         return SocStatus::malformed_callback;
     }
+    callback_mutated_ = false;
     const DmaCallbackStatus status =
         bus.read_word(bus.context, address & kAddressMask, &value);
+    if (callback_mutated_) {
+        return SocStatus::callback_rejected;
+    }
     switch (status) {
     case DmaCallbackStatus::ok:
         return SocStatus::ok;
@@ -1292,8 +1319,12 @@ SocStatus DmaController::write_bus(const std::size_t index,
     if (bus.write_word == nullptr) {
         return SocStatus::malformed_callback;
     }
+    callback_mutated_ = false;
     const DmaCallbackStatus status =
         bus.write_word(bus.context, address & kAddressMask, value);
+    if (callback_mutated_) {
+        return SocStatus::callback_rejected;
+    }
     switch (status) {
     case DmaCallbackStatus::ok:
         return SocStatus::ok;
@@ -1311,7 +1342,11 @@ SocStatus DmaController::read_device(const std::size_t index,
     if (device.read_word == nullptr) {
         return SocStatus::malformed_callback;
     }
+    callback_mutated_ = false;
     const DmaCallbackStatus status = device.read_word(device.context, &value);
+    if (callback_mutated_) {
+        return SocStatus::callback_rejected;
+    }
     switch (status) {
     case DmaCallbackStatus::ok:
         return SocStatus::ok;
@@ -1329,7 +1364,11 @@ SocStatus DmaController::write_device(const std::size_t index,
     if (device.write_word == nullptr) {
         return SocStatus::malformed_callback;
     }
+    callback_mutated_ = false;
     const DmaCallbackStatus status = device.write_word(device.context, value);
+    if (callback_mutated_) {
+        return SocStatus::callback_rejected;
+    }
     switch (status) {
     case DmaCallbackStatus::ok:
         return SocStatus::ok;
@@ -1652,6 +1691,16 @@ SocStatus DmaController::transfer_one(const std::size_t index,
 
 DmaRunReport DmaController::run(const DmaRunBudget& budget) noexcept {
     DmaRunReport report{};
+    if (running_) {
+        callback_mutated_ = true;
+        report.status = SocStatus::callback_rejected;
+        return report;
+    }
+    running_ = true;
+    struct RunGuard final {
+        bool& running;
+        ~RunGuard() { running = false; }
+    } guard{running_};
     if (budget.max_words == 0U || budget.max_cpu_cycles == 0U) {
         report.status = SocStatus::invalid_argument;
         return report;
@@ -1793,7 +1842,6 @@ SocStatus DmaController::validate_snapshot(
             (snapshot_state.error &&
              (snapshot_state.last_status == SocStatus::ok ||
               snapshot_state.last_status == SocStatus::idle ||
-              snapshot_state.last_status == SocStatus::callback_rejected ||
               snapshot_state.last_status == SocStatus::snapshot_mismatch)) ||
             (!snapshot_state.active && !snapshot_state.completed &&
              !snapshot_state.error &&
@@ -2032,6 +2080,7 @@ SocStatus DmaController::validate_snapshot(
 }
 
 SocStatus DmaController::restore(const DmaSnapshot& state) noexcept {
+    callback_mutated_ = callback_mutated_ || running_;
     const SocStatus validation = validate_snapshot(state);
     if (validation != SocStatus::ok) {
         return validation;

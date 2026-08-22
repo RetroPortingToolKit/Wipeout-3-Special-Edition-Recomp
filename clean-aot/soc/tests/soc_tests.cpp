@@ -176,6 +176,42 @@ DmaDeviceCallbacks device_for(Device& device) noexcept {
     return DmaDeviceCallbacks{&device, read_device, write_device};
 }
 
+enum class ReentrantAction { reset, rewrite, run };
+
+struct ReentrantMemory {
+    DmaController* dma = nullptr;
+    ReentrantAction action = ReentrantAction::reset;
+    std::uint32_t value = 0;
+    SocStatus nested_status = SocStatus::idle;
+};
+
+DmaCallbackStatus read_reentrant_memory(void* const context,
+                                        const std::uint32_t /*address*/,
+                                        std::uint32_t* const value) noexcept {
+    auto* const memory = static_cast<ReentrantMemory*>(context);
+    if (memory == nullptr || memory->dma == nullptr || value == nullptr) {
+        return DmaCallbackStatus::malformed;
+    }
+    *value = memory->value;
+    switch (memory->action) {
+    case ReentrantAction::reset:
+        memory->dma->reset();
+        break;
+    case ReentrantAction::rewrite:
+        memory->nested_status = memory->dma->write_block_control(0U, 7U);
+        break;
+    case ReentrantAction::run:
+        memory->nested_status =
+            memory->dma->run(DmaRunBudget{1U, 1U}).status;
+        break;
+    }
+    return DmaCallbackStatus::ok;
+}
+
+DmaBusCallbacks bus_for(ReentrantMemory& memory) noexcept {
+    return DmaBusCallbacks{&memory, read_reentrant_memory, nullptr};
+}
+
 void enable_dma_interrupt(DmaController& dma,
                           const std::size_t channel) noexcept {
     const std::uint32_t channel_bit = std::uint32_t{1}
@@ -1082,6 +1118,43 @@ void test_dma_dpcr_endpoints_and_reset(TestRunner& runner) {
            reset_device.count == 1U && reset_device.values[0] == 0x55aaU);
 }
 
+void test_dma_reentrant_callbacks_fail_closed(TestRunner& runner) {
+    for (const ReentrantAction action : {ReentrantAction::reset,
+                                         ReentrantAction::rewrite,
+                                         ReentrantAction::run}) {
+        InterruptController interrupts;
+        DmaController dma(&interrupts);
+        ReentrantMemory memory{&dma, action, 0x55aaU, SocStatus::idle};
+        Device device{};
+        EXPECT(runner, dma.set_callbacks(0U, bus_for(memory),
+                                         device_for(device)) == SocStatus::ok);
+        set_priority(dma, 0U, 0U, true);
+        EXPECT(runner, dma.write_base_address(0U, 0xb00U) == SocStatus::ok);
+        EXPECT(runner, dma.write_block_control(0U, 1U) == SocStatus::ok);
+        EXPECT(runner, dma.write_channel_control(
+                           0U, linear_control(true, false, false, 0U)) ==
+                           SocStatus::ok);
+
+        const auto report = dma.run(DmaRunBudget{1U, 2U});
+        EXPECT(runner, report.status == SocStatus::callback_rejected);
+        EXPECT(runner, report.words_transferred == 0U);
+        EXPECT(runner, device.count == 0U);
+        const auto status = dma.channel_status(0U);
+        EXPECT(runner, status.error && !status.active &&
+                           status.last_status == SocStatus::callback_rejected);
+        EXPECT(runner, status.words_remaining !=
+                           std::numeric_limits<std::uint64_t>::max());
+        const auto snapshot = dma.snapshot();
+        EXPECT(runner, dma.validate_snapshot(snapshot) == SocStatus::ok);
+        if (action == ReentrantAction::rewrite) {
+            EXPECT(runner, memory.nested_status == SocStatus::ok);
+        } else if (action == ReentrantAction::run) {
+            EXPECT(runner,
+                   memory.nested_status == SocStatus::callback_rejected);
+        }
+    }
+}
+
 void test_dma_arbitration_and_edges(TestRunner& runner) {
     InterruptController interrupts;
     DmaController dma(&interrupts);
@@ -1865,6 +1938,7 @@ int main() {
     test_native_timing_is_not_retirement_scaled(runner);
     test_dma_registers_and_linear(runner);
     test_dma_dpcr_endpoints_and_reset(runner);
+    test_dma_reentrant_callbacks_fail_closed(runner);
     test_dma_arbitration_and_edges(runner);
     test_dma_start_windows_and_irq_edges(runner);
     test_dma_address_chop_otc(runner);

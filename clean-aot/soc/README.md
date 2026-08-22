@@ -12,6 +12,10 @@ devices. DMA never knows what a graphics, disc, sound, or decompression device
 does. A callback receives one masked, aligned 24-bit word address and must
 return an explicit result. Null callbacks, callback rejection, and malformed
 results become deterministic channel errors rather than undefined behavior.
+Callbacks may inspect controller state, but re-entering `run()` or mutating the
+DMA controller during a callback is rejected deterministically. The outer
+transfer performs no post-callback counter decrement or endpoint side effect
+after such a mutation, preventing reset/rewrite underflow and stale-state use.
 
 The interrupt controller implements latched status, writable mask, explicit
 acknowledge, zero-to-clear status writes, and the CPU-line predicate. DMA uses

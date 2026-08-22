@@ -248,6 +248,10 @@ struct DmaDeviceCallbacks {
     DmaDeviceWriteCallback write_word = nullptr;
 };
 
+// Endpoint callbacks may inspect the controller but must not re-enter run() or
+// mutate DMA state. Such attempts fail the active transfer with
+// SocStatus::callback_rejected before transfer counters are advanced.
+
 enum class DmaSyncMode : std::uint8_t {
     manual = 0,
     request = 1,
@@ -396,6 +400,8 @@ private:
     bool master_irq_line_ = false;
     std::uint32_t max_linked_nodes_ = 4096U;
     std::uint64_t max_linked_words_ = 1'000'000U;
+    bool running_ = false;
+    bool callback_mutated_ = false;
 
     [[nodiscard]] ChannelState* channel(std::size_t index) noexcept;
     [[nodiscard]] const ChannelState* channel(std::size_t index) const noexcept;
