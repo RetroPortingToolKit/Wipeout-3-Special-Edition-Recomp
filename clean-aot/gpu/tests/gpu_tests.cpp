@@ -1147,6 +1147,60 @@ void test_event_payload_budget_and_snapshot_ownership() {
       gpu, "cache flush after payload release event"));
 }
 
+void test_backpressure_state_is_transactional() {
+  const auto fill_to_one_word = [](FrontEnd& gpu) {
+    send(gpu, gp0_word(0xa0u), "transaction pressure upload command");
+    send(gpu, point_word(0u, 0u), "transaction pressure upload destination");
+    send(gpu, extent_word(0u, 0u), "transaction pressure upload extent");
+    constexpr std::size_t kMaximumTransferWords =
+        clean_aot::gpu::kVramWordCount / 2u;
+    for (std::size_t index = 0U; index < kMaximumTransferWords; ++index) {
+      const auto result = gpu.write_gp0(static_cast<std::uint32_t>(index));
+      require(result.accepted, "transaction pressure upload data rejected");
+    }
+    for (std::size_t index = 0U; index < 12U; ++index) {
+      send(gpu, gp0_word(0x01u), "transaction pressure cache flush");
+    }
+  };
+
+  FrontEnd rejected;
+  FrontEnd control;
+  fill_to_one_word(rejected);
+  fill_to_one_word(control);
+  const std::uint32_t status_before = rejected.status();
+
+  send(rejected, 0x24010203u, "rejected textured polygon command");
+  send(rejected, vertex_word(1, 2), "rejected textured vertex 0");
+  send(rejected, 0x00400010u, "rejected textured CLUT");
+  send(rejected, vertex_word(3, 4), "rejected textured vertex 1");
+  send(rejected, 0x01ff0020u, "rejected inline texture page");
+  send(rejected, vertex_word(5, 6), "rejected textured vertex 2");
+  const auto final_word = rejected.write_gp0(0x00000030u);
+  require(!final_word.accepted &&
+              final_word.error == WriteError::EventQueueFull &&
+              rejected.input_phase() == Gp0InputPhase::Command &&
+              rejected.status() == status_before &&
+              rejected.state_digest() == control.state_digest(),
+          "rejected inline texture page escaped transactional backpressure");
+
+  const auto rejected_pressure = drain_event_digests(rejected);
+  const auto control_pressure = drain_event_digests(control);
+  require(rejected_pressure == control_pressure &&
+              rejected.state_digest() == control.state_digest(),
+          "rejected packet contaminated deterministic queue replay");
+
+  send_flat_textured_triangle(rejected, 0x0123u);
+  send_flat_textured_triangle(control, 0x0123u);
+  const PolygonEvent rejected_replay =
+      take_event<PolygonEvent>(rejected, "accepted replay polygon");
+  const PolygonEvent control_replay =
+      take_event<PolygonEvent>(control, "control replay polygon");
+  require(event_digest(Event{rejected_replay}) ==
+              event_digest(Event{control_replay}) &&
+              rejected.state_digest() == control.state_digest(),
+          "post-backpressure native packet digest diverged from control");
+}
+
 void test_deterministic_replay() {
   const std::vector<std::uint32_t> stream{0xe1000321u,
                                           0xe2001a2bu,
@@ -1231,6 +1285,8 @@ int main() {
              test_revision_specific_status_and_readback);
     run_test("event_payload_budget_and_snapshot_ownership",
              test_event_payload_budget_and_snapshot_ownership);
+    run_test("backpressure_state_is_transactional",
+             test_backpressure_state_is_transactional);
     run_test("deterministic_replay", test_deterministic_replay);
   } catch (const std::exception& error) {
     std::cerr << "FAIL " << error.what() << '\n';

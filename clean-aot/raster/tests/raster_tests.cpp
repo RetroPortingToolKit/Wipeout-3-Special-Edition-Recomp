@@ -1375,6 +1375,43 @@ void test_precise_transparency_safe_filtering() {
           "transparent footprint was filtered across a PS1 cutout edge");
 }
 
+void test_texture_page_enhancement_fallback_digest() {
+  PolygonEvent polygon{};
+  polygon.vertex_count = 3U;
+  polygon.textured = true;
+  polygon.raw_texture = true;
+  polygon.state = full_state();
+  polygon.state.draw_mode.x_base = 3U;
+  polygon.state.draw_mode.depth = TextureDepth::Direct15;
+  polygon.vertices[0] = vertex(10, 10);
+  polygon.vertices[1] = vertex(20, 10);
+  polygon.vertices[2] = vertex(10, 20);
+  for (std::size_t index = 0U; index < 3U; ++index) {
+    polygon.texture_coordinates[index] = uv(0U, 0U);
+    polygon.texture_coordinate_present[index] = true;
+    polygon.colors[index] = color(128U, 128U, 128U);
+    polygon.color_present[index] = true;
+  }
+
+  ReferenceRasterizer native;
+  ReferenceRasterizer fallback;
+  const Event texture{upload(VramPoint{192U, 0U}, VramExtent{1U, 1U},
+                             {0x0000001fU})};
+  consume_ok(native, texture);
+  consume_ok(fallback, texture);
+  consume_ok(native, Event{polygon});
+  const auto rejected = fallback.consume_precise_polygon(
+      polygon, std::span<const clean_aot::raster::PreciseVertex>{});
+  require(!rejected.accepted(),
+          "invalid enhancement provenance did not fail closed");
+  consume_ok(fallback, Event{polygon});
+  std::cout << "texture-page fallback digest: 0x" << std::hex
+            << native.digest() << std::dec << '\n';
+  require(native.digest() == fallback.digest() &&
+              native.digest() == 0xa7f630813c888ecdULL,
+          "texture-page enhancement fallback diverged from native digest");
+}
+
 void test_precise_quad_half_open_ownership() {
   ReferenceRasterizer rasterizer;
   rasterizer.reset(0x7c00U);
@@ -1713,6 +1750,7 @@ int main() {
     test_bounds_presentation_and_backend();
     test_adversarial_coordinates_and_budgets();
     test_precise_transparency_safe_filtering();
+    test_texture_page_enhancement_fallback_digest();
     test_precise_quad_half_open_ownership();
     test_precise_near_plane_clipping_contract();
     test_true_color_plane_feedback_contract();

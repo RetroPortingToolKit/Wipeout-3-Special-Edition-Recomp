@@ -402,8 +402,10 @@ WriteResult FrontEnd::finish_fixed() {
   if (opcode == 0x1fu) {
     InterruptRequestEvent event{};
     event.raw_word = packet_words_.front();
-    control_.irq1_pending = true;
     const WriteResult result = enqueue(event);
+    if (result.accepted) {
+      control_.irq1_pending = true;
+    }
     abandon_packet();
     return result;
   }
@@ -473,7 +475,15 @@ WriteResult FrontEnd::finish_fixed() {
       event.clut = decode_clut(event.texture_coordinates[0].upper);
       event.inline_texture_page =
           decode_texture_page_attribute(event.texture_coordinates[1].upper);
+      const DrawModeState previous_draw_mode = control_.render.draw_mode;
       apply_texture_page_attribute(*event.inline_texture_page);
+      event.state = control_.render;
+      const WriteResult result = enqueue(event);
+      if (!result.accepted) {
+        control_.render.draw_mode = previous_draw_mode;
+      }
+      abandon_packet();
+      return result;
     }
     event.state = control_.render;
     const WriteResult result = enqueue(event);
@@ -631,6 +641,7 @@ WriteResult FrontEnd::finish_fixed() {
   if (is_environment_opcode(opcode)) {
     EnvironmentEvent event{};
     event.raw_word = packet_words_[0];
+    const RenderStateSnapshot previous_render = control_.render;
     switch (opcode) {
       case 0xe1u:
         control_.render.draw_mode = decode_draw_mode(
@@ -672,6 +683,9 @@ WriteResult FrontEnd::finish_fixed() {
     }
     event.state = control_.render;
     const WriteResult result = enqueue(event);
+    if (!result.accepted) {
+      control_.render = previous_render;
+    }
     abandon_packet();
     return result;
   }
