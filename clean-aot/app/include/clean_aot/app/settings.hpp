@@ -9,6 +9,8 @@
 
 namespace clean_aot::app {
 
+struct GraphicsConfiguration;
+
 struct RuntimeSettings final {
     std::uint32_t width = 3840U;
     std::uint32_t height = 2160U;
@@ -21,6 +23,7 @@ struct RuntimeSettings final {
     std::uint16_t deadzone_per_mille = 120U;
     bool rumble = true;
     bool pgxp = true;
+    bool pgxp_verified_near_plane = true;
     bool true_color = true;
     bool hd_assets = true;
     bool ultrawide = true;
@@ -28,6 +31,7 @@ struct RuntimeSettings final {
     std::uint8_t card_slots = 2U;
 
     [[nodiscard]] clean_aot::host::SdlVulkanConfig host_config(bool hidden) const noexcept;
+    void apply_graphics_settings(GraphicsConfiguration& graphics) const noexcept;
 };
 
 enum class SettingsStatus : std::uint8_t { loaded, created, reset, upgraded, invalid, io_error };

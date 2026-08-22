@@ -1,4 +1,5 @@
 #include "clean_aot/app/settings.hpp"
+#include "clean_aot/app/graphics.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -23,6 +24,21 @@ int main(){
            "ultrawide setting reaches the host viewport");
     expect(apply_settings_override(loaded.value,"input.deadzone_per_mille=200",override_error)&&loaded.value.deadzone_per_mille==200U,
            "controller deadzone override applies");
+    expect(loaded.value.pgxp_verified_near_plane &&
+           apply_settings_override(loaded.value,"graphics.pgxp_verified_near_plane=off",override_error) &&
+           !loaded.value.pgxp_verified_near_plane,
+           "validated PGXP near-plane policy can be disabled explicitly");
+    GraphicsConfiguration graphics{};
+    loaded.value.apply_graphics_settings(graphics);
+    expect(graphics.pgxp_enabled &&
+           graphics.pgxp_near_plane == PgxpNearPlanePolicy::NativeFallback,
+           "validated disabled near-plane setting reaches live graphics policy");
+    auto legacy_json = runtime_settings_json(RuntimeSettings{});
+    const auto near_field = legacy_json.find(",\"pgxp_verified_near_plane\":true");
+    legacy_json.erase(near_field, std::string_view{",\"pgxp_verified_near_plane\":true"}.size());
+    {std::ofstream legacy(path,std::ios::trunc);legacy<<legacy_json;}
+    expect(load_runtime_settings(path).status == SettingsStatus::loaded,
+           "v2 settings without the additive near-plane field retain safe defaults");
     expect(!apply_settings_override(loaded.value,"audio.max_queued_frames=441",override_error),
            "audio queue cannot be reduced below latency");
     expect(!apply_settings_override(loaded.value,"presentation.rate_hz=60",override_error),"timing override is unavailable");

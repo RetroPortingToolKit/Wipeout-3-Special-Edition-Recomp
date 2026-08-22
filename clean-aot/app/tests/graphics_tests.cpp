@@ -162,6 +162,89 @@ public:
     std::array<psx::render::VertexCandidate, 4U> candidates{};
 };
 
+class CameraPlaneProvenance final : public clean_aot::app::IPolygonProvenanceProvider {
+public:
+    explicit CameraPlaneProvenance(bool verified) : verified_(verified) {}
+    clean_aot::app::ProjectionContract projection_contract() const noexcept override {
+        if (!verified_) return {};
+        // GTE RTPS clamps architectural SZ3 to unsigned positive depth and
+        // divides H/SZ3. PGXP must retain the pre-clamp camera depth in W so a
+        // crossing can be reconstructed instead of inheriting SZ3's zero clamp.
+        return {clean_aot::app::ProjectionWConvention::GtePositiveDepth, true, true};
+    }
+    bool resolve(const clean_aot::gpu::PolygonEvent& event,
+                 clean_aot::app::PolygonProvenanceView& view) noexcept override {
+        if (event.vertex_count != 3U) return false;
+        constexpr std::array<double, 3U> w{-1.0, 2.0, 2.0};
+        for (std::size_t i = 0; i < 3U; ++i) {
+            const psx::render::NativePosition native{event.vertices[i].x,
+                                                     event.vertices[i].y};
+            const auto written = state.write_gte(
+                static_cast<psx::render::GteRegister>(i), native,
+                {static_cast<double>(native.x), static_cast<double>(native.y),
+                 w[i], w[i]});
+            const auto address = 0x800U + static_cast<std::uint32_t>(i) * 4U;
+            const std::uint32_t raw = static_cast<std::uint16_t>(native.x) |
+                (static_cast<std::uint32_t>(static_cast<std::uint16_t>(native.y)) << 16U);
+            if (!state.store_memory(address, raw, written.candidate().enhancement)
+                     .carried_precise()) return false;
+            candidates[i] = state.load_memory(address)->candidate();
+        }
+        view = {candidates, &state};
+        return true;
+    }
+private:
+    bool verified_ = false;
+    psx::render::ProvenanceState state{};
+    std::array<psx::render::VertexCandidate, 3U> candidates{};
+};
+
+void queue_camera_plane_triangle(clean_aot::runtime::Runtime& runtime) {
+    auto& gpu = runtime.gpu();
+    const std::array<std::uint32_t, 6U> words{
+        0xe3000000U, 0xe4000000U | (511U << 10U) | 1023U,
+        0x2000ffffU, (80U << 16U) | 80U, (80U << 16U) | 240U,
+        (240U << 16U) | 80U};
+    for (const auto word : words) expect(gpu.write_gp0(word).accepted,
+                                         "camera-plane GP0 packet accepts");
+}
+
+void test_live_verified_camera_plane_clipping() {
+    using namespace clean_aot;
+    std::vector<std::uint8_t> bios(512U * 1024U, 0U);
+    runtime::Configuration runtime_config{}; runtime_config.bios = bios;
+    runtime::Runtime clipped_runtime(runtime_config), fallback_runtime(runtime_config);
+    queue_camera_plane_triangle(clipped_runtime);
+    queue_camera_plane_triangle(fallback_runtime);
+
+    CameraPlaneProvenance verified(true), unverified(false);
+    app::GraphicsConfiguration config{};
+    config.runtime_scanout = true;
+    config.output_width = 5120U; config.output_height = 2160U;
+    config.presentation = raster::PresentationMode::Generic21x9;
+    config.custom_aspect_width = 21U; config.custom_aspect_height = 9U;
+    config.pgxp_enabled = true;
+    config.pgxp_near_plane = app::PgxpNearPlanePolicy::ClipWhenGtePositiveWVerified;
+    config.provenance_provider = &verified;
+    app::RuntimeGraphics clipped(config);
+    host::HeadlessBackend clipped_host;
+    expect(clipped.positive_w_clipping_active() &&
+           clipped.present(clipped_runtime, clipped_host, 0U).success() &&
+           clipped.precise_primitives() == 1U &&
+           clipped.precise_raster_stats().near_plane_clipped_primitives == 1U &&
+           clipped.visual_receipt().content_width == 5040U &&
+           clipped.visual_receipt().content_height == 2160U,
+           "verified GTE positive-W crossing clips through GP0 to 5K ultrawide");
+
+    config.provenance_provider = &unverified;
+    app::RuntimeGraphics fallback(config);
+    host::HeadlessBackend fallback_host;
+    expect(!fallback.positive_w_clipping_active() &&
+           fallback.present(fallback_runtime, fallback_host, 0U).success() &&
+           fallback.precise_primitives() == 0U && fallback.precise_fallbacks() == 1U,
+           "unverified W convention fails closed to native rasterization");
+}
+
 void test_live_pgxp_projection_pipeline() {
     using namespace clean_aot;
     std::vector<std::uint8_t> bios(512U * 1024U, 0U);
@@ -1083,6 +1166,7 @@ void test_native_png_decode() {
 }
 } // namespace
 int main() {
+    test_live_verified_camera_plane_clipping();
     test_live_pgxp_projection_pipeline();
     test_live_gp0_primitive_compatibility_matrix();
     test_identity_bound_gpu_trace_replay();

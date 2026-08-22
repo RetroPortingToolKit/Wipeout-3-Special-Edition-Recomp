@@ -1,4 +1,5 @@
 #include "clean_aot/app/settings.hpp"
+#include "clean_aot/app/graphics.hpp"
 #include "json.hpp"
 
 #include <fstream>
@@ -58,6 +59,11 @@ bool parse(std::string_view input, RuntimeSettings& value, std::string& error) {
         !boolean(root,"graphics","pgxp",value.pgxp)||!boolean(root,"graphics","true_color",value.true_color)||
         !boolean(root,"graphics","hd_assets",value.hd_assets)||!boolean(root,"saves","atomic",value.atomic_saves)||
         !number(root,"saves","card_slots",cards)) { error="settings field missing or wrong type"; return false; }
+    if (nested(root, "graphics", "pgxp_verified_near_plane") != nullptr &&
+        !boolean(root, "graphics", "pgxp_verified_near_plane",
+                 value.pgxp_verified_near_plane)) {
+        error = "settings field missing or wrong type"; return false;
+    }
     if (width<640||width>7680||height<480||height>4320||rate!=100||latency<441||latency>8192||
         max_frames<latency||max_frames>16384||deadzone>500||cards<1||cards>2||device.empty()||device.size()>256) {
         error="settings value outside safe bounds"; return false;
@@ -95,12 +101,20 @@ host::SdlVulkanConfig RuntimeSettings::host_config(bool hidden) const noexcept {
     result.audio_max_buffer_frames=audio_max_frames; return result;
 }
 
+void RuntimeSettings::apply_graphics_settings(
+    GraphicsConfiguration& graphics) const noexcept {
+    graphics.pgxp_enabled = pgxp;
+    graphics.pgxp_near_plane = pgxp && pgxp_verified_near_plane
+        ? PgxpNearPlanePolicy::ClipWhenGtePositiveWVerified
+        : PgxpNearPlanePolicy::NativeFallback;
+}
+
 std::string runtime_settings_json(const RuntimeSettings& s) {
     return std::string{"{\"audio\":{\"device\":\""}+s.audio_device+"\",\"latency_frames\":"+std::to_string(s.audio_latency_frames)+
         ",\"max_queued_frames\":"+std::to_string(s.audio_max_frames)+"},\"display\":{\"aspect\":\""+(s.ultrawide?"auto-ultrawide":"native-4:3")+
         "\",\"filter\":\""+(s.presentation_filter==host::PresentationFilter::Linear?"linear":"nearest")+"\",\"height\":"+std::to_string(s.height)+
         ",\"mode\":\""+mode(s.fullscreen)+"\",\"width\":"+std::to_string(s.width)+"},\"graphics\":{\"hd_assets\":"+(s.hd_assets?"true":"false")+
-        ",\"pgxp\":"+(s.pgxp?"true":"false")+",\"true_color\":"+(s.true_color?"true":"false")+"},\"input\":{\"deadzone_per_mille\":"+
+        ",\"pgxp\":"+(s.pgxp?"true":"false")+",\"pgxp_verified_near_plane\":"+(s.pgxp_verified_near_plane?"true":"false")+",\"true_color\":"+(s.true_color?"true":"false")+"},\"input\":{\"deadzone_per_mille\":"+
         std::to_string(s.deadzone_per_mille)+",\"rumble\":"+(s.rumble?"true":"false")+"},\"presentation\":{\"policy\":\""+policy(s.present_policy)+
         "\",\"rate_hz\":100},\"saves\":{\"atomic\":"+(s.atomic_saves?"true":"false")+",\"card_slots\":"+std::to_string(s.card_slots)+
         "},\"schema\":\"wipeout3se.runtime-settings.v2\"}\n";
@@ -130,7 +144,7 @@ bool apply_settings_override(RuntimeSettings& s, std::string_view assignment, st
     if(key=="display.aspect") { if(value=="auto-ultrawide")s.ultrawide=true;else if(value=="native-4:3")s.ultrawide=false;else{error="invalid aspect policy";return false;}return true; }
     if(key=="display.filter") { if(value=="linear")s.presentation_filter=host::PresentationFilter::Linear;else if(value=="nearest")s.presentation_filter=host::PresentationFilter::Nearest;else{error="invalid presentation filter";return false;}return true; }
     if(key=="presentation.policy") { if(value=="low-latency-100hz")s.present_policy=host::SdlPresentPolicy::low_latency_100hz;else if(value=="vsync")s.present_policy=host::SdlPresentPolicy::vsync;else if(value=="mailbox")s.present_policy=host::SdlPresentPolicy::mailbox;else{error="invalid present policy";return false;}return true; }
-    if(key=="graphics.pgxp"||key=="graphics.true_color"||key=="graphics.hd_assets"||key=="input.rumble") {bool* target=key=="graphics.pgxp"?&s.pgxp:key=="graphics.true_color"?&s.true_color:key=="graphics.hd_assets"?&s.hd_assets:&s.rumble;if(value=="on")*target=true;else if(value=="off")*target=false;else{error="boolean override must be on/off";return false;}return true;}
+    if(key=="graphics.pgxp"||key=="graphics.pgxp_verified_near_plane"||key=="graphics.true_color"||key=="graphics.hd_assets"||key=="input.rumble") {bool* target=key=="graphics.pgxp"?&s.pgxp:key=="graphics.pgxp_verified_near_plane"?&s.pgxp_verified_near_plane:key=="graphics.true_color"?&s.true_color:key=="graphics.hd_assets"?&s.hd_assets:&s.rumble;if(value=="on")*target=true;else if(value=="off")*target=false;else{error="boolean override must be on/off";return false;}return true;}
     error="unknown settings override"; return false;
 }
 } // namespace clean_aot::app

@@ -57,9 +57,33 @@ struct PolygonProvenanceView final {
     const psx::render::ProvenanceState* state = nullptr;
 };
 
+enum class PgxpNearPlanePolicy : std::uint8_t {
+    NativeFallback,
+    ClipWhenGtePositiveWVerified,
+};
+
+enum class ProjectionWConvention : std::uint8_t {
+    Unverified,
+    GtePositiveDepth,
+};
+
+struct ProjectionContract final {
+    ProjectionWConvention w_convention = ProjectionWConvention::Unverified;
+    bool w_is_unclamped_camera_depth = false;
+    bool screen_xy_are_post_divide = false;
+
+    [[nodiscard]] constexpr bool supports_positive_w_clipping() const noexcept {
+        return w_convention == ProjectionWConvention::GtePositiveDepth &&
+               w_is_unclamped_camera_depth && screen_xy_are_post_divide;
+    }
+};
+
 class IPolygonProvenanceProvider {
 public:
     virtual ~IPolygonProvenanceProvider() = default;
+    [[nodiscard]] virtual ProjectionContract projection_contract() const noexcept {
+        return {};
+    }
     [[nodiscard]] virtual bool resolve(
         const gpu::PolygonEvent& event,
         PolygonProvenanceView& view) noexcept = 0;
@@ -134,6 +158,7 @@ struct GraphicsConfiguration final {
     ReplacementAssetRuntime* replacement_assets = nullptr;
     IReplacementKeyPolicy* replacement_policy = nullptr;
     bool pgxp_enabled = false;
+    PgxpNearPlanePolicy pgxp_near_plane = PgxpNearPlanePolicy::NativeFallback;
     IPolygonProvenanceProvider* provenance_provider = nullptr;
     psx::render::ProjectionPolicy projection =
         psx::render::ProjectionPolicy::PreserveNative4x3;
@@ -335,6 +360,7 @@ public:
     [[nodiscard]] VisualReceipt visual_receipt() const noexcept;
     [[nodiscard]] std::uint64_t precise_primitives() const noexcept;
     [[nodiscard]] std::uint64_t precise_fallbacks() const noexcept;
+    [[nodiscard]] bool positive_w_clipping_active() const noexcept;
     [[nodiscard]] std::uint64_t geometry_digest() const noexcept;
     [[nodiscard]] const raster::PreciseRasterStats& precise_raster_stats()
         const noexcept;
@@ -372,6 +398,7 @@ private:
     std::uint64_t native_fallbacks_ = 0U;
     std::uint64_t policy_invalidation_serial_ = 0U;
     psx::render::ProjectionPlan projection_plan_{};
+    bool positive_w_clipping_active_ = false;
     std::uint64_t precise_primitives_ = 0U;
     std::uint64_t precise_fallbacks_ = 0U;
     std::uint64_t geometry_digest_ = 0U;

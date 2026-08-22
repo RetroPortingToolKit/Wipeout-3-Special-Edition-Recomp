@@ -805,6 +805,13 @@ RuntimeGraphics::RuntimeGraphics(GraphicsConfiguration configuration)
     } else {
         projection_plan_ = projection.plan;
     }
+    positive_w_clipping_active_ =
+        configuration_.pgxp_enabled &&
+        configuration_.pgxp_near_plane ==
+            PgxpNearPlanePolicy::ClipWhenGtePositiveWVerified &&
+        configuration_.provenance_provider != nullptr &&
+        configuration_.provenance_provider->projection_contract()
+            .supports_positive_w_clipping();
     if (configuration_.replacement_policy != nullptr) {
         policy_invalidation_serial_ =
             configuration_.replacement_policy->invalidation_serial();
@@ -911,7 +918,10 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                                         ? raster::PreciseCullingPolicy::NativeHardware
                                             : raster::PreciseCullingPolicy::ProjectedBounds,
                                     configuration_.texture_filter,
-                                    configuration_.precise_color);
+                                    configuration_.precise_color,
+                                    positive_w_clipping_active_
+                                        ? raster::PreciseNearPlanePolicy::ClipPositiveW
+                                        : raster::PreciseNearPlanePolicy::NativeFallback);
                             if (rendered.accepted()) {
                                 consumed_precise = true;
                                 ++precise_primitives_;
@@ -1292,6 +1302,10 @@ std::uint64_t RuntimeGraphics::precise_primitives() const noexcept {
 
 std::uint64_t RuntimeGraphics::precise_fallbacks() const noexcept {
     return precise_fallbacks_;
+}
+
+bool RuntimeGraphics::positive_w_clipping_active() const noexcept {
+    return positive_w_clipping_active_;
 }
 
 std::uint64_t RuntimeGraphics::geometry_digest() const noexcept {
