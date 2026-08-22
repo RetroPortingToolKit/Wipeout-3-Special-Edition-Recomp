@@ -2,7 +2,13 @@ import hashlib
 import struct
 import unittest
 
-from tools.analysis.build_indirect_cfi import CfiError, build
+from tools.analysis.build_indirect_cfi import (
+    CfiError,
+    bounded_table_targets,
+    build,
+    fixed_dispatch_targets,
+    memory_loaded_callback,
+)
 
 
 class IndirectCfiTests(unittest.TestCase):
@@ -54,6 +60,56 @@ class IndirectCfiTests(unittest.TestCase):
         images["main-exe"] = bytes(len(images["main-exe"]))
         with self.assertRaises(CfiError):
             build(authority, shards, images)
+
+    def test_bounded_table_requires_exact_guard_and_authenticated_table(self):
+        base = 0x10000000
+        data = bytearray(0x100)
+        pc = base + 0x20
+        words = [
+            0x2C820003,  # sltiu v0, a0, 3
+            0x10400008,  # beq v0, zero, default
+            0x00042080,  # sll a0, a0, 2
+            0x3C021000,  # lui v0, 0x1000
+            0x00441021,  # addu v0, v0, a0
+            0x8C420080,  # lw v0, 0x80(v0)
+            0x00000000,  # load delay
+            0x00400008,  # jr v0
+        ]
+        for index, raw in enumerate(words):
+            struct.pack_into("<I", data, pc - base - 28 + index * 4, raw)
+        targets = (base + 0x40, base + 0x50, base + 0x60)
+        for index, target in enumerate(targets):
+            struct.pack_into("<I", data, 0x80 + index * 4, target)
+        self.assertEqual(bounded_table_targets(bytes(data), base, pc, 2),
+                         list(targets))
+        data[pc - base - 20] ^= 1
+        self.assertIsNone(bounded_table_targets(bytes(data), base, pc, 2))
+
+    def test_memory_callback_requires_nearest_definition_to_be_lw(self):
+        base = 0x1000
+        data = bytearray(0x40)
+        struct.pack_into("<I", data, 0, 0x8E220010)  # lw v0, 16(s1)
+        self.assertTrue(memory_loaded_callback(bytes(data), base, 0x1008, 2))
+        struct.pack_into("<I", data, 4, 0x24020001)  # addiu v0, zero, 1
+        self.assertFalse(memory_loaded_callback(bytes(data), base, 0x1008, 2))
+
+    def test_fixed_dispatcher_rejects_near_match(self):
+        base = 0x8016FC00
+        pc = 0x8016FD2C
+        data = bytearray(0x200)
+        expected = {
+            0x8016FC48: 0x3C0C8016, 0x8016FC4C: 0x358CF94C,
+            0x8016FC50: 0x3C0D8016, 0x8016FC54: 0x35ADFA70,
+            0x8016FC58: 0x3C0E8017, 0x8016FC5C: 0x35CE0774,
+            0x8016FCA0: 0x01A06021, 0x8016FCB0: 0x01C06021,
+            0x8016FCC4: 0x01A06021, 0x8016FCD4: 0x01A06021,
+        }
+        for address, raw in expected.items():
+            struct.pack_into("<I", data, address - base, raw)
+        self.assertEqual(fixed_dispatch_targets(bytes(data), base, pc, 12),
+                         [0x8016F94C, 0x8016FA70, 0x80170774])
+        struct.pack_into("<I", data, 0x8016FCC4 - base, 0)
+        self.assertIsNone(fixed_dispatch_targets(bytes(data), base, pc, 12))
 
 
 if __name__ == "__main__":

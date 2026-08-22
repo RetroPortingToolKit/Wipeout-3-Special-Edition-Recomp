@@ -126,12 +126,16 @@ deduplication reduces that review frontier to 650 unique payload identities
 without using duplication as evidence that any identity is data. The strict raw
 MIPS ABI-shape scan finds no additional candidate beyond the already-bound NFE
 entry 5, but unknown executable risk remains open rather than treating that scan
-as proof of absence. In addition,
-59 effective indirect sites remain after 46 exact literal A0/B0/C0 vector exits
-and 47 same-epoch bounded callbacks were closed. The remaining sites are
-return-value or unclassified computed-register transfers; no targets were
-inferred for them. A static CFI receipt also binds 955 `JR $ra` sites to finite
-compiled call-continuation universes. Six overlapping-address edges
+as proof of absence. In addition, identity-bound value/set analysis now admits
+51 memory-loaded callbacks and 47 argument callbacks only to the authenticated
+same-image function-entry universe. It recognizes eight exact bounded switch
+tables and one three-target constant dispatcher, but leaves them rejected
+because at least one target at each site is not executable-authorized. One
+computed transfer in an unknown instruction gap also remains rejected. A static
+CFI receipt binds 955 `JR $ra` sites to finite compiled call-continuation
+universes. The resulting closed shards contain 99,367 instructions in 480
+regions (87,323 main-image and 12,044 NFE instructions); unknown identities,
+PCs, and target values still fail closed. Six overlapping-address edges
 are now governed by the authenticated epoch-discriminator contract rather than
 remaining rejected. The direct
 corridor recovery receipt authenticates 1,107 newly admitted instructions in

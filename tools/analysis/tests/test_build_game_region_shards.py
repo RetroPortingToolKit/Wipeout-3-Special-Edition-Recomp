@@ -78,6 +78,28 @@ class GameShardTests(unittest.TestCase):
         with self.assertRaises(ShardError):
             build(authority, self.finite(), cfi)
 
+    def test_finite_cfi_target_must_be_authorized_and_is_precompiled(self):
+        authority = self.authority()
+        authority["images"][0]["unresolved_indirects"] = [{"pc": 0x1008}]
+        import hashlib
+        from tools.analysis.build_game_region_shards import canonical
+        cfi = {"schema": "wo3se.indirect-cfi.v1",
+               "authority_sha256": hashlib.sha256(canonical(authority)).hexdigest(),
+               "universes": [{"id": "main-exe:site-00001008",
+                              "identity_sha256": "a" * 64,
+                              "entries": [0x100C]}],
+               "sites": [{"admit_source": True, "kind": "finite-table",
+                          "source_image": "main-exe", "source_pc": 0x1008,
+                          "source_identity_sha256": "a" * 64,
+                          "universe": "main-exe:site-00001008"}]}
+        result = build(authority, self.finite(), cfi)
+        main = next(x for x in result["images"] if x["name"] == "main-exe")
+        self.assertIn(0x1008, main["entries"])
+        self.assertIn(0x100C, main["entries"])
+        cfi["universes"][0]["entries"] = [0x1010]
+        with self.assertRaises(ShardError):
+            build(authority, self.finite(), cfi)
+
     def test_identity_mismatch_and_zero_output_fail_closed(self):
         finite = self.finite()
         finite["image"]["sha256"] = "c" * 64

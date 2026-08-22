@@ -58,23 +58,37 @@ def build(authority: dict[str, Any], finite: dict[str, Any],
         "nfe-entry5-route-variant": evidence["nfe_route_variant_sha256"],
     }
     cfi_sites: dict[str, set[int]] = {name: set() for name in selected}
+    cfi_targets: dict[tuple[str, int], set[int]] = {}
     if cfi is not None:
         if (cfi.get("schema") != "wo3se.indirect-cfi.v1" or
                 cfi.get("authority_sha256") !=
                 hashlib.sha256(canonical(authority)).hexdigest()):
             raise ShardError("CFI receipt is not bound to this authorization")
+        universes = {row["id"]: row for row in cfi.get("universes", [])}
+        if len(universes) != len(cfi.get("universes", [])):
+            raise ShardError("CFI universe identifiers are not unique")
         for site in cfi.get("sites", []):
             name = site.get("source_image")
             if (name not in selected or site.get("admit_source") is not True or
                     site.get("source_identity_sha256") != identities[name]):
                 raise ShardError("CFI site identity is invalid")
-            if site.get("kind") == "bounded-callback":
+            if site.get("kind") in {"bounded-callback", "bounded-memory-callback",
+                                     "finite-table", "finite-constant-set"}:
                 cfi_sites[name].add(site["source_pc"])
+                if site.get("kind") in {"finite-table", "finite-constant-set"}:
+                    universe = universes.get(site.get("universe"))
+                    if (universe is None or
+                            universe.get("identity_sha256") != identities[name]):
+                        raise ShardError("finite CFI universe identity is invalid")
+                    cfi_targets[(name, site["source_pc"])] = set(universe["entries"])
     if (finite.get("image", {}).get("name") != "main-exe" or
             finite["image"].get("sha256") != identities["main-exe"]):
         raise ShardError("finite-target evidence is not bound to the main image")
 
     nodes = {name: expand(image["authorized_ranges"]) for name, image in selected.items()}
+    for (name, _), targets in cfi_targets.items():
+        if not targets or not targets.issubset(nodes[name]):
+            raise ShardError("finite CFI target is not authorized")
     safe = {name: set(values) for name, values in nodes.items()}
     finite_sites = {item["source"]: set(item["targets"]) for item in finite["sites"]}
     dependencies: dict[tuple[str, int], set[tuple[str, int]]] = {}
@@ -98,6 +112,10 @@ def build(authority: dict[str, Any], finite: dict[str, Any],
                 (edge["target_image"], edge["target"]))
         if name == "main-exe":
             for source, targets in finite_sites.items():
+                dependencies.setdefault((name, source), set()).update(
+                    (name, target) for target in targets)
+        for (source_image, source), targets in cfi_targets.items():
+            if source_image == name:
                 dependencies.setdefault((name, source), set()).update(
                     (name, target) for target in targets)
 

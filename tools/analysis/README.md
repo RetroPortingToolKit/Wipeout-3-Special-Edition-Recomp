@@ -102,7 +102,10 @@ are finite external exits; every other unresolved indirect remains rejected.
 
 `build_indirect_cfi.py` derives finite per-image function-entry and
 call-continuation universes from authenticated callgraph edges intersected with
-the generated shard set. `JR $ra` uses only continuation entries; argument
-callbacks use only same-epoch function entries. Return-value, memory-loaded,
-unclassified computed, and cross-image callbacks require exact trace evidence
-and otherwise remain unresolved.
+the generated shard set. `JR $ra` uses only continuation entries; argument and
+locally proved memory-loaded callbacks use only same-epoch function entries.
+It also recognizes bounded `SLTIU`/indexed-word switch tables and one exact
+constant-set dispatcher, emitting per-site universes only when every target is
+executable-authorized. The shard builder turns those universes into mandatory
+precompiled dependencies. Unknown values, unauthenticated table targets,
+unclassified computed transfers, and cross-image callbacks remain rejected.
