@@ -716,8 +716,10 @@ struct Runtime::Impl final {
     std::size_t audio_count = 0U;
     std::uint64_t produced_audio = 0U;
     bool spu_irq_enabled = false;
-    std::uint64_t crtc_gpu_phase = 0U;
-    std::uint32_t crtc_line_cycle = 0U;
+    VideoClock video_clock = VideoClock::Pal;
+    std::uint64_t crtc_oscillator_phase = 0U;
+    std::uint32_t crtc_line_half_cycle = 0U;
+    std::uint64_t crtc_field_half_cycle = 0U;
     std::uint16_t crtc_line = 0U;
     bool crtc_odd_field = false;
     bool crtc_hblank = true;
@@ -731,7 +733,8 @@ struct Runtime::Impl final {
           sio0(sio::Sio0::Callbacks{&Impl::sio_irq_callback, this}),
           cdda_bridge(this),
           router(this),
-          bus(memory::BusConfig{configuration.bios, &router}) {
+          bus(memory::BusConfig{configuration.bios, &router}),
+          video_clock(configuration.video_clock) {
         const auto requested_capacity =
             configuration.authenticated_region_capacity;
         if (requested_capacity > 0U &&
@@ -743,6 +746,8 @@ struct Runtime::Impl final {
             }
         }
         configured = multiplier_valid && clock.configured() && bus.configured() &&
+                     (video_clock == VideoClock::Pal ||
+                      video_clock == VideoClock::Ntsc) &&
                      copied_epoch_capacity == requested_capacity &&
                      requested_capacity > 0U;
         try {
@@ -789,8 +794,9 @@ struct Runtime::Impl final {
         audio_count = 0U;
         produced_audio = 0U;
         spu_irq_enabled = false;
-        crtc_gpu_phase = 0U;
-        crtc_line_cycle = 0U;
+        crtc_oscillator_phase = 0U;
+        crtc_line_half_cycle = 0U;
+        crtc_field_half_cycle = 0U;
         crtc_line = 0U;
         crtc_odd_field = false;
         crtc_hblank = true;
@@ -804,10 +810,22 @@ struct Runtime::Impl final {
                                                                   : 3413U;
     }
 
-    [[nodiscard]] static std::uint16_t crtc_lines(
+    [[nodiscard]] static std::uint16_t crtc_whole_lines(
         const gpu::DisplayTiming& display) noexcept {
         return display.video_standard == gpu::VideoStandard::Pal ? 314U
                                                                   : 263U;
+    }
+
+    [[nodiscard]] static std::uint64_t crtc_field_half_cycles(
+        const gpu::DisplayTiming& display) noexcept {
+        const std::uint64_t line_cycles = crtc_line_cycles(display);
+        if (!display.interlaced) {
+            return static_cast<std::uint64_t>(crtc_whole_lines(display)) *
+                   line_cycles * 2U;
+        }
+        const std::uint64_t half_lines =
+            display.video_standard == gpu::VideoStandard::Pal ? 625U : 525U;
+        return half_lines * line_cycles;
     }
 
     [[nodiscard]] static std::uint32_t crtc_dot_divider(
@@ -832,31 +850,67 @@ struct Runtime::Impl final {
     }
 
     [[nodiscard]] Status advance_crtc(const std::uint64_t native_delta) noexcept {
-        if (native_delta >
-            (std::numeric_limits<std::uint64_t>::max() - crtc_gpu_phase) / 11U) {
+        constexpr std::uint64_t kOscillatorDenominator = 451'584U;
+        const std::uint64_t oscillator_numerator =
+            video_clock == VideoClock::Pal ? 1'418'758U : 1'431'818U;
+        const std::uint64_t whole_native =
+            native_delta / kOscillatorDenominator;
+        if (whole_native != 0U &&
+            oscillator_numerator >
+                std::numeric_limits<std::uint64_t>::max() / whole_native) {
             return Status::ArithmeticOverflow;
         }
-        const std::uint64_t scaled = native_delta * 11U + crtc_gpu_phase;
-        std::uint64_t gpu_cycles = scaled / 7U;
-        crtc_gpu_phase = scaled % 7U;
-        while (gpu_cycles != 0U) {
+        std::uint64_t half_cycles = whole_native * oscillator_numerator;
+        const std::uint64_t remainder_native =
+            native_delta % kOscillatorDenominator;
+        const std::uint64_t fractional =
+            remainder_native * oscillator_numerator +
+            crtc_oscillator_phase;
+        if (half_cycles > std::numeric_limits<std::uint64_t>::max() -
+                              fractional / kOscillatorDenominator) {
+            return Status::ArithmeticOverflow;
+        }
+        half_cycles += fractional / kOscillatorDenominator;
+        crtc_oscillator_phase = fractional % kOscillatorDenominator;
+        while (half_cycles != 0U) {
             const gpu::DisplayTiming display = gpu.control().display;
             const std::uint32_t line_cycles = crtc_line_cycles(display);
-            if (crtc_line_cycle >= line_cycles) {
+            const std::uint32_t line_half_cycles = line_cycles * 2U;
+            const std::uint64_t field_half_cycles =
+                crtc_field_half_cycles(display);
+            if (crtc_line_half_cycle >= line_half_cycles ||
+                crtc_field_half_cycle >= field_half_cycles) {
                 return Status::DeviceRejected;
             }
-            const std::uint64_t step = std::min<std::uint64_t>(
-                gpu_cycles, line_cycles - crtc_line_cycle);
-            const std::uint32_t old_cycle = crtc_line_cycle;
-            crtc_line_cycle += static_cast<std::uint32_t>(step);
-            gpu_cycles -= step;
+            const std::uint32_t horizontal_start =
+                std::min<std::uint32_t>(display.horizontal_start, line_cycles);
+            const std::uint32_t horizontal_end =
+                std::min<std::uint32_t>(display.horizontal_end, line_cycles);
+            std::uint64_t step = std::min<std::uint64_t>(
+                half_cycles,
+                std::min<std::uint64_t>(
+                    line_half_cycles - crtc_line_half_cycle,
+                    field_half_cycles - crtc_field_half_cycle));
+            if (horizontal_start < horizontal_end) {
+                for (const std::uint32_t boundary :
+                     {horizontal_start * 2U, horizontal_end * 2U}) {
+                    if (crtc_line_half_cycle < boundary) {
+                        step = std::min<std::uint64_t>(
+                            step, boundary - crtc_line_half_cycle);
+                    }
+                }
+            }
+            const std::uint32_t old_half_cycle = crtc_line_half_cycle;
+            crtc_line_half_cycle += static_cast<std::uint32_t>(step);
+            crtc_field_half_cycle += step;
+            half_cycles -= step;
 
             const std::uint32_t divider = crtc_dot_divider(display);
-            const std::uint64_t old_dots = old_cycle / divider;
+            const std::uint64_t old_dots = old_half_cycle / (divider * 2U);
             const std::uint64_t new_dots =
-                crtc_line_cycle == line_cycles
+                crtc_line_half_cycle == line_half_cycles
                     ? crtc_dots_per_line(display)
-                    : crtc_line_cycle / divider;
+                    : crtc_line_half_cycle / (divider * 2U);
             if (new_dots != old_dots &&
                 !soc::succeeded(soc.counters().advance_external_clock(
                     soc::CounterClockSource::dot_clock,
@@ -864,21 +918,17 @@ struct Runtime::Impl final {
                 return Status::DeviceRejected;
             }
 
-            const std::uint32_t horizontal_start =
-                std::min<std::uint32_t>(display.horizontal_start, line_cycles);
-            const std::uint32_t horizontal_end =
-                std::min<std::uint32_t>(display.horizontal_end, line_cycles);
             if (horizontal_start < horizontal_end) {
-                if (crtc_hblank && old_cycle < horizontal_start &&
-                    crtc_line_cycle >= horizontal_start) {
+                if (crtc_hblank && old_half_cycle < horizontal_start * 2U &&
+                    crtc_line_half_cycle >= horizontal_start * 2U) {
                     if (!soc::succeeded(soc.counters().input_edge(
                             soc::CounterEdge::hblank_end, nullptr))) {
                         return Status::DeviceRejected;
                     }
                     crtc_hblank = false;
                 }
-                if (!crtc_hblank && old_cycle < horizontal_end &&
-                    crtc_line_cycle >= horizontal_end) {
+                if (!crtc_hblank && old_half_cycle < horizontal_end * 2U &&
+                    crtc_line_half_cycle >= horizontal_end * 2U) {
                     if (!soc::succeeded(soc.counters().input_edge(
                             soc::CounterEdge::hblank_begin, nullptr))) {
                         return Status::DeviceRejected;
@@ -887,39 +937,40 @@ struct Runtime::Impl final {
                 }
             }
 
-            if (crtc_line_cycle != line_cycles) {
-                continue;
+            const bool line_boundary =
+                crtc_line_half_cycle == line_half_cycles;
+            const bool field_boundary =
+                crtc_field_half_cycle == field_half_cycles;
+            if (line_boundary) {
+                crtc_line_half_cycle = 0U;
+                crtc_line = static_cast<std::uint16_t>(crtc_line + 1U);
+                const std::uint16_t vertical_start = display.vertical_start;
+                const std::uint16_t vertical_end = display.vertical_end;
+                if (crtc_vblank && crtc_line == vertical_start) {
+                    if (!soc::succeeded(soc.counters().input_edge(
+                            soc::CounterEdge::vblank_end, nullptr))) {
+                        return Status::DeviceRejected;
+                    }
+                    crtc_vblank = false;
+                }
+                if (!crtc_vblank && crtc_line == vertical_end) {
+                    if (!soc::succeeded(soc.counters().input_edge(
+                            soc::CounterEdge::vblank_begin, nullptr))) {
+                        return Status::DeviceRejected;
+                    }
+                    crtc_vblank = true;
+                    soc.interrupts().raise(soc::InterruptSource::vblank);
+                }
             }
-            crtc_line_cycle = 0U;
-            crtc_line = static_cast<std::uint16_t>(crtc_line + 1U);
-            const std::uint16_t line_count = crtc_lines(display);
-            if (crtc_line >= line_count) {
+            if (field_boundary) {
+                crtc_field_half_cycle = 0U;
                 crtc_line = 0U;
-                if (display.interlaced) {
-                    crtc_odd_field = !crtc_odd_field;
-                } else {
-                    crtc_odd_field = false;
-                }
+                crtc_odd_field = display.interlaced ? !crtc_odd_field : false;
             }
-            /* Out-of-raster GP1 ranges do not alias back into the field. */
-            const std::uint16_t vertical_start = display.vertical_start;
-            const std::uint16_t vertical_end = display.vertical_end;
-            if (crtc_vblank && crtc_line == vertical_start) {
-                if (!soc::succeeded(soc.counters().input_edge(
-                        soc::CounterEdge::vblank_end, nullptr))) {
-                    return Status::DeviceRejected;
-                }
-                crtc_vblank = false;
-            }
-            if (!crtc_vblank && crtc_line == vertical_end) {
-                if (!soc::succeeded(soc.counters().input_edge(
-                        soc::CounterEdge::vblank_begin, nullptr))) {
-                    return Status::DeviceRejected;
-                }
-                crtc_vblank = true;
-                soc.interrupts().raise(soc::InterruptSource::vblank);
-            }
-            gpu.set_scanout_state(crtc_odd_field, crtc_vblank);
+            const bool gpu_line_bit =
+                display.interlaced ? crtc_odd_field
+                                   : (crtc_line & 1U) != 0U;
+            gpu.set_scanout_state(gpu_line_bit, crtc_vblank);
         }
         return Status::Ok;
     }
@@ -2476,6 +2527,51 @@ std::size_t Runtime::queued_audio_samples() const noexcept {
 
 std::uint64_t Runtime::produced_audio_samples() const noexcept {
     return impl_ != nullptr ? impl_->produced_audio : 0U;
+}
+
+CrtcSnapshot Runtime::crtc_snapshot() const noexcept {
+    if (impl_ == nullptr) {
+        return {};
+    }
+    return CrtcSnapshot{impl_->crtc_oscillator_phase,
+                        impl_->crtc_line_half_cycle,
+                        impl_->crtc_field_half_cycle,
+                        impl_->crtc_line,
+                        impl_->crtc_odd_field,
+                        impl_->crtc_hblank,
+                        impl_->crtc_vblank};
+}
+
+bool Runtime::restore_crtc_snapshot(const CrtcSnapshot& snapshot) noexcept {
+    if (impl_ == nullptr || impl_->in_public_access) {
+        return false;
+    }
+    constexpr std::uint64_t kOscillatorDenominator = 451'584U;
+    const gpu::DisplayTiming display = impl_->gpu.control().display;
+    const std::uint32_t line_half_cycles =
+        Impl::crtc_line_cycles(display) * 2U;
+    const std::uint64_t field_half_cycles =
+        Impl::crtc_field_half_cycles(display);
+    if (snapshot.oscillator_phase >= kOscillatorDenominator ||
+        snapshot.line_half_cycle >= line_half_cycles ||
+        snapshot.field_half_cycle >= field_half_cycles ||
+        snapshot.scanline > Impl::crtc_whole_lines(display) ||
+        (!display.interlaced && snapshot.odd_field)) {
+        return false;
+    }
+    AccessGuard guard(impl_->in_public_access);
+    impl_->crtc_oscillator_phase = snapshot.oscillator_phase;
+    impl_->crtc_line_half_cycle = snapshot.line_half_cycle;
+    impl_->crtc_field_half_cycle = snapshot.field_half_cycle;
+    impl_->crtc_line = snapshot.scanline;
+    impl_->crtc_odd_field = snapshot.odd_field;
+    impl_->crtc_hblank = snapshot.hblank;
+    impl_->crtc_vblank = snapshot.vblank;
+    const bool gpu_line_bit = display.interlaced
+                                  ? snapshot.odd_field
+                                  : (snapshot.scanline & 1U) != 0U;
+    impl_->gpu.set_scanout_state(gpu_line_bit, snapshot.vblank);
+    return true;
 }
 
 std::size_t Runtime::drain_audio(

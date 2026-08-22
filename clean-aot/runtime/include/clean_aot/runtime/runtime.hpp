@@ -152,12 +152,31 @@ struct StereoSample final {
                                      const StereoSample&) noexcept = default;
 };
 
+enum class VideoClock : std::uint8_t {
+    Pal,
+    Ntsc,
+};
+
+struct CrtcSnapshot final {
+    std::uint64_t oscillator_phase = 0;
+    std::uint32_t line_half_cycle = 0;
+    std::uint64_t field_half_cycle = 0;
+    std::uint16_t scanline = 0;
+    bool odd_field = false;
+    bool hblank = true;
+    bool vblank = true;
+
+    friend constexpr bool operator==(const CrtcSnapshot&,
+                                     const CrtcSnapshot&) noexcept = default;
+};
+
 struct Configuration final {
     /* Copied into immutable machine-owned storage during construction. */
     std::span<const std::uint8_t> bios{};
     machine::VBlankRate initial_vblank_rate = machine::VBlankRate::Hz100;
     std::uint64_t cpu_multiplier_numerator = 1;
     std::uint64_t cpu_multiplier_denominator = 1;
+    VideoClock video_clock = VideoClock::Pal;
     /* Optional caller-owned media endpoint. No media bytes are retained. */
     cdrom::RawSectorSource* disc_source = nullptr;
     const cdrom::DiscLayout* disc_layout = nullptr;
@@ -282,6 +301,9 @@ public:
     [[nodiscard]] bool cpu_interrupt_line() const noexcept;
     [[nodiscard]] std::size_t queued_audio_samples() const noexcept;
     [[nodiscard]] std::uint64_t produced_audio_samples() const noexcept;
+    [[nodiscard]] CrtcSnapshot crtc_snapshot() const noexcept;
+    [[nodiscard]] bool restore_crtc_snapshot(
+        const CrtcSnapshot& snapshot) noexcept;
     /* Removes up to destination.size() oldest samples; never blocks. */
     [[nodiscard]] std::size_t drain_audio(
         std::span<StereoSample> destination) noexcept;
