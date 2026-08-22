@@ -36,6 +36,7 @@ class ReleaseReadinessTests(unittest.TestCase):
             self.assertIn("authenticated-media-execution", failed)
             self.assertIn("graphics-feature-matrix", failed)
             self.assertIn("current-product-performance-soak", failed)
+            self.assertIn("memory-card-persistence-recovery", failed)
             passed = {item["name"] for item in first["gates"] if item["status"] == "pass"}
             self.assertIn("deterministic-receipt-integrity", passed)
 

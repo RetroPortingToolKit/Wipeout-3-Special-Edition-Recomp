@@ -57,6 +57,19 @@ int main() {
         !std::equal(marker.begin(), marker.end(), reloaded.bytes().begin() + 127U * 1024U)) return 11;
     const std::array<std::uint8_t, 2> overflow{};
     if (reloaded.write(clean_aot::app::kMemoryCardBytes - 1U, overflow)) return 12;
+    const std::array<std::uint8_t, 1> second_marker{0x7eU};
+    if (!reloaded.write(126U * 1024U, second_marker) || !reloaded.flush()) return 13;
+    if (!std::filesystem::exists(path.string() + ".bak")) return 14;
+    {
+        std::fstream corrupt(path, std::ios::binary | std::ios::in | std::ios::out);
+        const char bad = 0;
+        corrupt.seekp(0); corrupt.write(&bad, 1); corrupt.flush();
+    }
+    clean_aot::app::MemoryCard recovered;
+    if (!recovered.load_or_create(path) || recovered.bytes()[0] != 0x4dU) return 15;
+    const auto unicode_path = root / "\u4fdd\u5b58" / "card2.mcd";
+    clean_aot::app::MemoryCard unicode_card;
+    if (!unicode_card.load_or_create(unicode_path) || !unicode_card.flush()) return 16;
     std::filesystem::remove_all(root, ignored);
     std::cout << "clean_aot_memory_card_tests: all checks passed\n";
     return 0;

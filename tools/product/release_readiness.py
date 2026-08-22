@@ -192,6 +192,32 @@ def audit_release_readiness(package: Path, evidence_root: Path,
          "4K/ultrawide/PGXP/true-color/filter/HD matrix passes" if graphics_ok else
          "no complete product-bound graphics matrix receipt")
 
+    persistence_path = product / "persistence-acceptance.json"
+    persistence = _load(persistence_path) or {}
+    persistence_cards = persistence.get("cards", {})
+    persistence_ok = (
+        persistence.get("schema") == "wipeout3se.clean-aot.persistence-acceptance.v1" and
+        persistence.get("status") == "passed" and
+        persistence.get("package_manifest_sha256") == structural.get("manifest_sha256") and
+        persistence.get("runtime_executable_sha256") == _sha(executable) and
+        persistence.get("persistence_model") == "dual-128k-memory-cards-only" and
+        persistence.get("emulator_save_states") is False and
+        persistence.get("save_state_leaks") == [] and
+        persistence_cards.get("slots") == 2 and
+        persistence_cards.get("bytes_each") == 128 * 1024 and
+        persistence_cards.get("transactional_replace") is True and
+        persistence_cards.get("backup_rotation_depth") == 2 and
+        persistence_cards.get("corruption_detection") is True and
+        persistence_cards.get("automatic_recovery") is True and
+        persistence.get("install", {}).get("unicode_path") is True and
+        persistence.get("upgrade", {}).get("cards_preserved") is True and
+        persistence.get("rollback", {}).get("cards_preserved") is True and
+        persistence.get("scripted_input", {}).get("rate_hz") == 100 and
+        persistence.get("scripted_input", {}).get("scenario_count") == 64)
+    gate("memory-card-persistence-recovery", persistence_ok, [persistence_path],
+         "dual cards pass transactional, corruption, recovery, Unicode, upgrade, and rollback acceptance"
+         if persistence_ok else "no current product-bound dual-card persistence acceptance")
+
     config = _load(package / "policy" / "default-config.json") or {}
     boundary_ok = (config.get("schema") == "wipeout3se.runtime-settings.v2" and
                    config.get("saves", {}).get("atomic") is True and

@@ -33,6 +33,7 @@ if __package__ in {None, ""}:
     from content_coverage import build_content_coverage_ledger  # type: ignore[import-not-found]
     from behavioral_runner import (build_scenario_plan,
                                    run_behavioral_scenarios)  # type: ignore[import-not-found]
+    from persistence_acceptance import run_persistence_acceptance  # type: ignore[import-not-found]
 else:
     from .pipeline import (
         DEFAULT_MEDIA_MANIFEST,
@@ -53,6 +54,7 @@ else:
     from .release_readiness import audit_release_readiness, write_readiness_receipt
     from .content_coverage import build_content_coverage_ledger
     from .behavioral_runner import build_scenario_plan, run_behavioral_scenarios
+    from .persistence_acceptance import run_persistence_acceptance
 
 
 def _common_media(parser: argparse.ArgumentParser) -> None:
@@ -212,6 +214,12 @@ def _build_parser() -> argparse.ArgumentParser:
     behavior_run.add_argument("--route", action="append", default=[])
     behavior_run.add_argument("--timeout-seconds", type=float, default=120.0)
     behavior_run.add_argument("--receipt", type=Path, required=True)
+    persistence = subparsers.add_parser(
+        "persistence-acceptance", help="exercise dual-card durability and recovery boundaries")
+    persistence.add_argument("--package", type=Path, required=True)
+    persistence.add_argument("--memory-card-test", type=Path, required=True)
+    persistence.add_argument("--policy", type=Path, required=True)
+    persistence.add_argument("--receipt", type=Path, required=True)
     installer = subparsers.add_parser("package-installer", help="create the two-stage offline installer")
     installer.add_argument("--setup-exe", type=Path, required=True)
     installer.add_argument("--runtime-payload", type=Path, required=True)
@@ -356,6 +364,10 @@ def main(argv: list[str] | None = None) -> int:
                 package=args.package, policy_path=args.policy,
                 media_manifest_path=args.media_manifest, routes=args.route,
                 timeout_seconds=args.timeout_seconds, receipt_path=args.receipt)
+        elif args.command == "persistence-acceptance":
+            document = run_persistence_acceptance(
+                package=args.package, memory_card_test=args.memory_card_test,
+                policy_path=args.policy, receipt_path=args.receipt)
         elif args.command == "package-installer":
             document = create_installer(setup_exe=args.setup_exe,
                 runtime_payload=args.runtime_payload, setup_payload=_artifacts(args.setup_payload),

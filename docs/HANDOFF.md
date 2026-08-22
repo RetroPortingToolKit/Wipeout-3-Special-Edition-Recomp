@@ -1,5 +1,19 @@
 # Handoff
 
+## Memory-card persistence and recovery acceptance (2026-08-22)
+
+- Setup now creates canonical formatted 128-KiB PS1 images for both card slots.
+  The native card host transactionally replaces dirty images, rotates two
+  backups, detects malformed header/directory frames, and recovers the newest
+  valid generation. Unicode paths and bounded writes are covered natively.
+- Product acceptance binds native proof to the installed package, preserves
+  both exact card hashes through real setup upgrade/rollback functions, checks
+  all 64 scripted scenarios remain at 100 Hz, and rejects save-state material.
+  This is memory-card persistence only; no emulator save states were added.
+- `memory-card-persistence-recovery` passes. Overall readiness remains blocked
+  only by direct game execution, behavioral-route execution, and authenticated
+  media execution.
+
 ## Behavioral route verification harness (2026-08-22)
 
 - The product tooling now derives a deterministic 64-route scripted-input plan

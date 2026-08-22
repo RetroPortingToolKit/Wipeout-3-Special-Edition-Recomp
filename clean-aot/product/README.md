@@ -345,3 +345,22 @@ At the current BIOS frontier the executable produces no eligible observation,
 the command exits nonzero, and no execution receipt is written. Synthetic
 harness fixtures test the protocol and hash verifier but are never accepted as
 product evidence.
+
+Gameplay persistence is limited to two standard 128-KiB PlayStation memory-card
+images. Setup creates canonical formatted cards rather than blank files. Runtime
+flushes use write-and-sync replacement, rotate two recovery generations, reject
+invalid header/directory checksums, and restore the newest valid backup. No
+emulator save-state or runtime snapshot format is defined or packaged.
+
+The product-bound acceptance lane runs the native card implementation, creates
+both cards below a Unicode user-data path, preserves their exact hashes through
+setup upgrade and rollback, scans the package for save-state material, and
+binds the result to the installed executable and 100-Hz behavioral plan:
+
+```powershell
+python tools/product/build_product.py persistence-acceptance `
+  --package build-product-runtime-135829 `
+  --memory-card-test build-app-input-save/clean_aot_memory_card_tests.exe `
+  --policy clean-aot/product/content-coverage-policy.json `
+  --receipt clean-aot/product/evidence/persistence-acceptance.json
+```

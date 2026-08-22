@@ -156,6 +156,23 @@ def _atomic_write(path: Path, data: bytes) -> None:
     os.replace(temporary, path)
 
 
+def _new_memory_card() -> bytes:
+    """Return the canonical formatted 128-KiB PS1 memory-card image."""
+    image = bytearray(b"\xff" * CARD_SIZE)
+    def frame(index: int, prefix: bytes) -> None:
+        offset = index * 128
+        image[offset:offset + 128] = bytes(128)
+        image[offset:offset + len(prefix)] = prefix
+        checksum = 0
+        for byte in image[offset:offset + 127]: checksum ^= byte
+        image[offset + 127] = checksum
+    frame(0, b"MC")
+    for index in range(1, 16): frame(index, b"\xa0" + bytes(7) + b"\xff\xff")
+    for index in range(16, 36): frame(index, b"\xff\xff\xff\xff")
+    image[63 * 128:64 * 128] = image[0:128]
+    return bytes(image)
+
+
 def initialize_install(package: Path, user_data: Path) -> dict[str, Any]:
     """Create durable per-user state without asserting that media is authorized."""
     validation = validate_release(package)
@@ -184,7 +201,7 @@ def initialize_install(package: Path, user_data: Path) -> dict[str, Any]:
     for slot in (1, 2):
         card = user_data / "saves" / f"card{slot}.mcd"
         if not card.exists():
-            _atomic_write(card, bytes(CARD_SIZE))
+            _atomic_write(card, _new_memory_card())
         if card.is_symlink() or card.stat().st_size != CARD_SIZE:
             raise ReleaseError(f"memory card slot {slot} is malformed")
     receipt = {
