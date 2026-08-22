@@ -479,7 +479,17 @@ link_lobby = true
 # extracted from j-target scans of the captured patched-text regions.
 [[overlays]]
 load_addr = "0x80780000"
-bytes_crc = "0x8B994BAE"
+# CRC of the ntscfull8 engine payload actually captured. This gate is what
+# binds the entry list below to the image; a stale value silently detaches it,
+# compile_overlays reports "seeds: 0 / 80780000 excluded: OBSERVED_PC_ONLY",
+# no shard is ever emitted, and the whole enhancement engine interprets
+# forever — 11.9M interpreted dispatches in one session, with the interpreter's
+# last guard yield sitting inside 0x80781xxx on both link crashes. Was
+# 0x8B994BAE (a different build of the payload); the 46 entries below were
+# re-derived from this image by j/jal-target scan and matched all 46 exactly,
+# so only the gate was wrong. Re-derive both together if the package version
+# or `build` option changes.
+bytes_crc = "0xFE3CBD88"
 entries = [
     "0x80780000",
     "0x80780568",
