@@ -248,6 +248,8 @@ void test_direct_decoder_control_classes() {
         0x00000000U, encode_beq(-2));
     require(wrapped_branch.direct_target == 0xfffffffcU,
             "negative branch displacement must wrap in the 32-bit guest space");
+    const auto bc2t=clean_aot::compiler::decode_instruction(0x00001000U,(0x12U<<26U)|(0x08U<<21U)|(1U<<16U)|1U);
+    require(bc2t.kind==InstructionKind::ConditionalBranch&&bc2t.has_delay_slot&&bc2t.direct_target==0x00001008U,"BC2T must retain its direct conditional edge and delay slot");
 }
 
 Region make_trampoline_region() {

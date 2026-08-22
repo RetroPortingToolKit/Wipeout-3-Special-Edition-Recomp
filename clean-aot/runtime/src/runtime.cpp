@@ -493,6 +493,7 @@ struct Runtime::Impl final {
     std::uint64_t generated_memory_writes = 0U;
     std::uint64_t generated_device_reads = 0U;
     std::uint64_t generated_device_writes = 0U;
+    std::uint32_t last_bios_instruction_count = 0U;
 
     static bool generated_write32(void* context, std::uint32_t address,
                                   std::uint32_t value) noexcept {
@@ -1690,6 +1691,7 @@ Status Runtime::reset() noexcept {
     impl_->generated_memory_writes = 0U;
     impl_->generated_device_reads = 0U;
     impl_->generated_device_writes = 0U;
+    impl_->last_bios_instruction_count = 0U;
     impl_->generated_cpu = GeneratedCpuState{};
     impl_->executable_loaded = false;
     impl_->sample_device_irqs();
@@ -1747,6 +1749,7 @@ DispatchStatus Runtime::dispatch_bios() noexcept {
     impl_->bios_cpu.cop0_cause=(impl_->bios_cpu.cop0_cause&~0x0000FC00U)|((static_cast<std::uint32_t>(impl_->interrupt_lines)<<10U)&0x0000FC00U);
     impl_->active_generated_cpu=&impl_->bios_cpu;
     const auto result=dispatcher->dispatch(impl_->bios_cpu);
+    impl_->last_bios_instruction_count = dispatcher->last_instruction_count();
     impl_->active_generated_cpu=nullptr;
     if(result==DispatchStatus::Executed)(void)impl_->advance_to(impl_->bios_cpu.issue_cycle);
     return result;
@@ -1772,7 +1775,7 @@ std::uint32_t Runtime::bios_pc() const noexcept {
 }
 
 std::uint32_t Runtime::last_bios_instruction_count() const noexcept {
-    return impl_ != nullptr ? impl_->bios_dispatcher.last_instruction_count() : 0U;
+    return impl_ != nullptr ? impl_->last_bios_instruction_count : 0U;
 }
 
 Runtime::GeneratedExecutionSnapshot Runtime::bios_execution_snapshot() const noexcept {

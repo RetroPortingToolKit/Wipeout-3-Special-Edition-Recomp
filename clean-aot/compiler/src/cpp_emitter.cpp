@@ -75,6 +75,8 @@ void write_semantic(std::ostringstream& out, const Instruction& instruction) {
     else if(op==0x2aU)out<<"        cpu_ops::swl(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u));\n"<<std::dec;
     else if(op==0x2bU)out<<"        cpu_ops::sw(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u));\n"<<std::dec;
     else if(op==0x2eU)out<<"        cpu_ops::swr(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u));\n"<<std::dec;
+    else if(op==0x32U)out<<"        cpu_ops::lwc2(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u));\n"<<std::dec;
+    else if(op==0x3aU)out<<"        cpu_ops::swc2(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u));\n"<<std::dec;
     else if(op==0x10U&&rs==0U)out<<"        cpu_ops::mfc0(state,"<<rt<<","<<rd<<");\n";
     else if(op==0x10U&&rs==4U)out<<"        cpu_ops::mtc0(state,"<<rt<<","<<rd<<");\n";
     else if(raw==0x42000010U)out<<"        cpu_ops::rfe(state);\n";
@@ -250,6 +252,7 @@ std::string CppEmitter::emit(const Region& region) {
             else if (opcode == 0x07U) output << "cpu_ops::s(state.gpr["<<rs<<"]) > 0";
             else if (opcode == 0x01U && (((raw >> 16U) & 1U) == 0U)) output << "cpu_ops::s(state.gpr["<<rs<<"]) < 0";
             else if (opcode == 0x01U) output << "cpu_ops::s(state.gpr["<<rs<<"]) >= 0";
+            else if (opcode == 0x12U) output << ((((raw>>16U)&1U)!=0U)?"state.cop2_condition":"!state.cop2_condition");
             else output << "false";
             output << ";\n        state.pc = state.branch_taken ? ";
             write_address(output, *taken->target);

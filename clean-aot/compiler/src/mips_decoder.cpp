@@ -63,6 +63,11 @@ Instruction decode_instruction(GuestAddress address, std::uint32_t raw) {
         instruction.has_delay_slot = true;
         instruction.direct_target = branch_target(address, raw);
         return instruction;
+    case 0x12U:
+        if(((raw>>21U)&0x1fU)==0x08U&&(((raw>>16U)&0x1fU)==0U||((raw>>16U)&0x1fU)==1U)){
+            instruction.kind=InstructionKind::ConditionalBranch;instruction.has_delay_slot=true;instruction.direct_target=branch_target(address,raw);return instruction;
+        }
+        break;
     default:
         break;
     }
