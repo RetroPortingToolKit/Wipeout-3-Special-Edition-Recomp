@@ -33,6 +33,7 @@ add_library(clean_aot_app STATIC
     src/application.cpp
     src/authorization.cpp
     src/bootstrap.cpp
+    src/controller_input.cpp
     src/disc_source.cpp
     src/graphics.cpp
     src/json.cpp
@@ -114,6 +115,10 @@ if(CLEAN_AOT_APP_BUILD_TESTS AND BUILD_TESTING)
     target_link_libraries(clean_aot_memory_card_tests PRIVATE clean_aot_app)
     clean_aot_app_warnings(clean_aot_memory_card_tests)
     add_test(NAME clean_aot_memory_card_tests COMMAND clean_aot_memory_card_tests)
+    add_executable(clean_aot_controller_input_tests tests/controller_input_tests.cpp)
+    target_link_libraries(clean_aot_controller_input_tests PRIVATE clean_aot_app)
+    clean_aot_app_warnings(clean_aot_controller_input_tests)
+    add_test(NAME clean_aot_controller_input_tests COMMAND clean_aot_controller_input_tests)
     add_executable(clean_aot_app_graphics_tests tests/graphics_tests.cpp)
     target_link_libraries(clean_aot_app_graphics_tests PRIVATE clean_aot_app)
     clean_aot_app_warnings(clean_aot_app_graphics_tests)

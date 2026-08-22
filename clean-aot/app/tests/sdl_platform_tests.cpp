@@ -39,6 +39,14 @@ int main() {
         std::cerr << "SDL bounded input/event pump failed\n";
         return 1;
     }
+    if (controller.sample_index != 0U) return 1;
+    for (std::uint64_t sample = 1U; sample < 3600U; ++sample) {
+        if (!platform.pump(controller, quit) || quit ||
+            controller.sample_index != sample) {
+            std::cerr << "100 Hz input sample sequence drifted\n";
+            return 1;
+        }
+    }
     std::array<std::int16_t,
                clean_aot::host::kAudioFramesPerUpdate *
                    clean_aot::host::kAudioChannels> silence{};
