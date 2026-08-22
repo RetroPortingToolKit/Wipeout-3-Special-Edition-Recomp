@@ -133,13 +133,15 @@ python tools/product/build_product.py package `
   --sdl build-release/SDL3.dll `
   --artifact regions/main.native=build-release/main.native `
   --root . `
-  --source clean-aot/app `
-  --source clean-aot/runtime `
-  --source clean-aot/host `
+  --source build-policy/shipping-sources `
   --link-map build-release/Wipeout3SE.map `
-  --allowlist clean-aot/product/cleanroom_allowlist.json `
+  --allowlist build-policy/shipping-source-allowlist.json `
   --output dist/Wipeout3SE
 ```
+
+The source list and its exact allowlist are release-build artifacts matching
+the final link graph. Passing broad source trees or the analysis-stage product
+allowlist fails closed on unreviewed architecture constants and stale records.
 
 The package contains only the application, SDL runtime, declared generated
 clean artifacts, a hash manifest, a one-time first-run setup contract, and

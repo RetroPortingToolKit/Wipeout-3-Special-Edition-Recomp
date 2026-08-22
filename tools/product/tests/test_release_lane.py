@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import shutil
 import sys
 import tempfile
@@ -26,6 +26,15 @@ class ReleaseLaneTests(unittest.TestCase):
         self.source = self.root / "src" / "shipping.cpp"
         self.source.write_text("int shipping_entry() { return 0; }\n", encoding="utf-8")
         self.link_map = self.root / "build" / "release.map"
+        self._write_good_link_map()
+        self.app = self.root / "build" / "app.exe"
+        self.sdl = self.root / "build" / "SDL3.dll"
+        self.artifact = self.root / "build" / "generated-native.dat"
+        self.app.write_bytes(b"MZ synthetic clean app")
+        self.sdl.write_bytes(b"MZ synthetic SDL runtime")
+        self.artifact.write_bytes(b"generated native region")
+
+    def _write_good_link_map(self) -> None:
         self.link_map.write_text(
             " Timestamp is 00000000 (Thu Jan  1 00:00:00 1970)\n"
             " Preferred load address is 0000000140000000\n"
@@ -35,12 +44,6 @@ class ReleaseLaneTests(unittest.TestCase):
             " 0001:00000000 shipping_entry 0000000140001000 f app.obj\n",
             encoding="utf-8",
         )
-        self.app = self.root / "build" / "app.exe"
-        self.sdl = self.root / "build" / "SDL3.dll"
-        self.artifact = self.root / "build" / "generated-native.dat"
-        self.app.write_bytes(b"MZ synthetic clean app")
-        self.sdl.write_bytes(b"MZ synthetic SDL runtime")
-        self.artifact.write_bytes(b"generated native region")
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -107,17 +110,9 @@ class ReleaseLaneTests(unittest.TestCase):
             create_release(
                 app=self.app, sdl=self.sdl, artifacts=[], output=self.root / "bad-map",
                 root=self.root, link_map=self.link_map, sources=[self.source])
-        self.setUp_link_map()
+        self._write_good_link_map()
 
-    def setUp_link_map(self) -> None:
-        self.link_map.write_text(
-            " Timestamp is 00000000 (Thu Jan  1 00:00:00 1970)\n"
-            " Preferred load address is 0000000140000000\n"
-            " Start         Length     Name                   Class\n"
-            " 0001:00000000 00000010H .text CODE\n"
-            " Address         Publics by Value              Rva+Base       Lib:Object\n"
-            " 0001:00000000 shipping_entry 0000000140001000 f app.obj\n",
-            encoding="utf-8")
+    def test_profile_hash_leakage_fails_closed(self) -> None:
         profile = self.root / "profile.json"
         profile.write_text(json.dumps({"bios": {"sha256": hashlib.sha256(
             self.artifact.read_bytes()).hexdigest()}}), encoding="utf-8")
