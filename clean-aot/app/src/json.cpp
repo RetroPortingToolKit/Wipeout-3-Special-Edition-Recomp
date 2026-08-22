@@ -9,6 +9,7 @@ const JsonObject* Json::object() const noexcept { return std::get_if<JsonObject>
 const JsonArray* Json::array() const noexcept { return std::get_if<JsonArray>(&value); }
 const std::string* Json::string() const noexcept { return std::get_if<std::string>(&value); }
 const std::uint64_t* Json::number() const noexcept { return std::get_if<std::uint64_t>(&value); }
+const bool* Json::boolean() const noexcept { return std::get_if<bool>(&value); }
 
 namespace {
 class Parser final {
@@ -72,7 +73,7 @@ private:
         while (position_ < input_.size()) {
             const unsigned char c = static_cast<unsigned char>(input_[position_++]);
             if (c == '"') return true;
-            if (c < 0x20U || c >= 0x80U) return fail("JSON strings must be printable ASCII");
+            if (c < 0x20U) return fail("JSON strings must not contain controls");
             if (c != '\\') { out.push_back(static_cast<char>(c)); continue; }
             if (position_ >= input_.size()) return fail("truncated JSON escape");
             const char escaped = input_[position_++];

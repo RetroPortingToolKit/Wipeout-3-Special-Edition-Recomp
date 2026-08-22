@@ -22,6 +22,7 @@ struct Json final {
     [[nodiscard]] const JsonArray* array() const noexcept;
     [[nodiscard]] const std::string* string() const noexcept;
     [[nodiscard]] const std::uint64_t* number() const noexcept;
+    [[nodiscard]] const bool* boolean() const noexcept;
 };
 
 [[nodiscard]] bool parse_json(std::string_view text, Json& result,

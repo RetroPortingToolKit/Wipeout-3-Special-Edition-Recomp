@@ -25,7 +25,8 @@ class ReleaseError(RuntimeError):
 
 SCHEMA = "wipeout3se.clean-aot.release.v1"
 SETUP_SCHEMA = "wipeout3se.clean-aot.first-run-setup.v1"
-CONFIG_SCHEMA = "wipeout3se.clean-aot.config.v1"
+CONFIG_SCHEMA = "wipeout3se.runtime-settings.v2"
+LEGACY_CONFIG_SCHEMA = "wipeout3se.clean-aot.config.v1"
 INSTALL_SCHEMA = "wipeout3se.clean-aot.install.v1"
 CARD_SIZE = 128 * 1024
 FORBIDDEN_NAMES = (
@@ -116,21 +117,22 @@ def default_setup_contract(executable_name: str) -> dict[str, Any]:
 def default_config() -> dict[str, Any]:
     return {
         "schema": CONFIG_SCHEMA,
-        "save": {"root": "${USER_DATA}/Wipeout3SE/saves", "card_slots": 2,
-                 "atomic_replace": True},
-        "input": {"profile": "modern-gamepad", "deadzone": 0.12,
+        "saves": {"card_slots": 2, "atomic": True},
+        "input": {"profile": "modern-gamepad",
+                  "deadzone_per_mille": 120, "rumble": True,
                   "hotplug": True, "background_input": False,
                   "mapping": {"cross": "south", "circle": "east",
                               "square": "west", "triangle": "north",
                               "l1": "left-shoulder", "r1": "right-shoulder",
                               "l2": "left-trigger", "r2": "right-trigger",
                               "start": "start", "select": "back"}},
-        "audio": {"sample_rate_hz": 44100, "channels": 2,
-                  "buffer_frames": 882, "exclusive_mode": False,
+        "audio": {"sample_rate_hz": 44100, "channels": 2, "device": "default",
+                  "latency_frames": 882, "exclusive_mode": False,
                   "underrun": "count-and-resume-next-batch", "max_queued_frames": 3528},
-        "video": {"update_rate_hz": 100, "fullscreen": "borderless",
-                  "aspect": "auto-ultrawide", "render_scale": "native-4k",
-                  "window_width": 3840, "window_height": 2160},
+        "display": {"mode": "borderless", "aspect": "auto-ultrawide", "filter": "linear",
+                    "width": 3840, "height": 2160},
+        "presentation": {"rate_hz": 100, "policy": "low-latency-100hz"},
+        "graphics": {"pgxp": True, "true_color": True, "hd_assets": True},
     }
 
 
@@ -161,7 +163,18 @@ def initialize_install(package: Path, user_data: Path) -> dict[str, Any]:
         installed_config = json.loads(config_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         raise ReleaseError("installed configuration is malformed") from error
-    _validate_config(installed_config)
+    if installed_config.get("schema") == LEGACY_CONFIG_SCHEMA:
+        legacy = installed_config; installed_config = default_config()
+        video, audio, input_config = legacy.get("video", {}), legacy.get("audio", {}), legacy.get("input", {})
+        installed_config["display"]["width"] = video.get("window_width", 3840)
+        installed_config["display"]["height"] = video.get("window_height", 2160)
+        installed_config["display"]["mode"] = video.get("fullscreen", "borderless")
+        installed_config["audio"]["latency_frames"] = audio.get("buffer_frames", 882)
+        installed_config["audio"]["max_queued_frames"] = audio.get("max_queued_frames", 3528)
+        installed_config["input"]["deadzone_per_mille"] = round(float(input_config.get("deadzone", .12))*1000)
+        _validate_config(installed_config); _atomic_write(config_path, _canonical(installed_config))
+    else:
+        _validate_config(installed_config)
     for slot in (1, 2):
         card = user_data / "saves" / f"card{slot}.mcd"
         if not card.exists():
@@ -311,14 +324,18 @@ def _validate_config(config: dict[str, Any]) -> None:
     if (config.get("schema") != CONFIG_SCHEMA
             or config.get("audio", {}).get("sample_rate_hz") != 44100
             or config.get("audio", {}).get("channels") != 2
-            or not 441 <= config.get("audio", {}).get("buffer_frames", 0) <= 8192
-            or config.get("video", {}).get("update_rate_hz") != 100
+            or not 441 <= config.get("audio", {}).get("latency_frames", 0) <= 8192
+            or config.get("presentation", {}).get("rate_hz") != 100
             or config.get("audio", {}).get("underrun") != "count-and-resume-next-batch"
             or config.get("audio", {}).get("max_queued_frames", 0) < 882
-            or not 0.0 <= config.get("input", {}).get("deadzone", -1.0) <= 0.5
+            or not 0 <= config.get("input", {}).get("deadzone_per_mille", -1) <= 500
             or config.get("input", {}).get("profile") != "modern-gamepad"
-            or config.get("save", {}).get("card_slots") not in {1, 2}
-            or not str(config.get("save", {}).get("root", "")).startswith("${USER_DATA}/")):
+            or config.get("saves", {}).get("card_slots") not in {1, 2}
+            or config.get("display", {}).get("mode") not in {"windowed", "borderless", "exclusive"}
+            or config.get("display", {}).get("aspect") not in {"native-4:3", "auto-ultrawide"}
+            or config.get("presentation", {}).get("policy") not in {"vsync", "mailbox", "low-latency-100hz"}
+            or not 640 <= config.get("display", {}).get("width", 0) <= 7680
+            or not 480 <= config.get("display", {}).get("height", 0) <= 4320):
         raise ReleaseError("save/input/audio/video configuration boundary is invalid")
 
 

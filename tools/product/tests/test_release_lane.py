@@ -101,7 +101,7 @@ class ReleaseLaneTests(unittest.TestCase):
         config = json.loads((relocated / "policy" / "default-config.json").read_text())
         self.assertEqual(config["schema"], CONFIG_SCHEMA)
         self.assertEqual(config["audio"]["sample_rate_hz"], 44100)
-        self.assertEqual(config["video"]["update_rate_hz"], 100)
+        self.assertEqual(config["presentation"]["rate_hz"], 100)
         self.assertEqual(config["audio"]["underrun"], "count-and-resume-next-batch")
         self.assertEqual(config["input"]["mapping"]["cross"], "south")
         self.assertFalse((relocated / "policy" / "first-run-setup.json").exists())
@@ -128,6 +128,24 @@ class ReleaseLaneTests(unittest.TestCase):
         (user_data / "config.json").write_text("{}", encoding="utf-8")
         with self.assertRaisesRegex(ReleaseError, "configuration boundary"):
             initialize_install(package, user_data)
+
+    def test_unicode_install_and_legacy_settings_upgrade(self) -> None:
+        package = self.root / "release"; self.package(package)
+        user_data = self.root / "利用者" / "設定"
+        user_data.mkdir(parents=True)
+        legacy = {"schema":"wipeout3se.clean-aot.config.v1",
+            "save":{"root":"${USER_DATA}/Wipeout3SE/saves","card_slots":2},
+            "input":{"profile":"modern-gamepad","deadzone":.2},
+            "audio":{"sample_rate_hz":44100,"channels":2,"buffer_frames":1323,
+                     "underrun":"count-and-resume-next-batch","max_queued_frames":4096},
+            "video":{"update_rate_hz":100,"fullscreen":"windowed","window_width":5120,"window_height":2160}}
+        (user_data/"config.json").write_text(json.dumps(legacy,ensure_ascii=False),encoding="utf-8")
+        initialize_install(package,user_data)
+        upgraded=json.loads((user_data/"config.json").read_text(encoding="utf-8"))
+        self.assertEqual(upgraded["schema"],CONFIG_SCHEMA)
+        self.assertEqual(upgraded["display"]["width"],5120)
+        self.assertEqual(upgraded["audio"]["latency_frames"],1323)
+        self.assertEqual(upgraded["input"]["deadzone_per_mille"],200)
 
     def test_tamper_unmanifested_file_and_forbidden_payload_fail_closed(self) -> None:
         package = self.root / "release"

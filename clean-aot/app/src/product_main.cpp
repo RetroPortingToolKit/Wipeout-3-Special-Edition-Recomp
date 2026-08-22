@@ -2,6 +2,7 @@
 #include "clean_aot/host/pacing.hpp"
 #include "clean_aot/host/sdl_vulkan.hpp"
 #include "clean_aot/runtime/runtime.hpp"
+#include "clean_aot/app/settings.hpp"
 
 #include <array>
 #include <algorithm>
@@ -13,6 +14,11 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 
 #ifdef CLEAN_AOT_PRODUCT_HAS_EPOCH_BINDINGS
 #include "product_epoch_bindings.hpp"
@@ -127,23 +133,79 @@ bool run_workload(clean_aot::host::IHostBackend& host, std::uint32_t width,
 }
 }
 
+#ifdef _WIN32
+std::string utf8(const wchar_t* value) {
+    const int length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, -1, nullptr, 0, nullptr, nullptr);
+    if (length <= 1) return {};
+    std::string result(static_cast<std::size_t>(length), '\0');
+    WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, -1, result.data(), length, nullptr, nullptr);
+    result.pop_back();
+    return result;
+}
+int wmain(int argc, wchar_t** argv) {
+#else
 int main(int argc, char** argv) {
+#endif
     std::filesystem::path user_data, bios_path;
+    std::filesystem::path settings_path;
     std::string profile;
+    std::vector<std::string> settings_overrides;
     std::uint64_t workload_updates = 0U;
-    bool hidden = false;
+    bool hidden = false, reset_settings = false;
+    Receipt receipt{};
     for (int index = 1; index < argc; ++index) {
-        const std::string argument = argv[index];
+        const std::string argument =
+#ifdef _WIN32
+            utf8(argv[index]);
+#else
+            argv[index];
+#endif
         if ((argument == "--user-data" || argument == "--bios") && index + 1 < argc) {
             const auto value = std::filesystem::path(argv[++index]);
             if (argument == "--user-data") user_data = value; else bios_path = value;
         } else if (argument == "--smoke-hidden") hidden = true;
-        else if (argument == "--workload-profile" && index + 1 < argc) profile = argv[++index];
+        else if (argument == "--settings" && index + 1 < argc) settings_path = std::filesystem::path(argv[++index]);
+        else if (argument == "--set" && index + 1 < argc) settings_overrides.emplace_back(
+#ifdef _WIN32
+            utf8(argv[++index])
+#else
+            argv[++index]
+#endif
+        );
+        else if (argument == "--reset-settings") reset_settings = true;
+        else if (argument == "--workload-profile" && index + 1 < argc) profile =
+#ifdef _WIN32
+            utf8(argv[++index]);
+#else
+            argv[++index];
+#endif
         else if (argument == "--workload-updates" && index + 1 < argc) {
-            try { workload_updates = std::stoull(argv[++index]); } catch (...) { return 64; }
+            try {
+#ifdef _WIN32
+                workload_updates = std::stoull(argv[++index]);
+#else
+                workload_updates = std::stoull(argv[++index]);
+#endif
+            } catch (...) { return 64; }
         } else { std::cerr << "unsupported product argument\n"; return 64; }
     }
-    Receipt receipt{}; receipt.workload_profile = profile;
+    clean_aot::app::RuntimeSettings settings{};
+    if (settings_path.empty() && !user_data.empty()) settings_path = user_data / "config.json";
+    if (!settings_path.empty()) {
+        const auto loaded = clean_aot::app::load_runtime_settings(settings_path, reset_settings);
+        if (loaded.status == clean_aot::app::SettingsStatus::invalid ||
+            loaded.status == clean_aot::app::SettingsStatus::io_error) {
+            receipt.reason = "invalid-runtime-settings"; receipt.print(); return 78;
+        }
+        settings = loaded.value;
+    }
+    for (const auto& override_value : settings_overrides) {
+        std::string error;
+        if (!clean_aot::app::apply_settings_override(settings, override_value, error)) {
+            receipt.reason = "invalid-settings-override"; receipt.print(); return 64;
+        }
+    }
+    receipt.workload_profile = profile;
     const bool headless = profile.ends_with("-headless");
     const bool p4k = profile == "4k-headless" || profile == "4k-hidden";
     const bool puw = profile == "5120x2160-headless" || profile == "5120x2160-hidden";
@@ -170,9 +232,9 @@ int main(int argc, char** argv) {
     if (!binding) { receipt.reason = "missing-authenticated-generated-bios-binding"; receipt.print(); return 78; }
     receipt.bios_identity_sha256 = std::string(binding->variant_identity_sha256);
     receipt.bios_sha256 = std::string(binding->executable_sha256);
-    clean_aot::host::SdlVulkanConfig host_config{};
+    clean_aot::host::SdlVulkanConfig host_config = settings.host_config(hidden || workload);
     host_config.title = "Clean AOT Product"; host_config.hidden = hidden || workload;
-    host_config.width = puw ? 5120U : 3840U; host_config.height = 2160U;
+    if (workload) { host_config.width = puw ? 5120U : 3840U; host_config.height = 2160U; }
     clean_aot::host::SdlVulkanPresentation live(host_config);
     clean_aot::host::HeadlessBackend null_host;
     clean_aot::host::IHostBackend* host = headless ? static_cast<clean_aot::host::IHostBackend*>(&null_host)

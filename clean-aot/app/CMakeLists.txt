@@ -43,6 +43,7 @@ add_library(clean_aot_app STATIC
     src/graphics.cpp
     src/json.cpp
     src/memory_card.cpp
+    src/settings.cpp
     src/sha256.cpp
 )
 target_include_directories(clean_aot_app PUBLIC include)
@@ -79,7 +80,10 @@ if(CLEAN_AOT_APP_ENABLE_SDL)
         clean_aot_host_sdl_vulkan SDL3::SDL3)
     clean_aot_app_warnings(clean_aot_app_sdl)
     add_executable(Wipeout3SE src/product_main.cpp)
-    target_link_libraries(Wipeout3SE PRIVATE clean_aot_runtime
+    if(MINGW)
+        target_link_options(Wipeout3SE PRIVATE -municode)
+    endif()
+    target_link_libraries(Wipeout3SE PRIVATE clean_aot_app clean_aot_runtime
         clean_aot_host_sdl_vulkan SDL3::SDL3)
     if(CLEAN_AOT_PRODUCT_GENERATED_DIR)
         file(GLOB _clean_aot_product_generated CONFIGURE_DEPENDS
@@ -177,6 +181,10 @@ if(CLEAN_AOT_APP_BUILD_TESTS AND BUILD_TESTING)
     target_link_libraries(clean_aot_controller_input_tests PRIVATE clean_aot_app)
     clean_aot_app_warnings(clean_aot_controller_input_tests)
     add_test(NAME clean_aot_controller_input_tests COMMAND clean_aot_controller_input_tests)
+    add_executable(clean_aot_settings_tests tests/settings_tests.cpp)
+    target_link_libraries(clean_aot_settings_tests PRIVATE clean_aot_app)
+    clean_aot_app_warnings(clean_aot_settings_tests)
+    add_test(NAME clean_aot_settings_tests COMMAND clean_aot_settings_tests)
     add_executable(clean_aot_app_graphics_tests tests/graphics_tests.cpp)
     target_link_libraries(clean_aot_app_graphics_tests PRIVATE clean_aot_app)
     clean_aot_app_warnings(clean_aot_app_graphics_tests)
