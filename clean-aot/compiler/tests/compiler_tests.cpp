@@ -460,6 +460,17 @@ void test_delay_slot_boundaries_fail_closed() {
     require(standalone != nullptr && standalone->instructions.size() == 1U &&
                 standalone->instructions[0].address == 0x00003c04U,
             "the explicit entry must retain a standalone instruction copy");
+
+    std::vector<std::uint8_t> edge_text(16U, 0U);
+    write_le32(edge_text, 0U, encode_beq(1));
+    write_le32(edge_text, 8U, encode_jump(0x00003d08U, 0x00003d04U));
+    const PsxExeImage edge_image =
+        make_image(0x00003d00U, 0x00003d00U, std::move(edge_text));
+    require_throws([&] {
+        RegionBuildOptions options;
+        options.entry_points = {0x00003d00U};
+        (void)RegionBuilder::build(edge_image, std::move(options));
+    }, "a discovered direct edge into a delay slot must still fail closed");
 }
 
 void test_loop_and_emission_order_are_deterministic() {
