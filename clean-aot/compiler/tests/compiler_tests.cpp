@@ -264,6 +264,14 @@ Region make_trampoline_region() {
     return RegionBuilder::build(image, std::move(options));
 }
 
+Region make_generated_fixture_region() {
+    std::vector<std::uint8_t> text(0x3cU, 0U);
+    write_le32(text,0x00U,encode_jump(0x00001000U,0x00001010U));write_le32(text,0x04U,0x24210001U);
+    write_le32(text,0x10U,encode_jump(0x00001010U,0x00001020U));write_le32(text,0x14U,0x24210001U);write_le32(text,0x20U,0x34021234U);
+    write_le32(text,0x30U,(0x22U<<26U)|(1U<<21U)|(2U<<16U)|3U);write_le32(text,0x34U,(0x26U<<26U)|(1U<<21U)|(2U<<16U));
+    const PsxExeImage image=make_image(0x00001000U,0x00001000U,std::move(text));RegionBuildOptions options;options.entry_points={0x00001000U,0x00001030U};return RegionBuilder::build(image,std::move(options));
+}
+
 void test_unnamed_direct_path_preserves_targets() {
     const Region region = make_trampoline_region();
     require(region.blocks.size() == 3U,
@@ -566,7 +574,7 @@ int main(int argc, char** argv) {
             std::cerr << "unable to open emitter output path\n";
             return 2;
         }
-        output << clean_aot::compiler::CppEmitter::emit(make_trampoline_region());
+        output << clean_aot::compiler::CppEmitter::emit(make_generated_fixture_region());
         if (!output) {
             std::cerr << "unable to write emitter output\n";
             return 2;

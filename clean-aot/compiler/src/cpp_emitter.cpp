@@ -51,11 +51,15 @@ void write_semantic(std::ostringstream& out, const Instruction& instruction) {
     else if(op==0x0fU)out<<"        state.write("<<rt<<", 0x"<<std::hex<<(imm<<16U)<<"u);\n"<<std::dec;
     else if(op==0x20U||op==0x24U)out<<"        cpu_ops::lb(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u),"<<(op==0x24U?"true":"false")<<");\n"<<std::dec;
     else if(op==0x21U||op==0x25U)out<<"        cpu_ops::lh(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u),"<<(op==0x25U?"true":"false")<<");\n"<<std::dec;
+    else if(op==0x22U)out<<"        cpu_ops::lwl(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u));\n"<<std::dec;
     else if(op==0x23U)out<<"        cpu_ops::lw(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u));\n"<<std::dec;
+    else if(op==0x26U)out<<"        cpu_ops::lwr(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u));\n"<<std::dec;
     else if(op==0x28U)out<<"        cpu_ops::sb(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u));\n"<<std::dec;
     else if(op==0x29U)out<<"        cpu_ops::sh(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u));\n"<<std::dec;
-    else if(op==0x2bU)out<<"        cpu_ops::sw(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u)); if(state.fault != CpuFault::None) return false;\n"<<std::dec;
-    else if(!instruction.has_delay_slot)out<<"        state.fault = CpuFault::ReservedInstruction; return false;\n";
+    else if(op==0x2aU)out<<"        cpu_ops::swl(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u));\n"<<std::dec;
+    else if(op==0x2bU)out<<"        cpu_ops::sw(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u));\n"<<std::dec;
+    else if(op==0x2eU)out<<"        cpu_ops::swr(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u));\n"<<std::dec;
+    else if(!instruction.has_delay_slot)out<<"        cpu_ops::raise_exception(state, CpuException::ReservedInstruction);\n";
 }
 
 } // namespace
@@ -149,11 +153,19 @@ std::string CppEmitter::emit(const Region& region) {
         write_address(output, block->start);
         output << ": {\n";
         output << "        state.fault = CpuFault::None;\n";
-        for (const Instruction& instruction : block->instructions) {
-            output << "        cpu_ops::begin(state);\n";
+        for (std::size_t instruction_index = 0; instruction_index < block->instructions.size(); ++instruction_index) {
+            const Instruction& instruction = block->instructions[instruction_index];
+            const bool delay = block->terminator_index.has_value() && instruction_index == *block->terminator_index + 1U;
+            output << "        cpu_ops::begin(state, ";
+            write_address(output, instruction.address);
+            output << ", " << (delay ? "true" : "false") << ", ";
+            if (delay) write_address(output, block->instructions[*block->terminator_index].address);
+            else output << "0u";
+            output << ");\n";
             if (!is_control_transfer(instruction.kind)) write_semantic(output, instruction);
             output << "        cpu_ops::end(state);\n";
             output << "        if (state.fault != CpuFault::None) return false;\n";
+            output << "        if (state.exception_raised) return true;\n";
         }
         const auto& edges = outgoing.at(block->id);
         const auto find_edge = [&](EdgeKind kind) -> const Edge* {
