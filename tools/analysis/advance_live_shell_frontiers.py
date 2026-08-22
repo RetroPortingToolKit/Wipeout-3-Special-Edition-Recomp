@@ -159,9 +159,13 @@ def main() -> int:
         physical = pc & 0x1fffffff
         if 0x1fc00000 <= physical < 0x1fc80000:
             source, source_start, source_count = bios_path.read_bytes(), 0xbfc00000, 0x80000
+            image_base = 0xbfc00000
             offset = physical - 0x1fc00000
         elif physical < len(ram):
             source, source_start, source_count = ram, 0, len(ram)
+            # The authenticated copied-epoch source window is physical RAM,
+            # while live CPU frontiers retain their KSEG virtual address.
+            image_base = pc - physical
             offset = physical
         else:
             print("MATERIAL_BLOCKER frontier-outside-ram-bios", flush=True)
@@ -174,12 +178,12 @@ def main() -> int:
         seen.add(key)
         if args.max_direct_closure_instructions:
             ranges = authenticated_mandatory_ranges(
-                source, source_start, pc, args.max_direct_closure_instructions)
+                source, image_base, pc, args.max_direct_closure_instructions)
         else:
             span = authenticated_straight_line_span(source, offset, args.max_batch_instructions)
             ranges = [(pc, pc + span)]
         payload_start, payload_end = ranges[0][0], ranges[-1][1]
-        payload_offset = payload_start - source_start
+        payload_offset = payload_start - image_base
         payload = source[payload_offset:payload_offset + payload_end - payload_start]
         range_contract = ",".join(f"{start:08x}-{end:08x}" for start, end in ranges)
         identity_input = (f"{source_hash}:{ranges[0][0]:08x}:{ranges[0][1]:08x}"

@@ -74,6 +74,13 @@ class LiveShellFrontierTests(unittest.TestCase):
         self.assertEqual(authenticated_mandatory_ranges(image, base, base, 8),
                          [(base, base + 8), (base + 16, base + 24)])
 
+    def test_mandatory_closure_translates_kseg_ram_to_physical_image(self):
+        base = 0x80000000
+        normal = (0x24020001).to_bytes(4, "little")
+        image = bytes(0x20) + normal * 2
+        self.assertEqual(authenticated_mandatory_ranges(
+            image, base, base + 0x20, 2), [(base + 0x20, base + 0x28)])
+
     def test_mandatory_closure_does_not_authorize_conditional_target(self):
         base = 0x80000000
         branch = (0x10000002).to_bytes(4, "little")
