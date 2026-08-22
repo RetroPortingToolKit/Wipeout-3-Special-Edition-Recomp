@@ -772,6 +772,44 @@ void test_adsr_sweep_noise_and_modulation() {
                 before_sweep.value != after_sweep.value,
             "linear volume sweep changes current volume");
 
+    static Device restarted_sweep;
+    restarted_sweep.reset();
+    put(restarted_sweep, 0u, 0x1000u);
+    render_count(restarted_sweep, 1u,
+                 "apply sweep-restart fixed volume");
+    constexpr std::uint16_t two_tick_sweep = 0x8030u;
+    put(restarted_sweep, 0u, two_tick_sweep);
+    render_count(restarted_sweep, 1u,
+                 "prime half of the sweep divider period");
+    put(restarted_sweep, 0u, two_tick_sweep);
+    static std::array<std::byte, Device::SnapshotBytes>
+        restarted_sweep_snapshot{};
+    require(restarted_sweep.save_snapshot(restarted_sweep_snapshot).ok(),
+            "snapshot rewritten sweep before its native edge");
+    static Device restarted_sweep_replay;
+    restarted_sweep_replay.reset();
+    require(restarted_sweep_replay.restore_snapshot(restarted_sweep_snapshot)
+                .ok(),
+            "restore rewritten sweep before its native edge");
+    std::array<StereoSample, 1u> restart_edge{};
+    std::array<StereoSample, 1u> restart_edge_replay{};
+    require(restarted_sweep.render(restart_edge).ok() &&
+                restarted_sweep_replay.render(restart_edge_replay).ok(),
+            "render first edge of restarted sweep");
+    const auto restart_first = restarted_sweep.read_mmio(
+        Device::InternalVoiceVolumeBase, kWord);
+    require(restart_edge == restart_edge_replay && restart_first.ok() &&
+                restart_first.value == 0x2000u &&
+                restarted_sweep.deterministic_digest() ==
+                    restarted_sweep_replay.deterministic_digest(),
+            "sweep rewrite restarts divider and replays before first step");
+    require(restarted_sweep.render(restart_edge).ok(),
+            "render second edge of restarted sweep");
+    const auto restart_second = restarted_sweep.read_mmio(
+        Device::InternalVoiceVolumeBase, kWord);
+    require(restart_second.ok() && restart_second.value > restart_first.value,
+            "restarted sweep steps only after its complete divider period");
+
     static Device wipeout_sweep;
     wipeout_sweep.reset();
     put(wipeout_sweep, 0u, 0x1000u);

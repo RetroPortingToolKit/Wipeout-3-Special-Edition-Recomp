@@ -477,6 +477,9 @@ void Device::write_volume(VolumeControl& volume,
         volume.pending_current = decode_fixed_volume(raw);
         volume.pending_counter = 0u;
         volume.pending_fixed = true;
+    } else {
+        /* A newly programmed sweep starts a fresh native divider phase. */
+        volume.counter = 0u;
     }
 }
 
