@@ -694,7 +694,14 @@ RuntimeGraphics::RuntimeGraphics(GraphicsConfiguration configuration)
              raster::PresentationResolveMode::Native ||
          configuration_.maximum_resolved_pixels != 0U) &&
         (!configuration_.high_resolution_ui ||
-         configuration_.maximum_ui_pixels_per_frame != 0U);
+         configuration_.maximum_ui_pixels_per_frame != 0U) &&
+        (configuration_.display_postprocess ==
+             raster::DisplayPostprocessMode::None ||
+         configuration_.display_postprocess ==
+             raster::DisplayPostprocessMode::ChromaSmooth24Bit) &&
+        (configuration_.display_postprocess ==
+             raster::DisplayPostprocessMode::None ||
+         configuration_.maximum_postprocess_pixels != 0U);
     const psx::render::ProjectionResult projection =
         psx::render::ProjectionPolicyPlanner::plan({
             configuration_.projection, configuration_.culling,
@@ -723,6 +730,7 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
         ui_draws_.clear();
         resolved_width_ = 0U;
         resolved_height_ = 0U;
+        using_postprocessed_scanout_ = false;
         std::size_t drained = 0U;
         while (auto event = runtime.gpu().pop_event()) {
             if (++drained > gpu::kEventQueueCapacity) {
@@ -925,8 +933,41 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                 ++upscale_fallbacks_;
             }
         }
+        display_postprocess_stats_ = {};
+        if (configuration_.display_postprocess ==
+                raster::DisplayPostprocessMode::ChromaSmooth24Bit &&
+            planned.plan.pixel_format == raster::ScanoutPixelFormat::PackedRgb888 &&
+            presented.data() == resolved_scanout_.data()) {
+            const std::uint64_t pixels =
+                static_cast<std::uint64_t>(presented_width) * presented_height;
+            bool processed = pixels <= configuration_.maximum_postprocess_pixels &&
+                pixels <= std::numeric_limits<std::size_t>::max() / 3U;
+            if (processed) {
+                try {
+                    postprocessed_scanout_.resize(
+                        static_cast<std::size_t>(pixels) * 3U);
+                } catch (...) {
+                    processed = false;
+                }
+            }
+            if (processed) {
+                processed = raster::ScanoutMapper::chroma_smooth_rgb888(
+                    presented_width, presented_height, presented,
+                    postprocessed_scanout_, display_postprocess_stats_).accepted();
+            }
+            if (processed) {
+                presented = postprocessed_scanout_;
+                using_postprocessed_scanout_ = true;
+            } else {
+                ++display_postprocess_fallbacks_;
+            }
+        }
         if (configuration_.high_resolution_ui &&
-            presented.data() == resolved_scanout_.data() && !ui_draws_.empty()) {
+            presented.data() != scanout_.data() && !ui_draws_.empty()) {
+            std::span<std::uint8_t> enhanced_output =
+                using_postprocessed_scanout_
+                    ? std::span<std::uint8_t>(postprocessed_scanout_)
+                    : std::span<std::uint8_t>(resolved_scanout_);
             const bool direct_scanout =
                 planned.plan.pixel_format == raster::ScanoutPixelFormat::Rgb555 &&
                 planned.plan.source_line_step == 1U &&
@@ -1082,9 +1123,9 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                             };
                             const std::size_t destination =
                                 (static_cast<std::size_t>(y) * presented_width + x) * 3U;
-                            resolved_scanout_[destination] = channel(0U);
-                            resolved_scanout_[destination + 1U] = channel(1U);
-                            resolved_scanout_[destination + 2U] = channel(2U);
+                            enhanced_output[destination] = channel(0U);
+                            enhanced_output[destination + 1U] = channel(1U);
+                            enhanced_output[destination + 2U] = channel(2U);
                             ++ui_stats_.pixels_written;
                             touched = true;
                         }
@@ -1094,7 +1135,7 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                 }
             }
         }
-        if (presented.data() == resolved_scanout_.data()) {
+        if (presented.data() != scanout_.data()) {
             resolved_width_ = presented_width;
             resolved_height_ = presented_height;
         }
@@ -1158,7 +1199,9 @@ const RuntimeGraphics::UiStats& RuntimeGraphics::ui_stats() const noexcept {
 
 std::span<const std::uint8_t> RuntimeGraphics::resolved_pixels() const noexcept {
     if (resolved_width_ == 0U || resolved_height_ == 0U) return {};
-    return resolved_scanout_;
+    return using_postprocessed_scanout_
+        ? std::span<const std::uint8_t>(postprocessed_scanout_)
+        : std::span<const std::uint8_t>(resolved_scanout_);
 }
 
 std::uint32_t RuntimeGraphics::resolved_width() const noexcept {
@@ -1167,6 +1210,15 @@ std::uint32_t RuntimeGraphics::resolved_width() const noexcept {
 
 std::uint32_t RuntimeGraphics::resolved_height() const noexcept {
     return resolved_height_;
+}
+
+const raster::DisplayPostprocessStats&
+RuntimeGraphics::display_postprocess_stats() const noexcept {
+    return display_postprocess_stats_;
+}
+
+std::uint64_t RuntimeGraphics::display_postprocess_fallbacks() const noexcept {
+    return display_postprocess_fallbacks_;
 }
 
 std::uint64_t RuntimeGraphics::visual_digest() const noexcept {

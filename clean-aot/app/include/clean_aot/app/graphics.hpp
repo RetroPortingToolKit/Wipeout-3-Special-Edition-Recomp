@@ -146,6 +146,9 @@ struct GraphicsConfiguration final {
     std::uint64_t maximum_resolved_pixels = 5120ULL * 2160ULL;
     bool high_resolution_ui = true;
     std::uint64_t maximum_ui_pixels_per_frame = 5120ULL * 2160ULL;
+    raster::DisplayPostprocessMode display_postprocess =
+        raster::DisplayPostprocessMode::None;
+    std::uint64_t maximum_postprocess_pixels = 5120ULL * 2160ULL;
 };
 
 class IPngDecoder {
@@ -263,12 +266,16 @@ public:
     [[nodiscard]] std::span<const std::uint8_t> resolved_pixels() const noexcept;
     [[nodiscard]] std::uint32_t resolved_width() const noexcept;
     [[nodiscard]] std::uint32_t resolved_height() const noexcept;
+    [[nodiscard]] const raster::DisplayPostprocessStats&
+        display_postprocess_stats() const noexcept;
+    [[nodiscard]] std::uint64_t display_postprocess_fallbacks() const noexcept;
 
 private:
     GraphicsConfiguration configuration_{};
     raster::ReferenceRasterizer raster_{};
     std::vector<std::uint8_t> scanout_{};
     std::vector<std::uint8_t> resolved_scanout_{};
+    std::vector<std::uint8_t> postprocessed_scanout_{};
     std::uint64_t sequence_ = 0U;
     std::uint64_t visual_digest_ = 0U;
     bool configured_ = false;
@@ -291,6 +298,9 @@ private:
     UiStats ui_stats_{};
     std::uint32_t resolved_width_ = 0U;
     std::uint32_t resolved_height_ = 0U;
+    raster::DisplayPostprocessStats display_postprocess_stats_{};
+    std::uint64_t display_postprocess_fallbacks_ = 0U;
+    bool using_postprocessed_scanout_ = false;
 };
 
 } // namespace clean_aot::app

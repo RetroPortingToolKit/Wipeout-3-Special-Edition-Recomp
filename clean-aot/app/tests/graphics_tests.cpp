@@ -602,6 +602,93 @@ void test_4k_edge_aware_runtime_resolve() {
            fallback.visual_digest() == 0xa0c4b5214903b3ddULL,
            "bounded allocation policy falls back to exact native scanout");
 }
+void test_live_24bit_chroma_postprocess() {
+    using namespace clean_aot;
+    const auto prepare = [](runtime::Runtime& runtime) {
+        auto& gpu = runtime.gpu();
+        (void)gpu.write_gp1(0x03000000U);
+        (void)gpu.write_gp1(0x05000000U);
+        (void)gpu.write_gp1(0x06c00200U);
+        (void)gpu.write_gp1(0x07040010U);
+        (void)gpu.write_gp1(0x08000011U);
+        (void)gpu.write_gp0(0xa0000000U);
+        (void)gpu.write_gp0(0U);
+        (void)gpu.write_gp0((1U << 16U) | 3U);
+        (void)gpu.write_gp0(0x8c646464U);
+        (void)gpu.write_gp0(0x00006450U);
+    };
+    std::vector<std::uint8_t> bios(512U * 1024U, 0U);
+    runtime::Configuration runtime_config{};
+    runtime_config.bios = bios;
+    const auto run = [&](std::uint32_t output_width,
+                         raster::PresentationMode presentation,
+                         std::uint32_t expected_width,
+                         std::uint64_t expected_digest,
+                         const char* label) {
+        runtime::Runtime runtime(runtime_config);
+        prepare(runtime);
+        app::GraphicsConfiguration configuration{};
+        configuration.runtime_scanout = true;
+        configuration.output_width = output_width;
+        configuration.output_height = 2160U;
+        configuration.presentation = presentation;
+        configuration.presentation_resolve =
+            raster::PresentationResolveMode::EdgeAware;
+        configuration.display_postprocess =
+            raster::DisplayPostprocessMode::ChromaSmooth24Bit;
+        app::RuntimeGraphics graphics(configuration);
+        host::HeadlessBackend host;
+        expect(graphics.present(runtime, host, 0U).success() &&
+               host.service().success(), label);
+        const auto& stats = graphics.display_postprocess_stats();
+        const std::uint64_t pixels =
+            static_cast<std::uint64_t>(expected_width) * 2160U;
+        expect(graphics.resolved_width() == expected_width &&
+               graphics.resolved_height() == 2160U &&
+               stats.pixels == pixels &&
+               stats.source_pixel_reads == pixels * 3U &&
+               stats.luma_comparisons == pixels * 2U &&
+               stats.bytes_written == pixels * 3U &&
+               stats.chroma_filtered_pixels <= pixels &&
+               graphics.display_postprocess_fallbacks() == 0U &&
+               graphics.visual_digest() == expected_digest,
+               label);
+        std::cout << label << " digest: 0x" << std::hex
+                  << graphics.visual_digest() << std::dec << '\n';
+    };
+    run(3840U, raster::PresentationMode::Identity4x3, 2880U,
+        0x1a8fedaa6afeafebULL,
+        "4K packed-24 chroma postprocess stays within fixed work bounds");
+    run(5120U, raster::PresentationMode::Generic21x9, 5040U,
+        0xe6959cf9bfad2d73ULL,
+        "ultrawide packed-24 chroma postprocess stays within fixed work bounds");
+
+    runtime::Runtime fallback_runtime(runtime_config);
+    runtime::Runtime control_runtime(runtime_config);
+    prepare(fallback_runtime);
+    prepare(control_runtime);
+    app::GraphicsConfiguration fallback_configuration{};
+    fallback_configuration.runtime_scanout = true;
+    fallback_configuration.output_width = 640U;
+    fallback_configuration.output_height = 480U;
+    fallback_configuration.presentation_resolve =
+        raster::PresentationResolveMode::EdgeAware;
+    fallback_configuration.display_postprocess =
+        raster::DisplayPostprocessMode::ChromaSmooth24Bit;
+    fallback_configuration.maximum_postprocess_pixels = 1U;
+    auto control_configuration = fallback_configuration;
+    control_configuration.display_postprocess =
+        raster::DisplayPostprocessMode::None;
+    app::RuntimeGraphics fallback(fallback_configuration);
+    app::RuntimeGraphics control(control_configuration);
+    host::HeadlessBackend fallback_host;
+    host::HeadlessBackend control_host;
+    expect(fallback.present(fallback_runtime, fallback_host, 0U).success() &&
+           control.present(control_runtime, control_host, 0U).success() &&
+           fallback.display_postprocess_fallbacks() == 1U &&
+           fallback.visual_digest() == control.visual_digest(),
+           "postprocess budget failure preserves exact resolved native frame");
+}
 void test_replacement_runtime() {
     const auto root = std::filesystem::temp_directory_path() /
         "clean-aot-replacement-runtime";
@@ -773,6 +860,7 @@ int main() {
     test_live_replacement_pipeline();
     test_live_hd_font_and_banner_compositor();
     test_runtime_scanout(); test_4k_edge_aware_runtime_resolve();
+    test_live_24bit_chroma_postprocess();
     test_replacement_runtime(); test_native_png_decode();
     test_title_manifest_and_receipts(); test_missing_asset_native_fallback();
     test_ultrawide_visual_receipt();

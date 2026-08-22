@@ -1708,6 +1708,83 @@ EventResult ScanoutMapper::upscale_edge_aware_rgb888(
   return EventResult{EventStatus::Applied, RasterError::None, output_pixels};
 }
 
+EventResult ScanoutMapper::chroma_smooth_rgb888(
+    std::uint32_t width, std::uint32_t height,
+    std::span<const std::uint8_t> source_rgb888,
+    std::span<std::uint8_t> output_rgb888,
+    DisplayPostprocessStats &stats) noexcept {
+  stats = {};
+  constexpr std::uint64_t kMaximumPixels = 8192ULL * 8192ULL;
+  const std::uint64_t pixels = static_cast<std::uint64_t>(width) * height;
+  const std::uint64_t bytes = pixels * 3U;
+  const std::uintptr_t source_begin =
+      reinterpret_cast<std::uintptr_t>(source_rgb888.data());
+  const std::uintptr_t output_begin =
+      reinterpret_cast<std::uintptr_t>(output_rgb888.data());
+  const bool address_overflow =
+      bytes > std::numeric_limits<std::uintptr_t>::max() - source_begin ||
+      bytes > std::numeric_limits<std::uintptr_t>::max() - output_begin;
+  const bool overlaps = !address_overflow &&
+      source_begin < output_begin + bytes && output_begin < source_begin + bytes;
+  if (width == 0U || height == 0U || pixels > kMaximumPixels ||
+      bytes != source_rgb888.size() || bytes != output_rgb888.size() ||
+      address_overflow || overlaps) {
+    return EventResult{EventStatus::Rejected,
+                       RasterError::InvalidPresentationRequest};
+  }
+  stats.pixels = pixels;
+  stats.source_pixel_reads = pixels * 3U;
+  stats.luma_comparisons = pixels * 2U;
+  stats.bytes_written = bytes;
+  const auto clamp_channel = [](std::int32_t value) noexcept {
+    return static_cast<std::uint8_t>(std::clamp(value, 0, 255));
+  };
+  const auto luma = [](const std::uint8_t* pixel) noexcept {
+    return (77 * static_cast<std::int32_t>(pixel[0]) +
+            150 * static_cast<std::int32_t>(pixel[1]) +
+             29 * static_cast<std::int32_t>(pixel[2]) + 128) >> 8;
+  };
+  for (std::uint32_t y = 0U; y < height; ++y) {
+    for (std::uint32_t x = 0U; x < width; ++x) {
+      const std::uint32_t left_x = x == 0U ? 0U : x - 1U;
+      const std::uint32_t right_x = std::min(x + 1U, width - 1U);
+      const std::uint8_t* center = source_rgb888.data() +
+          (static_cast<std::size_t>(y) * width + x) * 3U;
+      const std::uint8_t* left = source_rgb888.data() +
+          (static_cast<std::size_t>(y) * width + left_x) * 3U;
+      const std::uint8_t* right = source_rgb888.data() +
+          (static_cast<std::size_t>(y) * width + right_x) * 3U;
+      const std::int32_t center_y = luma(center);
+      const std::int32_t left_y = luma(left);
+      const std::int32_t right_y = luma(right);
+      std::int32_t red = center[0];
+      std::int32_t green = center[1];
+      std::int32_t blue = center[2];
+      if (std::abs(center_y - left_y) <= 12 &&
+          std::abs(center_y - right_y) <= 12) {
+        const std::int32_t cr =
+            ((static_cast<std::int32_t>(left[0]) - left_y) +
+             2 * (static_cast<std::int32_t>(center[0]) - center_y) +
+             (static_cast<std::int32_t>(right[0]) - right_y) + 2) / 4;
+        const std::int32_t cb =
+            ((static_cast<std::int32_t>(left[2]) - left_y) +
+             2 * (static_cast<std::int32_t>(center[2]) - center_y) +
+             (static_cast<std::int32_t>(right[2]) - right_y) + 2) / 4;
+        red = center_y + cr;
+        blue = center_y + cb;
+        green = (256 * center_y - 77 * red - 29 * blue + 75) / 150;
+        ++stats.chroma_filtered_pixels;
+      }
+      const std::size_t destination =
+          (static_cast<std::size_t>(y) * width + x) * 3U;
+      output_rgb888[destination] = clamp_channel(red);
+      output_rgb888[destination + 1U] = clamp_channel(green);
+      output_rgb888[destination + 2U] = clamp_channel(blue);
+    }
+  }
+  return EventResult{EventStatus::Applied, RasterError::None, pixels};
+}
+
 bool native_backend_compatible(const NativeBackendV1 &backend) noexcept {
   return backend.abi_version == kNativeBackendAbiVersion &&
          backend.consume_event != nullptr;

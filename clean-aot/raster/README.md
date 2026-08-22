@@ -159,3 +159,11 @@ bits, framebuffer feedback, or 15/24-bit display decoding. Work is linear and
 bounded per output pixel: five source-pixel reads, at most three RGB
 comparisons, and one RGB write. Invalid dimensions, underscaling, oversized
 surfaces, and wrong buffer extents are rejected before output is touched.
+
+`ScanoutMapper::chroma_smooth_rgb888()` is a separate display-domain seam for
+decoded packed 24-bit content. It uses a horizontal 1:2:1 chroma kernel only
+when both neighbors are within a bounded luma threshold, reconstructs RGB at
+the center luma, and never reads or writes VRAM. Work is fixed at three RGB
+reads, two luma comparisons, and one RGB write per pixel. Source/destination
+aliasing, malformed extents, and oversized surfaces are rejected before any
+destination byte changes; callers retain the unprocessed frame as fallback.

@@ -215,6 +215,19 @@ struct UpscaleStats final {
   std::uint64_t bytes_written = 0U;
 };
 
+enum class DisplayPostprocessMode : std::uint8_t {
+  None,
+  ChromaSmooth24Bit,
+};
+
+struct DisplayPostprocessStats final {
+  std::uint64_t pixels = 0U;
+  std::uint64_t source_pixel_reads = 0U;
+  std::uint64_t luma_comparisons = 0U;
+  std::uint64_t chroma_filtered_pixels = 0U;
+  std::uint64_t bytes_written = 0U;
+};
+
 class ScanoutMapper final {
 public:
   [[nodiscard]] static ScanoutResult plan(const ScanoutRequest &request) noexcept;
@@ -227,6 +240,11 @@ public:
       std::span<const std::uint8_t> source_rgb888,
       std::span<std::uint8_t> output_rgb888,
       UpscaleStats &stats) noexcept;
+  [[nodiscard]] static EventResult chroma_smooth_rgb888(
+      std::uint32_t width, std::uint32_t height,
+      std::span<const std::uint8_t> source_rgb888,
+      std::span<std::uint8_t> output_rgb888,
+      DisplayPostprocessStats &stats) noexcept;
 };
 
 using BackendConsumeEvent = EventResult (*)(void *context,

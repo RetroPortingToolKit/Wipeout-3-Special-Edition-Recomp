@@ -16,6 +16,15 @@ frame on allocation, dimension, or budget failure. The SDL/Vulkan host selects
 linear final sampling only for an enhanced resolved frame; native mode retains
 the original nearest sampler.
 
+`DisplayPostprocessMode::ChromaSmooth24Bit` is an opt-in presentation-only
+filter for packed 24-bit scanout. After the bounded high-resolution resolve it
+smooths horizontal chroma variation only where both neighboring luma values
+remain close, then restores the center pixel's luma. RGB555 scanout, native
+resolve, disabled mode, and any allocation or pixel-budget failure retain the
+unchanged frame. The fixed cost is three RGB reads, two luma comparisons, and
+one RGB write per output pixel; HD UI replacement is composited afterward so
+text and banners remain crisp.
+
 Replacement assets remain separated from title policy. A title-owned key
 policy may identify a texture or font while the generic runtime validates
 manifest/source generations, confines paths to the asset root, verifies

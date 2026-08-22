@@ -1420,6 +1420,35 @@ void test_edge_aware_4k_resolve_contract() {
           "overlapping resolve buffers were not rejected");
 }
 
+void test_bounded_chroma_smoothing_contract() {
+  constexpr std::array<std::uint8_t, 9U> source{
+      100U, 100U, 100U, 140U, 80U, 100U, 60U, 120U, 100U};
+  std::array<std::uint8_t, source.size()> output{};
+  clean_aot::raster::DisplayPostprocessStats stats{};
+  require(ScanoutMapper::chroma_smooth_rgb888(
+              3U, 1U, source, output, stats).accepted() &&
+              output[3U] == 110U && output[4U] == 95U &&
+              output[5U] == 100U,
+          "equal-luma chroma variation was not deterministically smoothed");
+  require(stats.pixels == 3U && stats.source_pixel_reads == 9U &&
+              stats.luma_comparisons == 6U &&
+              stats.chroma_filtered_pixels == 3U &&
+              stats.bytes_written == output.size(),
+          "chroma smoothing exceeded its three-read/one-write pixel budget");
+  constexpr std::array<std::uint8_t, 9U> hard_edge{
+      0U, 0U, 0U, 255U, 255U, 255U, 0U, 0U, 0U};
+  output.fill(0U);
+  require(ScanoutMapper::chroma_smooth_rgb888(
+              3U, 1U, hard_edge, output, stats).accepted() &&
+              output == hard_edge && stats.chroma_filtered_pixels == 0U,
+          "luma-edge guard blurred a hard display edge");
+  output.fill(0x5aU);
+  require(!ScanoutMapper::chroma_smooth_rgb888(
+               3U, 1U, std::span<const std::uint8_t>(output), output, stats)
+               .accepted() && output.front() == 0x5aU,
+          "overlapping chroma buffers were not rejected before output mutation");
+}
+
 } // namespace
 
 int main() {
@@ -1437,6 +1466,7 @@ int main() {
     test_adversarial_coordinates_and_budgets();
     test_precise_transparency_safe_filtering();
     test_edge_aware_4k_resolve_contract();
+    test_bounded_chroma_smoothing_contract();
     test_scanout_boundaries();
     test_golden_digest();
   } catch (const TestFailure &failure) {
