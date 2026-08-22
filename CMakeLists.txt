@@ -17,8 +17,13 @@ if(EXISTS "${PSXRECOMP_ROOT}/lib/recomp-net/CMakeLists.txt")
     set(PSX_NETPLAY ON CACHE BOOL
         "Link recomp-net delay-sync (opt-in; needs recomp-net)" FORCE)
 endif()
-set(PSX_SETUP_WIZARD ON CACHE BOOL
+set(PSX_SETUP_WIZARD OFF CACHE BOOL
     "Advertise first-run setup wizard + Generate & rebuild in recomp-ui" FORCE)
+# WipEout 3 is a retail-BIOS product: never link or stage OpenBIOS.
+set(PSXRECOMP_BIOS_STEMS "SCPH1001" CACHE STRING
+    "Retail BIOS backend required for WipEout 3" FORCE)
+set(PSXRECOMP_BIOS_STEM "SCPH1001" CACHE STRING
+    "Retail BIOS backend used by WipEout 3" FORCE)
 include("${PSXRECOMP_ROOT}/runtime/runtime.cmake")
 
 file(GLOB WIPEOUT3_MOD_PLUGIN_SOURCES CONFIGURE_DEPENDS
@@ -35,7 +40,6 @@ psxrecomp_add_game_runtime(psx-runtime
     PGXP
     ENABLE_NETPLAY_IF_PRESENT
     NETPLAY_LOBBY_URL "ws://netplay.retcomm.net:8765"
-    ENABLE_SETUP_WIZARD
     WINDOW_TITLE "Wipeout 3 Special Edition  Recompiled"
     DEFAULT_GAME_CONFIG_PATH "game.toml"
     MAX_PLAYERS 4

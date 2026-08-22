@@ -4,7 +4,7 @@
 [game]
 name = "Wipeout 3 Special Edition"
 id = "SCES-02845"
-players = 4
+players = 2
 exe = "disc/SCES_028.45"
 disc = "disc/WipEout 3 - Special Edition (Europe) (En,Fr,De,Es,It).cue"
 load_address = "0x80010000"
@@ -37,146 +37,16 @@ strict = true
 mod_function_entry_funcs = ["0x800EDFC8"]
 
 [runtime]
-# Enables the translation/VRAM-patch layer (translations/*.toml). English
-# game; the layer only applies the surgical data fixes shipped in-repo.
-language = "en"
 window_title = "Wipeout 3 Special Edition Recompiled"
 memcard_dir = "saves"
-# Record streamed/mod-patched code into overlay_captures.json and run it as
-# native shards instead of the dirty-RAM interpreter. Required here: the
-# framerate package patches the game's code on disc (target = "disc_user"),
-# so none of it matches the AOT image built from the stock SCES_028.45 and
-# it would otherwise interpret forever. See docs/COMPILING_OVERLAYS.md.
-overlay_cache = true
-# Background autocompile (gcc tier). Configuring this ALSO enables autocapture
-# on interp pressure — required to capture the ntscfull8 enhancement code the
-# game writes into the high 8 MB banks (0x781000+) and the runtime-dispatched
-# interior PCs in mod-patched text; neither is seen by the passive CD-DMA
-# capture path. The spawn itself runs on Windows only — on Linux/macOS run the
-# same command by hand after a play session (docs/COMPILING_OVERLAYS.md §1).
-# {TOKENS} instead of paths: the runtime resolves each to an absolute path,
-# searching the install directory before the project root (autocompile.h). The
-# old repo-relative form only worked when the game was launched with the repo
-# root as its working directory — in a shipped bundle every compile failed with
-# "can't open file .../compile_overlays.py" and all mod-patched code stayed on
-# the interpreter (measured: 29.3M interpreted dispatches over 12.9k frames).
-#
-# --captures / --out-dir are deliberately absent: the runtime injects the
-# canonical pair via PSX_OVERLAY_CACHE_DIR / PSX_OVERLAY_CAPTURES so the write
-# cache can never drift from where the loader reads.
-#
-# --flavor 2 is REQUIRED: this title builds PGXP-mandatory (top-level
-# CMakeLists), so the runtime is PSX_OVERLAY_FLAVOR=2 and the loader rejects
-# any shard whose flavor tag differs. The tool defaults to 0, so omitting this
-# silently fills a .._f0 dir this build can never load. (The runtime's own
-# spawn also pins the flavor by env; this keeps hand-runs of the same command
-# honest.)
-overlay_autocompile_cmd = "python3 {COMPILE_OVERLAYS} --game-toml {GAME_TOML} --recompiler {RECOMPILER} --runtime-include {RUNTIME_INCLUDE} --gcc gcc --cps --jobs 8 --flavor 2"
-
-# SIO1 serial link. WipEout 3 SE's 2/3/4P mode is its own libcomb "sio" driver
-# on SIO1 (4P = 2 consoles x 2 splitscreen), so the link needs an actual peer on
-# the wire. Without this the register file still responds and the game programs
-# mode/ctrl/baud happily, but the backend stays "null" -- every byte it sends
-# goes nowhere, ESTABLISH LINK times out, and both consoles wedge waiting.
-#
-# "crossover" cross-wires the two in-process machines (Stage B dual-console) and
-# also requests them, so PSX_DUAL_CONSOLE=1 is no longer needed to get a pair.
-# Env PSX_SIO1_BACKEND / PSX_SIO1_LATENCY override this for A/B.
-# enabled=false: the crossover peer request activates DUAL CONSOLE -- two full
-# PSX machines on one core. Shipping that on meant every stock launch (menus,
-# FMV, single player) ran at half speed or worse (~17 fps measured). Link play
-# opts in with PSX_DUAL_CONSOLE=1 (or flip this to true for a link session).
-[runtime.link]
-enabled = false
-backend = "crossover"
-latency_cycles = 0
+openbios = false
+# Runtime code is statically linked; no runtime compiler or overlay cache.
+overlay_cache = false
 
 [video]
 renderer = "opengl"
-# Late swaps present immediately (tear) instead of stalling a full refresh —
-# removes the heavy-sim-vblank judder on the 30fps-sim variants. Driver
-# fallback to full vsync if EXT_swap_control_tear is unsupported.
-vsync = "adaptive"
 geometry_correction = true
 auto_skip_fmv = false
-# PGXP tuning, measured live at 8K internal on this title (2026-08-17).
-# tolerance 0.5 rejected ~92k candidates per 4s and landed only ~28k
-# dataflow hits; 1.0 takes rejections to ZERO and quadruples hits to ~112k.
-# 2.0/4.0/8.0 are flat against 1.0, so 1.0 is the knee -- anything looser
-# buys nothing and only widens what gets accepted.
-pgxp_tolerance = 1.0
-# false: the PGXP shadow engine is a per-instruction tax (psx_pgxp_alu at ~2%
-# of a stock FMV run) and correction is off by default anyway -- run the engine
-# only when someone actually enables the feature (launcher PGXP mod / settings).
-pgxp_cpu_mode = false
-# Depth-test polygons on PGXP's recovered per-vertex Z instead of relying
-# solely on the PS1 ordering table, whose one-bucket-per-primitive sort
-# cannot resolve intersecting or interpenetrating geometry.
-#
-# Depth comes from the ABSOLUTE GTE screen Z, mapped reciprocally
-# (1 - 2*zn/z) rather than linearly: a linear map has to clamp past a chosen
-# far value and everything beyond collapses onto one plane, which is most of
-# a race track. Verified against two savestates at 6x internal: the ship
-# renders intact where the earlier linear mapping chopped its fuselage apart.
-# DEFAULT OFF pending a fix: static frames verify correctly, but in MOTION
-# the track drops out and the ship clips through the floor. A per-frame
-# depth clear that does not actually run every frame would do exactly that,
-# and a savestate A/B cannot see it because the defect needs sustained
-# gameplay to show up. Flip to true to test: pgxp_depth on=1 over the wire.
-pgxp_depth = false
-
-# PS1 affine texture mapping is very visible at high internal resolution.
-perspective_texturing = true
-# Beetle PSX HW-format HD texture pack from
-# <disc dir>/<disc stem>-texture-replacements/. princepeter64's Wip3out pack is
-# drop-in: tex_pack.h matches Beetle's hashing exactly (same CRC32 polynomial,
-# same hashed byte range, same UV-limited sample rect), and its 292 entries
-# index and decode cleanly — 79 of them matched real draws in a single race
-# with zero decode failures.
-#
-# Substitution is implemented and on. The four font atlases are held back via
-# exclude.txt in the pack directory: the game draws all of its text from them,
-# and they render invisibly through this path, so replacing them erases every
-# glyph in the game. Everything else in the pack is correct and visibly
-# sharper. See that file for the detail.
-hd_textures = true
-# The pack (and the HD FONT — the F500 atlases are pack entries) lives in the
-# repo disc/ folder, NOT beside whatever cue is loaded. Without this, launching
-# from any other disc path silently loads a 0-entry pack: textures AND fonts
-# revert to low-res at once. That is exactly what happened.
-hd_texture_dir = "hd_textures"
-
-# CPU overclock, percent of stock.
-#
-# REQUIRES A RETAIL BIOS above ~300%. Measured: with the recompiled OpenBIOS,
-# 400% and up run but never enable the display; with SCPH-1001 recompiled in,
-# 900% and 1000% boot fine. Same binary, same scaling, same mods -- only the
-# BIOS differs. OpenBIOS's boot path does not survive the CPU running ~10x
-# ahead of its devices; the retail kernel does.
-#
-# Switching BIOS is a REGENERATION, not a runtime flag -- this is a static
-# recompilation, so the kernel is compiled in. Passing --bios at runtime still
-# reports image=OPENBIOS. Use:
-#   python psxrecomp/psxrecomp_cli.py generate --config game.toml \
-#          --project-root . --disc <cue> --bios <SCPH1001.BIN>
-#   cmake -S . -B build-release      # re-globs the generated sources
-#   cmake --build build-release
-# Skipping the reconfigure fails with "Recompiled game code is MISSING", which
-# points nowhere near the BIOS. The guest runs as native code, so this
-# scales the per-instruction cycle CHARGE down: more work per CRTC period,
-# while timers, SPU, CDROM and refresh keep their real rates.
-# hueponik's pal100full8 patch requires >900%.
-cpu_overclock = 100
-
-# Margin artwork is game-owned on the Mods page (Bezel Artwork), not a config
-# knob -- same move as Widescreen below. Left "off" so the package owns the
-# setting outright: the plugin writes the player's team choice at activation,
-# and a disabled package leaves this value standing, which is the off state.
-# A team name ("qirex"), "random", or a path still works here if you want the
-# artwork without the mod, but the Mods page will override it when enabled.
-# Logos by toolboxio (deviantart.com/toolboxio), via awesome-wipeout.github.io.
-bezel = "off"
-
 # Authentic 4:3 is the baseline. The Widescreen mod below activates WipEout
 # 3's game-specific native-wide hooks and chooses fixed/adaptive presentation.
 aspect_ratio = "4:3"
@@ -186,11 +56,6 @@ aspect_ratio = "4:3"
 offer = false
 offer_ultrawide = true
 adaptive_view = true
-# Fill the pillarbox margins of a 4:3-pinned present (2D menus, title, FMV-less
-# full-2D screens) with the frame's own edge columns instead of black. Opt-in
-# per title since it smears any content whose edge columns carry picture; kept
-# ON here — this is WipEout 3's authored look on very wide displays.
-menu_edge_fill = true
 
 # WipEout 3 is a 3D racer; keep BIOS/FMV/2D-only frames authored at 4:3 and
 # engage wide gameplay presentation on GTE-active frames.
@@ -213,242 +78,335 @@ nw_phase_backdrop = false
 auto_screen_x = true
 screen_w_imms = ["0x200", "0x240"]
 screen_h_imms = ["0x100"]
-# Slack beyond the exact reveal before a primitive is trivially rejected.
-# 16 put the reject edge essentially AT the revealed boundary (32:9 reveal is
-# 267px, so the margin was 283), which still dropped primitives straddling it
-# -- visible as occasional objects winking out at the extreme sides. 64 gives
-# real slack; the cost is a little more submitted geometry, and the arena sits
-# at 43% with the tightest pool at a third, so there is ample headroom.
-guard_pixels = 64
+guard_pixels = 16
 
 # SceneryFrustumClip (0x80142634) clips in CAMERA space before RTPS squash
 # (left/right: 2488*Z ± 25CC*X; top/bottom: 2480*Z ± 25CC*Y). That is the
 # 4:3 knife-cut on trackside buildings. plane_nx on the 25CC/2480 loads widens
 # it correctly, but every surviving poly advances the GPU packet cursor at
-# 0x80198620 (+40B in the clipper alone). The stock arena has no headroom for
-# the extra FOV, so the cursor overruns (start-grid ships snap backwards and
-# freeze). Do NOT re-enable plane_nx until that arena is relocated/enlarged.
-# Identity at 4:3 is not enough — wide must also be safe.
-#
-# Corrections (2026-08-16), from a full-EXE scan; the notes above predate them:
-#  - The cursor is 0x80198620, not 0x801A8620. lui 0x801A + offset -31200 =
-#    0x801A0000 - 0x79E0. The old address is referenced 0 times by the game.
-#  - "stomps racer state" is UNVERIFIED. The arena is two 0x14000 halves at
-#    0x801A5944/0x801B9944 ending 0x801CD944; overrunning half 0 runs into
-#    half 1 (the list being DMA'd), and past half 1 sits a VRAM staging cursor
-#    and render globals. No per-racer physics/AI array is adjacent either way.
-#    That accounts for pop-in and visual damage, not for inverted steering.
-#  - There are THREE unchecked cursors, not one. The tightest is 0x801E5668,
-#    a hard 750-slot 40-byte pool (bumped at 0x801701B0); 0x801E5664 walks 190
-#    32-byte slots. Guarding the 81920-byte arena alone would not be enough.
-#  - Widescreen does not WIDEN the horizontal reject at these sites, it DISABLES
-#    it: psx_ws_cull_keep_result consumes the margin as a boolean, so the
-#    admitted geometry is unbounded rather than +33% of the frustum. No finite
-#    arena enlargement is provably sufficient while that holds.
-# RE-ENABLED 2026-08-17: the packet-overflow rationale above is disproved.
-# Measured live, the arena peaks at 41.5% of 81920 B and the tightest pool at
-# 247/750 across 4:3, 16:9 and 21:9 -- it never approaches capacity. The
-# corruption blamed on overflow was the cull.keep PINS, now migrated to
-# cull.widen. Screen-space widening cannot reach this clip: it runs in CAMERA
-# space before RTPS, so raising x_margin (tested to 400) leaves the sides cut.
-plane_nx_sites = ["0x80142664", "0x80142690"]
+# 0x801A8620 (+40B in the clipper alone). The stock arena has no headroom for
+# the extra FOV, so the cursor stomps racer state (start-grid ships snap
+# backwards and freeze). Do NOT re-enable plane_nx until that arena is
+# relocated/enlarged. Identity at 4:3 is not enough — wide must also be safe.
+# plane_nx_sites = ["0x80142664", "0x80142690"]  # DISABLED — packet overflow
 
-# Cohen-Sutherland outcode packers (post-squash SXY). These set bit0 RIGHT /
-# bit1 LEFT, which the submitters AND-accumulate across a primitive's vertices
-# and reject only when EVERY vertex is off the same edge -- a trivial reject,
-# not a subdivision. They previously used [[widescreen.cull.keep]], which pins
-# the verdict, i.e. deletes the horizontal trivial reject entirely and makes
-# the game submit unbounded off-screen geometry. Widening moves the BOUND with
-# the live reveal margin instead, so the reject stays honest and simply happens
-# at the revealed edge. Identity at 4:3 (margin 0) in every mode.
-#
-# The paired VERTICAL compares and the NCLIP bltz are deliberately absent and
-# stay vanilla -- only the horizontal field changes with aspect.
-#
-# REMOVED (2026-08-17): 28 further sites were listed here as cull.keep but are
-# not screen-coordinate culls at all -- they compare GTE SZ depth against a
-# near-Z constant (250 / 1700) held in s6, selecting a submitter path. Pinning
-# those changed submitter selection for reasons unrelated to aspect, so they
-# are back to vanilla. Encodings: 0x00D6302A, 0x0096202A, 0x00B6282A,
-# 0x00F6382A, 0x0396282A, 0x03F6202A.
+# Packer LEFT/RIGHT keeps (post-squash SXY) are no-ops for extra FOV after
+# squash maps 16:9 onto [0,width]; they stay identity at 4:3. Vertical packer
+# tests and NCLIP bltz stay vanilla.
 
-# LEFT edge: vanilla `sx < 0`; widened `sx < 0 - m`, so the reject line moves
-# to more negative X and the revealed left margin is kept rather than voted
-# off. rs holds SX (sign-extended by the preceding lh of the GTE SXY word).
-[[widescreen.cull.widen]]
+# Clip-code packers: sx < 0 (LEFT). result=0 => never LEFT while wide.
+[[widescreen.cull.keep]]
 address  = "0x8017032C"
 expected = "0x28850000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80170370"
 expected = "0x28850000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80170460"
 expected = "0x28850000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x801704A4"
 expected = "0x28850000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80170608"
 expected = "0x28850000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80170658"
 expected = "0x28850000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x801706A8"
 expected = "0x28850000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x801706F8"
 expected = "0x28850000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x8017073C"
 expected = "0x28850000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80171B50"
 expected = "0x296C0000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80171BAC"
 expected = "0x296C0000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80172900"
 expected = "0x296C0000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80172948"
 expected = "0x296C0000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x801730AC"
 expected = "0x28850000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x801730E0"
 expected = "0x28850000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80173114"
 expected = "0x28850000"
-mode     = "imm_lower"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80173148"
 expected = "0x28850000"
-mode     = "imm_lower"
+result   = 0
 
-# RIGHT edge: vanilla `bound < sx` where rs is the draw-window width; widened
-# `bound + m < sx`, i.e. the bound INCREASES so the predicate gets harder and
-# the revealed right margin is kept. `bound - m` would be the inversion.
-[[widescreen.cull.widen]]
+# Clip-code packers: width < sx (RIGHT). result=0 => never RIGHT while wide.
+[[widescreen.cull.keep]]
 address  = "0x80170334"
 expected = "0x01C4202A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80170378"
 expected = "0x01C4202A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80170468"
 expected = "0x01C4202A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x801704AC"
 expected = "0x01C4202A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80170610"
 expected = "0x01C4202A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80170660"
 expected = "0x01C4202A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x801706B0"
 expected = "0x01C4202A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80170700"
 expected = "0x01C4202A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80170744"
 expected = "0x01C4202A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80171B58"
 expected = "0x004B582A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80171BB4"
 expected = "0x004B582A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80172908"
 expected = "0x004B582A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80172950"
 expected = "0x004B582A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x801730B4"
 expected = "0x02E4202A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x801730E8"
 expected = "0x02E4202A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x8017311C"
 expected = "0x02E4202A"
-mode     = "bound_rs"
+result   = 0
 
-[[widescreen.cull.widen]]
+[[widescreen.cull.keep]]
 address  = "0x80173150"
 expected = "0x02E4202A"
-mode     = "bound_rs"
+result   = 0
 
 # Scenery submitter (PSX_FN_SceneryPolySubmit): slt sx, $s6. result=1 => packet builder.
+[[widescreen.cull.keep]]
+address  = "0x80171D84"
+expected = "0x03F6202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171D88"
+expected = "0x0396282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171D98"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171F0C"
+expected = "0x0096202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171F10"
+expected = "0x00B6282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171F14"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80171F18"
+expected = "0x00F6382A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172068"
+expected = "0x03F6202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x8017206C"
+expected = "0x0396282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x8017207C"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801721D8"
+expected = "0x0096202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801721DC"
+expected = "0x00B6282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801721E0"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801721E4"
+expected = "0x00F6382A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172324"
+expected = "0x03F6202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172328"
+expected = "0x0396282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172338"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172474"
+expected = "0x0096202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172478"
+expected = "0x00B6282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x8017247C"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x80172480"
+expected = "0x00F6382A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801725A0"
+expected = "0x03F6202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801725A4"
+expected = "0x0396282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801725B4"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801726E8"
+expected = "0x0096202A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801726EC"
+expected = "0x00B6282A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801726F0"
+expected = "0x00D6302A"
+result   = 1
+
+[[widescreen.cull.keep]]
+address  = "0x801726F4"
+expected = "0x00F6382A"
+result   = 1
+
 [controller]
 default_mode = "digital"
 
@@ -459,17 +417,6 @@ multitap_analog = true
 require_cue = true
 required_tracks = 14
 required_disc_fp = "a8a369bf31c63906bfcf91d1a0a87d93bde7984d82f02edc5e79727d1e325339"
-# PSX-Link lobby type: 4 seats over two serial-linked consoles (2 per console).
-# Each machine runs its own console visibly plus a headless follower for the
-# other; the cable is local shm, netplay carries only the 4 pad streams.
-link_lobby = true
-# Shared dev channel. When set (or via PSX_NETPLAY_DEV_TAG at runtime) this
-# build advertises "dev+<tag>" to the lobby instead of its release version:
-# every build carrying the same tag finds each other, and the rooms stay
-# invisible to players on a versioned release (their browser pins an exact
-# version no dev build advertises, and the server refuses a version mismatch
-# on join). Leave unset for a shipping build.
-# dev_tag = "wipeout-lab"
 
 # 8 MB framerate mod (ntscfull8): the enhancement engine at 0x80780000+ is a
 # detour trampoline farm — patched text sites `j 0x8078xxxx` into stubs that
@@ -480,41 +427,7 @@ link_lobby = true
 # extracted from j-target scans of the captured patched-text regions.
 [[overlays]]
 load_addr = "0x80780000"
-# CRC of the ntscfull8 engine payload actually captured. This gate is what
-# binds the entry list below to the image; a stale value silently detaches it,
-# compile_overlays reports "seeds: 0 / 80780000 excluded: OBSERVED_PC_ONLY",
-# no shard is ever emitted, and the whole enhancement engine interprets
-# forever — 11.9M interpreted dispatches in one session, with the interpreter's
-# last guard yield sitting inside 0x80781xxx on both link crashes.
-#
-# The raw region CRC is NOT usable as that gate. This region is not pure code:
-# 12 mutable records at a uniform 0xC4 stride from +0x62C carry live state, so
-# the raw CRC differed on every one of 17 consecutive captures (0x21A6D2C3,
-# 0xE2E4E03F, 0x3508976D, … 0xFE247301). Pinning any one of them — 0x8B994BAE,
-# then 0xFE3CBD88 — matched exactly the single capture it was read from and
-# detached on the very next run, which is why the engine kept interpreting
-# despite the entry list being correct all along.
-#
-# bytes_crc_ignore zeroes those mutable heads before hashing, so bytes_crc is
-# the identity of the CODE. Verified: all 17 captures hash to 0x8A7331C5 once
-# masked. Re-derive the entries (not this CRC) if the package version or
-# `build` option changes; the runtime's own shard gate is unaffected either way
-# — overlay_loader.c:cand_crc() already hashes only the shard's code ranges.
-bytes_crc = "0x8A7331C5"
-bytes_crc_ignore = [
-    { start = "0x8078062C", end = "0x80780634" },
-    { start = "0x807806F0", end = "0x807806F8" },
-    { start = "0x807807B4", end = "0x807807BC" },
-    { start = "0x80780878", end = "0x80780880" },
-    { start = "0x8078093C", end = "0x80780944" },
-    { start = "0x80780A00", end = "0x80780A08" },
-    { start = "0x80780AC4", end = "0x80780ACC" },
-    { start = "0x80780B88", end = "0x80780B90" },
-    { start = "0x80780C4C", end = "0x80780C54" },
-    { start = "0x80780D10", end = "0x80780D18" },
-    { start = "0x80780DD4", end = "0x80780DDC" },
-    { start = "0x80780E98", end = "0x80780EA0" },
-]
+bytes_crc = "0x8B994BAE"
 entries = [
     "0x80780000",
     "0x80780568",
