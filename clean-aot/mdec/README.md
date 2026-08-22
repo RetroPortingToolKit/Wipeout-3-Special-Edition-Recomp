@@ -36,6 +36,10 @@ signed and unsigned modes, bit-15 control, 4:2:0 macroblock reconstruction,
 bounded FIFOs, fail-closed malformed-stream handling, snapshots, a stable
 state digest, and an explicit deterministic device-cycle counter.
 
+Quantization selection follows block purpose rather than the internal block
+number alone: monochrome 4/8-bit Y blocks and colored Y1..Y4 use the luminance
+table, while only colored Cr/Cb blocks use the chroma table.
+
 The integer output contract is deliberately written down because the public
 hardware documentation leaves some silicon details under-specified. Scale
 values use the upper 13 bits, each IDCT pass uses the documented matrix indexing

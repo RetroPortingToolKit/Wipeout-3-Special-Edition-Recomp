@@ -168,6 +168,16 @@ void send_direct(Device& device,
     }
 }
 
+void load_quant_tables(Device& device, std::uint8_t luma, std::uint8_t chroma)
+{
+    std::vector<std::uint32_t> words(32U);
+    const std::uint32_t luma_word = static_cast<std::uint32_t>(luma) * 0x01010101U;
+    const std::uint32_t chroma_word = static_cast<std::uint32_t>(chroma) * 0x01010101U;
+    std::fill_n(words.begin(), 16U, luma_word);
+    std::fill(words.begin() + 16, words.end(), chroma_word);
+    send_direct(device, command(2U) | 1U, words);
+}
+
 std::vector<std::uint32_t> drain(Device& device)
 {
     std::vector<std::uint32_t> output;
@@ -353,6 +363,55 @@ void test_reference_rle_idct_vectors()
         require_equal(normal_output[index], kNormalGolden[index],
                       "normal inverse-zigzag golden");
     }
+}
+
+void test_monochrome_uses_luminance_quantization()
+{
+    const std::array<std::pair<std::uint8_t, std::int32_t>, 2> ac = {
+        std::pair<std::uint8_t, std::int32_t>{0U, 7},
+        std::pair<std::uint8_t, std::int32_t>{3U, -5},
+    };
+    const auto words = pack_halfwords(make_block(9U, 11, ac));
+
+    Device low_chroma;
+    load_quant_tables(low_chroma, 3U, 1U);
+    send_direct(low_chroma,
+                command(1U, OutputDepth::EightBit, false, false,
+                        static_cast<std::uint16_t>(words.size())),
+                words);
+    const auto reference = drain(low_chroma);
+
+    Device hostile_chroma;
+    load_quant_tables(hostile_chroma, 3U, 251U);
+    send_direct(hostile_chroma,
+                command(1U, OutputDepth::EightBit, false, false,
+                        static_cast<std::uint16_t>(words.size())),
+                words);
+    require_equal(drain(hostile_chroma), reference,
+                  "monochrome Y output is independent of chroma quantization");
+
+    Device chunked;
+    load_quant_tables(chunked, 3U, 251U);
+    require(chunked.write_command_word(
+                command(1U, OutputDepth::EightBit, false, false,
+                        static_cast<std::uint16_t>(words.size())))
+                .complete,
+            "chunked monochrome command");
+    require(chunked.write_command_word(words.front()).complete,
+            "chunked monochrome prefix");
+    Snapshot snapshot{};
+    require(chunked.save_snapshot(snapshot), "mid-block quant snapshot");
+    Device restored;
+    require(restored.load_snapshot(snapshot), "mid-block quant restore");
+    for (std::size_t index = 1U; index < words.size(); ++index) {
+        require(chunked.write_command_word(words[index]).complete,
+                "chunked monochrome suffix");
+        require(restored.write_command_word(words[index]).complete,
+                "restored monochrome suffix");
+    }
+    require_equal(drain(chunked), reference, "chunked luminance-quant output");
+    require_equal(drain(restored), reference, "restored luminance-quant output");
+    require_equal(restored.digest(), chunked.digest(), "quant snapshot replay digest");
 }
 
 void test_color_conversion_and_flags()
@@ -873,11 +932,13 @@ void test_adversarial_bounded_sequences()
 
 int main()
 {
-    const std::array<std::pair<const char*, void (*)()>, 13> tests = {
+    const std::array<std::pair<const char*, void (*)()>, 14> tests = {
         std::pair{"reset_and_status", &test_reset_and_status},
         std::pair{"quant_and_scale_loads", &test_quant_and_scale_loads},
         std::pair{"monochrome_output_and_packing", &test_monochrome_output_and_packing},
         std::pair{"reference_rle_idct_vectors", &test_reference_rle_idct_vectors},
+        std::pair{"monochrome_uses_luminance_quantization",
+                  &test_monochrome_uses_luminance_quantization},
         std::pair{"color_conversion_and_flags", &test_color_conversion_and_flags},
         std::pair{"color_macroblock_raster_order", &test_color_macroblock_raster_order},
         std::pair{"rle_saturation_and_boundaries", &test_rle_saturation_and_boundaries},

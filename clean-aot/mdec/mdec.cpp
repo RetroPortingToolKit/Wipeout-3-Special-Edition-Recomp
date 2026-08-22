@@ -753,7 +753,9 @@ bool Device::process_decode_step() noexcept
 
         const std::uint8_t q_scale = static_cast<std::uint8_t>(value >> 10U);
         const std::int32_t dc = sign_extend_10(value);
-        const std::uint8_t quant = state_.decode_block < 2U
+        const bool color_block = state_.depth == OutputDepth::TwentyFourBit ||
+                                 state_.depth == OutputDepth::FifteenBit;
+        const std::uint8_t quant = color_block && state_.decode_block < 2U
                                        ? state_.quant_chroma[0]
                                        : state_.quant_luma[0];
         state_.work_block.fill(0);
@@ -797,7 +799,9 @@ bool Device::process_decode_step() noexcept
         return finish_block();
     }
     const std::int32_t ac = sign_extend_10(value);
-    const std::uint8_t quant = state_.decode_block < 2U
+    const bool color_block = state_.depth == OutputDepth::TwentyFourBit ||
+                             state_.depth == OutputDepth::FifteenBit;
+    const std::uint8_t quant = color_block && state_.decode_block < 2U
                                    ? state_.quant_chroma[next]
                                    : state_.quant_luma[next];
     const std::size_t destination = state_.q_scale == 0U

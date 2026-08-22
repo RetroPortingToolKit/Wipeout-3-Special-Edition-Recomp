@@ -15,6 +15,10 @@ inverse-zig-zag and `q_scale=0` natural-order paths, macroblock block order, the
 published scale matrix, the 0x20-word MDEC DMA boundary, and the known hardware
 uncertainty around exact IDCT/YUV rounding and decompression latency.
 
+The documented decompression routines identify monochrome blocks as Y using
+`iq_y`, and colored blocks as Cr/Cb using `iq_uv` followed by Y1..Y4 using
+`iq_y`. Table selection in this model follows those roles explicitly.
+
 The same pinned MDEC register description explicitly distinguishes colored
 MDEC0 reads (four sequential 8x8 bitmaps requiring software reordering) from
 DMA1 output (the DMA path performs that reordering). This is the basis for the
