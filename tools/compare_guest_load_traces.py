@@ -1,4 +1,9 @@
-"""Compare retained normal/accelerated guest-load trace artifacts."""
+"""Compare the two focused normal/accelerated load gates.
+
+The gates intentionally test load results, not whole-run identity:
+``startup-card`` compares the memory-card load endpoint; ``race-load`` compares
+the loaded-race endpoint and its short post-load continuation.
+"""
 import argparse
 import json
 from pathlib import Path
@@ -24,6 +29,9 @@ def compare(label, left, right, keys):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--gate", required=True,
+                    choices=("startup-card", "race-load"),
+                    help="startup-card: memory-card result; race-load: race result")
     ap.add_argument("--normal", required=True, type=Path)
     ap.add_argument("--accelerated", required=True, type=Path)
     ap.add_argument("--kind", choices=("fingerprint", "card", "cd"), required=True)
@@ -36,10 +44,20 @@ def main():
         "card": ("slot", "cmd", "sector", "checksum", "data_idx", "data_peek"),
         "cd": ("kind", "addr", "val", "w", "frame", "stat", "request", "sector_pos", "read_cmd"),
     }[args.kind]
-    error = compare(args.kind, load(args.normal), load(args.accelerated), keys)
+    allowed = {
+        "startup-card": {"card"},
+        "race-load": {"fingerprint", "cd"},
+    }
+    if args.kind not in allowed[args.gate]:
+        raise SystemExit(
+            f"{args.gate} gate does not accept --kind {args.kind}; "
+            f"use one of: {', '.join(sorted(allowed[args.gate]))}"
+        )
+    error = compare(f"{args.gate}/{args.kind}",
+                    load(args.normal), load(args.accelerated), keys)
     if error:
         raise SystemExit(f"FAIL {error}")
-    print(f"PASS {args.kind}: retained normal and accelerated guest traces match")
+    print(f"PASS {args.gate}: normal and accelerated load result matches ({args.kind})")
 
 
 if __name__ == "__main__":
