@@ -44,6 +44,11 @@
   settled around 60–70 Hz after PAL x2 with audio underruns; PAL-100 is still
   not release-ready because the full workload needs CPU-side optimization or
   a proven equivalent scheduling strategy.
+- A clean `Release` rebuild (`-O3`) was also tested with the opt-in package.
+  It improves the post-PAL interval to roughly 74–79 guest Hz, but still does
+  not reach 100 Hz and still reports audio underruns. The earlier A/B with
+  supersampling 1 and HD replacement disabled remained CPU-bound as well, so
+  graphics presentation is not the sole cause.
 
 ## Open blockers
 
