@@ -544,6 +544,16 @@ instruction and fails closed on every unknown PC or executable identity.
   dispatches with 9,524 reads, 18,432 writes, 3,720 isolated-cache writes, one
   device read, and 50 device writes. Receipt `bios-frontier-00086892.json`
   records `UnknownCode`; RAM remains `9548d3d4...4a35d` and COP0 is fault-free.
+- Fresh epoch-`9548d3d4...4a35d` bytes authenticate only `[0x3C2C,0x3CE0)`
+  (SHA-256 `814b8e26...6a705`) and its live A0/0x2A stub
+  `[0x6B20,0x6B2C)` (SHA-256 `ad7c5bc5...2876d`). A0/0x2A traverses the
+  existing exact BIOS path, performs another 1,240 isolated-cache writes, and
+  mutates RAM to epoch `9898a802...6e6d`. Execution then reaches formerly
+  dormant A0/0x97 stub `0x00006AB0` and rejects it because it has not been
+  authenticated in the new epoch. Two repeated probes reach 88,864
+  instructions and 15,237 dispatches with 9,614 reads, 19,757 writes, 4,960
+  isolated-cache writes, one device read, and 53 device writes. Receipt
+  `bios-frontier-00088864.json` records fault-free `UnknownCode` at `0x6AB0`.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control
