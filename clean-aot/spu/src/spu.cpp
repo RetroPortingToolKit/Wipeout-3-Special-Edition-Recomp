@@ -2508,12 +2508,12 @@ bool Device::validate_payload(SnapshotReader& reader) const noexcept {
     static_cast<void>(reader.get_u16());
     static_cast<void>(reader.get_u16());
     static_cast<void>(reader.get_u16());
-    static_cast<void>(reader.get_u16());
-    static_cast<void>(reader.get_u16());
+    const std::uint16_t control = reader.get_u16();
+    const std::uint16_t effective_control = reader.get_u16();
     const std::uint16_t pending_control_mode = reader.get_u16();
     const std::uint8_t pending_control = reader.get_u8();
-    static_cast<void>(reader.get_u32());
-    static_cast<void>(reader.get_u32());
+    const std::uint32_t pending_key_on = reader.get_u32();
+    const std::uint32_t pending_key_off = reader.get_u32();
     const std::uint8_t dma_ready = reader.get_u8();
     const std::uint8_t transfer_busy = reader.get_u8();
     const std::uint16_t transfer_control = reader.get_u16();
@@ -2565,8 +2565,21 @@ bool Device::validate_payload(SnapshotReader& reader) const noexcept {
     const std::uint32_t expected_transfer_tail =
         (static_cast<std::uint32_t>(transfer_head) + transfer_count) %
         static_cast<std::uint32_t>(TransferFifoCapacity);
+    const bool control_topology_valid =
+        (effective_control & static_cast<std::uint16_t>(~0x003Fu)) ==
+            (control & static_cast<std::uint16_t>(~0x003Fu)) &&
+        pending_control_mode == (control & 0x003Fu) &&
+        (pending_control != 0u ||
+         (effective_control & 0x003Fu) == (control & 0x003Fu)) &&
+        (pending_key_on & 0xFF000000u) == 0u &&
+        (pending_key_off & 0xFF000000u) == 0u &&
+        (dma_ready == 0u ||
+         transfer_mode(effective_control) == TransferMode::DmaRead) &&
+        (irq == 0u ||
+         (effective_control & (ControlEnable | ControlIrqEnable)) ==
+             (ControlEnable | ControlIrqEnable));
     return reader.good && volumes_valid && cdda_valid && xa_valid && external_valid &&
-           (pending_control <= 1u) &&
+           control_topology_valid && (pending_control <= 1u) &&
            (pending_control_mode & ~0x003Fu) == 0u && dma_ready <= 1u &&
            /*
             * DMA calls are synchronous: there is no resumable operation that

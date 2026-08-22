@@ -1345,6 +1345,36 @@ void test_snapshot_chunking_and_long_replay() {
 
     const std::uint64_t before_bad_restore = replay.deterministic_digest();
     static std::array<std::byte, Device::SnapshotBytes> forged{};
+    static std::array<std::byte, Device::SnapshotBytes> reset_snapshot{};
+    static Device reset_snapshot_source;
+    reset_snapshot_source.reset();
+    require(reset_snapshot_source.save_snapshot(reset_snapshot).ok(),
+            "save canonical reset snapshot for topology attacks");
+    constexpr std::size_t control_payload_offset =
+        clean_aot::spu::SoundRamBytes +
+        (clean_aot::spu::VoiceCount * Device::VoiceSnapshotBytes) +
+        (2u * Device::VolumeSnapshotBytes) + 12u;
+    const auto reject_topology = [&](const std::size_t payload_offset,
+                                     const std::uint8_t value,
+                                     const char* const message) {
+        forged = reset_snapshot;
+        forged[Device::SnapshotHeaderBytes + payload_offset] =
+            static_cast<std::byte>(value);
+        reseal_snapshot(forged);
+        require(replay.restore_snapshot(forged).fault ==
+                        SnapshotFault::InvalidPayload &&
+                    replay.deterministic_digest() == before_bad_restore,
+                message);
+    };
+    reject_topology(control_payload_offset + 15u, 1u,
+                    "snapshot rejects DRQ readiness outside DMA-read mode");
+    reject_topology(control_payload_offset + 132u, 1u,
+                    "snapshot rejects IRQ pending after SPUCNT acknowledge");
+    reject_topology(control_payload_offset + 10u, 1u,
+                    "snapshot rejects key events above voice 23");
+    reject_topology(control_payload_offset + 4u, 1u,
+                    "snapshot rejects mismatched delayed control mode");
+
     forged = snapshot;
     constexpr std::size_t voice_sample_index_offset =
         Device::SnapshotHeaderBytes + clean_aot::spu::SoundRamBytes + 49u;
