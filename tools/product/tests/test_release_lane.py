@@ -12,6 +12,7 @@ from tools.product.release_lane import (
     CONFIG_SCHEMA,
     ReleaseError,
     create_release,
+    initialize_install,
     run_soak,
     validate_release,
 )
@@ -72,9 +73,33 @@ class ReleaseLaneTests(unittest.TestCase):
         self.assertEqual(config["schema"], CONFIG_SCHEMA)
         self.assertEqual(config["audio"]["sample_rate_hz"], 44100)
         self.assertEqual(config["video"]["update_rate_hz"], 100)
+        self.assertEqual(config["audio"]["underrun"], "insert-silence-and-count")
+        self.assertEqual(config["input"]["mapping"]["cross"], "south")
         setup = json.loads((relocated / "policy" / "first-run-setup.json").read_text())
         self.assertEqual(setup["mode"], "one-time-first-run")
         self.assertNotIn(str(package), json.dumps(setup))
+        launcher = (relocated / "Wipeout3SE.cmd").read_text()
+        self.assertIn("%~dp0", launcher)
+        self.assertNotIn(str(package), launcher)
+
+    def test_install_creates_durable_cards_and_remains_fail_closed(self) -> None:
+        package = self.root / "release"
+        self.package(package)
+        user_data = self.root / "user-data"
+        receipt = initialize_install(package, user_data)
+        self.assertFalse(receipt["game_ready"])
+        self.assertEqual(receipt["status"], "awaiting-authenticated-media-import")
+        for slot in (1, 2):
+            card = user_data / "saves" / f"card{slot}.mcd"
+            self.assertEqual(card.stat().st_size, 128 * 1024)
+        card1 = user_data / "saves" / "card1.mcd"
+        card1.write_bytes(b"bad")
+        with self.assertRaisesRegex(ReleaseError, "memory card slot 1 is malformed"):
+            initialize_install(package, user_data)
+        card1.write_bytes(bytes(128 * 1024))
+        (user_data / "config.json").write_text("{}", encoding="utf-8")
+        with self.assertRaisesRegex(ReleaseError, "configuration boundary"):
+            initialize_install(package, user_data)
 
     def test_tamper_unmanifested_file_and_forbidden_payload_fail_closed(self) -> None:
         package = self.root / "release"
@@ -126,9 +151,11 @@ class ReleaseLaneTests(unittest.TestCase):
     def test_deterministic_soak_and_performance_threshold(self) -> None:
         receipt = run_soak(
             [sys.executable, "-c", "print('stable-frame-digest')"],
-            iterations=5, timeout_seconds=5.0, max_p95_ms=5000.0)
+            iterations=5, timeout_seconds=5.0, max_p95_ms=5000.0,
+            receipt_path=self.root / "receipts" / "soak.json")
         self.assertEqual(receipt["status"], "pass")
         self.assertEqual(receipt["iterations"], 5)
+        self.assertEqual(json.loads((self.root / "receipts" / "soak.json").read_text()), receipt)
         with self.assertRaisesRegex(ReleaseError, "nondeterministic"):
             run_soak(
                 [sys.executable, "-c", "import time; print(time.time_ns())"],

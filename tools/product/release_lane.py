@@ -26,6 +26,8 @@ class ReleaseError(RuntimeError):
 SCHEMA = "wipeout3se.clean-aot.release.v1"
 SETUP_SCHEMA = "wipeout3se.clean-aot.first-run-setup.v1"
 CONFIG_SCHEMA = "wipeout3se.clean-aot.config.v1"
+INSTALL_SCHEMA = "wipeout3se.clean-aot.install.v1"
+CARD_SIZE = 128 * 1024
 FORBIDDEN_NAMES = (
     "bios", "scph", "track01", ".cue", ".iso", ".bin", "compiler",
     "oracle", "interpreter", "legacy", "ghidra", "duckstation", "goosestation",
@@ -112,13 +114,84 @@ def default_config() -> dict[str, Any]:
         "schema": CONFIG_SCHEMA,
         "save": {"root": "${USER_DATA}/Wipeout3SE/saves", "card_slots": 2,
                  "atomic_replace": True},
-        "input": {"profile": "dual-analog", "deadzone": 0.12,
-                  "hotplug": True, "background_input": False},
+        "input": {"profile": "modern-gamepad", "deadzone": 0.12,
+                  "hotplug": True, "background_input": False,
+                  "mapping": {"cross": "south", "circle": "east",
+                              "square": "west", "triangle": "north",
+                              "l1": "left-shoulder", "r1": "right-shoulder",
+                              "l2": "left-trigger", "r2": "right-trigger",
+                              "start": "start", "select": "back"}},
         "audio": {"sample_rate_hz": 44100, "channels": 2,
-                  "buffer_frames": 882, "exclusive_mode": False},
+                  "buffer_frames": 882, "exclusive_mode": False,
+                  "underrun": "insert-silence-and-count", "max_queued_frames": 3528},
         "video": {"update_rate_hz": 100, "fullscreen": "borderless",
-                  "aspect": "auto-ultrawide", "render_scale": "native-4k"},
+                  "aspect": "auto-ultrawide", "render_scale": "native-4k",
+                  "window_width": 3840, "window_height": 2160},
     }
+
+
+def _atomic_write(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".new")
+    if temporary.exists():
+        if temporary.is_symlink() or not temporary.is_file():
+            raise ReleaseError("unsafe stale atomic-write temporary")
+        temporary.unlink()
+    with temporary.open("xb") as stream:
+        stream.write(data)
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, path)
+
+
+def initialize_install(package: Path, user_data: Path) -> dict[str, Any]:
+    """Create durable per-user state without asserting that media is authorized."""
+    validation = validate_release(package)
+    user_data = user_data.resolve(strict=False)
+    if user_data.exists() and user_data.is_symlink():
+        raise ReleaseError("user data root must not be a symlink")
+    config_path = user_data / "config.json"
+    if not config_path.exists():
+        _atomic_write(config_path, _canonical(default_config()))
+    try:
+        installed_config = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise ReleaseError("installed configuration is malformed") from error
+    _validate_config(installed_config)
+    for slot in (1, 2):
+        card = user_data / "saves" / f"card{slot}.mcd"
+        if not card.exists():
+            _atomic_write(card, bytes(CARD_SIZE))
+        if card.is_symlink() or card.stat().st_size != CARD_SIZE:
+            raise ReleaseError(f"memory card slot {slot} is malformed")
+    receipt = {
+        "schema": INSTALL_SCHEMA,
+        "status": "awaiting-authenticated-media-import",
+        "package_manifest_sha256": validation["manifest_sha256"],
+        "configuration_sha256": _sha256(config_path),
+        "memory_cards": [
+            {"slot": slot, "size": CARD_SIZE,
+             "sha256": _sha256(user_data / "saves" / f"card{slot}.mcd")}
+            for slot in (1, 2)
+        ],
+        "next_action": "select lawful retail disc, BIOS, and PAL patch",
+        "game_ready": False,
+    }
+    _atomic_write(user_data / "receipts" / "install.json", _canonical(receipt))
+    return receipt
+
+
+def portable_launcher() -> bytes:
+    return ("@echo off\r\nsetlocal\r\n"
+            "set \"PACKAGE_ROOT=%~dp0\"\r\n"
+            "if not defined LOCALAPPDATA exit /b 64\r\n"
+            "set \"USER_DATA=%LOCALAPPDATA%\\Wipeout3SE\"\r\n"
+            "if not exist \"%USER_DATA%\\receipts\\finalize.json\" (\r\n"
+            "  echo First-run media import is incomplete. 1>&2\r\n"
+            "  exit /b 78\r\n"
+            ")\r\n"
+            "\"%PACKAGE_ROOT%bin\\Wipeout3SE.exe\" --user-data \"%USER_DATA%\"\r\n"
+            "exit /b %ERRORLEVEL%\r\n").encode("ascii")
 
 
 def create_release(*, app: Path, sdl: Path, artifacts: Sequence[tuple[str, Path]],
@@ -177,8 +250,11 @@ def create_release(*, app: Path, sdl: Path, artifacts: Sequence[tuple[str, Path]
         (policy / "first-run-setup.json").write_bytes(
             _canonical(default_setup_contract(executable_name)))
         (policy / "default-config.json").write_bytes(_canonical(default_config()))
+        launcher = temporary / "Wipeout3SE.cmd"
+        launcher.write_bytes(portable_launcher())
         for path, role in ((policy / "first-run-setup.json", "setup-contract"),
-                           (policy / "default-config.json", "configuration-defaults")):
+                           (policy / "default-config.json", "configuration-defaults"),
+                           (launcher, "portable-launcher")):
             entries.append({"path": path.relative_to(temporary).as_posix(), "role": role,
                             "size": path.stat().st_size, "sha256": _sha256(path)})
         entries.sort(key=lambda item: item["path"])
@@ -233,21 +309,32 @@ def validate_release(package: Path) -> dict[str, Any]:
             or len(setup.get("required_imports", [])) != 3
             or not str(setup.get("user_data_root", "")).startswith("${USER_DATA}/")):
         raise ReleaseError("first-run setup UX contract is invalid")
+    _validate_config(config)
+    launcher = (package / "Wipeout3SE.cmd").read_bytes()
+    if launcher != portable_launcher() or b"%~dp0" not in launcher:
+        raise ReleaseError("portable launcher contract is invalid")
+    return {"schema": SCHEMA, "status": "validated", "files": len(listed),
+            "manifest_sha256": _sha256(manifest_path)}
+
+
+def _validate_config(config: dict[str, Any]) -> None:
     if (config.get("schema") != CONFIG_SCHEMA
             or config.get("audio", {}).get("sample_rate_hz") != 44100
             or config.get("audio", {}).get("channels") != 2
             or not 441 <= config.get("audio", {}).get("buffer_frames", 0) <= 8192
             or config.get("video", {}).get("update_rate_hz") != 100
+            or config.get("audio", {}).get("underrun") != "insert-silence-and-count"
+            or config.get("audio", {}).get("max_queued_frames", 0) < 882
             or not 0.0 <= config.get("input", {}).get("deadzone", -1.0) <= 0.5
+            or config.get("input", {}).get("profile") != "modern-gamepad"
             or config.get("save", {}).get("card_slots") not in {1, 2}
             or not str(config.get("save", {}).get("root", "")).startswith("${USER_DATA}/")):
         raise ReleaseError("save/input/audio/video configuration boundary is invalid")
-    return {"schema": SCHEMA, "status": "validated", "files": len(listed),
-            "manifest_sha256": _sha256(manifest_path)}
 
 
 def run_soak(command: Sequence[str], *, iterations: int, timeout_seconds: float,
-             max_p95_ms: float, cwd: Path | None = None) -> dict[str, Any]:
+             max_p95_ms: float, cwd: Path | None = None,
+             receipt_path: Path | None = None) -> dict[str, Any]:
     if iterations < 3 or iterations > 10000 or timeout_seconds <= 0 or max_p95_ms <= 0:
         raise ReleaseError("invalid bounded soak parameters")
     environment = {"PATH": os.environ.get("PATH", ""), "LANG": "C", "LC_ALL": "C",
@@ -276,7 +363,11 @@ def run_soak(command: Sequence[str], *, iterations: int, timeout_seconds: float,
     p95 = ordered[max(0, (95 * len(ordered) + 99) // 100 - 1)]
     if p95 > max_p95_ms:
         raise ReleaseError(f"soak p95 {p95:.3f} ms exceeds {max_p95_ms:.3f} ms")
-    return {"schema": "wipeout3se.clean-aot.soak.v1", "status": "pass",
+    receipt = {"schema": "wipeout3se.clean-aot.soak.v1", "status": "pass",
             "iterations": iterations, "output_sha256": digests[0],
+            "command_sha256": hashlib.sha256(_canonical(list(command))).hexdigest(),
             "timing_ms": {"min": min(elapsed_ms), "median": statistics.median(elapsed_ms),
                           "p95": p95, "max": max(elapsed_ms), "limit_p95": max_p95_ms}}
+    if receipt_path is not None:
+        _atomic_write(receipt_path.resolve(strict=False), _canonical(receipt))
+    return receipt

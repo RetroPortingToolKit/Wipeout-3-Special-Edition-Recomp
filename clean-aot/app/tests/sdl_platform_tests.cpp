@@ -5,7 +5,10 @@
 
 int main() {
     clean_aot::app::SdlPlatform platform;
-    if (!platform.initialize("clean AOT shell test", 320U, 240U)) {
+    clean_aot::app::PlatformConfiguration configuration{};
+    configuration.width = 320U;
+    configuration.height = 240U;
+    if (!platform.initialize("clean AOT shell test", configuration)) {
         std::cerr << "SDL dummy window/audio/input initialization failed\n";
         return 1;
     }
@@ -24,6 +27,7 @@ int main() {
         std::cerr << "SDL exact audio batch queue failed\n";
         return 1;
     }
+    if (platform.audio_health().overflows != 0U) return 1;
     platform.shutdown();
     std::cout << "clean_aot_app_sdl_tests: all checks passed\n";
     return 0;

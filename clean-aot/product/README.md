@@ -160,13 +160,30 @@ reject additions or tampering:
 python tools/product/build_product.py validate-release --package D:/Games/Wipeout3SE
 ```
 
+Initialize per-user state before authenticated media setup:
+
+```powershell
+python tools/product/build_product.py install `
+  --package D:/Games/Wipeout3SE `
+  --user-data "$env:LOCALAPPDATA/Wipeout3SE"
+```
+
+This creates two exact 128-KiB memory cards and the bounded modern controller,
+44.1-kHz audio-buffer/underrun, 4K/ultrawide display configuration using atomic
+write-through replacement. Its receipt remains
+`awaiting-authenticated-media-import`; the portable `Wipeout3SE.cmd` resolves
+the package from its own location and refuses to launch until the existing
+authenticated setup/finalization pipeline has published `finalize.json`.
+
 The deterministic soak command runs a headless validation executable multiple
 times with fixed locale/timezone/SDL drivers, requires identical output bytes,
 enforces bounded execution, and checks a declared p95 ceiling:
 
 ```powershell
 python tools/product/build_product.py soak --iterations 1000 `
-  --timeout-seconds 30 --max-p95-ms 10 -- build-release/product_soak.exe
+  --timeout-seconds 30 --max-p95-ms 10 `
+  --receipt build-release/receipts/soak-1000.json `
+  -- build-release/product_soak.exe
 ```
 
 Passing these gates proves package isolation, relocation, deterministic harness

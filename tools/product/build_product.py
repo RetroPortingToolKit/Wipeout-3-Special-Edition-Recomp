@@ -20,7 +20,7 @@ if __package__ in {None, ""}:
         setup_product,
     )
     from release_lane import (  # type: ignore[import-not-found]
-        ReleaseError, create_release, run_soak, validate_release)
+        ReleaseError, create_release, initialize_install, run_soak, validate_release)
 else:
     from .pipeline import (
         DEFAULT_MEDIA_MANIFEST,
@@ -31,7 +31,8 @@ else:
         run_dry_run,
         setup_product,
     )
-    from .release_lane import ReleaseError, create_release, run_soak, validate_release
+    from .release_lane import (ReleaseError, create_release, initialize_install,
+                               run_soak, validate_release)
 
 
 def _common_media(parser: argparse.ArgumentParser) -> None:
@@ -98,12 +99,18 @@ def _build_parser() -> argparse.ArgumentParser:
         "validate-release", help="remeasure a package after relocation")
     validate.add_argument("--package", type=Path, required=True)
 
+    install = subparsers.add_parser(
+        "install", help="initialize durable per-user state and first-run media UX")
+    install.add_argument("--package", type=Path, required=True)
+    install.add_argument("--user-data", type=Path, required=True)
+
     soak = subparsers.add_parser(
         "soak", help="run a deterministic bounded performance/soak command")
     soak.add_argument("--iterations", type=int, default=100)
     soak.add_argument("--timeout-seconds", type=float, default=30.0)
     soak.add_argument("--max-p95-ms", type=float, required=True)
     soak.add_argument("--cwd", type=Path)
+    soak.add_argument("--receipt", type=Path)
     soak.add_argument("command_line", nargs=argparse.REMAINDER)
     return parser
 
@@ -172,6 +179,8 @@ def main(argv: list[str] | None = None) -> int:
                 leakage_profile=args.profile)
         elif args.command == "validate-release":
             document = validate_release(args.package)
+        elif args.command == "install":
+            document = initialize_install(args.package, args.user_data)
         elif args.command == "soak":
             command_line = args.command_line
             if command_line and command_line[0] == "--":
@@ -181,7 +190,8 @@ def main(argv: list[str] | None = None) -> int:
             document = run_soak(
                 command_line, iterations=args.iterations,
                 timeout_seconds=args.timeout_seconds,
-                max_p95_ms=args.max_p95_ms, cwd=args.cwd)
+                max_p95_ms=args.max_p95_ms, cwd=args.cwd,
+                receipt_path=args.receipt)
         else:  # pragma: no cover - argparse enforces the command set
             raise ProductError("unknown product command")
         _print(document)
