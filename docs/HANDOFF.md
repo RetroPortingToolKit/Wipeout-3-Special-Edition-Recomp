@@ -1179,9 +1179,10 @@ instruction and fails closed on every unknown PC or executable identity.
   requirements. The shipping architecture is the established PSXRecomp model:
   HLE boot skip, statically generated base-game code, and the framework's
   capture/compile/cache safety path for overlays and unknown code.
-- Preserve `clean-aot/` as research and a source of independently useful
-  hardware, rendering, timing, input, and audio fixes. Do not spend further
-  shipping work advancing exact BIOS-shell frontiers.
+- Preserve `clean-aot/` only as historical research. It is not a source for
+  shipping code, feature design, or acceptance evidence. Do not spend further
+  shipping work advancing or porting its BIOS, hardware, rendering, timing,
+  input, audio, packaging, or verification implementations.
 - A fresh `build-psx-standard` Release build from the root generated project
   completed successfully. A bounded headless run with the prepared 14-track
   local test disc reached frame 3,486 and visually rendered the city intro;
@@ -1195,3 +1196,39 @@ instruction and fails closed on every unknown PC or executable identity.
 - Next: verify the no-wizard launcher from a clean portable directory with no
   cached paths, require/select external retail BIOS and disc without copying
   either, then exercise menus and race routes through the debug protocol.
+
+## Inherited-runtime distrust and upstream reset (2026-08-22)
+
+- The user explicitly rejected inherited repository implementations and old
+  receipts as trustworthy evidence; the failed historical project is why this
+  refactor exists. A boot screenshot is only a smoke result, never proof of
+  correctness, completeness, remaster quality, or performance.
+- The pinned framework fork was 21 commits behind `mstan/psxrecomp` master and
+  carried one 954-line local patch (`afe4c690`) mixing compiler behavior with
+  bespoke route/freeze tooling. Current official upstream independently
+  contains the important PGXP newline, load-delay scope, CPS fallthrough,
+  dirty-text continuation, overlay-capture, and SPU corrections as smaller
+  commits with focused tests.
+- The submodule is reset to current official upstream
+  `cf918c7be5e0926ec47c0e709e7070b6ff535a37`, plus the one-line test-harness
+  correction described below (`d65e88f3`). A fresh isolated Release build
+  (`build-psx-upstream-audit`, debug tools enabled) completed with no local
+  production-runtime patch.
+- Fresh external retail BIOS plus full 14-track disc execution reached frame
+  3,483 and rendered the city intro. This proves only upstream baseline
+  viability. All menus, races, overlays, graphics features, timing, audio,
+  input, saves, and packaging still require new evidence.
+- `game.toml` now sets `openbios = false`, matching the product decision that
+  players provide the exact retail BIOS. A clean-directory probe with no BIOS
+  failed closed at “Step 1 of 2”; supplying the BIOS but no disc failed closed
+  at “Step 2 of 2”; supplying both reached the intro without copying either
+  input into the application directory.
+- The user subsequently made the reset absolute: old project work is treated
+  as failed and useless for this refactor. Implement the remaster independently
+  on the audited upstream base; do not inventory old fixes for selective reuse.
+- Upstream's full runtime test build initially exposed an unlinked
+  `gpu_ws_precise_nclip_enabled` dependency in `gte_register_access_test`.
+  Branch `codex/wipeout3-upstream-audit` commit `d65e88f3` supplies the missing
+  test stub. After that one-line harness fix, all 38 enabled upstream tests
+  passed; three explicitly disabled upstream tests remain unproved and must not
+  be represented as coverage.

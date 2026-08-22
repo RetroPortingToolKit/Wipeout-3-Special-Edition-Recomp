@@ -39,6 +39,10 @@ strict = true
 [runtime]
 window_title = "Wipeout 3 Special Edition Recompiled"
 memcard_dir = "saves"
+# The player supplies the retail BIOS that matches the linked SCPH-1001
+# backend. OpenBIOS remains a framework development option but is not the
+# supported product configuration for this title.
+openbios = false
 
 [video]
 renderer = "opengl"
