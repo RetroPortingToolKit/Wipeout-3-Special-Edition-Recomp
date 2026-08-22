@@ -138,6 +138,8 @@ struct GraphicsConfiguration final {
         psx::render::ProjectionPolicy::PreserveNative4x3;
     psx::render::CullingPolicy culling =
         psx::render::CullingPolicy::NativeHardware;
+    raster::TextureFilterMode texture_filter =
+        raster::TextureFilterMode::NearestNative;
 };
 
 class IPngDecoder {
@@ -239,6 +241,8 @@ public:
     [[nodiscard]] std::uint64_t precise_primitives() const noexcept;
     [[nodiscard]] std::uint64_t precise_fallbacks() const noexcept;
     [[nodiscard]] std::uint64_t geometry_digest() const noexcept;
+    [[nodiscard]] const raster::PreciseRasterStats& precise_raster_stats()
+        const noexcept;
 
 private:
     GraphicsConfiguration configuration_{};

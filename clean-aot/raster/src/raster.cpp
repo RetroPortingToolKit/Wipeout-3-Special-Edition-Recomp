@@ -431,6 +431,7 @@ struct ReferenceRasterizer::Impl {
   RasterLimits limits{};
   std::uint64_t vram_generation = 0u;
   const ReplacementTexture *replacement = nullptr;
+  PreciseRasterStats precise_stats{};
 
   [[nodiscard]] EventResult reject(RasterError error) const noexcept {
     return EventResult{EventStatus::Rejected, error, 0, {}};
@@ -585,6 +586,59 @@ struct ReferenceRasterizer::Impl {
         texel == 0u, (texel & 0x8000u) != 0u};
   }
 
+  [[nodiscard]] TextureSample sample_texture_filtered(
+      const gpu::RenderStateSnapshot &state,
+      const std::optional<gpu::ClutAttribute> &clut, double u, double v,
+      TextureFilterMode filtering) noexcept {
+    const std::int64_t nearest_u = static_cast<std::int64_t>(u);
+    const std::int64_t nearest_v = static_cast<std::int64_t>(v);
+    if (filtering == TextureFilterMode::NearestNative) {
+      return sample_texture(state, clut, nearest_u, nearest_v);
+    }
+    const double floor_u = std::floor(u);
+    const double floor_v = std::floor(v);
+    const double fraction_u = u - floor_u;
+    const double fraction_v = v - floor_v;
+    if (fraction_u == 0.0 && fraction_v == 0.0) {
+      return sample_texture(state, clut, nearest_u, nearest_v);
+    }
+    const std::int64_t x0 = static_cast<std::int64_t>(floor_u);
+    const std::int64_t y0 = static_cast<std::int64_t>(floor_v);
+    const std::array<TextureSample, 4U> samples{
+        sample_texture(state, clut, x0, y0),
+        sample_texture(state, clut, x0 + 1, y0),
+        sample_texture(state, clut, x0, y0 + 1),
+        sample_texture(state, clut, x0 + 1, y0 + 1)};
+    precise_stats.bilinear_texture_fetches += 4U;
+    const bool semi = samples[0].semi_transparent;
+    if (std::any_of(samples.begin(), samples.end(),
+                    [semi](const TextureSample& sample) {
+                      return sample.transparent ||
+                          sample.semi_transparent != semi;
+                    })) {
+      ++precise_stats.transparency_fallbacks;
+      return sample_texture(state, clut, nearest_u, nearest_v);
+    }
+    const std::array<double, 4U> weights{
+        (1.0 - fraction_u) * (1.0 - fraction_v),
+        fraction_u * (1.0 - fraction_v),
+        (1.0 - fraction_u) * fraction_v,
+        fraction_u * fraction_v};
+    const auto channel = [&](Color TextureSample::* color,
+                             std::int64_t Color::* component) noexcept {
+      double value = 0.0;
+      for (std::size_t i = 0U; i < samples.size(); ++i) {
+        value += static_cast<double>((samples[i].*color).*component) * weights[i];
+      }
+      return static_cast<std::int64_t>(std::lround(value));
+    };
+    ++precise_stats.bilinear_fragments;
+    return TextureSample{Color{
+        channel(&TextureSample::color_5bit, &Color::red),
+        channel(&TextureSample::color_5bit, &Color::green),
+        channel(&TextureSample::color_5bit, &Color::blue)}, false, semi};
+  }
+
   [[nodiscard]] static Color raw_texture_color(Color texture_5bit) noexcept {
     return Color{texture_5bit.red << 3u, texture_5bit.green << 3u,
                  texture_5bit.blue << 3u};
@@ -717,12 +771,15 @@ struct ReferenceRasterizer::Impl {
       const gpu::PolygonEvent &event,
       std::span<const PreciseVertex> vertices,
       PreciseCullingPolicy culling,
+      TextureFilterMode filtering,
       WorkBudget &budget) noexcept {
     const std::size_t expected = event.quad ? 6u : 3u;
     const bool textured = event.textured && !event.state.draw_mode.texture_disable;
     if (event.kind != gpu::EventKind::Polygon || vertices.size() != expected ||
         !valid_common_state(event.state) ||
-        !valid_texture_state(event.state, textured, event.clut)) {
+        !valid_texture_state(event.state, textured, event.clut) ||
+        (filtering != TextureFilterMode::NearestNative &&
+         filtering != TextureFilterMode::BilinearTransparencySafe)) {
       return reject(RasterError::MalformedEvent);
     }
     std::uint64_t work_units = 0U;
@@ -791,6 +848,7 @@ struct ReferenceRasterizer::Impl {
                                   static_cast<double>(y)) / area;
           const double c = 1.0 - a - b;
           if (a < 0.0 || b < 0.0 || c < 0.0) continue;
+          ++precise_stats.precise_fragments;
           const double denominator = a / v[0].w + b / v[1].w + c / v[2].w;
           if (!std::isfinite(denominator) || denominator == 0.0) continue;
           const double pa = (a / v[0].w) / denominator;
@@ -811,10 +869,11 @@ struct ReferenceRasterizer::Impl {
               const double value = pa * (select_v ? v[0].v : v[0].u) +
                   pb * (select_v ? v[1].v : v[1].u) +
                   pc * (select_v ? v[2].v : v[2].u);
-              return static_cast<std::int64_t>(value * 255.0);
+              return value * 255.0;
             };
-            const TextureSample sample = sample_texture(
-                event.state, event.clut, coordinate(false), coordinate(true));
+            const TextureSample sample = sample_texture_filtered(
+                event.state, event.clut, coordinate(false), coordinate(true),
+                filtering);
             transparent = sample.transparent;
             texture_semi = sample.semi_transparent;
             color = event.raw_texture ? raw_texture_color(sample.color_5bit)
@@ -1574,6 +1633,7 @@ ReferenceRasterizer::~ReferenceRasterizer() noexcept = default;
 
 void ReferenceRasterizer::reset(VramWord value) noexcept {
   impl_->vram.fill(value);
+  impl_->precise_stats = {};
   if (impl_->vram_generation != std::numeric_limits<std::uint64_t>::max()) {
     ++impl_->vram_generation;
   }
@@ -1597,11 +1657,13 @@ EventResult ReferenceRasterizer::consume_precise_polygon(
     const gpu::PolygonEvent &event,
     std::span<const PreciseVertex> triangle_vertices,
     const ReplacementTexture *replacement,
-    PreciseCullingPolicy culling) noexcept {
+    PreciseCullingPolicy culling,
+    TextureFilterMode filtering) noexcept {
   WorkBudget budget{};
   impl_->replacement = replacement;
   const EventResult result =
-      impl_->consume_precise_polygon(event, triangle_vertices, culling, budget);
+      impl_->consume_precise_polygon(
+          event, triangle_vertices, culling, filtering, budget);
   impl_->replacement = nullptr;
   return result;
 }
@@ -1657,6 +1719,10 @@ std::uint64_t ReferenceRasterizer::vram_generation() const noexcept {
 
 const RasterLimits &ReferenceRasterizer::limits() const noexcept {
   return impl_->limits;
+}
+
+const PreciseRasterStats &ReferenceRasterizer::precise_stats() const noexcept {
+  return impl_->precise_stats;
 }
 
 NativeBackendV1 ReferenceRasterizer::native_backend() noexcept {

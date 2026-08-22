@@ -775,7 +775,8 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                                     projection_plan_.culling ==
                                             psx::render::CullingPolicy::NativeHardware
                                         ? raster::PreciseCullingPolicy::NativeHardware
-                                        : raster::PreciseCullingPolicy::ProjectedBounds);
+                                        : raster::PreciseCullingPolicy::ProjectedBounds,
+                                    configuration_.texture_filter);
                             if (rendered.accepted()) {
                                 consumed_precise = true;
                                 ++precise_primitives_;
@@ -881,6 +882,11 @@ std::uint64_t RuntimeGraphics::precise_fallbacks() const noexcept {
 
 std::uint64_t RuntimeGraphics::geometry_digest() const noexcept {
     return geometry_digest_;
+}
+
+const raster::PreciseRasterStats& RuntimeGraphics::precise_raster_stats()
+    const noexcept {
+    return raster_.precise_stats();
 }
 
 std::uint64_t RuntimeGraphics::visual_digest() const noexcept {

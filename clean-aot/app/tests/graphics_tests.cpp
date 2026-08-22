@@ -126,10 +126,15 @@ void test_live_pgxp_projection_pipeline() {
         expect(gpu.write_gp0(word).accepted, "PGXP live packet accepts");
     };
     send(0xe3000000U); send(0xe4000000U | (511U << 10U) | 1023U);
-    send(0x200000ffU);
+    send(0xa0000000U); send(64U); send((2U << 16U) | 2U);
+    send(0x03e0001fU); send(0x7fff7c00U);
+    send(0x25ffffffU);
     send((20U << 16U) | 20U);
+    send(0U);
     send((20U << 16U) | 220U);
+    send(0x01010001U);
     send((180U << 16U) | 20U);
+    send(0x00000100U);
 
     LiveProvenance provenance;
     app::GraphicsConfiguration graphics_config{};
@@ -143,6 +148,8 @@ void test_live_pgxp_projection_pipeline() {
     graphics_config.provenance_provider = &provenance;
     graphics_config.projection = psx::render::ProjectionPolicy::ExpandHorizontal;
     graphics_config.culling = psx::render::CullingPolicy::MatchExpandedProjection;
+    graphics_config.texture_filter =
+        raster::TextureFilterMode::BilinearTransparencySafe;
     app::RuntimeGraphics graphics(graphics_config);
     host::HeadlessBackend host;
     expect(graphics.configured() && graphics.present(runtime, host, 0U).success(),
@@ -151,8 +158,13 @@ void test_live_pgxp_projection_pipeline() {
               << graphics.geometry_digest() << std::dec << '\n';
     expect(graphics.precise_primitives() == 1U &&
            graphics.precise_fallbacks() == 0U &&
-           graphics.geometry_digest() == 0x44a1ecefa6185830ULL,
+           graphics.geometry_digest() == 0x55e1f82e49a637d6ULL,
            "GTE/RAM/GPU provenance drives deterministic projected geometry");
+    const auto& filter_stats = graphics.precise_raster_stats();
+    expect(filter_stats.bilinear_fragments != 0U &&
+           filter_stats.bilinear_texture_fetches <=
+               filter_stats.precise_fragments * 4U,
+           "live ultrawide filtering remains within four fetches per fragment");
     expect(graphics.visual_receipt().content_width == 5040U &&
            graphics.visual_receipt().content_height == 2160U,
            "projected geometry reaches the 5K ultrawide presentation plan");

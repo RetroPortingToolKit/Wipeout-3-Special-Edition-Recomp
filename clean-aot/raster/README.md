@@ -141,3 +141,12 @@ windows, modulation/raw paths, semi-transparency, dither, draw clipping and
 offset, fixed-point line behavior, full hardware-captured Gouraud and UV/color
 interpolation scenes, presentation aspect seams, backend dispatch, work bounds,
 and a project-scene VRAM golden digest.
+
+The precise-polygon path also offers an explicit
+`BilinearTransparencySafe` filter. It performs a fixed four-sample bilinear
+blend only when every texel in the footprint is visible and carries the same
+PS1 semi-transparency bit. Transparent or mixed-STP footprints use native
+nearest sampling, preventing color bleed across cutout edges and preserving the
+hardware blend class. `NearestNative` remains the default and is byte-identical
+to the unenhanced path. Counters expose fragment, fetch, and fallback costs for
+deterministic performance receipts.

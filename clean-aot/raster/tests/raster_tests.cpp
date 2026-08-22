@@ -1314,6 +1314,65 @@ void test_scanout_boundaries() {
           "out-of-domain horizontal resolution was silently masked");
 }
 
+void test_precise_transparency_safe_filtering() {
+  using clean_aot::raster::PreciseCullingPolicy;
+  using clean_aot::raster::PreciseVertex;
+  using clean_aot::raster::TextureFilterMode;
+  ReferenceRasterizer rasterizer;
+  consume_ok(rasterizer, Event{upload(
+      VramPoint{64, 0}, VramExtent{2, 2},
+      {0x03e0001fu, 0x7fff7c00u})});
+
+  PolygonEvent polygon{};
+  polygon.vertex_count = 3U;
+  polygon.textured = true;
+  polygon.raw_texture = true;
+  polygon.state = full_state();
+  polygon.state.draw_mode.x_base = 1U;
+  polygon.state.draw_mode.depth = TextureDepth::Direct15;
+  polygon.vertices[0] = vertex(10, 10);
+  polygon.vertices[1] = vertex(30, 10);
+  polygon.vertices[2] = vertex(10, 30);
+  constexpr double texel = 1.0 / 255.0;
+  const auto precise = [](double x, double y, double u, double v) {
+    return PreciseVertex{x, y, 1.0, 1.0, u, v, 0xffffffffU, 1U, 1U};
+  };
+  std::array<PreciseVertex, 3U> vertices{
+      precise(10.0, 10.0, 0.0, 0.0),
+      precise(30.0, 10.0, texel, 0.0),
+      precise(10.0, 30.0, 0.0, texel)};
+  require(rasterizer.consume_precise_polygon(polygon, vertices).accepted() &&
+              rasterizer.read_vram(15, 15) == 0x001fu,
+          "default precise filtering changed native nearest sampling");
+
+  for (PreciseVertex& point : vertices) point.x += 30.0;
+  require(rasterizer.consume_precise_polygon(
+              polygon, vertices, nullptr, PreciseCullingPolicy::NativeHardware,
+              TextureFilterMode::BilinearTransparencySafe).accepted() &&
+              rasterizer.read_vram(45, 15) == 0x2113u,
+          "opaque precise footprint did not receive deterministic bilinear filtering");
+  const auto opaque_stats = rasterizer.precise_stats();
+  require(opaque_stats.bilinear_fragments != 0U &&
+              opaque_stats.bilinear_texture_fetches ==
+                  4U * (opaque_stats.bilinear_fragments +
+                        opaque_stats.transparency_fallbacks) &&
+              opaque_stats.bilinear_texture_fetches <=
+                  opaque_stats.precise_fragments * 4U,
+          "bilinear hot path exceeded its fixed four-fetch fragment budget");
+
+  consume_ok(rasterizer, Event{upload(
+      VramPoint{64, 0}, VramExtent{2, 2},
+      {0x03e00000u, 0x7fff7c00u})});
+  for (PreciseVertex& point : vertices) point.x += 30.0;
+  const std::uint64_t fallbacks = rasterizer.precise_stats().transparency_fallbacks;
+  require(rasterizer.consume_precise_polygon(
+              polygon, vertices, nullptr, PreciseCullingPolicy::NativeHardware,
+              TextureFilterMode::BilinearTransparencySafe).accepted() &&
+              rasterizer.read_vram(75, 15) == 0U &&
+              rasterizer.precise_stats().transparency_fallbacks > fallbacks,
+          "transparent footprint was filtered across a PS1 cutout edge");
+}
+
 } // namespace
 
 int main() {
@@ -1329,6 +1388,7 @@ int main() {
     test_texture_mask_transparency_and_modulation();
     test_bounds_presentation_and_backend();
     test_adversarial_coordinates_and_budgets();
+    test_precise_transparency_safe_filtering();
     test_scanout_boundaries();
     test_golden_digest();
   } catch (const TestFailure &failure) {

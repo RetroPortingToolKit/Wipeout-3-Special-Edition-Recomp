@@ -82,6 +82,18 @@ enum class PreciseCullingPolicy : std::uint8_t {
   ProjectedBounds,
 };
 
+enum class TextureFilterMode : std::uint8_t {
+  NearestNative,
+  BilinearTransparencySafe,
+};
+
+struct PreciseRasterStats final {
+  std::uint64_t precise_fragments = 0U;
+  std::uint64_t bilinear_fragments = 0U;
+  std::uint64_t bilinear_texture_fetches = 0U;
+  std::uint64_t transparency_fallbacks = 0U;
+};
+
 struct EventResult {
   EventStatus status = EventStatus::Rejected;
   RasterError error = RasterError::MalformedEvent;
@@ -246,7 +258,8 @@ public:
       std::span<const PreciseVertex> triangle_vertices,
       const ReplacementTexture *replacement = nullptr,
       PreciseCullingPolicy culling =
-          PreciseCullingPolicy::NativeHardware) noexcept;
+          PreciseCullingPolicy::NativeHardware,
+      TextureFilterMode filtering = TextureFilterMode::NearestNative) noexcept;
   [[nodiscard]] EventResult consume(const gpu::Event &event,
                                     WorkBudget &budget) noexcept;
   [[nodiscard]] BatchResult
@@ -260,6 +273,7 @@ public:
   [[nodiscard]] std::uint64_t digest() const noexcept;
   [[nodiscard]] std::uint64_t vram_generation() const noexcept;
   [[nodiscard]] const RasterLimits &limits() const noexcept;
+  [[nodiscard]] const PreciseRasterStats &precise_stats() const noexcept;
 
   [[nodiscard]] NativeBackendV1 native_backend() noexcept;
 
