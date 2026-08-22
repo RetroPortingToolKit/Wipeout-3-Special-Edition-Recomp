@@ -10,8 +10,8 @@
  * a display-only multiplier from being mistaken for a 100 Hz simulation.
  */
 static void wipeout3_framerate_pal_x2_activate(void) {
-    (void)psx_mod_set_crtc_refresh_multiplier(2u);
     (void)psx_mod_set_native_vblank_rate(100u);
+    (void)psx_mod_set_crtc_refresh_multiplier(2u);
 }
 
 PSX_MOD_CONSTRUCTOR(wipeout3_register_framerate_100_plugins) {
