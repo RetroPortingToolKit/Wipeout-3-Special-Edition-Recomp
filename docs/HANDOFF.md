@@ -1,5 +1,20 @@
 # Handoff
 
+## Live a0==0 continuation through frontier 0x8005161C (2026-08-22)
+
+- Live stack/CFI execution followed 103 exact fail-closed frontiers from
+  `0x80050A7C` through the current `a0==0` initializer path. The requested
+  100-frontier tranche starts at `0x80050A88` and ends at UnknownCode
+  `0x8005161C`; no edge was forced from the static `46da91b` route contract.
+- Two repeated probes are byte-identical (SHA-256 `d7f5afaa...1801`) at
+  19,272,155 instructions / 1,787,780 dispatches. Terminal `$ra=0x80047450`,
+  `$sp=0x801FFD60`, Cause is zero, and CD MMIO reads/writes/raw sectors remain
+  `0/0/0`. The later `a0==1` invocation and `0x80030120` have not yet occurred.
+- Canonical receipt: `bios-shell-live-frontiers-8005161c.json` (SHA-256
+  `784129ee...79fc`). It retains all 103 exact source/variant/image/manifest
+  identities. Generated C++ remains ignored scratch;
+  `advance_live_shell_frontiers.py` deterministically regenerates the batch.
+
 ## Root-counter target/overflow reset dwell (2026-08-22)
 
 - Target reset now holds zero for two selected-source ticks; ordinary `FFFFh`
