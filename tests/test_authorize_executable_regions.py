@@ -58,3 +58,13 @@ def test_literal_indirect_target_is_finite() -> None:
          "proof": "local_literal_register_construction"}
     ]
     assert report["finite_indirect_closure"]
+
+
+def test_observed_unknown_pc_can_seed_disjoint_direct_closure() -> None:
+    base = 0xBFC00000
+    image = words(0x0BF00004, 0, 0, 0, 0x03E00008, 0)
+    allowed = set(range(base, base + len(image), 4))
+    report = MODULE.analyze(image, base, {base, base + 16}, allowed, "test")
+    assert report["authorized_instruction_count"] == 4
+    assert report["roots"] == [base, base + 16]
+    assert report["direct_closure_complete"]

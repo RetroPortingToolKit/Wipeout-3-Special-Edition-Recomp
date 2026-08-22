@@ -45,6 +45,9 @@ The exact BIOS direct frontier starts at reset, includes the previously excluded
 hash-pinned BIOS bytes. It has complete direct closure across 56 ranges and
 stops fail-closed at 27 indirect sites. The generated manifest gives every
 range an explicit entry and never treats unauthenticated disassembly as a root.
+The deterministic 17,353-instruction execution receipt additionally proves the
+runtime return target `0xBFC0703C`. Manifest generation preserves that root even
+though its bytes coalesce with the surrounding authorized range.
 
 The exact 270 main-image unknown ranges and 18 NFE unknown ranges are recorded
 under each image's `unknown_ranges` array in the receipt. The NFE ranges are:

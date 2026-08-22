@@ -224,6 +224,7 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
     expansion = load_json(args.nfe_expansion_receipt)
     route = load_json(args.route_receipt)
     broader_route = load_json(args.broader_route_receipt)
+    bios_execution = load_json(args.bios_execution_receipt)
     capture = load_json(args.capture)
     exe_hints = load_json(args.exe_hints)
     hints = load_json(args.nfe_hints)
@@ -252,6 +253,11 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         raise AuthorizationError("deterministic route receipt is not exact and complete")
     if broader_route.get("format") != "wipeout3se.goosestation-route-replay.v1":
         raise AuthorizationError("broader route receipt has an unknown format")
+    if (bios_execution.get("schema") != "clean-aot.real-bios-execution.v1" or
+            bios_execution.get("bios_sha256") != sha256(bios) or
+            bios_execution.get("dispatch_status") != 2 or
+            bios_execution.get("cop0_cause") != 0):
+        raise AuthorizationError("BIOS execution receipt is not a clean unknown-PC stop")
 
     nfe_end = args.nfe_base + len(nfe)
     observed: set[int] = set()
@@ -373,8 +379,12 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         del report["_authorized"]
 
     bios_allowed = set(range(args.bios_base, args.bios_base + len(bios), 4))
+    observed_bios_pc = int(bios_execution["stop_pc"])
+    if (observed_bios_pc % 4 != 0 or
+            not args.bios_base <= observed_bios_pc < args.bios_base + len(bios)):
+        raise AuthorizationError("BIOS execution stop PC is outside the authenticated BIOS")
     bios_report = analyze(
-        bios, args.bios_base, {args.bios_base}, bios_allowed,
+        bios, args.bios_base, {args.bios_base, observed_bios_pc}, bios_allowed,
         "exact verified retail BIOS reset vector; direct closure over the authenticated BIOS image",
     )
     reset_end = args.bios_base + args.bios_reset_bytes
@@ -416,6 +426,8 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         },
         "evidence": {
             "bios_sha256": sha256(bios),
+            "bios_execution_receipt_sha256": sha256(args.bios_execution_receipt.read_bytes()),
+            "bios_execution_observed_root": observed_bios_pc,
             "exe_text_sha256": sha256(exe),
             "exe_container_sha256": sha256(container),
             "exe_hint_receipt_sha256": sha256(args.exe_hints.read_bytes()),
@@ -451,6 +463,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--bios-reset-bytes", type=lambda value: int(value, 0), default=0x78)
     result.add_argument("--bios-variant-sha256", required=True)
     result.add_argument("--bios-manifest-output", type=Path)
+    result.add_argument("--bios-execution-receipt", type=Path, required=True)
     result.add_argument("--exe-text", type=Path, required=True)
     result.add_argument("--exe-container", type=Path, required=True)
     result.add_argument("--exe-container-sha256", required=True)
@@ -492,8 +505,13 @@ def main(argv: list[str] | None = None) -> int:
                 f"load_start={args.bios_base:#x}",
                 f"load_end_exclusive={args.bios_base + (args.bios.stat().st_size):#x}",
             ]
-            for authorized_range in bios_report["authorized_ranges"]:
-                lines.append(f"entry={authorized_range['start']:#x}")
+            manifest_roots = sorted(
+                set(bios_report["roots"]) |
+                {authorized_range["start"]
+                 for authorized_range in bios_report["authorized_ranges"]}
+            )
+            for root in manifest_roots:
+                lines.append(f"entry={root:#x}")
             for authorized_range in bios_report["authorized_ranges"]:
                 lines.append(
                     f"code={authorized_range['start']:#x}-"

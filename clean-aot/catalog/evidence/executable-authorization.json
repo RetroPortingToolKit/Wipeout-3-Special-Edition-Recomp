@@ -14,6 +14,8 @@
     }
   },
   "evidence": {
+    "bios_execution_observed_root": 3217059900,
+    "bios_execution_receipt_sha256": "1401007c3e94e4467110a7d85649fc5e95de2a42b6a72ee2384bf7c3e2a7a252",
     "bios_sha256": "71af94d1e47a68c11e8fdb9f8368040601514a42a5a399cda48c7d3bff1e99d3",
     "broader_route_classification": "behavioral cross-evidence only; contains no PC/edge authority",
     "broader_route_receipt_sha256": "87ccea3e4d19969e24efe7c83ff4d0caab8158d62b3da075a3952915740db8d7",
@@ -738848,7 +738850,8 @@
       "rejected_roots": [],
       "root_evidence": "exact verified retail BIOS reset vector; direct closure over the authenticated BIOS image",
       "roots": [
-        3217031168
+        3217031168,
+        3217059900
       ],
       "unknown_ranges": [
         {
