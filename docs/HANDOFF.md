@@ -274,7 +274,11 @@ instruction and fails closed on every unknown PC or executable identity.
   tranche branches remain divergent and should be treated as review receipts,
   not independently shippable products.
 - Fresh aggregate GCC 16.1 Release configure/build succeeded from
-  `clean-aot/CMakeLists.txt`; all 15 CTest targets passed.
+  `clean-aot/CMakeLists.txt`; after correcting the aggregate to include media,
+  runtime, and host, all 18 CTest targets passed.
+- Fresh aggregate Clang 22.1.8 RelWithDebInfo with non-recovering ASan/UBSan
+  built every component and passed the same 18 CTest targets with no sanitizer
+  report.
 - Fresh Python verification passed 118 tests and 584 subtests; one test was
   skipped by its declared environment gate.
 - Those results establish buildability and regression-test health only. They do

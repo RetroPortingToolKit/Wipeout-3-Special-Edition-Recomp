@@ -32,7 +32,9 @@ runtime fallbacks are not implementation or correctness authorities.
   machine timing, DMA/timers/interrupts, GPU, raster, CD-ROM/media, SPU, SIO,
   MDEC, rendering provenance, host presentation, and product setup.
 - Recovery verification on 2026-08-21 passed the aggregate GCC 16.1 Release
-  build and all 15 CTest targets.
+  build and all 18 CTest targets, including media, runtime, and host.
+- The same complete aggregate passed Clang 22.1.8 RelWithDebInfo under
+  non-recovering AddressSanitizer and UndefinedBehaviorSanitizer.
 - Python verification passed 118 tests and 584 subtests with one declared
   environment-dependent skip.
 - A deterministic quarantined route reaches a live race. GooseStation behavior
