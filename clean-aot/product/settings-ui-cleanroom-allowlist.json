@@ -1,0 +1,9 @@
+{
+  "format": "psxrecomp-cleanroom-allowlist-v1",
+  "source": [
+    {"rule":"title_name","path":"clean-aot/app/src/settings.cpp","line":16,"column":39,"match":"wipeout3se","reason":"Runtime settings schema identifier."},
+    {"rule":"title_name","path":"clean-aot/app/src/settings.cpp","line":233,"column":25,"match":"wipeout3se","reason":"Validated runtime settings schema serialization."},
+    {"rule":"title_name","path":"clean-aot/app/src/settings_ui.cpp","line":176,"column":74,"match":"Wipeout 3 SE","reason":"Native product settings window title."}
+  ],
+  "link_map": []
+}

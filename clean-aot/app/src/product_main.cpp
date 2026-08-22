@@ -4,6 +4,7 @@
 #include "clean_aot/runtime/runtime.hpp"
 #include "clean_aot/app/graphics.hpp"
 #include "clean_aot/app/settings.hpp"
+#include "clean_aot/app/settings_ui.hpp"
 
 #include <array>
 #include <algorithm>
@@ -153,8 +154,9 @@ int main(int argc, char** argv) {
     std::filesystem::path settings_path;
     std::string profile;
     std::vector<std::string> settings_overrides;
+    std::vector<std::string> settings_ui_actions;
     std::uint64_t workload_updates = 0U;
-    bool hidden = false, reset_settings = false;
+    bool hidden = false, reset_settings = false, settings_ui = false;
     Receipt receipt{};
     for (int index = 1; index < argc; ++index) {
         const std::string argument =
@@ -176,6 +178,15 @@ int main(int argc, char** argv) {
 #endif
         );
         else if (argument == "--reset-settings") reset_settings = true;
+        else if (argument == "--settings-ui") settings_ui = true;
+        else if (argument == "--settings-ui-action" && index + 1 < argc)
+            settings_ui_actions.emplace_back(
+#ifdef _WIN32
+                utf8(argv[++index])
+#else
+                argv[++index]
+#endif
+            );
         else if (argument == "--workload-profile" && index + 1 < argc) profile =
 #ifdef _WIN32
             utf8(argv[++index]);
@@ -194,7 +205,32 @@ int main(int argc, char** argv) {
     }
     clean_aot::app::RuntimeSettings settings{};
     if (settings_path.empty() && !user_data.empty()) settings_path = user_data / "config.json";
-    if (!settings_path.empty()) {
+    const bool settings_missing = !settings_path.empty() && !std::filesystem::exists(settings_path);
+    const bool show_first_run_settings = settings_missing && profile.empty() && settings_ui_actions.empty();
+    if ((settings_ui || show_first_run_settings || !settings_ui_actions.empty()) && settings_path.empty()) {
+        receipt.reason = "settings-ui-requires-user-data-or-settings-path"; receipt.print(); return 64;
+    }
+    if (settings_ui || show_first_run_settings || !settings_ui_actions.empty()) {
+        clean_aot::app::SettingsUiResult edited{};
+        if (!settings_ui_actions.empty()) {
+            std::vector<std::string_view> actions;
+            actions.reserve(settings_ui_actions.size());
+            for (const auto& action : settings_ui_actions) actions.emplace_back(action);
+            edited = clean_aot::app::run_settings_ui_headless(settings_path, actions);
+        } else edited = clean_aot::app::run_settings_ui_native(settings_path);
+        if (edited.status == clean_aot::app::SettingsUiStatus::invalid ||
+            edited.status == clean_aot::app::SettingsUiStatus::io_error ||
+            edited.status == clean_aot::app::SettingsUiStatus::unavailable) {
+            receipt.reason = "settings-ui-rejected"; receipt.print(); return 78;
+        }
+        settings = edited.value;
+        if (settings_ui || !settings_ui_actions.empty()) {
+            receipt.stage = edited.status == clean_aot::app::SettingsUiStatus::saved
+                ? "settings-saved" : "settings-cancelled";
+            receipt.reason = "settings-ui-complete"; receipt.print(); return 0;
+        }
+    }
+    if (!settings_path.empty() && std::filesystem::exists(settings_path)) {
         const auto loaded = clean_aot::app::load_runtime_settings(settings_path, reset_settings);
         if (loaded.status == clean_aot::app::SettingsStatus::invalid ||
             loaded.status == clean_aot::app::SettingsStatus::io_error) {

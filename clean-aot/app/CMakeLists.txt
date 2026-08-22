@@ -44,6 +44,7 @@ add_library(clean_aot_app STATIC
     src/json.cpp
     src/memory_card.cpp
     src/settings.cpp
+    src/settings_ui.cpp
     src/sha256.cpp
 )
 target_include_directories(clean_aot_app PUBLIC include)
@@ -185,6 +186,10 @@ if(CLEAN_AOT_APP_BUILD_TESTS AND BUILD_TESTING)
     target_link_libraries(clean_aot_settings_tests PRIVATE clean_aot_app)
     clean_aot_app_warnings(clean_aot_settings_tests)
     add_test(NAME clean_aot_settings_tests COMMAND clean_aot_settings_tests)
+    add_executable(clean_aot_settings_ui_tests tests/settings_ui_tests.cpp)
+    target_link_libraries(clean_aot_settings_ui_tests PRIVATE clean_aot_app)
+    clean_aot_app_warnings(clean_aot_settings_ui_tests)
+    add_test(NAME clean_aot_settings_ui_tests COMMAND clean_aot_settings_ui_tests)
     add_executable(clean_aot_app_graphics_tests tests/graphics_tests.cpp)
     target_link_libraries(clean_aot_app_graphics_tests PRIVATE clean_aot_app)
     clean_aot_app_warnings(clean_aot_app_graphics_tests)

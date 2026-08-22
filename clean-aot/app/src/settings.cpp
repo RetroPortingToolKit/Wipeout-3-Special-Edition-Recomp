@@ -5,6 +5,11 @@
 #include <fstream>
 #include <limits>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 namespace clean_aot::app {
 namespace {
 using detail::Json;
@@ -35,14 +40,25 @@ bool boolean(const Json& root, std::string_view group, std::string_view key, boo
 bool write_atomic(const std::filesystem::path& path, std::string_view bytes) {
     std::filesystem::create_directories(path.parent_path());
     auto temporary = path; temporary += ".new";
-    std::error_code error; std::filesystem::remove(temporary, error);
+    std::error_code error;
+    if (std::filesystem::exists(temporary)) {
+        if (std::filesystem::is_symlink(temporary) || !std::filesystem::is_regular_file(temporary))
+            return false;
+        std::filesystem::remove(temporary, error); if (error) return false;
+    }
     std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
     if (!output || !output.write(bytes.data(), static_cast<std::streamsize>(bytes.size()))) return false;
     output.flush(); output.close();
-    std::filesystem::rename(temporary, path, error);
-    if (!error) return true;
-    std::filesystem::remove(path, error); error.clear(); std::filesystem::rename(temporary, path, error);
-    return !error;
+#ifdef _WIN32
+    HANDLE handle = CreateFileW(temporary.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr,
+                                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) return false;
+    const BOOL synced = FlushFileBuffers(handle); CloseHandle(handle);
+    return synced != 0 && MoveFileExW(temporary.c_str(), path.c_str(),
+                                      MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+#else
+    std::filesystem::rename(temporary, path, error); return !error;
+#endif
 }
 bool parse(std::string_view input, RuntimeSettings& value, std::string& error) {
     Json root; if (!detail::parse_json(input, root, error)) return false;
@@ -200,7 +216,14 @@ std::string GraphicsFeatureReceipt::canonical_json() const {
 }
 
 std::string runtime_settings_json(const RuntimeSettings& s) {
-    return std::string{"{\"audio\":{\"device\":\""}+s.audio_device+"\",\"latency_frames\":"+std::to_string(s.audio_latency_frames)+
+    std::string device;
+    for (const char raw : s.audio_device) {
+        const auto character = static_cast<unsigned char>(raw);
+        if (character == '"' || character == '\\') device += '\\';
+        if (character < 0x20U) continue;
+        device += static_cast<char>(character);
+    }
+    return std::string{"{\"audio\":{\"device\":\""}+device+"\",\"latency_frames\":"+std::to_string(s.audio_latency_frames)+
         ",\"max_queued_frames\":"+std::to_string(s.audio_max_frames)+"},\"display\":{\"aspect\":\""+(s.ultrawide?"auto-ultrawide":"native-4:3")+
         "\",\"filter\":\""+(s.presentation_filter==host::PresentationFilter::Linear?"linear":"nearest")+"\",\"height\":"+std::to_string(s.height)+
         ",\"mode\":\""+mode(s.fullscreen)+"\",\"width\":"+std::to_string(s.width)+"},\"graphics\":{\"hd_assets\":"+(s.hd_assets?"true":"false")+
@@ -208,6 +231,20 @@ std::string runtime_settings_json(const RuntimeSettings& s) {
         std::to_string(s.deadzone_per_mille)+",\"rumble\":"+(s.rumble?"true":"false")+"},\"presentation\":{\"policy\":\""+policy(s.present_policy)+
         "\",\"rate_hz\":100},\"saves\":{\"atomic\":"+(s.atomic_saves?"true":"false")+",\"card_slots\":"+std::to_string(s.card_slots)+
         "},\"schema\":\"wipeout3se.runtime-settings.v2\"}\n";
+}
+
+bool save_runtime_settings(const std::filesystem::path& path,
+                           const RuntimeSettings& settings, std::string& error) noexcept {
+    try {
+        if (path.empty() || settings.audio_device.empty() || settings.audio_device.size() > 512U) {
+            error = "settings path or audio device is invalid"; return false;
+        }
+        RuntimeSettings verified{};
+        const auto bytes = runtime_settings_json(settings);
+        if (!parse(bytes, verified, error)) return false;
+        if (!write_atomic(path, bytes)) { error = "atomic settings write failed"; return false; }
+        return true;
+    } catch (const std::exception& exception) { error = exception.what(); return false; }
 }
 
 SettingsResult load_runtime_settings(const std::filesystem::path& path, bool reset) noexcept {
@@ -230,6 +267,8 @@ bool apply_settings_override(RuntimeSettings& s, std::string_view assignment, st
     if(key=="audio.latency_frames") { auto candidate=s.audio_latency_frames; if(!integer(candidate,441,8192)||candidate>s.audio_max_frames){error="invalid audio latency";return false;}s.audio_latency_frames=candidate;return true; }
     if(key=="audio.max_queued_frames") { auto candidate=s.audio_max_frames; if(!integer(candidate,441,16384)||candidate<s.audio_latency_frames){error="invalid audio queue limit";return false;}s.audio_max_frames=candidate;return true; }
     if(key=="input.deadzone_per_mille") { std::uint32_t candidate=s.deadzone_per_mille;if(!integer(candidate,0,500)){error="invalid controller deadzone";return false;}s.deadzone_per_mille=static_cast<std::uint16_t>(candidate);return true; }
+    if(key=="audio.device") { if(value.empty()||value.size()>512U){error="invalid audio device";return false;}s.audio_device=std::string(value);return true; }
+    if(key=="saves.card_slots") { std::uint32_t candidate=s.card_slots;if(!integer(candidate,1,2)){error="invalid card slot count";return false;}s.card_slots=static_cast<std::uint8_t>(candidate);return true; }
     if(key=="display.mode") { if(value=="windowed")s.fullscreen=host::FullscreenMode::windowed;else if(value=="borderless")s.fullscreen=host::FullscreenMode::borderless;else if(value=="exclusive")s.fullscreen=host::FullscreenMode::exclusive;else{error="invalid display mode";return false;}return true; }
     if(key=="display.aspect") { if(value=="auto-ultrawide")s.ultrawide=true;else if(value=="native-4:3")s.ultrawide=false;else{error="invalid aspect policy";return false;}return true; }
     if(key=="display.filter") { if(value=="linear")s.presentation_filter=host::PresentationFilter::Linear;else if(value=="nearest")s.presentation_filter=host::PresentationFilter::Nearest;else{error="invalid presentation filter";return false;}return true; }

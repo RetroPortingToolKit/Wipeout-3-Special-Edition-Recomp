@@ -34,6 +34,7 @@ if __package__ in {None, ""}:
     from behavioral_runner import (build_scenario_plan,
                                    run_behavioral_scenarios)  # type: ignore[import-not-found]
     from persistence_acceptance import run_persistence_acceptance  # type: ignore[import-not-found]
+    from settings_ui_acceptance import run_settings_ui_acceptance  # type: ignore[import-not-found]
 else:
     from .pipeline import (
         DEFAULT_MEDIA_MANIFEST,
@@ -55,6 +56,7 @@ else:
     from .content_coverage import build_content_coverage_ledger
     from .behavioral_runner import build_scenario_plan, run_behavioral_scenarios
     from .persistence_acceptance import run_persistence_acceptance
+    from .settings_ui_acceptance import run_settings_ui_acceptance
 
 
 def _common_media(parser: argparse.ArgumentParser) -> None:
@@ -220,6 +222,10 @@ def _build_parser() -> argparse.ArgumentParser:
     persistence.add_argument("--memory-card-test", type=Path, required=True)
     persistence.add_argument("--policy", type=Path, required=True)
     persistence.add_argument("--receipt", type=Path, required=True)
+    settings_ui_acceptance = subparsers.add_parser(
+        "settings-ui-acceptance", help="exercise installed native/headless settings UX")
+    settings_ui_acceptance.add_argument("--package", type=Path, required=True)
+    settings_ui_acceptance.add_argument("--receipt", type=Path, required=True)
     installer = subparsers.add_parser("package-installer", help="create the two-stage offline installer")
     installer.add_argument("--setup-exe", type=Path, required=True)
     installer.add_argument("--runtime-payload", type=Path, required=True)
@@ -368,6 +374,8 @@ def main(argv: list[str] | None = None) -> int:
             document = run_persistence_acceptance(
                 package=args.package, memory_card_test=args.memory_card_test,
                 policy_path=args.policy, receipt_path=args.receipt)
+        elif args.command == "settings-ui-acceptance":
+            document = run_settings_ui_acceptance(args.package, args.receipt)
         elif args.command == "package-installer":
             document = create_installer(setup_exe=args.setup_exe,
                 runtime_payload=args.runtime_payload, setup_payload=_artifacts(args.setup_payload),

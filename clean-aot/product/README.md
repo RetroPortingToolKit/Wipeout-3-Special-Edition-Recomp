@@ -364,3 +364,22 @@ python tools/product/build_product.py persistence-acceptance `
   --policy clean-aot/product/content-coverage-policy.json `
   --receipt clean-aot/product/evidence/persistence-acceptance.json
 ```
+
+`Wipeout3SE.exe` also owns a compiler-free native settings window. A missing
+configuration on first run opens it automatically; `--settings-ui` opens it
+explicitly. Standard Win32 controls provide keyboard navigation for display
+mode and resolution, 4K/ultrawide policy, enhancement toggles, audio device and
+latency, controller deadzone/rumble, and card slots. Save validates and durably
+replaces `wipeout3se.runtime-settings.v2`; Reset restores safe remaster defaults;
+Cancel closes without touching the file.
+
+Automation uses the same controller without opening a window by repeating
+`--settings-ui-action key=value` and terminating with `save` or `cancel`. The
+installed acceptance lane covers Unicode paths/devices, invalid values, reset,
+and byte-identical cancellation:
+
+```powershell
+python tools/product/build_product.py settings-ui-acceptance `
+  --package build-product-runtime-settings-v2 `
+  --receipt clean-aot/product/evidence/settings-ui-acceptance.json
+```

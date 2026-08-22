@@ -64,5 +64,8 @@ struct SettingsResult final { SettingsStatus status = SettingsStatus::invalid; R
                                            std::string_view assignment,
                                            std::string& error) noexcept;
 [[nodiscard]] std::string runtime_settings_json(const RuntimeSettings& settings);
+[[nodiscard]] bool save_runtime_settings(const std::filesystem::path& path,
+                                         const RuntimeSettings& settings,
+                                         std::string& error) noexcept;
 
 } // namespace clean_aot::app

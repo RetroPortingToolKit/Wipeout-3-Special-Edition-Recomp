@@ -1,5 +1,17 @@
 # Handoff
 
+## Native runtime settings UX (2026-08-22)
+
+- `Wipeout3SE.exe` now opens a compiler-free Win32 settings window for missing
+  first-run configuration or `--settings-ui`. Native tab controls cover
+  display/4K/ultrawide, graphics enhancements, audio device/latency, controller
+  deadzone/rumble, card slots, reset defaults, save, and cancel.
+- Native controls and `--settings-ui-action` automation share one strict schema
+  validator and durable atomic writer. Unicode save, byte-identical cancel,
+  invalid rejection, and reset recovery pass in the genuine installed package.
+- Canonical settings UI acceptance is bound to package manifest `849a197b...`
+  and executable `00ad0cfd...`; it remains explicitly not game-ready.
+
 ## Memory-card persistence and recovery acceptance (2026-08-22)
 
 - Setup now creates canonical formatted 128-KiB PS1 images for both card slots.
