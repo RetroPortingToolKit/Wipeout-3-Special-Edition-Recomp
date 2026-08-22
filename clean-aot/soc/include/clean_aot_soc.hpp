@@ -223,6 +223,7 @@ private:
 
 enum class DmaCallbackStatus : std::uint8_t {
     ok,
+    not_ready,
     rejected,
     malformed,
 };

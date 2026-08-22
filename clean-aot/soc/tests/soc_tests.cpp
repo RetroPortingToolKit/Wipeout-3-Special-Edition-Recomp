@@ -132,6 +132,7 @@ struct Device {
     std::size_t input_cursor = 0U;
     bool reject = false;
     bool malformed = false;
+    bool not_ready = false;
 };
 
 DmaCallbackStatus read_device(void* const context,
@@ -142,6 +143,9 @@ DmaCallbackStatus read_device(void* const context,
     }
     if (device->malformed) {
         return DmaCallbackStatus::malformed;
+    }
+    if (device->not_ready) {
+        return DmaCallbackStatus::not_ready;
     }
     if (device->reject || device->input_cursor >= device->input_count) {
         return DmaCallbackStatus::rejected;
@@ -159,6 +163,9 @@ DmaCallbackStatus write_device(void* const context,
     }
     if (device->malformed) {
         return DmaCallbackStatus::malformed;
+    }
+    if (device->not_ready) {
+        return DmaCallbackStatus::not_ready;
     }
     if (device->reject || device->count >= device->values.size()) {
         return DmaCallbackStatus::rejected;
@@ -1537,6 +1544,50 @@ void test_dma_linked_and_errors(TestRunner& runner) {
     EXPECT(runner, dma.channel_status(2U).completed);
     EXPECT(runner, dma.channel_status(2U).linked_nodes == 2U);
     EXPECT(runner, (dma.interrupt_flags() & (1U << 2U)) != 0U);
+
+    InterruptController stalled_interrupts;
+    DmaController stalled(&stalled_interrupts, 4U, 8U);
+    set_priority(stalled, 2U, 0U, true);
+    Memory stalled_memory{};
+    Device stalled_device{};
+    stalled_device.not_ready = true;
+    EXPECT(runner, stalled.set_callbacks(2U, bus_for(stalled_memory),
+                                         device_for(stalled_device)) == SocStatus::ok);
+    stalled_memory.words[memory_index(0x280U)] = (2U << 24U) | 0x00ff'ffffU;
+    stalled_memory.words[memory_index(0x284U)] = 0x1111U;
+    stalled_memory.words[memory_index(0x288U)] = 0x2222U;
+    stalled.write_base_address(2U, 0x280U);
+    stalled.write_channel_control(2U, linear_control(true, false, false, 2U));
+    enable_dma_interrupt(stalled, 2U);
+    const auto blocked = stalled.run(DmaRunBudget{8U, 16U});
+    const auto blocked_state = stalled.channel_status(2U);
+    EXPECT(runner, blocked.status == SocStatus::ok);
+    EXPECT(runner, blocked.words_transferred == 0U && blocked.cpu_cycles == 1U);
+    EXPECT(runner, blocked_state.active && !blocked_state.error &&
+                       !blocked_state.completed && blocked_state.linked_nodes == 1U &&
+                       blocked_state.words_remaining == 2U);
+    EXPECT(runner, stalled_device.count == 0U && stalled.interrupt_flags() == 0U &&
+                       !stalled.irq_line());
+    const auto stalled_snapshot = stalled.snapshot();
+    stalled_device.not_ready = false;
+    const auto resumed = stalled.run(DmaRunBudget{8U, 16U});
+    EXPECT(runner, resumed.status == SocStatus::ok && resumed.words_transferred == 2U);
+    EXPECT(runner, stalled.channel_status(2U).completed &&
+                       !stalled.channel_status(2U).error);
+    EXPECT(runner, stalled_device.count == 2U && stalled_device.values[0] == 0x1111U &&
+                       stalled_device.values[1] == 0x2222U);
+    EXPECT(runner, (stalled.interrupt_flags() & (1U << 2U)) != 0U &&
+                       stalled.irq_line());
+
+    DmaController replay(&stalled_interrupts, 4U, 8U);
+    Device replay_device{};
+    replay_device.not_ready = false;
+    EXPECT(runner, replay.set_callbacks(2U, bus_for(stalled_memory),
+                                        device_for(replay_device)) == SocStatus::ok);
+    EXPECT(runner, replay.restore(stalled_snapshot) == SocStatus::ok);
+    const auto replayed = replay.run(DmaRunBudget{8U, 16U});
+    EXPECT(runner, replayed.words_transferred == resumed.words_transferred &&
+                       replayed.cpu_cycles == resumed.cpu_cycles && replay_device.count == 2U);
 
     InterruptController loop_interrupts;
     DmaController loop_dma(&loop_interrupts, 4U, 8U);

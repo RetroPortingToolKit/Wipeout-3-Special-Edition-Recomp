@@ -1304,6 +1304,8 @@ SocStatus DmaController::read_bus(const std::size_t index,
     switch (status) {
     case DmaCallbackStatus::ok:
         return SocStatus::ok;
+    case DmaCallbackStatus::not_ready:
+        return SocStatus::bus_fault;
     case DmaCallbackStatus::rejected:
         return SocStatus::bus_fault;
     case DmaCallbackStatus::malformed:
@@ -1328,6 +1330,8 @@ SocStatus DmaController::write_bus(const std::size_t index,
     switch (status) {
     case DmaCallbackStatus::ok:
         return SocStatus::ok;
+    case DmaCallbackStatus::not_ready:
+        return SocStatus::bus_fault;
     case DmaCallbackStatus::rejected:
         return SocStatus::bus_fault;
     case DmaCallbackStatus::malformed:
@@ -1350,6 +1354,8 @@ SocStatus DmaController::read_device(const std::size_t index,
     switch (status) {
     case DmaCallbackStatus::ok:
         return SocStatus::ok;
+    case DmaCallbackStatus::not_ready:
+        return SocStatus::idle;
     case DmaCallbackStatus::rejected:
         return SocStatus::device_fault;
     case DmaCallbackStatus::malformed:
@@ -1372,6 +1378,8 @@ SocStatus DmaController::write_device(const std::size_t index,
     switch (status) {
     case DmaCallbackStatus::ok:
         return SocStatus::ok;
+    case DmaCallbackStatus::not_ready:
+        return SocStatus::idle;
     case DmaCallbackStatus::rejected:
         return SocStatus::device_fault;
     case DmaCallbackStatus::malformed:

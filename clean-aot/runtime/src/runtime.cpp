@@ -1518,7 +1518,7 @@ struct Runtime::Impl final {
         case 2U: {
             const gpu::ReadResult result = self.gpu.read_dma_word();
             if (!result.ready) {
-                return soc::DmaCallbackStatus::rejected;
+                return soc::DmaCallbackStatus::not_ready;
             }
             *value = result.word;
             return soc::DmaCallbackStatus::ok;
@@ -1566,7 +1566,7 @@ struct Runtime::Impl final {
         case 2U:
             return self.gpu.write_dma_word(value).accepted
                        ? soc::DmaCallbackStatus::ok
-                       : soc::DmaCallbackStatus::rejected;
+                       : soc::DmaCallbackStatus::not_ready;
         case 4U: {
             const std::array<std::uint16_t, 2U> words{
                 static_cast<std::uint16_t>(value),
