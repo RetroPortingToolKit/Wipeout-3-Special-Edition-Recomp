@@ -417,14 +417,16 @@ Result<ParsedDisc> parse_cue(const std::filesystem::path& cue_path) {
                     static_cast<std::uint8_t>(parsed_number);
                 const std::string type = uppercase(tokens[2U]);
                 TrackType track_type{};
-                if (type == "MODE2/2352") {
+                if (type == "MODE1/2352") {
+                    track_type = TrackType::Mode1_2352;
+                } else if (type == "MODE2/2352") {
                     track_type = TrackType::Mode2_2352;
                 } else if (type == "AUDIO") {
                     track_type = TrackType::Audio;
                 } else {
                     return Result<ParsedDisc>::failure(make_error(
                         ErrorCode::UnsupportedTrackType,
-                        "only TRACK MODE2/2352 and TRACK AUDIO are accepted", line_number));
+                        "only TRACK MODE1/2352, MODE2/2352, and AUDIO are accepted", line_number));
                 }
                 const std::uint8_t expected_number =
                     static_cast<std::uint8_t>(parsed.tracks.size() + 1U);
@@ -795,6 +797,28 @@ Result<Mode2Sector> CueImage::read_mode2_sector(Lba lba) const {
     return decode_mode2(lba, std::span<const std::uint8_t, RawSectorBytes>(raw.bytes));
 }
 
+Result<Mode1Sector> CueImage::read_mode1_sector(Lba lba) const {
+    const TrackInfo* track = track_for_lba(lba);
+    if (track == nullptr) {
+        return Result<Mode1Sector>::failure(
+            make_error(ErrorCode::LbaOutOfRange, "LBA is outside the disc program area"));
+    }
+    if (lba < track->stored_start_lba || lba >= track->stored_end_lba) {
+        return Result<Mode1Sector>::failure(
+            make_error(ErrorCode::SyntheticSector, "pregap or postgap has no Mode1 payload"));
+    }
+    if (track->type != TrackType::Mode1_2352) {
+        return Result<Mode1Sector>::failure(
+            make_error(ErrorCode::WrongTrackType, "MODE1 read requested from another track type"));
+    }
+    auto raw_result = read_raw_sector(lba);
+    if (!raw_result) {
+        return Result<Mode1Sector>::failure(raw_result.error());
+    }
+    const RawSector& raw = raw_result.value();
+    return decode_mode1(lba, std::span<const std::uint8_t, RawSectorBytes>(raw.bytes));
+}
+
 Result<CddaSector> CueImage::read_cdda_sector(Lba lba) const {
     const TrackInfo* track = track_for_lba(lba);
     if (track == nullptr) {
@@ -852,6 +876,34 @@ std::uint32_t CueImage::compute_edc(std::span<const std::uint8_t> bytes) noexcep
         }
     }
     return value;
+}
+
+Result<Mode1Sector> CueImage::decode_mode1(
+    Lba lba,
+    std::span<const std::uint8_t, RawSectorBytes> raw) {
+    if (lba >= MaximumDiscSectors || !raw_sync_is_valid(raw) || raw[15U] != 1U) {
+        return Result<Mode1Sector>::failure(
+            make_error(ErrorCode::MalformedSector, "raw sector is not a Mode1 sector"));
+    }
+    const Msf expected = lba_to_msf(lba);
+    std::uint8_t minute = 0U;
+    std::uint8_t second = 0U;
+    std::uint8_t frame = 0U;
+    if (!bcd_to_decimal(raw[12U], minute) || !bcd_to_decimal(raw[13U], second) ||
+        !bcd_to_decimal(raw[14U], frame) || Msf{minute, second, frame} != expected) {
+        return Result<Mode1Sector>::failure(
+            make_error(ErrorCode::MalformedSector, "Mode1 header MSF does not match LBA"));
+    }
+    const std::uint32_t stored = read_le_u32(raw.data() + 2064U);
+    if (stored != compute_edc(raw.first(2064U))) {
+        return Result<Mode1Sector>::failure(
+            make_error(ErrorCode::InvalidEdc, "Mode1 EDC mismatch"));
+    }
+    Mode1Sector result{};
+    result.lba = lba;
+    result.edc = stored;
+    std::copy_n(raw.begin() + 16, Mode1PayloadBytes, result.payload.begin());
+    return Result<Mode1Sector>::success(std::move(result));
 }
 
 Result<Mode2Sector> CueImage::decode_mode2(
@@ -1136,8 +1188,13 @@ Result<std::size_t> XaRateConverter::push(std::span<const StereoSample> input,
         return Result<std::size_t>::failure(
             make_error(ErrorCode::Overflow, "XA converter timeline overflow"));
     }
+    /* Without an explicit end marker the final sample is retained as the
+       right endpoint for the next chunk, so it does not create an interval
+       yet. Capacity checks must match that exact streaming behavior. */
+    const std::uint64_t interval_count =
+        end_of_stream ? new_input_count : (new_input_count == 0U ? 0U : new_input_count - 1U);
     const std::uint64_t horizon =
-        new_input_count * static_cast<std::uint64_t>(CddaRateHz);
+        interval_count * static_cast<std::uint64_t>(CddaRateHz);
     const std::uint64_t remaining =
         horizon > next_output_numerator_ ? horizon - next_output_numerator_ : 0U;
     const std::uint64_t required_outputs =

@@ -931,8 +931,11 @@ void test_mix_capture_and_input_fifos() {
     put(fifo, Device::CdVolume + 2u, 0x7FFFu);
     put(fifo, Device::Control,
         static_cast<std::uint16_t>(kLive | Device::ControlCdEnable));
-    std::array<StereoSample, AudioFifoCapacity + 1u> fifo_output{};
-    require(fifo.render(fifo_output).ok(), "CDDA FIFO consumption");
+    std::array<StereoSample, clean_aot::spu::MaxRenderSamplesPerCall> fifo_output{};
+    require(fifo.render(fifo_output).ok() && fifo.render(fifo_output).ok(),
+            "CDDA FIFO consumption in bounded native chunks");
+    std::array<StereoSample, 1u> underflow_output{};
+    require(fifo.render(underflow_output).ok(), "CDDA FIFO underflow probe");
     const auto empty_status = fifo.input_status(AudioSource::Cdda);
     require(empty_status.underflow && empty_status.underflow_count == 1u,
             "CDDA FIFO underflow is observable");

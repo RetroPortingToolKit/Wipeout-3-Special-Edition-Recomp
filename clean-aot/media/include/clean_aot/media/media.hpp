@@ -16,6 +16,7 @@ namespace clean_aot::media {
 inline constexpr std::size_t RawSectorBytes = 2352U;
 inline constexpr std::size_t Mode2FormOnePayloadBytes = 2048U;
 inline constexpr std::size_t Mode2FormTwoPayloadBytes = 2324U;
+inline constexpr std::size_t Mode1PayloadBytes = 2048U;
 inline constexpr std::size_t XaAdpcmBytes = 2304U;
 inline constexpr std::size_t CddaFramesPerSector = 588U;
 inline constexpr std::uint32_t CddaRateHz = 44100U;
@@ -110,6 +111,7 @@ struct Msf final {
 };
 
 enum class TrackType : std::uint8_t {
+    Mode1_2352,
     Mode2_2352,
     Audio,
 };
@@ -153,6 +155,12 @@ struct StereoSample final {
 
 struct CddaSector final {
     std::array<StereoSample, CddaFramesPerSector> frames{};
+};
+
+struct Mode1Sector final {
+    Lba lba = 0U;
+    std::array<std::uint8_t, Mode1PayloadBytes> payload{};
+    std::uint32_t edc = 0U;
 };
 
 struct XaMetadata final {
@@ -223,11 +231,15 @@ public:
     [[nodiscard]] const TrackInfo* track_for_lba(Lba lba) const noexcept;
 
     Result<RawSector> read_raw_sector(Lba lba) const;
+    Result<Mode1Sector> read_mode1_sector(Lba lba) const;
     Result<Mode2Sector> read_mode2_sector(Lba lba) const;
     Result<CddaSector> read_cdda_sector(Lba lba) const;
     Result<XaSector> read_xa_sector(Lba lba) const;
 
     static Result<Mode2Sector> decode_mode2(
+        Lba lba,
+        std::span<const std::uint8_t, RawSectorBytes> raw);
+    static Result<Mode1Sector> decode_mode1(
         Lba lba,
         std::span<const std::uint8_t, RawSectorBytes> raw);
     static Result<CddaSector> decode_cdda(

@@ -40,12 +40,16 @@ Implemented surface
   replication modes, transfer status, a stable programmed transfer-address
   register with a separate advancing internal pointer, and IRQ checks on RAM
   transactions.
-- Separate bounded CDDA, resampled-XA, and external stereo FIFOs. Pushing past
+- Separate bounded CDDA, resampled-XA, and external stereo FIFOs sized to hold
+  the legal worst-case 9,408-frame mono/half-rate XA sector burst. Pushing past
   capacity drops the newest samples and records overflow; consuming an empty
   enabled input produces a deterministic zero only as an explicitly recorded
   underflow. `push_xa_resampled` accepts stereo PCM already resampled to
   44,100 Hz. XA sector parsing and sample-rate conversion belong to the
-  CD-ROM component and are not hidden in this boundary.
+  CD-ROM component. `CdAudioSink` is the explicit native-time integration seam:
+  it preserves XA decode/resampler history across forward interleaved sectors,
+  resets on stream identity/format discontinuities, applies the staged CD
+  matrix and mute state, and hands bounded 44.1-kHz frames to this device.
 - A fixed-point, register-driven reverb path with same-side reflection,
   cross-side reflection, four comb stages, two all-pass stages, wet output,
   intermediate saturation, and the documented alternate left/right 22,050 Hz

@@ -13,7 +13,7 @@ parser or decoder.
 `CueImage::open` accepts a CUE text file with:
 
 - `FILE "..." BINARY` entries resolved relative to the CUE directory;
-- `TRACK nn MODE2/2352` and `TRACK nn AUDIO` tracks;
+- `TRACK nn MODE1/2352`, `TRACK nn MODE2/2352`, and `TRACK nn AUDIO` tracks;
 - `INDEX 00`, `INDEX 01`, `PREGAP`, and `POSTGAP` in valid command order;
 - the normal Redump metadata directives (`REM`, `CATALOG`, `TITLE`,
   `PERFORMER`, `SONGWRITER`, `ISRC`, `FLAGS`, and `CDTEXTFILE`) as inert
@@ -37,7 +37,9 @@ synthetic gaps. `TrackInfo` exposes both logical and stored boundaries, whether
 each directive was present, the exact relative MSF values, and the file-sector
 range, so the CD-ROM layer does not have to reconstruct CUE semantics.
 
-`read_mode2_sector` validates the sync pattern, expected BCD MSF, mode byte,
+`read_mode1_sector` validates the sync pattern, expected BCD MSF, mode byte,
+and the Mode 1 EDC over the complete sync/header/payload prefix before exposing
+the 2,048-byte payload. `read_mode2_sector` validates the sync pattern, expected BCD MSF, mode byte,
 duplicated XA subheader, and EDC. It exposes the exact 8-byte subheader and
 either the 2048-byte Form 1 or 2324-byte Form 2 payload. Form 2 accepts the
 standard optional zero EDC. `read_cdda_sector` exposes 588 signed stereo frames

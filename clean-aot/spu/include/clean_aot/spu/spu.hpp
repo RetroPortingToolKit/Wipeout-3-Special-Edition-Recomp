@@ -13,7 +13,8 @@ static constexpr std::size_t SoundRamBytes = 512u * 1024u;
 static constexpr std::size_t AdpcmBlockBytes = 16u;
 static constexpr std::size_t AdpcmSamplesPerBlock = 28u;
 static constexpr std::size_t CaptureSamplesPerHalf = 512u;
-static constexpr std::size_t AudioFifoCapacity = 2048u;
+/* One legal mono, 18.9 kHz XA sector resamples to 9,408 native frames. */
+static constexpr std::size_t AudioFifoCapacity = 16384u;
 static constexpr std::size_t TransferFifoCapacity = 32u;
 static constexpr std::size_t MaxDmaHalfwordsPerCall = 4096u;
 static constexpr std::size_t MaxRenderSamplesPerCall = 8192u;

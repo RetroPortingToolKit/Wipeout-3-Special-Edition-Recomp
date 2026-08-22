@@ -150,6 +150,19 @@ RawSector cdda_sector(std::int16_t left, std::int16_t right) {
     return sector;
 }
 
+RawSector mode1_sector(std::uint64_t lba, std::uint8_t seed) {
+    RawSector sector{};
+    set_raw_header(sector, lba, 1U);
+    for (std::size_t index = 0U; index < clean_aot::media::Mode1PayloadBytes; ++index) {
+        sector.bytes[16U + index] =
+            static_cast<std::uint8_t>(seed + static_cast<std::uint8_t>(index));
+    }
+    const std::uint32_t edc = CueImage::compute_edc(
+        std::span<const std::uint8_t>(sector.bytes.data(), 2064U));
+    write_le_u32(sector.bytes, 2064U, edc);
+    return sector;
+}
+
 XaSector xa_vector(bool stereo, XaBitsPerSample bits, std::uint32_t rate) {
     XaSector sector{};
     sector.metadata.audio = true;
@@ -239,6 +252,18 @@ void test_cue_layout_and_random_reads() {
 
 void test_same_file_and_rejection_boundaries() {
     TemporaryDirectory temporary;
+    const auto mode1_path = temporary.path / "mode1.bin";
+    write_sectors(mode1_path, {mode1_sector(0U, 0x51U)});
+    const auto mode1_cue = temporary.path / "mode1.cue";
+    write_text(mode1_cue,
+               "FILE \"mode1.bin\" BINARY\n"
+               "TRACK 01 MODE1/2352\n"
+               "INDEX 01 00:00:00\n");
+    auto mode1_image = CueImage::open(mode1_cue);
+    require(mode1_image && mode1_image.value().read_mode1_sector(0U) &&
+                mode1_image.value().read_mode1_sector(0U).value().payload[0U] == 0x51U,
+            "strict CUE/BIN mapping exposes MODE1/2352 payloads");
+
     const auto full_path = temporary.path / "full.bin";
     write_sectors(full_path,
                   {mode2_sector(0U, false, 1U), mode2_sector(1U, false, 2U),
@@ -330,6 +355,26 @@ void test_same_file_and_rejection_boundaries() {
 }
 
 void test_mode2_and_xa_exposure() {
+    const RawSector mode1 = mode1_sector(0U, 0x31U);
+    auto mode1_result = CueImage::decode_mode1(
+        0U, std::span<const std::uint8_t, clean_aot::media::RawSectorBytes>(mode1.bytes));
+    require(mode1_result && mode1_result.value().payload[0U] == 0x31U,
+            "Mode1 payload and full raw-sector EDC are exposed");
+    RawSector damaged_mode1 = mode1;
+    damaged_mode1.bytes[0U] ^= 1U;
+    require(!CueImage::decode_mode1(
+                0U, std::span<const std::uint8_t, clean_aot::media::RawSectorBytes>(
+                        damaged_mode1.bytes)),
+            "Mode1 sync corruption fails closed");
+    damaged_mode1 = mode1;
+    damaged_mode1.bytes[100U] ^= 1U;
+    auto damaged_mode1_result = CueImage::decode_mode1(
+        0U, std::span<const std::uint8_t, clean_aot::media::RawSectorBytes>(
+                damaged_mode1.bytes));
+    require(!damaged_mode1_result &&
+                damaged_mode1_result.error().code == ErrorCode::InvalidEdc,
+            "Mode1 payload corruption fails full-sector EDC validation");
+
     require(CueImage::lba_to_msf(0U) == clean_aot::media::Msf{0U, 2U, 0U} &&
                 CueImage::lba_to_msf(74U) == clean_aot::media::Msf{0U, 2U, 74U} &&
                 CueImage::lba_to_msf(75U) == clean_aot::media::Msf{0U, 3U, 0U} &&
