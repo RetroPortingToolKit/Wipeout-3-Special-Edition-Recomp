@@ -32,9 +32,11 @@ void sha_block(std::array<std::uint32_t,8>& h,const std::uint8_t* p){std::array<
     return value;
 }
 
-[[nodiscard]] std::string symbol(GuestAddress address) {
+[[nodiscard]] std::string symbol(GuestAddress address,
+                                 std::string_view suffix = {}) {
     std::ostringstream out; out << "clean_aot_region_" << std::hex << std::setw(8)
-                                << std::setfill('0') << address; return out.str();
+                                << std::setfill('0') << address << suffix;
+    return out.str();
 }
 
 [[nodiscard]] std::vector<std::uint8_t> read_bytes(const std::filesystem::path& path) {
@@ -82,6 +84,12 @@ int run(int argc, char** argv) {
     const std::string digest=one("image_sha256");
     if (digest.size()!=64U || sha256(bytes)!=digest) throw std::runtime_error("image SHA-256 mismatch");
     const auto whole=clean_aot::compiler::PsxExeImage::parse_raw(bytes,static_cast<GuestAddress>(load),roots.front());
+    const std::string variant=one("variant_sha256");
+    const auto symbol_namespace=fields.find("symbol_namespace");
+    if(symbol_namespace!=fields.end()&&(symbol_namespace->second.size()!=1U||
+       symbol_namespace->second[0]!="variant"))throw std::runtime_error("unsupported symbol namespace");
+    const std::string symbol_suffix=symbol_namespace==fields.end()
+        ? std::string{} : std::string("_v")+variant;
     if(std::filesystem::exists(output)) throw std::runtime_error("output already exists");
     std::filesystem::create_directories(output);
     struct Entry { GuestAddress pc; GuestAddress region; std::uint32_t instruction_count; }; std::vector<Entry> entries;
@@ -102,8 +110,8 @@ int run(int argc, char** argv) {
             if(!shard_identities.insert(shard_identity).second)throw std::runtime_error("duplicate generated shard identity");
             std::vector<clean_aot::compiler::BlockId> ids;ids.reserve(finish-begin);
             for(std::size_t i=begin;i<finish;++i){ids.push_back(blocks[i]->id);entries.push_back({blocks[i]->start,shard_identity,static_cast<std::uint32_t>(blocks[i]->instructions.size())});}
-            const std::string generated=clean_aot::compiler::CppEmitter::emit_shard(region,ids,shard_identity);
-            std::ofstream source(output/(symbol(shard_identity)+".cpp"),std::ios::binary);source<<generated;if(!source)throw std::runtime_error("unable to write shard source");
+            const std::string generated=clean_aot::compiler::CppEmitter::emit_shard(region,ids,shard_identity,symbol_suffix);
+            std::ofstream source(output/(symbol(shard_identity,symbol_suffix)+".cpp"),std::ios::binary);source<<generated;if(!source)throw std::runtime_error("unable to write shard source");
             const std::vector<std::uint8_t> generated_bytes(generated.begin(),generated.end());
             shards.push_back({range.start,shard_identity,static_cast<std::uint32_t>(ids.size()),static_cast<std::uint32_t>(instructions),sha256(generated_bytes)});
             begin=finish;
@@ -111,7 +119,6 @@ int run(int argc, char** argv) {
     }
     std::sort(entries.begin(),entries.end(),[](auto a,auto b){return a.pc<b.pc;});
     if(std::adjacent_find(entries.begin(),entries.end(),[](auto a,auto b){return a.pc==b.pc;})!=entries.end()) throw std::runtime_error("overlapping generated entries");
-    const std::string variant=one("variant_sha256");
     std::vector<GuestAddress> regions; for(const auto& entry:entries) regions.push_back(entry.region);
     std::sort(regions.begin(),regions.end()); regions.erase(std::unique(regions.begin(),regions.end()),regions.end());
     if(regions.size()>65536U) throw std::runtime_error("too many generated regions for packed table");
@@ -122,9 +129,9 @@ int run(int argc, char** argv) {
     for(auto page=first_page;page<=last_page;++page){const auto begin=cursor;while(cursor<entries.size()&&(entries[cursor].pc>>12U)==page)++cursor;pages.emplace_back(static_cast<std::uint32_t>(begin),static_cast<std::uint32_t>(cursor));}
     std::ofstream binding(output/"entry_table.cpp",std::ios::binary);
     binding<<"#include <array>\n#include <clean_aot/runtime/native_dispatch.hpp>\n\n";
-    for(const auto region:regions) binding<<"extern \"C\" bool "<<symbol(region)<<"(clean_aot::runtime::GeneratedCpuState&) noexcept;\n";
+    for(const auto region:regions) binding<<"extern \"C\" bool "<<symbol(region,symbol_suffix)<<"(clean_aot::runtime::GeneratedCpuState&) noexcept;\n";
     binding<<"namespace {\nconstexpr std::array<std::uint32_t,"<<roots.size()<<"> roots{{"; for(auto root:roots) binding<<"0x"<<std::hex<<root<<"U,";
-    binding<<"}};\nconst std::array<clean_aot::runtime::GeneratedRegionFunction,"<<std::dec<<regions.size()<<"> regions{{"; for(auto region:regions) binding<<symbol(region)<<",";
+    binding<<"}};\nconst std::array<clean_aot::runtime::GeneratedRegionFunction,"<<std::dec<<regions.size()<<"> regions{{"; for(auto region:regions) binding<<symbol(region,symbol_suffix)<<",";
     binding<<"}};\nconstexpr std::array<clean_aot::runtime::GeneratedPackedRegionEntry,"<<entries.size()<<"> entries{{";
     for(const auto& entry:entries){const auto index=std::lower_bound(regions.begin(),regions.end(),entry.region)-regions.begin();binding<<"{0x"<<std::hex<<entry.pc<<"U,"<<std::dec<<index<<"U,"<<entry.instruction_count<<"U},";}
     binding<<"}};\nconstexpr std::array<clean_aot::runtime::GeneratedDispatchPage,"<<pages.size()<<"> pages{{";for(const auto [begin_index,end_index]:pages)binding<<"{"<<begin_index<<"U,"<<end_index<<"U},";

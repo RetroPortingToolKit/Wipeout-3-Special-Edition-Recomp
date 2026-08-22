@@ -1,0 +1,42 @@
+{
+  "schema": "clean-aot-bios-shell-exact-frontiers-v1",
+  "base_frontier": 139,
+  "first_frontier": 140,
+  "last_frontier": 239,
+  "frontier_count": 100,
+  "start_pc": "0x00002588",
+  "terminal_status": "UnknownCode",
+  "terminal_pc": "0x80050F8C",
+  "instruction_count": 19271314,
+  "dispatch_count": 1787439,
+  "memory_read_count": 4230943,
+  "memory_write_count": 2992351,
+  "isolated_cache_write_count": 7680,
+  "device_read_count": 5008,
+  "device_write_count": 56404,
+  "spu_write_count": 54328,
+  "cd_mmio_read_count": 0,
+  "cd_mmio_write_count": 0,
+  "raw_sector_read_count": 0,
+  "queued_audio_frame_count": 1025,
+  "initial_ram_epoch_sha256": "3515fab5acab0b887a315687a21afb58ea2877000475e2ee55eb0f4c377cf056",
+  "terminal_ram_epoch_sha256": "4d47363787443ae126ec36bf7dfff5c77d2cf500c643904c495be3d2f4b74b7a",
+  "epoch_transition_frontier": 146,
+  "final_exact_region": {
+    "load_start": "0x8004ED14",
+    "load_end_exclusive": "0x8004ED1C",
+    "image_sha256": "6d64edf91449c1b17746c1ef18afa2eb25c70bdf1322ab3df5a2630993b7e2f1",
+    "variant_sha256": "1f73b9acaaed8e45848e0f2a8abf8a7fc4db916732fd9a31504ba7bf243de59b"
+  },
+  "proof": {
+    "repeated_probe_runs": 2,
+    "repeated_probe_match": true,
+    "delay_slot_atomicity_preserved": true,
+    "range_generation": "four-byte minimum, extended by one instruction only when the compiler requires a bounded delay slot",
+    "static_shard_reuse": "frontier 209 reused exact resident-shell AUTO82 only after full range and payload identity matched",
+    "epoch_symbol_isolation": "frontier 210 required a distinct authenticated payload at an existing guest PC; generated native symbols are variant-qualified to prevent cross-epoch linker aliasing",
+    "authorization_broadened": false,
+    "forced_boot": false
+  },
+  "stop_reason": "requested one-hundred exact frontiers completed without CD activity or another material blocker"
+}

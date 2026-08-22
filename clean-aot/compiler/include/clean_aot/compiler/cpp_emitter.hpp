@@ -4,6 +4,7 @@
 
 #include <span>
 #include <string>
+#include <string_view>
 
 namespace clean_aot::compiler {
 
@@ -21,7 +22,8 @@ public:
     [[nodiscard]] static std::string emit_shard(
         const Region& region,
         std::span<const BlockId> block_ids,
-        GuestAddress shard_identity);
+        GuestAddress shard_identity,
+        std::string_view symbol_suffix = {});
 };
 
 } // namespace clean_aot::compiler

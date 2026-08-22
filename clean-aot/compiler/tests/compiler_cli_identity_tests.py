@@ -7,6 +7,47 @@ from pathlib import Path
 
 
 class CompilerCliIdentityTests(unittest.TestCase):
+    def test_variant_symbol_namespace_is_exact_and_rejects_unknown_modes(self):
+        cli = Path(sys.argv[1])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            image = root / "image.bin"
+            payload = bytes.fromhex("00000000")
+            image_digest = hashlib.sha256(payload).hexdigest()
+            variant_digest = hashlib.sha256(b"epoch-exact-context").hexdigest()
+            image.write_bytes(payload)
+
+            def write_manifest(path, namespace):
+                path.write_text("\n".join((
+                    "schema=clean-aot-compiler-manifest-v1",
+                    "image_kind=raw-payload",
+                    f"symbol_namespace={namespace}",
+                    f"variant_sha256={variant_digest}",
+                    f"image_sha256={image_digest}",
+                    "load_start=0x1000",
+                    "load_end_exclusive=0x1004",
+                    "entry=0x1000",
+                    "code=0x1000-0x1004",
+                    "",
+                )))
+
+            manifest = root / "variant.manifest"
+            write_manifest(manifest, "variant")
+            output = root / "generated"
+            subprocess.run((cli, "--image", image, "--manifest", manifest,
+                            "--output", output), check=True, capture_output=True)
+            expected = f"clean_aot_region_00001000_v{variant_digest}"
+            self.assertTrue((output / f"{expected}.cpp").is_file())
+            self.assertIn(expected, (output / "entry_table.cpp").read_text())
+
+            rejected_manifest = root / "rejected.manifest"
+            write_manifest(rejected_manifest, "address")
+            rejected = subprocess.run(
+                (cli, "--image", image, "--manifest", rejected_manifest,
+                 "--output", root / "rejected"), capture_output=True, text=True)
+            self.assertEqual(rejected.returncode, 2)
+            self.assertIn("unsupported symbol namespace", rejected.stderr)
+
     def test_identity_bound_emission_and_sparse_unknown_pc(self):
         cli = Path(sys.argv[1])
         with tempfile.TemporaryDirectory() as directory:

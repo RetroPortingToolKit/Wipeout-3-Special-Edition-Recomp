@@ -73,7 +73,8 @@ namespace {
 
 std::string emit_selected(const Region& region,
                           std::span<const BlockId> selected_ids,
-                          GuestAddress shard_identity) {
+                          GuestAddress shard_identity,
+                          std::string_view symbol_suffix = {}) {
     region.validate();
     if (selected_ids.empty() || (shard_identity % 4U) != 0U) {
         throw IrError("emitter shard selection is empty or unaligned");
@@ -146,6 +147,7 @@ std::string emit_selected(const Region& region,
            << "extern \"C\" bool clean_aot_region_"
            << std::hex << std::setw(8) << std::setfill('0') << shard_identity
            << std::dec << std::setfill(' ')
+           << symbol_suffix
            << "(GeneratedCpuState& state) noexcept {\n"
            << "    switch (state.pc) {\n";
 
@@ -290,8 +292,9 @@ std::string CppEmitter::emit(const Region& region) {
 std::string CppEmitter::emit_shard(
     const Region& region,
     std::span<const BlockId> block_ids,
-    GuestAddress shard_identity) {
-    return emit_selected(region, block_ids, shard_identity);
+    GuestAddress shard_identity,
+    std::string_view symbol_suffix) {
+    return emit_selected(region, block_ids, shard_identity, symbol_suffix);
 }
 
 } // namespace clean_aot::compiler

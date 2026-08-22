@@ -853,3 +853,15 @@ instruction and fails closed on every unknown PC or executable identity.
   function is exactly `[0x17F4,0x1858)`. Fifty exact frontiers now reach
   `0x2588`: 19,270,583 instructions, 1,787,197 dispatches, zero CD MMIO and
   zero sectors. Receipt: `bios-shell-exact-frontiers-00000139.json`.
+- Exact frontiers 140 through 239 advance from `0x00002588` to fail-closed
+  `UnknownCode` at `0x80050F8C`. The repeated receipt is 19,271,314
+  instructions, 1,787,439 dispatches, 5,008 device reads, 56,404 device
+  writes, 54,328 SPU writes, and zero CD MMIO or raw sectors. RAM changes at
+  frontier 146 from epoch `3515fab5...056` to `4d473637...7a`; every later
+  copied-RAM binding uses the latter exact stamp. Frontier 209 reuses resident
+  shell shard AUTO82 only after its complete range/hash matches. Frontier 210
+  has different authenticated bytes at an already-used guest PC, so generated
+  native symbols now optionally use the full variant identity; unknown symbol
+  namespace modes fail closed. Continue by authenticating only the live path
+  at `0x80050F8C`. Receipt:
+  `clean-aot/catalog/evidence/bios-shell-exact-frontiers-00000239.json`.
