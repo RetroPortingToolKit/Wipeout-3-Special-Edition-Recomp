@@ -61,6 +61,15 @@
 
 ## Open blockers
 
+- The PAL x2 activation initially exposed a boot-path defect: setting the native
+  rate and CRTC multiplier immediately changed BIOS cadence before the title
+  programmed its PAL mode. This is now corrected in the working tree: the
+  native period and multiplier are deferred until a programmed PAL CRTC is
+  observed. A 14-second boot probe records CRTC x1, guest ~60 Hz, SPU ~44.1
+  kHz, and zero underruns. The subsequent PAL/FM V transition still falls to
+  about 50 Hz with severe audio underruns, so gameplay/audio behavior remains
+  unverified and the feature must stay default-off.
+
 - PAL100 title timing is now authenticated for the supplied PAL target: the
   title selector/state path at 0x8017BB8C–0x8017BBAC maps selector 2 to
   gSimVblankSkip=1 and PAL-x2 state=1. The opt-in PAL-x2 hook and target-only
