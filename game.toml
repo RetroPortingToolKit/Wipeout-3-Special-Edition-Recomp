@@ -484,12 +484,36 @@ load_addr = "0x80780000"
 # compile_overlays reports "seeds: 0 / 80780000 excluded: OBSERVED_PC_ONLY",
 # no shard is ever emitted, and the whole enhancement engine interprets
 # forever — 11.9M interpreted dispatches in one session, with the interpreter's
-# last guard yield sitting inside 0x80781xxx on both link crashes. Was
-# 0x8B994BAE (a different build of the payload); the 46 entries below were
-# re-derived from this image by j/jal-target scan and matched all 46 exactly,
-# so only the gate was wrong. Re-derive both together if the package version
-# or `build` option changes.
-bytes_crc = "0xFE3CBD88"
+# last guard yield sitting inside 0x80781xxx on both link crashes.
+#
+# The raw region CRC is NOT usable as that gate. This region is not pure code:
+# 12 mutable records at a uniform 0xC4 stride from +0x62C carry live state, so
+# the raw CRC differed on every one of 17 consecutive captures (0x21A6D2C3,
+# 0xE2E4E03F, 0x3508976D, … 0xFE247301). Pinning any one of them — 0x8B994BAE,
+# then 0xFE3CBD88 — matched exactly the single capture it was read from and
+# detached on the very next run, which is why the engine kept interpreting
+# despite the entry list being correct all along.
+#
+# bytes_crc_ignore zeroes those mutable heads before hashing, so bytes_crc is
+# the identity of the CODE. Verified: all 17 captures hash to 0x8A7331C5 once
+# masked. Re-derive the entries (not this CRC) if the package version or
+# `build` option changes; the runtime's own shard gate is unaffected either way
+# — overlay_loader.c:cand_crc() already hashes only the shard's code ranges.
+bytes_crc = "0x8A7331C5"
+bytes_crc_ignore = [
+    { start = "0x8078062C", end = "0x80780634" },
+    { start = "0x807806F0", end = "0x807806F8" },
+    { start = "0x807807B4", end = "0x807807BC" },
+    { start = "0x80780878", end = "0x80780880" },
+    { start = "0x8078093C", end = "0x80780944" },
+    { start = "0x80780A00", end = "0x80780A08" },
+    { start = "0x80780AC4", end = "0x80780ACC" },
+    { start = "0x80780B88", end = "0x80780B90" },
+    { start = "0x80780C4C", end = "0x80780C54" },
+    { start = "0x80780D10", end = "0x80780D18" },
+    { start = "0x80780DD4", end = "0x80780DDC" },
+    { start = "0x80780E98", end = "0x80780EA0" },
+]
 entries = [
     "0x80780000",
     "0x80780568",
