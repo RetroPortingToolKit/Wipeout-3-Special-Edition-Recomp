@@ -86,17 +86,21 @@ def raw_mips_candidate(data: bytes) -> dict[str, Any] | None:
     if len(data) < 32 or len(data) % 4:
         return None
     words = struct.unpack(f"<{len(data) // 4}I", data)
-    prologues = [index * 4 for index, word in enumerate(words[:32])
-                 if word & 0xFFFF0000 == 0x27BD0000 and word & 0x8000]
-    ra_saves = [index * 4 for index, word in enumerate(words[:40])
-                if word & 0xFFFF0000 == 0xAFBF0000]
-    returns = [index * 4 for index, word in enumerate(words)
-               if word == 0x03E00008]
-    if not prologues or not ra_saves or not returns:
+    candidates = []
+    for index, word in enumerate(words):
+        if word & 0xFFFF0000 != 0x27BD0000 or not word & 0x8000:
+            continue
+        save = next((cursor for cursor in range(index, min(index + 40, len(words)))
+                     if words[cursor] & 0xFFFF0000 == 0xAFBF0000), None)
+        ret = next((cursor for cursor in range(index, min(index + 4096, len(words)))
+                    if words[cursor] == 0x03E00008), None)
+        if save is not None and ret is not None:
+            candidates.append({"entry_offset": index * 4,
+                               "ra_save_offset": save * 4,
+                               "return_offset": ret * 4})
+    if not candidates:
         return None
-    return {"format": "raw-mips-abi-candidate",
-            "prologue_offsets": prologues,
-            "ra_save_offsets": ra_saves, "return_offsets": returns}
+    return {"candidates": candidates, "format": "raw-mips-abi-candidate"}
 
 
 def parse_vag(data: bytes) -> dict[str, Any] | None:
@@ -119,6 +123,24 @@ def parse_vag(data: bytes) -> dict[str, Any] | None:
             "version": version}
 
 
+def parse_named_envelope(data: bytes) -> dict[str, Any] | None:
+    """Expose a strict 16-byte Wip3out name envelope; leave its body unknown."""
+    if len(data) <= 16:
+        return None
+    header = data[:16]
+    terminator = header.find(0)
+    if terminator < 4 or any(header[terminator:]):
+        return None
+    name = header[:terminator]
+    if any(not (48 <= byte <= 57 or 65 <= byte <= 90 or byte == 95)
+           for byte in name):
+        return None
+    body = data[16:]
+    return {"body": {"bytes": len(body), "offset": 16,
+                     "role": "unknown", "sha256": sha256(body)},
+            "format": "wip3out-named-envelope", "name": name.decode("ascii")}
+
+
 def classify(data: bytes, authenticated_executable: bool) -> tuple[str, Any]:
     if authenticated_executable:
         return "authenticated-runtime-executable", raw_mips_candidate(data)
@@ -131,6 +153,9 @@ def classify(data: bytes, authenticated_executable: bool) -> tuple[str, Any]:
     candidate = raw_mips_candidate(data)
     if candidate is not None:
         return "executable-candidate", candidate
+    envelope = parse_named_envelope(data)
+    if envelope is not None:
+        return "authenticated-structured-envelope", envelope
     return "unclassified-payload", ({"format": "all-zero-unknown-role"}
                                     if not any(data) else None)
 
@@ -330,14 +355,27 @@ def build_audit(iso: dict[str, Any], iso_digest: str,
             "status": value["status"],
         })
 
-    unresolved_payloads = sum(row["classification"] == "unclassified-payload"
-                              for row in payloads)
+    unknown_role_classes = {"authenticated-structured-envelope",
+                            "unclassified-payload"}
+    unknown_rows = [row for row in payloads
+                    if row["classification"] in unknown_role_classes]
+    unresolved_payloads = len(unknown_rows)
     data_payloads = sum(row["classification"] == "authenticated-data-format"
                         for row in payloads)
     executable_candidates = [
         {"container": row["container"], "expanded_sha256": row["expanded_sha256"],
          "index": row["index"], "proof": row["proof"]}
         for row in payloads if row["classification"] == "executable-candidate"
+    ]
+    identity_groups: dict[str, list[dict[str, Any]]] = {}
+    for row in unknown_rows:
+        identity_groups.setdefault(row["expanded_sha256"], []).append({
+            "container": row["container"], "index": row["index"]})
+    unknown_identities = [
+        {"expanded_sha256": digest, "occurrence_count": len(locations),
+         "occurrences": sorted(locations, key=lambda item: (item["container"],
+                                                             item["index"]))}
+        for digest, locations in sorted(identity_groups.items())
     ]
     unresolved_sites = sum(len(row["unresolved_indirects"])
                            for row in executable_images)
@@ -346,6 +384,9 @@ def build_audit(iso: dict[str, Any], iso_digest: str,
     unknown_ranges = sum(len(row["unknown_ranges"]) for row in executable_images)
     gates = {
         "all_media_payloads_classified": unresolved_payloads == 0,
+        "all_embedded_roles_classified": not any(
+            row["classification"] == "authenticated-structured-envelope"
+            for row in payloads),
         "additional_executable_candidates_resolved": not executable_candidates,
         "all_static_regions_compiled": all(row["compiled_region_count"] > 0
                                            for row in executable_images),
@@ -354,6 +395,7 @@ def build_audit(iso: dict[str, Any], iso_digest: str,
         "media_expansion_complete": True,
         "runtime_epoch_coverage_complete": False,
         "unknown_executable_risk_eliminated": unresolved_payloads == 0,
+        "unique_unknown_identities_resolved": not unknown_identities,
         "unknown_code_eliminated": unknown_ranges == 0,
     }
     gates["content_static_coverage_complete"] = all(gates.values())
@@ -382,13 +424,18 @@ def build_audit(iso: dict[str, Any], iso_digest: str,
         "schema": SCHEMA,
         "status": ("complete" if gates["content_static_coverage_complete"]
                    else "incomplete-fail-closed"),
+        "unknown_payload_identities": unknown_identities,
         "summary": {
             "authenticated_executable_payloads": 2,
             "authenticated_data_payloads": data_payloads,
             "cataloged_payloads": len(payloads),
             "rejected_direct_edges": rejected_edges,
             "runtime_epochs": len(epoch_rows),
+            "structured_unknown_payloads": sum(
+                row["classification"] == "authenticated-structured-envelope"
+                for row in payloads),
             "unclassified_payloads": unresolved_payloads,
+            "unique_unknown_payload_identities": len(unknown_identities),
             "unknown_code_ranges": unknown_ranges,
             "unresolved_indirect_sites": unresolved_sites,
         },

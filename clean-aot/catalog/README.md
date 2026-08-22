@@ -120,7 +120,10 @@ identities, reconciles the two supplemental finite main-image sites, and maps
 four observed NFE runtime epochs. It deliberately remains
 `incomplete-fail-closed`: exact bounded TIM and Sony VAG parsing proves 106
 payloads are data, while 5,071 payloads still lack an authenticated code/data
-role. The strict raw
+role. Of those, 1,722 have a fully validated 16-byte Wip3out name envelope and
+a separately hashed unknown-role body; 3,349 remain opaque. Exact content
+deduplication reduces that review frontier to 650 unique payload identities
+without using duplication as evidence that any identity is data. The strict raw
 MIPS ABI-shape scan finds no additional candidate beyond the already-bound NFE
 entry 5, but unknown executable risk remains open rather than treating that scan
 as proof of absence. In addition,

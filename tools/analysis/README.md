@@ -72,3 +72,7 @@ The byte-backed pass recognizes only exact bounded TIM and Sony VAG streams as
 data and uses
 a conservative MIPS ABI-shape scan solely to prioritize executable candidates.
 All-zero and unrecognized payloads remain unknown-role.
+The dominant named-record family is exposed only as a validated 16-byte
+uppercase identifier envelope plus a separately hashed unknown-role body.
+Unknown instances are also grouped by exact expanded SHA-256 so repeated media
+content is reviewed once, without weakening the executable-risk gate.

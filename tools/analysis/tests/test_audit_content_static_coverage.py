@@ -6,6 +6,7 @@ import unittest
 from tools.analysis.audit_content_static_coverage import (
     AuditError,
     build_audit,
+    parse_named_envelope,
     parse_tim,
     parse_vag,
     raw_mips_candidate,
@@ -117,6 +118,12 @@ class ContentCoverageAuditTests(unittest.TestCase):
         invalid_frame[48] = 0xF0
         self.assertIsNone(parse_vag(bytes(invalid_frame)))
 
+        envelope = b"BODY_TEST\0" + bytes(6) + b"opaque body"
+        parsed_envelope = parse_named_envelope(envelope)
+        self.assertEqual(parsed_envelope["name"], "BODY_TEST")
+        self.assertEqual(parsed_envelope["body"]["role"], "unknown")
+        self.assertIsNone(parse_named_envelope(b"body_test\0" + bytes(20)))
+
         words = [0x27BDFFE0, 0xAFBF001C] + [0] * 6 + [0x03E00008, 0]
         code = struct.pack(f"<{len(words)}I", *words)
         self.assertEqual(raw_mips_candidate(code)["format"],
@@ -130,6 +137,7 @@ class ContentCoverageAuditTests(unittest.TestCase):
         self.assertEqual(receipt["summary"]["authenticated_executable_payloads"], 2)
         self.assertEqual(receipt["summary"]["authenticated_data_payloads"], 1)
         self.assertEqual(receipt["summary"]["unclassified_payloads"], 5)
+        self.assertEqual(receipt["summary"]["unique_unknown_payload_identities"], 5)
         self.assertEqual(receipt["summary"]["runtime_epochs"], 1)
         self.assertFalse(receipt["coverage_gates"]["content_static_coverage_complete"])
         main = next(row for row in receipt["executable_images"]
