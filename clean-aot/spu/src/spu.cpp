@@ -2568,7 +2568,12 @@ bool Device::validate_payload(SnapshotReader& reader) const noexcept {
     return reader.good && volumes_valid && cdda_valid && xa_valid && external_valid &&
            (pending_control <= 1u) &&
            (pending_control_mode & ~0x003Fu) == 0u && dma_ready <= 1u &&
-           transfer_busy <= 1u &&
+           /*
+            * DMA calls are synchronous: there is no resumable operation that
+            * can legitimately own a restored busy flag.  Accepting such a
+            * payload would leave SPUSTAT busy forever.
+            */
+           transfer_busy == 0u &&
            (transfer_control & ~kTransferControlMask) == 0u &&
            transfer_head < TransferFifoCapacity &&
            transfer_tail < TransferFifoCapacity &&

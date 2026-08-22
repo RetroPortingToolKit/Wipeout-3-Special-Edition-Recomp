@@ -534,6 +534,43 @@ void test_irq_and_mmio_boundaries() {
     require(dma.dma_write(words).fault == DmaFault::WrongTransferMode,
             "DMA write rejects read mode");
 
+    static Device dma_irq_wrap;
+    dma_irq_wrap.reset();
+    IrqCounter dma_irq_counter;
+    dma_irq_wrap.set_irq_callback(IrqCounter::signal, &dma_irq_counter);
+    put(dma_irq_wrap, Device::TransferControl, kNormalTransfer);
+    put(dma_irq_wrap, Device::TransferAddress, 0xFFFFu);
+    put(dma_irq_wrap, Device::IrqAddress, 0u);
+    put(dma_irq_wrap, Device::Control,
+        static_cast<std::uint16_t>(kLive | Device::ControlIrqEnable |
+                                   kDmaWrite));
+    render_count(dma_irq_wrap, 1u, "apply wrapped IRQ DMA-write mode");
+    constexpr std::array<std::uint16_t, 8u> wrap_words = {
+        0x1001u, 0x1002u, 0x1003u, 0x1004u,
+        0x2001u, 0x2002u, 0x2003u, 0x2004u,
+    };
+    require(dma_irq_wrap.dma_write(wrap_words).ok() &&
+                dma_irq_wrap.irq_pending() && dma_irq_counter.calls == 1u,
+            "DMA write raises one IRQ on the exact wrapped sound-RAM word");
+    for (std::size_t index = 0u; index < 4u; ++index) {
+        require(ram_word(dma_irq_wrap, 524280u + index * 2u) ==
+                    wrap_words[index] &&
+                    ram_word(dma_irq_wrap, index * 2u) ==
+                    wrap_words[index + 4u],
+                "DMA write advances and wraps each transferred halfword");
+    }
+    static std::array<std::byte, Device::SnapshotBytes> dma_irq_snapshot{};
+    require(dma_irq_wrap.save_snapshot(dma_irq_snapshot).ok(),
+            "snapshot completed wrapped DMA/IRQ state");
+    static Device dma_irq_replay;
+    dma_irq_replay.reset();
+    require(dma_irq_replay.restore_snapshot(dma_irq_snapshot).ok() &&
+                dma_irq_replay.deterministic_digest() ==
+                    dma_irq_wrap.deterministic_digest() &&
+                (dma_irq_replay.read_mmio(Device::Status, kWord).value &
+                 Device::StatusTransferBusy) == 0u,
+            "wrapped DMA/IRQ snapshot restores without phantom busy state");
+
     static std::array<std::uint16_t,
                       clean_aot::spu::MaxDmaHalfwordsPerCall + 1u>
         oversized_dma{};
@@ -1317,6 +1354,19 @@ void test_snapshot_chunking_and_long_replay() {
     require(bad_voice.fault == SnapshotFault::InvalidPayload &&
                 replay.deterministic_digest() == before_bad_restore,
             "self-consistent digest cannot admit invalid voice sample index");
+
+    forged = snapshot;
+    constexpr std::size_t transfer_busy_payload_offset =
+        clean_aot::spu::SoundRamBytes +
+        (clean_aot::spu::VoiceCount * Device::VoiceSnapshotBytes) +
+        (2u * Device::VolumeSnapshotBytes) + 28u;
+    forged[Device::SnapshotHeaderBytes + transfer_busy_payload_offset] =
+        std::byte{1u};
+    reseal_snapshot(forged);
+    const auto bad_busy = replay.restore_snapshot(forged);
+    require(bad_busy.fault == SnapshotFault::InvalidPayload &&
+                replay.deterministic_digest() == before_bad_restore,
+            "snapshot rejects non-resumable synchronous DMA busy state");
 
     forged = snapshot;
     constexpr std::size_t first_audio_fifo_payload_offset =
