@@ -1,4 +1,6 @@
 #include "clean_aot/host/sdl_vulkan.hpp"
+#include "clean_aot/host/direct_vulkan_bridge.hpp"
+#include <SDL3/SDL.h>
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -165,6 +167,34 @@ int main() {
         timed_metrics.display_presentations_confirmed != 1U ||
         timed_metrics.completion_evidence_fault) return 23;
     timed.shutdown();
+
+    if (!SDL_Init(SDL_INIT_VIDEO)) return 24;
+    SDL_Window* direct_window = SDL_CreateWindow("direct Vulkan evidence",
+        3840, 2160, SDL_WINDOW_VULKAN | SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE);
+    if (direct_window == nullptr) return 25;
+    DirectVulkanPresentBridge direct{};
+    if (!direct.initialize(direct_window,3840U,2160U,true).success()) return 26;
+    DirectVulkanMetrics direct_metrics = direct.metrics();
+    if (!direct_metrics.surface_created || direct_metrics.swapchain_created ||
+        !direct_metrics.hidden || direct_metrics.completions != 0U) return 27;
+    if (!direct.resize(5120U,2160U,true).success() ||
+        direct.metrics().generation != 2U || direct.metrics().recreations != 1U) return 28;
+    if (!SDL_ShowWindow(direct_window) ||
+        !direct.resize(5120U,2160U,false).success()) return 29;
+    direct_metrics = direct.metrics();
+    if (!direct_metrics.swapchain_created || direct_metrics.hidden) return 30;
+    if (direct.present_clear(2U).code != HostCode::sequence_error) return 31;
+    for (std::uint64_t id = 1U; id <= 100U; ++id) {
+        if (!direct.present_clear(id).success()) return 32;
+    }
+    direct_metrics = direct.metrics();
+    if (direct_metrics.submissions != 100U ||
+        (direct_metrics.source == PresentCompletionSource::unavailable &&
+         direct_metrics.completions != 0U) ||
+        (direct_metrics.source != PresentCompletionSource::unavailable &&
+         (direct_metrics.completions != direct_metrics.submissions ||
+          direct_metrics.last_present_id != 100U))) return 33;
+    direct.shutdown(); SDL_DestroyWindow(direct_window); SDL_QuitSubSystem(SDL_INIT_VIDEO);
     std::cout << "clean_aot_host_sdl_vulkan_tests: 101 unique GPU submissions; "
                  "physical presentation intentionally unclaimed\n";
     return 0;

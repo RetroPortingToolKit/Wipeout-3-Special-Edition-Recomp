@@ -84,6 +84,19 @@ timestamps and 100 Hz interval tolerance, and fail closed on stale, duplicate,
 out-of-order, or future receipts. Resize starts a new evidence generation;
 device loss cannot be reported as a completion.
 
+`DirectVulkanPresentBridge` is the opt-in native path for systems that require
+physical evidence. SDL creates its window and `VkSurfaceKHR`; the bridge owns
+the Vulkan instance, physical/logical device selection, graphics/present
+queues, command pool, synchronization, and swapchain. It attaches strictly
+increasing `VkPresentIdKHR` values and waits with `vkWaitForPresentKHR`, or uses
+requested/past presentation timing with `VK_GOOGLE_display_timing`. A hidden
+window owns a surface but deliberately has no swapchain or completion. Resize
+destroys all swapchain-scoped state after device idle and advances the evidence
+generation. Unsupported extensions leave the source `unavailable` and never
+manufacture a completion. The stock SDL GPU backend remains the portable
+fallback. The direct bridge dependency is pinned to vk-bootstrap 1.3.302 and
+uses SDL's pinned Vulkan headers; no Vulkan SDK installation is required.
+
 The Vulkan SDK is therefore not a runtime dependency. A Windows release still
 needs the SDL3 runtime DLL and a Vulkan-capable driver. The current shell does
 not provide an audio device; the display-free headless backend is the accepted

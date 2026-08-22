@@ -182,9 +182,18 @@ if(CLEAN_AOT_HOST_ENABLE_SDL_VULKAN)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(SDL3)
+    FetchContent_Declare(vk_bootstrap
+        GIT_REPOSITORY https://github.com/charles-lunarg/vk-bootstrap.git
+        GIT_TAG ed1aebb754aa9974f613f25181434c90b8473f2b)
+    set(VK_BOOTSTRAP_TEST OFF CACHE BOOL "" FORCE)
+    set(VK_BOOTSTRAP_INSTALL OFF CACHE BOOL "" FORCE)
+    set(VK_BOOTSTRAP_VULKAN_HEADER_DIR
+        "${sdl3_SOURCE_DIR}/src/video/khronos" CACHE PATH "" FORCE)
+    FetchContent_MakeAvailable(vk_bootstrap)
     include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/colocate_sdl3.cmake")
 
     add_library(clean_aot_host_sdl_vulkan STATIC
+        src/direct_vulkan_bridge_win32.cpp
         src/sdl_vulkan_backend_win32.cpp
     )
     target_compile_features(clean_aot_host_sdl_vulkan PUBLIC cxx_std_20)
@@ -195,11 +204,14 @@ if(CLEAN_AOT_HOST_ENABLE_SDL_VULKAN)
         PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             "${CLEAN_AOT_HOST_SHADER_INCLUDE_DIR}"
+        PRIVATE
+            "${sdl3_SOURCE_DIR}/src/video/khronos"
     )
     target_link_libraries(clean_aot_host_sdl_vulkan
         PUBLIC
             clean_aot_host
             SDL3::SDL3
+            vk-bootstrap::vk-bootstrap
     )
     if(CLEAN_AOT_HOST_REBUILD_SHADERS)
         add_dependencies(clean_aot_host_sdl_vulkan clean_aot_host_shaders)
