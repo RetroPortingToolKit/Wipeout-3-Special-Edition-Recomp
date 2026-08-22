@@ -15,43 +15,25 @@ Wipeout 3 is a racing game that retains the same basic elements of its predecess
 | | |
 |---|---|
 | Players | 2 |
-| Region | USA |
+| Region | Europe (PAL) |
 | Publisher | Psygnosis |
 | Year | 2000 |
 
-Scaffolded with the New Project Layout. See
-`psxrecomp/docs/GAME_PROJECT_SETUP.md` for the full flow.
+## Running the game
 
-<!-- retcomm-readme-launcher -->
-## RetComM Launcher
+Open the game executable. Its built-in launcher owns video, audio, input,
+BIOS, disc, and accessibility settings and then starts the game. There is no
+installer and no separate Generate & Build wizard in the player package.
 
-You can run this title **standalone** (release zip + the built-in recomp-ui
-Generate & Build flow), or manage installs, updates, ROM/BIOS wiring, and queued
-builds more intuitively with
-**[RetComM Launcher](https://github.com/TechnicallyComputers/RetComM-Launcher)** —
-the Retro Compilation Manager hub for self-compiling recomps.
-
-[Downloads](https://github.com/TechnicallyComputers/RetComM-Launcher/releases) ·
-[Full README & features](https://github.com/TechnicallyComputers/RetComM-Launcher#readme)
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/TechnicallyComputers/RetComM-Launcher/main/docs/screenshots/hub-and-game-launcher.png" alt="RetComM hub with a background build, next to a title’s recomp-ui launcher" width="720">
-</p>
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/TechnicallyComputers/RetComM-Launcher/main/docs/screenshots/queue-and-background-build.png" alt="Background cmake build with titles queued" width="720">
-</p>
-
-RetComM checks for updates, rebuilds with existing build data when possible,
-shares the portable toolchain used by per-title launchers, and automates
-BIOS/ROM/save plumbing so you are not stuck repeating each game’s wizard by hand.
-<!-- /retcomm-readme-launcher -->
+On first launch, select your legally dumped PlayStation BIOS and your own
+WipEout 3 Special Edition disc image. The launcher remembers external paths;
+neither copyrighted input is copied into the application package.
 
 ## Legal
 
-You must own the original game. Disc images under `disc/` are gitignored and
-must never be committed. Retail BIOS dumps are not redistributed; OpenBIOS is
-used for Generate unless you supply your own SCPH locally.
+You must own the original game and provide your own disc image and PlayStation
+BIOS dump. Disc images and retail BIOS dumps are not redistributed and must
+never be committed.
 
 Default app icon: `assets/psxrecomp.ico` (and `.png` / `.svg`) — RetComM-themed controller mark from `psxrecomp/assets/`. Windows builds embed it via `APP_ICON`.
 

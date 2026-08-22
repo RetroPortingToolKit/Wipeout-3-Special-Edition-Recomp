@@ -1171,3 +1171,27 @@ instruction and fails closed on every unknown PC or executable identity.
   4K/ultrawide 100-Hz soaks, and graphics matrix pass. Readiness remains 12/15;
   only direct game execution, 64 behavioral routes, and authenticated media
   execution remain failed.
+
+## Standard PSXRecomp product-path pivot (2026-08-22)
+
+- The user explicitly retired the clean-AOT-only, genuine BIOS-shell boot, and
+  no-interpreter/runtime-compiler boundaries. They were not product
+  requirements. The shipping architecture is the established PSXRecomp model:
+  HLE boot skip, statically generated base-game code, and the framework's
+  capture/compile/cache safety path for overlays and unknown code.
+- Preserve `clean-aot/` as research and a source of independently useful
+  hardware, rendering, timing, input, and audio fixes. Do not spend further
+  shipping work advancing exact BIOS-shell frontiers.
+- A fresh `build-psx-standard` Release build from the root generated project
+  completed successfully. A bounded headless run with the prepared 14-track
+  local test disc reached frame 3,486 and visually rendered the city intro;
+  `baseline-frame.png` shows the Psygnosis logo and
+  `baseline-frame-20s.png` shows the intro. These build-local screenshots are
+  evidence only and must not be committed.
+- Root CMake now disables `PSX_SETUP_WIZARD` and no longer passes
+  `ENABLE_SETUP_WIZARD`. The normal single-executable recomp-ui launcher stays
+  enabled for settings and external BIOS/disc selection; the separate
+  Generate & Rebuild setup-host surface is not part of the player product.
+- Next: verify the no-wizard launcher from a clean portable directory with no
+  cached paths, require/select external retail BIOS and disc without copying
+  either, then exercise menus and race routes through the debug protocol.
