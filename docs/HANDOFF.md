@@ -1,5 +1,14 @@
 # Handoff
 
+## Native XA zigzag resampling (2026-08-22)
+
+- XA 37.8/18.9 kHz audio now uses the documented seven-phase, 29-tap CD-ROM
+  zigzag filter instead of linear interpolation while retaining exact 7/6 and
+  7/3 frame counts. Mid-phase history is snapshot-safe and fail-closed.
+- Independent impulse anchors, chunk/capacity attacks, sector handoff tests,
+  and Clang ASan/UBSan results are recorded in
+  `clean-aot/media/evidence/xa-zigzag-resampler-v1.json`.
+
 ## Native SPU/CDDA deadline ordering (2026-08-22)
 
 - A completed CDDA sector is now published only after SPU catch-up through the

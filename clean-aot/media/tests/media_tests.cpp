@@ -471,8 +471,6 @@ void test_exact_rate_converter() {
     auto produced = one_shot.push(input, one_shot_output, true);
     require(produced && produced.value() == 7U && one_shot.output_frames() == 7U,
             "37800 to 44100 exact seven-sixths count");
-    require(one_shot_output[0U] == input[0U] && one_shot_output[1U].left == 857,
-            "deterministic rational linear interpolation");
     require(!one_shot.push(input, one_shot_output, false) &&
                 one_shot.push(input, one_shot_output, false).error().code ==
                     ErrorCode::ConverterFinished,
@@ -500,6 +498,65 @@ void test_exact_rate_converter() {
     auto half_produced = half.push(std::span<const StereoSample>(input.data(), 3U), half_output, true);
     require(half_produced && half_produced.value() == 7U,
             "18900 to 44100 exact seven-thirds count");
+
+    std::array<StereoSample, 12U> impulse_input{};
+    impulse_input[0U] = StereoSample{32767, -32768};
+    std::array<StereoSample, 14U> impulse_output{};
+    auto impulse_result = XaRateConverter::create(XaRateFullHz);
+    require(impulse_result.has_value(), "zigzag impulse converter creation");
+    auto impulse = std::move(impulse_result).value();
+    auto impulse_produced = impulse.push(impulse_input, impulse_output);
+    constexpr std::array<std::int16_t, 7U> first_impulse{
+        -1, 2, -4, 4, 9, 25, -67};
+    constexpr std::array<std::int16_t, 7U> second_impulse{
+        8, 305, -925, 2487, -6015, 21471, 21471};
+    for (std::size_t phase = 0U; phase < 7U; ++phase) {
+        require(impulse_output[phase].left == first_impulse[phase] &&
+                    impulse_output[phase + 7U].left == second_impulse[phase],
+                "25-point zigzag phase impulse anchor");
+    }
+    require(impulse_produced && impulse_produced.value() == 14U,
+            "two six-step groups emit fourteen zigzag phases");
+
+    std::array<StereoSample, 5U> snapshot_prefix{};
+    snapshot_prefix[0U] = StereoSample{32767, -32768};
+    std::array<StereoSample, 1U> no_output{};
+    auto snapshot_source_result = XaRateConverter::create(XaRateFullHz);
+    require(snapshot_source_result.has_value(), "snapshot converter creation");
+    auto snapshot_source = std::move(snapshot_source_result).value();
+    auto prefix_result = snapshot_source.push(snapshot_prefix, no_output);
+    require(prefix_result && prefix_result.value() == 0U,
+            "five source samples remain before first zigzag boundary");
+    const auto converter_snapshot = snapshot_source.snapshot();
+    auto replay_result = XaRateConverter::create(XaRateHalfHz);
+    require(replay_result.has_value(), "snapshot replay converter creation");
+    auto replay = std::move(replay_result).value();
+    require(replay.restore_snapshot(converter_snapshot),
+            "restore mid-phase zigzag history");
+    constexpr std::array<StereoSample, 1U> final_zero{};
+    std::array<StereoSample, 7U> continued{};
+    std::array<StereoSample, 7U> replayed{};
+    require(snapshot_source.push(final_zero, continued).value() == 7U &&
+                replay.push(final_zero, replayed).value() == 7U &&
+                continued == replayed &&
+                snapshot_source.snapshot() == replay.snapshot(),
+            "mid-phase snapshot continuation is bit-identical");
+    auto malformed = converter_snapshot;
+    malformed.six_step = 0U;
+    const auto before_rejection = replay.snapshot();
+    require(!replay.restore_snapshot(malformed) &&
+                replay.snapshot() == before_rejection,
+            "malformed zigzag phase snapshot is rejected atomically");
+
+    auto atomic_result = XaRateConverter::create(XaRateFullHz);
+    require(atomic_result.has_value(), "atomic capacity converter creation");
+    auto atomic = std::move(atomic_result).value();
+    std::array<StereoSample, 6U> too_small_input{};
+    std::array<StereoSample, 0U> empty_output{};
+    const auto atomic_before = atomic.snapshot();
+    require(!atomic.push(too_small_input, empty_output) &&
+                atomic.snapshot() == atomic_before,
+            "undersized zigzag output rejects without consuming phase state");
 
     const std::vector<StereoSample> full_sector_input(2016U, StereoSample{123, -123});
     std::vector<StereoSample> full_sector_output(2352U);

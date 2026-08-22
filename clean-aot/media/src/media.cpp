@@ -1124,51 +1124,89 @@ Result<XaRateConverter> XaRateConverter::create(std::uint32_t source_rate_hz) {
 void XaRateConverter::reset() noexcept {
     input_frames_ = 0U;
     output_frames_ = 0U;
-    next_output_numerator_ = 0U;
-    previous_ = {};
-    have_previous_ = false;
+    ring_.fill({});
+    ring_position_ = 0U;
+    six_step_ = 6U;
     finished_ = false;
 }
 
-std::int16_t XaRateConverter::interpolate(std::int16_t first,
-                                          std::int16_t second,
-                                          std::uint64_t fraction,
-                                          std::uint32_t denominator) noexcept {
-    const std::int64_t first_weight =
-        static_cast<std::int64_t>(denominator) - static_cast<std::int64_t>(fraction);
-    const std::int64_t numerator = static_cast<std::int64_t>(first) * first_weight +
-                                   static_cast<std::int64_t>(second) *
-                                       static_cast<std::int64_t>(fraction);
-    return clamp_sample(round_half_away_from_zero(
-        numerator, static_cast<std::int64_t>(denominator)));
+XaRateConverter::Snapshot XaRateConverter::snapshot() const noexcept {
+    return Snapshot{source_rate_hz_, input_frames_, output_frames_, ring_,
+                    ring_position_, six_step_, finished_};
 }
 
-std::size_t XaRateConverter::process_interval(const StereoSample& first,
-                                              const StereoSample& second,
-                                              std::uint64_t interval_end,
-                                              std::span<StereoSample> output,
-                                              std::size_t output_offset) {
-    const std::uint64_t end_numerator =
-        interval_end * static_cast<std::uint64_t>(CddaRateHz);
-    const std::uint64_t start_numerator =
-        (interval_end - 1U) * static_cast<std::uint64_t>(CddaRateHz);
-    std::size_t produced = 0U;
-    while (next_output_numerator_ < end_numerator) {
-        const std::uint64_t fraction =
-            next_output_numerator_ <= start_numerator
-                ? 0U
-                : next_output_numerator_ - start_numerator;
-        if (output_offset + produced >= output.size()) {
-            break;
-        }
-        output[output_offset + produced] =
-            StereoSample{interpolate(first.left, second.left, fraction, CddaRateHz),
-                          interpolate(first.right, second.right, fraction, CddaRateHz)};
-        ++produced;
-        ++output_frames_;
-        next_output_numerator_ += source_rate_hz_;
+bool XaRateConverter::restore_snapshot(const Snapshot& snapshot) noexcept {
+    if (snapshot.source_rate_hz != XaRateFullHz &&
+        snapshot.source_rate_hz != XaRateHalfHz) {
+        return false;
     }
-    return produced;
+    const std::uint64_t expansion =
+        snapshot.source_rate_hz == XaRateHalfHz ? 2U : 1U;
+    if (snapshot.input_frames >
+        std::numeric_limits<std::uint64_t>::max() / expansion) {
+        return false;
+    }
+    const std::uint64_t expanded = snapshot.input_frames * expansion;
+    const std::uint64_t groups = expanded / 6U;
+    if (groups > std::numeric_limits<std::uint64_t>::max() / 7U ||
+        snapshot.ring_position >= snapshot.ring.size() ||
+        snapshot.ring_position != static_cast<std::uint8_t>(expanded & 31U) ||
+        snapshot.six_step == 0U || snapshot.six_step > 6U ||
+        expanded % 6U != 6U - snapshot.six_step ||
+        snapshot.output_frames != groups * 7U) {
+        return false;
+    }
+    source_rate_hz_ = snapshot.source_rate_hz;
+    input_frames_ = snapshot.input_frames;
+    output_frames_ = snapshot.output_frames;
+    ring_ = snapshot.ring;
+    ring_position_ = snapshot.ring_position;
+    six_step_ = snapshot.six_step;
+    finished_ = snapshot.finished;
+    return true;
+}
+
+namespace {
+
+constexpr std::array<std::array<std::int16_t, 29U>, 7U> kXaZigzag = {{
+    {{0,0,0,0,0,-2,10,-34,65,-84,52,9,-266,1024,-2680,9036,26516,-6016,3021,-1571,848,-365,107,10,-16,17,-8,3,-1}},
+    {{0,0,0,-2,0,3,-19,60,-75,162,-227,306,-67,-615,3229,29883,-4532,2488,-1471,882,-424,166,-27,5,6,-8,3,-1,0}},
+    {{0,0,-1,3,-2,-5,31,-74,179,-402,689,-926,1272,-1446,31033,-1446,1272,-926,689,-402,179,-74,31,-5,-2,3,-1,0,0}},
+    {{0,-1,3,-8,6,5,-27,166,-424,882,-1471,2488,-4532,29883,3229,-615,-67,306,-227,162,-75,60,-19,3,0,-2,0,0,0}},
+    {{-1,3,-8,17,-16,10,107,-365,848,-1571,3021,-6016,26516,9036,-2680,1024,-266,9,52,-84,65,-34,10,-1,3,1,0,0,0}},
+    {{2,-8,16,-35,43,26,-235,635,-1352,2810,-5882,21472,15367,-4681,2062,-839,347,-68,-23,70,-35,17,-5,0,0,0,0,0,0}},
+    {{-5,17,-35,70,-23,-68,347,-839,2062,-4681,15367,21472,-5882,2810,-1352,635,-235,26,43,-35,16,-8,2,0,0,0,0,0,0}},
+}};
+
+} // namespace
+
+StereoSample XaRateConverter::interpolate_phase(std::size_t phase) const noexcept {
+    std::int64_t left = 0;
+    std::int64_t right = 0;
+    for (std::size_t tap = 0U; tap < kXaZigzag[phase].size(); ++tap) {
+        const std::size_t index =
+            (static_cast<std::size_t>(ring_position_) + 31U - tap) & 31U;
+        const std::int64_t coefficient = kXaZigzag[phase][tap];
+        left += static_cast<std::int64_t>(ring_[index].left) * coefficient / 0x8000;
+        right += static_cast<std::int64_t>(ring_[index].right) * coefficient / 0x8000;
+    }
+    return StereoSample{clamp_sample(left), clamp_sample(right)};
+}
+
+void XaRateConverter::push_37800_sample(const StereoSample& sample,
+                                        std::span<StereoSample> output,
+                                        std::size_t& produced) noexcept {
+    ring_[ring_position_] = sample;
+    ring_position_ = static_cast<std::uint8_t>(
+        (static_cast<std::size_t>(ring_position_) + 1U) & 31U);
+    --six_step_;
+    if (six_step_ != 0U) {
+        return;
+    }
+    six_step_ = 6U;
+    for (std::size_t phase = 0U; phase < kXaZigzag.size(); ++phase) {
+        output[produced++] = interpolate_phase(phase);
+    }
 }
 
 Result<std::size_t> XaRateConverter::push(std::span<const StereoSample> input,
@@ -1182,51 +1220,36 @@ Result<std::size_t> XaRateConverter::push(std::span<const StereoSample> input,
         return Result<std::size_t>::failure(
             make_error(ErrorCode::Overflow, "XA converter input frame count overflow"));
     }
-    const std::uint64_t new_input_count = input_frames_ + input.size();
-    if (new_input_count > std::numeric_limits<std::uint64_t>::max() /
-                              static_cast<std::uint64_t>(CddaRateHz)) {
+    const std::uint64_t expansion = source_rate_hz_ == XaRateHalfHz ? 2U : 1U;
+    if (input.size() > std::numeric_limits<std::uint64_t>::max() / expansion) {
         return Result<std::size_t>::failure(
             make_error(ErrorCode::Overflow, "XA converter timeline overflow"));
     }
-    /* Without an explicit end marker the final sample is retained as the
-       right endpoint for the next chunk, so it does not create an interval
-       yet. Capacity checks must match that exact streaming behavior. */
-    const std::uint64_t interval_count =
-        end_of_stream ? new_input_count : (new_input_count == 0U ? 0U : new_input_count - 1U);
-    const std::uint64_t horizon =
-        interval_count * static_cast<std::uint64_t>(CddaRateHz);
-    const std::uint64_t remaining =
-        horizon > next_output_numerator_ ? horizon - next_output_numerator_ : 0U;
-    const std::uint64_t required_outputs =
-        remaining == 0U
-            ? 0U
-            : (remaining + static_cast<std::uint64_t>(source_rate_hz_) - 1U) /
-                  static_cast<std::uint64_t>(source_rate_hz_);
+    const std::uint64_t pending = 6U - six_step_;
+    const std::uint64_t expanded =
+        static_cast<std::uint64_t>(input.size()) * expansion;
+    const std::uint64_t groups = (pending + expanded) / 6U;
+    if (groups > std::numeric_limits<std::uint64_t>::max() / 7U) {
+        return Result<std::size_t>::failure(
+            make_error(ErrorCode::Overflow, "XA converter output count overflow"));
+    }
+    const std::uint64_t required_outputs = groups * 7U;
     if (required_outputs > output.size() ||
-        required_outputs > std::numeric_limits<std::size_t>::max() - output_frames_ ||
-        required_outputs >
-            (std::numeric_limits<std::uint64_t>::max() - next_output_numerator_) /
-                static_cast<std::uint64_t>(source_rate_hz_)) {
+        required_outputs > std::numeric_limits<std::uint64_t>::max() - output_frames_) {
         return Result<std::size_t>::failure(
             make_error(ErrorCode::OutputTooSmall, "XA converter output span is too small"));
     }
 
     std::size_t produced = 0U;
     for (const StereoSample& sample : input) {
-        if (!have_previous_) {
-            previous_ = sample;
-            have_previous_ = true;
-            input_frames_ = 1U;
-        } else {
-            produced += process_interval(previous_, sample, input_frames_, output, produced);
-            previous_ = sample;
-            ++input_frames_;
+        push_37800_sample(sample, output, produced);
+        if (expansion == 2U) {
+            push_37800_sample(sample, output, produced);
         }
     }
+    input_frames_ += static_cast<std::uint64_t>(input.size());
+    output_frames_ += static_cast<std::uint64_t>(produced);
     if (end_of_stream) {
-        if (have_previous_) {
-            produced += process_interval(previous_, previous_, input_frames_, output, produced);
-        }
         finished_ = true;
     }
     return Result<std::size_t>::success(produced);

@@ -56,12 +56,14 @@ reported in the format but rejected by the decoder because its PS1 formula is
 not specified by the public references and is not used by known PS1 software.
 
 `XaRateConverter` is a deterministic host boundary from either XA source rate
-to 44.1 kHz. It uses a rational phase/carry and two-sample linear interpolation;
-it never accumulates floating-point time or an unbounded stream buffer. For
-complete XA sector-sized blocks the output count is exact (`37800 -> 44100` is
-7/6 and `18900 -> 44100` is 7/3). This is an explicit deterministic conversion
-policy, not a claim that the undocumented drive-side 25-tap interpolation has
-been reproduced.
+to 44.1 kHz. It implements the documented seven-phase, 29-tap CD-ROM zigzag
+filter with a bounded 32-frame ring; 18.9 kHz samples enter the 37.8 kHz stage
+twice. Complete XA sector-sized blocks retain exact counts (`37800 -> 44100`
+is 7/6 and `18900 -> 44100` is 7/3), with no floating-point clock or unbounded
+stream buffer. Typed snapshots preserve and validate the ring and six-step
+phase. The public measurements note small residual silicon rounding errors,
+so this is the strongest documented filter model, not a bit-exact silicon
+claim.
 
 ## Build and test
 

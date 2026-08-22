@@ -50,7 +50,8 @@ Implemented surface
   CD-ROM component. `CdAudioSink` is the explicit native-time integration seam:
   it preserves XA decode/resampler history across forward interleaved sectors,
   resets on stream identity/format discontinuities, applies the staged CD
-  matrix and mute state, and hands bounded 44.1-kHz frames to this device.
+  matrix and mute state, resamples through the documented seven-phase XA
+  zigzag filter, and hands bounded 44.1-kHz frames to this device.
 - A fixed-point, register-driven reverb path with same-side reflection,
   cross-side reflection, four comb stages, two all-pass stages, wet output,
   intermediate saturation, and the documented alternate left/right 22,050 Hz
@@ -113,7 +114,7 @@ Integration risks remaining for a later tranche are sub-sample MMIO and
 key-on/key-off timing beyond the native 44,100 Hz sample boundary, exact
 silicon reverb evaluation/polyphase rounding, the unknown third per-voice RAM
 read and complete bus-slot IRQ ordering, physical transfer FIFO/DMA request
-timing and DMA arbitration, raw XA sector decode/resampling, external-port
+  timing and DMA arbitration, residual XA zigzag silicon rounding, external-port
 production wiring, and the system interrupt-controller adapter. The known
 delayed SPUCNT low bits, DMA-read request warm-up, inactive-voice header/data
 reads, and synchronous FIFO behavior are implemented and tested; the

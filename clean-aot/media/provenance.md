@@ -20,6 +20,11 @@ static-recompilation repository.
   subheader, optional Form 2 EDC, raw CDDA byte order used by PSX BIN images,
   XA coding-info bits, 128-byte sound-group layout, filter coefficients, and
   the 4-bit/8-bit sample expansion rules.
+- The pinned PSX-SPX `docs/cdromformat.md` at commit
+  `b791ca25b7833b356b28917383f231078762a75d`, SHA-256
+  `d391c98d5156b41edb15759e56b21e5619f73b12e2a541d9806f4bb68c981950`,
+  supplies the independently entered seven 29-tap XA zigzag measurement
+  tables and six-input/seven-output schedule.
 - [libyal CUE sheet format working document](https://github.com/libyal/libodraw/blob/main/documentation/CUE%20sheet%20format.asciidoc)
   was consulted for the text grammar and the ordering/meaning of `INDEX 00`,
   `INDEX 01`, `PREGAP`, and `POSTGAP`. It is treated as a format description,
@@ -34,10 +39,10 @@ synthetic gap is exposed as zero raw bytes for CDDA reads but is rejected by
 the Mode 2/XA readers because it has no sector header or payload.
 
 The XA decoder uses the public PS1 four-filter coefficient set and bounded
-per-channel predictor state. The rate converter intentionally uses exact
-rational phase/carry with integer interpolation rather than copying an
-emulator’s implementation or claiming undocumented CD-ROM interpolation
-behavior. Emphasis is surfaced but rejected at the decode boundary because
+per-channel predictor state. The rate converter uses the public measured
+zigzag constants as behavioral data, fixed-width per-tap arithmetic, and a
+bounded streaming state machine rather than emulator source. The reference
+documents small unexplained silicon rounding differences, which remain an
+explicit accuracy boundary. Emphasis is surfaced but rejected because
 the public PSX documentation leaves its formula unspecified and notes that it
 is not used by known PlayStation software.
-

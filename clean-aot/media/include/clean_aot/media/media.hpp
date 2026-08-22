@@ -280,6 +280,18 @@ private:
 
 class XaRateConverter final {
 public:
+    struct Snapshot final {
+        std::uint32_t source_rate_hz = 0U;
+        std::uint64_t input_frames = 0U;
+        std::uint64_t output_frames = 0U;
+        std::array<StereoSample, 32U> ring{};
+        std::uint8_t ring_position = 0U;
+        std::uint8_t six_step = 6U;
+        bool finished = false;
+
+        friend constexpr bool operator==(const Snapshot&, const Snapshot&) noexcept = default;
+    };
+
     static Result<XaRateConverter> create(std::uint32_t source_rate_hz);
 
     void reset() noexcept;
@@ -290,26 +302,23 @@ public:
     [[nodiscard]] std::uint32_t source_rate_hz() const noexcept { return source_rate_hz_; }
     [[nodiscard]] std::uint64_t input_frames() const noexcept { return input_frames_; }
     [[nodiscard]] std::uint64_t output_frames() const noexcept { return output_frames_; }
+    [[nodiscard]] Snapshot snapshot() const noexcept;
+    [[nodiscard]] bool restore_snapshot(const Snapshot& snapshot) noexcept;
 
 private:
     explicit XaRateConverter(std::uint32_t source_rate_hz) : source_rate_hz_(source_rate_hz) {}
 
-    static std::int16_t interpolate(std::int16_t first,
-                                    std::int16_t second,
-                                    std::uint64_t fraction,
-                                    std::uint32_t denominator) noexcept;
-    std::size_t process_interval(const StereoSample& first,
-                                 const StereoSample& second,
-                                 std::uint64_t interval_end,
-                                 std::span<StereoSample> output,
-                                 std::size_t output_offset);
+    [[nodiscard]] StereoSample interpolate_phase(std::size_t phase) const noexcept;
+    void push_37800_sample(const StereoSample& sample,
+                           std::span<StereoSample> output,
+                           std::size_t& produced) noexcept;
 
     std::uint32_t source_rate_hz_ = 0U;
     std::uint64_t input_frames_ = 0U;
     std::uint64_t output_frames_ = 0U;
-    std::uint64_t next_output_numerator_ = 0U;
-    StereoSample previous_{};
-    bool have_previous_ = false;
+    std::array<StereoSample, 32U> ring_{};
+    std::uint8_t ring_position_ = 0U;
+    std::uint8_t six_step_ = 6U;
     bool finished_ = false;
 };
 

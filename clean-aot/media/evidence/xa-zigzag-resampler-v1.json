@@ -1,0 +1,40 @@
+{
+  "schema": "clean-aot.media.xa-zigzag-resampler.v1",
+  "source": {
+    "psx_spx_commit": "b791ca25b7833b356b28917383f231078762a75d",
+    "document": "docs/cdromformat.md",
+    "sha256": "d391c98d5156b41edb15759e56b21e5619f73b12e2a541d9806f4bb68c981950"
+  },
+  "model": {
+    "history_frames": 32,
+    "taps_per_phase": 29,
+    "phases": 7,
+    "full_rate_inputs_per_group": 6,
+    "half_rate_input_replication": 2,
+    "arithmetic": "signed fixed-width per-tap divide by 0x8000, saturated int16 output"
+  },
+  "exact_counts": {
+    "37800_hz_sector": [2016, 2352],
+    "18900_hz_sector": [2016, 4704]
+  },
+  "tests": [
+    "two-group independent impulse phase anchors",
+    "one-shot versus arbitrary chunk carry",
+    "undersized output atomic rejection",
+    "mid-phase snapshot continuation and hostile restore",
+    "XA decoder/CD audio sink sector continuity"
+  ],
+  "verification": {
+    "gcc_16_1_0_spu_media": "4/4 pass",
+    "clang_22_1_8_asan_ubsan_spu_media": "4/4 pass"
+  },
+  "scope": {
+    "cmake_files_modified": false,
+    "boot_frontier_files_modified": false,
+    "product_package_files_modified": false
+  },
+  "remaining_unwaived": [
+    "residual low-order silicon zigzag rounding",
+    "XA emphasis"
+  ]
+}
