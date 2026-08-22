@@ -118,7 +118,12 @@ coverage audit. The current tranche catalogs the main executable plus every
 expanded NFE/PBP payload (5,179 records), binds the two authenticated executable
 identities, reconciles the two supplemental finite main-image sites, and maps
 four observed NFE runtime epochs. It deliberately remains
-`incomplete-fail-closed`: 5,177 payloads lack an authenticated code/data role,
+`incomplete-fail-closed`: exact bounded TIM and Sony VAG parsing proves 106
+payloads are data, while 5,071 payloads still lack an authenticated code/data
+role. The strict raw
+MIPS ABI-shape scan finds no additional candidate beyond the already-bound NFE
+entry 5, but unknown executable risk remains open rather than treating that scan
+as proof of absence. In addition,
 140 indirect sites, 71 direct edges, and 288 unknown code ranges remain, and no
 main/NFE static region set is yet marked compiled. The 13 ISO audio pseudo-files
 outside the data-track image are explicitly excluded rather than silently

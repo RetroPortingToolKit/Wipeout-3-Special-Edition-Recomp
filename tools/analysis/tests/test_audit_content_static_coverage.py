@@ -1,9 +1,14 @@
 import copy
+import hashlib
+import struct
 import unittest
 
 from tools.analysis.audit_content_static_coverage import (
     AuditError,
     build_audit,
+    parse_tim,
+    parse_vag,
+    raw_mips_candidate,
 )
 
 MAIN = "1" * 64
@@ -13,7 +18,14 @@ NFE_SOURCE = "4" * 64
 NFE_VARIANT = "5" * 64
 
 
+def digest(data):
+    return hashlib.sha256(data).hexdigest()
+
+
 def fixtures():
+    tim = struct.pack("<II I HHHH H", 16, 2, 14, 0, 0, 1, 1, 0x1234)
+    track_hash = digest(tim)
+    nfe_bytes = {index: bytes([index]) * 4 for index in range(6)}
     iso = {
         "schema": "psxrecomp.iso9660-inventory.v1", "status": "ok",
         "file_count": 3, "files": [
@@ -32,14 +44,15 @@ def fixtures():
     expanded = [("/WIPEOUT3/TRACKM01.PBP", {
         "status": "ok", "expanded_verification": {"status": "exact"},
         "container": {"bytes": 8, "sha256": "6" * 64}, "entry_count": 1,
-        "entries": [{"index": 0, "encoding": "stored", "expanded_bytes": 4,
-                     "expanded_sha256": "7" * 64}],
+        "entries": [{"index": 0, "encoding": "stored", "expanded_bytes": len(tim),
+                     "expanded_sha256": track_hash}],
     }, "8" * 64)]
     nfe_entries = [
         {"index": index, "encoding": "stored", "expanded_bytes": 4,
-         "expanded_sha256": NFE_SOURCE if index == 5 else str(index) * 64}
+         "expanded_sha256": digest(nfe_bytes[index])}
         for index in range(6)
     ]
+    nfe_entries[5]["expanded_sha256"] = NFE_SOURCE = digest(nfe_bytes[5])
     nfe = {"status": "ok", "expanded_verification": {"status": "exact"},
            "container": {"bytes": 20, "sha256": NFE_CONTAINER},
            "entry_count": 6, "entries": nfe_entries}
@@ -75,22 +88,48 @@ def fixtures():
                          "compared_bytes": 8, "compared_sha256": "9" * 64},
              "delta": {"changed_word_count": 0},
              "observed_execution": {"pc_count": 2}, "status": "exact-source"}
-    return iso, extraction, expanded, nfe, authorization, finite, [(epoch, "a" * 64)]
+    payload_bytes = {("/WIPEOUT3/TRACKM01.PBP", 0): tim}
+    payload_bytes.update({("/WIPEOUT3/NFE.PB", index): data
+                          for index, data in nfe_bytes.items()})
+    return (iso, extraction, expanded, nfe, authorization, finite,
+            [(epoch, "a" * 64)], payload_bytes)
 
 
 def build(values):
-    iso, extraction, expanded, nfe, authorization, finite, epochs = values
+    iso, extraction, expanded, nfe, authorization, finite, epochs, payload_bytes = values
     return build_audit(iso, "b" * 64, extraction, "c" * 64, expanded,
                        nfe, "d" * 64, authorization, "e" * 64,
-                       finite, "f" * 64, epochs)
+                       finite, "f" * 64, epochs, payload_bytes)
 
 
 class ContentCoverageAuditTests(unittest.TestCase):
+    def test_bounded_tim_and_raw_code_candidate_recognizers(self):
+        tim = fixtures()[7][("/WIPEOUT3/TRACKM01.PBP", 0)]
+        self.assertEqual(parse_tim(tim)["format"], "psx-tim")
+        self.assertIsNone(parse_tim(tim[:-1]))
+        self.assertIsNone(parse_tim(tim + b"\0"))
+
+        vag = (b"VAGp" + struct.pack(">IIII", 2, 0, 16, 22050) +
+               bytes(12) + b"test\0" + bytes(11) + bytes(16))
+        self.assertEqual(parse_vag(vag)["frame_count"], 1)
+        self.assertIsNone(parse_vag(vag[:-1]))
+        invalid_frame = bytearray(vag)
+        invalid_frame[48] = 0xF0
+        self.assertIsNone(parse_vag(bytes(invalid_frame)))
+
+        words = [0x27BDFFE0, 0xAFBF001C] + [0] * 6 + [0x03E00008, 0]
+        code = struct.pack(f"<{len(words)}I", *words)
+        self.assertEqual(raw_mips_candidate(code)["format"],
+                         "raw-mips-abi-candidate")
+        self.assertIsNone(raw_mips_candidate(code.replace(
+            struct.pack("<I", 0xAFBF001C), b"\0\0\0\0")))
+
     def test_maps_known_images_and_keeps_unknown_payloads_fail_closed(self):
         receipt = build(fixtures())
         self.assertEqual(receipt["summary"]["cataloged_payloads"], 8)
         self.assertEqual(receipt["summary"]["authenticated_executable_payloads"], 2)
-        self.assertEqual(receipt["summary"]["unclassified_payloads"], 6)
+        self.assertEqual(receipt["summary"]["authenticated_data_payloads"], 1)
+        self.assertEqual(receipt["summary"]["unclassified_payloads"], 5)
         self.assertEqual(receipt["summary"]["runtime_epochs"], 1)
         self.assertFalse(receipt["coverage_gates"]["content_static_coverage_complete"])
         main = next(row for row in receipt["executable_images"]
@@ -128,6 +167,11 @@ class ContentCoverageAuditTests(unittest.TestCase):
         overlapping[6].append((second, "0" * 64))
         with self.assertRaisesRegex(AuditError, "overlap"):
             build(overlapping)
+
+        wrong_bytes = fixtures()
+        wrong_bytes[7][("/WIPEOUT3/NFE.PB", 0)] = b"bad!"
+        with self.assertRaisesRegex(AuditError, "bytes mismatch"):
+            build(wrong_bytes)
 
 
 if __name__ == "__main__":

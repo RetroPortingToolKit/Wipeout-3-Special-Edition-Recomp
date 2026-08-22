@@ -68,3 +68,7 @@ the output even when its code/data role is unknown. Only identities supported
 by the supplied evidence are marked executable; unknown payloads, code ranges,
 callbacks, direct edges, runtime epochs, and absent compiled regions each hold
 their own completeness gate closed.
+The byte-backed pass recognizes only exact bounded TIM and Sony VAG streams as
+data and uses
+a conservative MIPS ABI-shape scan solely to prioritize executable candidates.
+All-zero and unrecognized payloads remain unknown-role.
