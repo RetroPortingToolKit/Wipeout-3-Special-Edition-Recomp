@@ -1,5 +1,22 @@
 # Handoff
 
+## Authenticated BIOS callback tranche (2026-08-21)
+
+- From `0x1B20` / RAM epoch `29d475f7...`, the corrected compiler advanced
+  through five exact live frontiers: copied-RAM `[0x1B20,0x1B44)`, callback
+  `[0x1420,0x1444)`, copied-RAM `[0x2724,0x278C)`, and immutable BIOS
+  continuations `0xBFC04678` and `0xBFC0472C` inside the existing
+  `[0xBFC04610,0xBFC04850)` range.
+- `0xBFC0472C` was verified as the saved caller return restored by the
+  `0xBFC04678` continuation, not a sequential-JR defect. Correct pre-delay
+  predicate/target sampling and the corrected retail RAM aperture remain in
+  force; no semantic or hardware workaround was added.
+- Repeated probes stop identically at UnknownCode `0x00001508`: 138,122
+  instructions, 26,099 dispatches, 15,905 reads, 23,822 writes, 6,400
+  isolated writes, one device read, and 62 device writes. Final RAM epoch is
+  `778e17e876cd4a9d39482302fb32ef36c80a5bcbfaa1029c06af95c61a2b7a8e`;
+  canonical evidence is `bios-frontier-00138122.json`.
+
 ## BIOS allocator semantic fix (2026-08-21)
 
 - The `0x1274` allocator runaway was a compiler delay-slot ordering defect.
