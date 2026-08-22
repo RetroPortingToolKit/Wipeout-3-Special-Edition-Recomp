@@ -8,6 +8,12 @@
   "schema": "wo3se.finite-indirect-targets.v1",
   "sites": [
     {
+      "proof": "authenticated_zero_trip_loop_unreachable",
+      "source": 2148935012,
+      "source_register": 8,
+      "targets": []
+    },
+    {
       "proof": "authenticated_masked_offset_construction",
       "source": 2148990068,
       "source_register": 2,

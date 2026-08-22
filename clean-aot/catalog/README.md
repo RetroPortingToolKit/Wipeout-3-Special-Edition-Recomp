@@ -107,4 +107,8 @@ masked-offset dispatch at `0x8016FC74`: the exact instruction bytes prove all
 eight possible aligned targets without assigning a target to any unresolved
 callback, return-value, or memory-loaded transfer. The deterministic generator
 rejects wrong image identities, instruction near-matches, unbounded masks, and
-unsorted or duplicate site declarations.
+unsorted or duplicate site declarations. The manifest also records the exact
+zero-trip initializer loop at `0x80162564`: its authenticated link-time count is
+zero and its branch skips the table call, so the only honest finite target set
+for that unreachable `jalr` is empty. Near-matches in the count, skip branch,
+or loop backedge fail closed.

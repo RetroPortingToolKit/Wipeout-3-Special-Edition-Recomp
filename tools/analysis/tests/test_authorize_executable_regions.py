@@ -1,3 +1,4 @@
+import hashlib
 import struct
 import json
 import subprocess
@@ -36,7 +37,51 @@ def computed_jump_image() -> bytes:
     return bytes(image)
 
 
+def zero_trip_loop_image() -> tuple[bytes, int]:
+    image = bytearray(0x10000)
+    pc = BASE + 0x2564
+    words = (
+        0x3C110000,  # lui s1, 0
+        0x26310000,  # addiu s1, s1, 0
+        0x12200007,  # beq s1, zero, continuation
+        0x00000000,
+        0x8E080000,  # lw t0, 0(s0)
+        0x26100004,  # addiu s0, s0, 4
+        0x0100F809,  # jalr t0
+        0x2631FFFF,  # addiu s1, s1, -1
+        0x1620FFFB,  # bne s1, zero, loop
+        0x00000000,
+        0x00000000,
+    )
+    for index, word in enumerate(words):
+        write_word(image, pc - 24 + index * 4, word)
+    return bytes(image), pc
+
+
 class FiniteIndirectTests(unittest.TestCase):
+    def test_authenticated_zero_trip_loop_proves_empty_target_set(self) -> None:
+        image, pc = zero_trip_loop_image()
+        self.assertEqual(
+            resolve_indirect(image, BASE, pc, 8),
+            ([], "authenticated_zero_trip_loop_unreachable"),
+        )
+        manifest = build_manifest(
+            image, hashlib.sha256(image).hexdigest(), BASE,
+            "synthetic-zero-trip", [(pc, 8)],
+        )
+        self.assertEqual(manifest["sites"][0]["targets"], [])
+
+    def test_zero_trip_near_matches_fail_closed(self) -> None:
+        image, pc = zero_trip_loop_image()
+        for address, word in (
+            (pc - 20, 0x26310001),  # non-zero count
+            (pc - 16, 0x12200006),  # branch does not skip the loop
+            (pc + 8, 0x1620FFFA),   # loop backedge differs
+        ):
+            changed = bytearray(image)
+            write_word(changed, address, word)
+            self.assertIsNone(resolve_indirect(bytes(changed), BASE, pc, 8))
+
     def test_authenticated_mask_proves_exact_finite_targets(self) -> None:
         image = computed_jump_image()
         resolution = resolve_indirect(image, BASE, PC, 2)
@@ -59,7 +104,6 @@ class FiniteIndirectTests(unittest.TestCase):
 
     def test_manifest_is_identity_bound_and_deterministic(self) -> None:
         image = computed_jump_image()
-        import hashlib
         digest = hashlib.sha256(image).hexdigest()
         first = build_manifest(image, digest, BASE, "synthetic", [(PC, 2)])
         second = build_manifest(image, digest, BASE, "synthetic", [(PC, 2)])
@@ -72,7 +116,6 @@ class FiniteIndirectTests(unittest.TestCase):
 
     def test_manifest_cli_round_trip_and_wrong_identity_rejection(self) -> None:
         image = computed_jump_image()
-        import hashlib
         digest = hashlib.sha256(image).hexdigest()
         script = Path(__file__).parents[1] / "generate_finite_indirect_manifest.py"
         with tempfile.TemporaryDirectory() as temporary:

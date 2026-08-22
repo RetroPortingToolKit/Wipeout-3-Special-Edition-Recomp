@@ -133,6 +133,42 @@ def resolve_indirect(
                 if all(target <= 0xFFFFFFFF and target % 4 == 0
                        for target in targets):
                     return (targets, "authenticated_masked_offset_construction")
+
+    # Exact zero-trip table-call loop retained by the linker. The authenticated
+    # count is zero, so the indirect call's finite target set is empty.
+    if pc - 24 >= base and pc + 16 < base + len(image):
+        lui_count, addiu_count, beq, branch_slot, load, advance = (
+            read(pc + offset) for offset in (-24, -20, -16, -12, -8, -4)
+        )
+        call, call_slot, bne, loop_slot = (
+            read(pc + offset) for offset in (0, 4, 8, 12)
+        )
+        count = (lui_count >> 16) & 31
+        cursor = (load >> 21) & 31
+        if count != 0 and cursor not in {0, register} and \
+                lui_count >> 26 == 15 and (lui_count & 0xFFFF) == 0 and \
+                addiu_count >> 26 == 9 and \
+                ((addiu_count >> 21) & 31) == count and \
+                ((addiu_count >> 16) & 31) == count and \
+                (addiu_count & 0xFFFF) == 0 and \
+                beq >> 26 == 4 and ((beq >> 21) & 31) == count and \
+                ((beq >> 16) & 31) == 0 and (beq & 0xFFFF) == 7 and \
+                branch_slot == 0 and load >> 26 == 35 and \
+                ((load >> 16) & 31) == register and \
+                (load & 0xFFFF) == 0 and advance >> 26 == 9 and \
+                ((advance >> 21) & 31) == cursor and \
+                ((advance >> 16) & 31) == cursor and \
+                (advance & 0xFFFF) == 4 and \
+                call >> 26 == 0 and (call & 0x3F) == 9 and \
+                ((call >> 21) & 31) == register and \
+                call_slot >> 26 == 9 and \
+                ((call_slot >> 21) & 31) == count and \
+                ((call_slot >> 16) & 31) == count and \
+                (call_slot & 0xFFFF) == 0xFFFF and bne >> 26 == 5 and \
+                ((bne >> 21) & 31) == count and \
+                ((bne >> 16) & 31) == 0 and \
+                (bne & 0xFFFF) == 0xFFFB and loop_slot == 0:
+            return ([], "authenticated_zero_trip_loop_unreachable")
     return None
 
 
