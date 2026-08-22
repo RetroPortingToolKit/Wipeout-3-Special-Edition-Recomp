@@ -517,6 +517,14 @@ instruction and fails closed on every unknown PC or executable identity.
   reads, 18,350 writes, 3,720 isolated-cache writes, one device read, and 48
   device writes. Receipt `bios-frontier-00086085.json` records `UnknownCode` at
   `0x000031E8`; RAM remains epoch `8af29f79...f1c9a` and COP0 reports no fault.
+- The executed path through exact region `[0x31E8,0x33A4)` reaches only the
+  exact A0/0x25 call stub `[0x6A90,0x6A9C)`. That stub traverses the existing
+  authenticated A0 trampoline and BIOS service, then returns to the next
+  unbound copied-RAM function at `0x00003108`; dormant edges remain rejected.
+  Two repeated probes reach 86,291 instructions and 14,939 dispatches with
+  9,422 reads, 18,369 writes, 3,720 isolated-cache writes, one device read, and
+  48 device writes. Receipt `bios-frontier-00086291.json` records `UnknownCode`;
+  RAM remains epoch `8af29f79...f1c9a` and COP0 remains fault-free.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control
