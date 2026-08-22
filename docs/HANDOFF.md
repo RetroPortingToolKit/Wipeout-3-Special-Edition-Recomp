@@ -150,6 +150,12 @@
   removed; the original overflow-safe discard sink remains the baseline. The
   debug-only probe also exposed a missing Windows `iphlpapi` link dependency,
   which is now fixed in the runtime link line.
+- The first disposable accelerated-route harness used a stale `input_hold`
+  command and therefore did not drive the route. That harness was corrected
+  to use the runtime's `input_route_append`/`input_route_start` API; the live
+  probe confirmed the 21-step route was loaded, but it did not yet reach the
+  race boundary before the probe was stopped. No aggregate audio result from
+  that invalid/partial run is used as equivalence evidence.
 - Runtime still links generic overlay/autocompile/interpreter plumbing even
   though the release configuration disables its behavior; strict link-surface
   removal remains unfinished.
