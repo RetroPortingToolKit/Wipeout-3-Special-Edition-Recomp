@@ -1,5 +1,29 @@
 # Handoff
 
+## Same-epoch overlap registry and live shell loop (2026-08-21)
+
+- Copied-RAM registries now retain independent exact range/hash/stamp contracts
+  when generated bindings overlap. Dispatch considers only bindings that both
+  cover the current PC and contain that exact entry, then selects the narrowest
+  range deterministically. Equal-width ties use start address and identity.
+- Exact duplicate contracts and conflicting identity/hash reuse reject. Every
+  covering contract is mutation-validated before dispatch, invalidated slots
+  are reclaimed, and the bounded metadata capacity is 256 exact bindings. No
+  page-wide byte union or fallback was introduced. Legacy and packed generated
+  tables share the same checked entry-resolution path.
+- The real probe advances through 16 additional exact shell/handler frontiers:
+  `0x80054C90`, `0x8005AA90`, `0xC80`, `0x8005AA98`, `0x8005A9D0`,
+  `0x1D8C`, `0x1D00`, `0x8005A9E0`, `0x1F10`, `0x8005AA10`,
+  `0x8005AA18`, `0x800522C0`, `0x800560C0`, `0x80056324`,
+  `0x8003FFB0`, and `0x80054428`.
+- From the final tranche, execution remains live through the bounded
+  one-million-dispatch probe and stops at `0x800545B8` with 9,473,267
+  instructions, 1,989,635 reads, 1,489,510 writes, and device totals
+  2,331/22,951. Two probes agree exactly. Instrumented classification found no
+  CD MMIO, GetID, ReadN, or raw-sector activity. This is a materially different
+  live-loop/timing blocker, not an authorization frontier. Canonical evidence:
+  `clean-aot/catalog/evidence/bios-shell-cd-execution-09473267.json`.
+
 ## SPU shell initialization frontier (2026-08-21)
 
 - Four newly authenticated copied-shell tranches advance the real path from

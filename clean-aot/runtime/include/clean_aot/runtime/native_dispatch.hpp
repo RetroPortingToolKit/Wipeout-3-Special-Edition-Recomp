@@ -68,6 +68,17 @@ public:
     [[nodiscard]] std::uint32_t last_instruction_count() const noexcept {
         return last_instruction_count_;
     }
+    [[nodiscard]] bool contains(std::uint32_t pc) const noexcept {
+        return bound() && pc >= load_start_ && pc < load_end_exclusive_;
+    }
+    [[nodiscard]] bool resolve_entry(std::uint32_t pc,
+                                     GeneratedRegionFunction& function,
+                                     std::uint32_t& instruction_count) const noexcept;
+    [[nodiscard]] std::uint32_t load_start() const noexcept { return load_start_; }
+    [[nodiscard]] std::uint64_t load_end_exclusive() const noexcept {
+        return load_end_exclusive_;
+    }
+    [[nodiscard]] std::string_view identity() const noexcept { return identity_; }
     void set_trace(RuntimeTargetTrace* trace) noexcept { trace_ = trace; }
 
 private:

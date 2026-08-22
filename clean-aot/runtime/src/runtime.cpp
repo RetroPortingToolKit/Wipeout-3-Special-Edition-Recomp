@@ -484,12 +484,15 @@ std::uint64_t RetirementClock::phase() const noexcept {
 }
 
 struct Runtime::Impl final {
-    static constexpr std::size_t kMaximumCopiedEpochs = 64U;
+    static constexpr std::size_t kMaximumCopiedEpochs = 256U;
     struct CopiedEpoch final {
         GeneratedDispatcher dispatcher{};
         memory::CodeRegionStamp stamp{};
         memory::VariantIdentity variant{};
         std::string destination_sha256{};
+        std::string source_sha256{};
+        std::uint32_t source_start = 0U;
+        std::uint32_t source_byte_count = 0U;
         bool bound = false;
     };
     GeneratedDispatcher generated_dispatcher{};
@@ -1724,7 +1727,7 @@ Status Runtime::reset() noexcept {
     impl_->bios_cpu.write32 = &Impl::generated_write32;
     Impl::bind_generated_cop2(*impl_,impl_->bios_cpu);
     impl_->bios_bound = false;
-    impl_->copied_epochs = {};
+    for (auto& epoch : impl_->copied_epochs) epoch = Impl::CopiedEpoch{};
     impl_->copied_epoch_count = 0U;
     impl_->generated_memory_reads = 0U;
     impl_->generated_memory_writes = 0U;
@@ -1785,21 +1788,28 @@ DispatchStatus Runtime::dispatch_bios() noexcept {
     Impl::CopiedEpoch* selected_epoch=nullptr;
     for(std::size_t index=0U;index<impl_->copied_epoch_count;++index){
         auto& epoch=impl_->copied_epochs[index];
-        if(epoch.bound&&impl_->bios_cpu.pc>=epoch.stamp.virtual_start&&static_cast<std::uint64_t>(impl_->bios_cpu.pc)<static_cast<std::uint64_t>(epoch.stamp.virtual_start)+epoch.stamp.byte_count){
-            if(selected_epoch==nullptr||epoch.stamp.byte_count<selected_epoch->stamp.byte_count)selected_epoch=&epoch;
-        }
-    }
-    if(selected_epoch!=nullptr){
-        if(impl_->bus.validate_code_region(selected_epoch->stamp,selected_epoch->variant)!=memory::CodeRegionValidity::Current){
+        if(!epoch.bound||!epoch.dispatcher.contains(impl_->bios_cpu.pc))continue;
+        if(impl_->bus.validate_code_region(epoch.stamp,epoch.variant)!=memory::CodeRegionValidity::Current){
             std::string current_hash;
-            try{if(!hash_bus_range(impl_->bus,selected_epoch->stamp.virtual_start,selected_epoch->stamp.byte_count,current_hash))return DispatchStatus::EpochMismatch;}catch(...){return DispatchStatus::EpochMismatch;}
-            if(current_hash!=selected_epoch->destination_sha256)return DispatchStatus::EpochMismatch;
-            const auto refreshed=impl_->bus.capture_code_region(selected_epoch->stamp.virtual_start,selected_epoch->stamp.byte_count,selected_epoch->variant);
+            try{if(!hash_bus_range(impl_->bus,epoch.stamp.virtual_start,epoch.stamp.byte_count,current_hash))return DispatchStatus::EpochMismatch;}catch(...){return DispatchStatus::EpochMismatch;}
+            if(current_hash!=epoch.destination_sha256)return DispatchStatus::EpochMismatch;
+            const auto refreshed=impl_->bus.capture_code_region(epoch.stamp.virtual_start,epoch.stamp.byte_count,epoch.variant);
             if(!refreshed.ok())return DispatchStatus::EpochMismatch;
-            selected_epoch->stamp=refreshed.stamp;
+            epoch.stamp=refreshed.stamp;
         }
-        dispatcher=&selected_epoch->dispatcher;
+        GeneratedRegionFunction function=nullptr;
+        std::uint32_t instruction_count=0U;
+        if(!epoch.dispatcher.resolve_entry(
+               impl_->bios_cpu.pc,function,instruction_count))continue;
+        if(selected_epoch==nullptr||epoch.stamp.byte_count<selected_epoch->stamp.byte_count||
+           (epoch.stamp.byte_count==selected_epoch->stamp.byte_count&&
+            (epoch.stamp.virtual_start<selected_epoch->stamp.virtual_start||
+             (epoch.stamp.virtual_start==selected_epoch->stamp.virtual_start&&
+              epoch.dispatcher.identity()<selected_epoch->dispatcher.identity())))){
+            selected_epoch=&epoch;
+        }
     }
+    if(selected_epoch!=nullptr)dispatcher=&selected_epoch->dispatcher;
     impl_->bios_cpu.issue_cycle=impl_->clock.retirement_total();
     impl_->bios_cpu.cop0_cause=(impl_->bios_cpu.cop0_cause&~0x0000FC00U)|((static_cast<std::uint32_t>(impl_->interrupt_lines)<<10U)&0x0000FC00U);
     impl_->active_generated_cpu=&impl_->bios_cpu;
@@ -1820,10 +1830,18 @@ DispatchStatus Runtime::bind_authenticated_copied_epoch(
     const auto destination_bytes=static_cast<std::uint32_t>(destination_bytes64);std::string source_hash,destination_hash;
     try{if(!hash_bus_range(impl_->bus,binding.source_start,binding.source_byte_count,source_hash)||!hash_bus_range(impl_->bus,binding.generated.load_start,destination_bytes,destination_hash))return DispatchStatus::LoadRejected;}catch(...){return DispatchStatus::LoadRejected;}
     if(source_hash!=binding.source_sha256||destination_hash!=binding.destination_sha256)return DispatchStatus::ExecutableHashMismatch;
+    GeneratedDispatcher candidate_dispatcher{};
+    const auto candidate_bound=candidate_dispatcher.bind(
+        binding.variant_identity_sha256,binding.generated);
+    if(candidate_bound!=DispatchStatus::Bound)return candidate_bound;
     const std::uint64_t candidate_end=binding.generated.load_end_exclusive;
     std::size_t target_index=impl_->copied_epoch_count;
     for(std::size_t index=0U;index<impl_->copied_epoch_count;++index){
         auto& existing=impl_->copied_epochs[index];
+        if(!existing.bound){
+            if(target_index==impl_->copied_epoch_count)target_index=index;
+            continue;
+        }
         const std::uint64_t existing_end=static_cast<std::uint64_t>(existing.stamp.virtual_start)+existing.stamp.byte_count;
         const bool overlaps=binding.generated.load_start<existing_end&&existing.stamp.virtual_start<candidate_end;
         if(!overlaps)continue;
@@ -1833,14 +1851,17 @@ DispatchStatus Runtime::bind_authenticated_copied_epoch(
                 if(!hash_bus_range(impl_->bus,existing.stamp.virtual_start,
                                    existing.stamp.byte_count,current_hash)){
                     existing.bound=false;
+                    if(target_index==impl_->copied_epoch_count)target_index=index;
                     continue;
                 }
             }catch(...){
                 existing.bound=false;
+                if(target_index==impl_->copied_epoch_count)target_index=index;
                 continue;
             }
             if(current_hash!=existing.destination_sha256){
                 existing.bound=false;
+                if(target_index==impl_->copied_epoch_count)target_index=index;
                 continue;
             }
             const auto refreshed=impl_->bus.capture_code_region(
@@ -1848,17 +1869,42 @@ DispatchStatus Runtime::bind_authenticated_copied_epoch(
                 existing.variant);
             if(!refreshed.ok()){
                 existing.bound=false;
+                if(target_index==impl_->copied_epoch_count)target_index=index;
                 continue;
             }
             existing.stamp=refreshed.stamp;
         }
-        if(binding.generated.load_start==existing.stamp.virtual_start&&candidate_end==existing_end)return DispatchStatus::InvalidBinding;
+        if(binding.variant_identity_sha256==existing.dispatcher.identity()&&
+           binding.destination_sha256!=existing.destination_sha256)return DispatchStatus::InvalidBinding;
+        const auto conflicting_count=[&](std::uint32_t pc,
+                                          std::uint32_t instruction_count){
+            GeneratedRegionFunction existing_function=nullptr;
+            std::uint32_t existing_count=0U;
+            return existing.dispatcher.resolve_entry(
+                       pc,existing_function,existing_count)&&
+                   existing_count!=instruction_count;
+        };
+        for(const auto& entry:binding.generated.entries)
+            if(conflicting_count(entry.pc,entry.instruction_count))
+                return DispatchStatus::InvalidBinding;
+        for(const auto& entry:binding.generated.packed_entries)
+            if(conflicting_count(entry.pc,entry.instruction_count))
+                return DispatchStatus::InvalidBinding;
+        if(binding.generated.load_start==existing.stamp.virtual_start&&
+           candidate_end==existing_end&&
+           binding.destination_sha256==existing.destination_sha256)
+            return DispatchStatus::InvalidBinding;
     }
     if(target_index==Impl::kMaximumCopiedEpochs)return DispatchStatus::LoadRejected;
     auto& epoch=impl_->copied_epochs[target_index];
-    const auto bound=epoch.dispatcher.bind(binding.variant_identity_sha256,binding.generated);if(bound!=DispatchStatus::Bound)return bound;
+    epoch.dispatcher=std::move(candidate_dispatcher);
     const auto capture=impl_->bus.capture_code_region(binding.generated.load_start,destination_bytes,variant);if(!capture.ok())return DispatchStatus::LoadRejected;
-    try{epoch.destination_sha256.assign(binding.destination_sha256);}catch(...){return DispatchStatus::LoadRejected;}
+    try{
+        epoch.destination_sha256.assign(binding.destination_sha256);
+        epoch.source_sha256.assign(binding.source_sha256);
+    }catch(...){return DispatchStatus::LoadRejected;}
+    epoch.source_start=binding.source_start;
+    epoch.source_byte_count=binding.source_byte_count;
     epoch.stamp=capture.stamp;epoch.variant=variant;epoch.bound=true;if(target_index==impl_->copied_epoch_count)++impl_->copied_epoch_count;return DispatchStatus::Bound;
 }
 

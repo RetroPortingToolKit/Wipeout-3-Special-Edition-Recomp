@@ -188,6 +188,39 @@ DispatchStatus GeneratedDispatcher::dispatch(GeneratedCpuState& state) const noe
     return DispatchStatus::Executed;
 }
 
+bool GeneratedDispatcher::resolve_entry(
+    std::uint32_t pc, GeneratedRegionFunction& function,
+    std::uint32_t& instruction_count) const noexcept {
+    function = nullptr;
+    instruction_count = 0U;
+    if (!contains(pc)) return false;
+    if (!packed_entries_.empty()) {
+        const std::size_t page = static_cast<std::size_t>(
+            (pc >> 12U) - (load_start_ >> 12U));
+        const auto range = dispatch_pages_[page];
+        const auto begin = packed_entries_.begin() + range.begin_index;
+        const auto end = packed_entries_.begin() + range.end_index;
+        const auto found = std::lower_bound(
+            begin, end, pc,
+            [](const GeneratedPackedRegionEntry& entry, std::uint32_t address) {
+                return entry.pc < address;
+            });
+        if (found == end || found->pc != pc) return false;
+        function = region_functions_[found->region_index];
+        instruction_count = found->instruction_count;
+        return true;
+    }
+    const auto found = std::lower_bound(
+        entries_.begin(), entries_.end(), pc,
+        [](const GeneratedRegionEntry& entry, std::uint32_t address) {
+            return entry.pc < address;
+        });
+    if (found == entries_.end() || found->pc != pc) return false;
+    function = found->function;
+    instruction_count = found->instruction_count;
+    return true;
+}
+
 DispatchStatus GeneratedEpochDispatcher::select(
     std::string_view authenticated_active_identity_sha256,
     std::span<const GeneratedEpochBinding> candidates) noexcept {
