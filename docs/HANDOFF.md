@@ -1,5 +1,23 @@
 # Handoff
 
+## 140,586-instruction shell tranche to 0x8005ABA0 (2026-08-22)
+
+- After the exact-capacity checkpoint, bindings 474-490 advanced normally
+  from `0x80047728` through a finite shell loop to `0x8005ABA0`. Relative to
+  the requested `0x800502D8` baseline, the tranche retired 140,586 additional
+  authenticated instructions (19,421,465 total / 1,837,422 dispatches), well
+  beyond the requested 20,000.
+- The endpoint is fail-closed: the current executable stamp reports
+  `EpochMismatch`; candidate binding 491 for exact bytes `0x240A00B0`
+  (`addiu $t2,$zero,0xB0`) and range `0x8005ABA0-0x8005ABA4` is rejected as an
+  overlapping duplicate of dormant exact binding 207. No union or dormant edge
+  was enabled. Current full-RAM SHA-256 is `aaea45af...2b42f4f`.
+- CD reads/writes/raw sectors remain `0/0/0`; no game identity transition.
+  Receipt: `clean-aot/catalog/evidence/bios-shell-live-frontiers-80047728-8005aba0.json`.
+- Next bounded action is exact duplicate-range epoch reconciliation: refresh or
+  deterministically replace the stale binding only after proving identical
+  range/hash/instruction-count and rejecting conflicting source identities.
+
 ## Exact manifest-capacity checkpoint at 0x80047728 (2026-08-22)
 
 - Exact batched bindings 432-473 advanced from `0x800502D8` through the shell
