@@ -1,5 +1,17 @@
 # Handoff
 
+## Behavioral route verification harness (2026-08-22)
+
+- The product tooling now derives a deterministic 64-route scripted-input plan
+  at 100 Hz for all required menu/mode/track/team/ship/FMV/audio routes.
+- `behavior-run` invokes only the validated installed `Wipeout3SE.exe` and will
+  publish eligible evidence only after authenticated game boot and exact
+  package/executable/media/scenario identity checks. Every completed route must
+  include remeasured static trace, frame, audio, and save captures.
+- A current real invocation at `modes:single-race` exits 2 with no receipt:
+  `installed product produced no behavioral proof`. This is the intended dormant
+  state at the BIOS frontier. The coverage ledger remains 0/64 and fail closed.
+
 ## Split content coverage gate (2026-08-21)
 
 - Product content readiness now has three independently hash-bound contracts:

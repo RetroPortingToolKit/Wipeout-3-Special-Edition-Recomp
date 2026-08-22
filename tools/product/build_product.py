@@ -31,6 +31,8 @@ if __package__ in {None, ""}:
     from release_readiness import (audit_release_readiness,
                                    write_readiness_receipt)  # type: ignore[import-not-found]
     from content_coverage import build_content_coverage_ledger  # type: ignore[import-not-found]
+    from behavioral_runner import (build_scenario_plan,
+                                   run_behavioral_scenarios)  # type: ignore[import-not-found]
 else:
     from .pipeline import (
         DEFAULT_MEDIA_MANIFEST,
@@ -50,6 +52,7 @@ else:
     from .installer_lane import audit_installed_runtime, create_installer, validate_installer
     from .release_readiness import audit_release_readiness, write_readiness_receipt
     from .content_coverage import build_content_coverage_ledger
+    from .behavioral_runner import build_scenario_plan, run_behavioral_scenarios
 
 
 def _common_media(parser: argparse.ArgumentParser) -> None:
@@ -197,6 +200,18 @@ def _build_parser() -> argparse.ArgumentParser:
     content_coverage.add_argument("--policy", type=Path, required=True)
     content_coverage.add_argument("--behavioral-evidence", action="append", type=Path, default=[])
     content_coverage.add_argument("--receipt", type=Path, required=True)
+    behavior_plan = subparsers.add_parser(
+        "behavior-plan", help="build the deterministic 64-route input scenario plan")
+    behavior_plan.add_argument("--policy", type=Path, required=True)
+    behavior_plan.add_argument("--receipt", type=Path, required=True)
+    behavior_run = subparsers.add_parser(
+        "behavior-run", help="run authenticated installed-product behavioral scenarios")
+    behavior_run.add_argument("--package", type=Path, required=True)
+    behavior_run.add_argument("--policy", type=Path, required=True)
+    behavior_run.add_argument("--media-manifest", type=Path, required=True)
+    behavior_run.add_argument("--route", action="append", default=[])
+    behavior_run.add_argument("--timeout-seconds", type=float, default=120.0)
+    behavior_run.add_argument("--receipt", type=Path, required=True)
     installer = subparsers.add_parser("package-installer", help="create the two-stage offline installer")
     installer.add_argument("--setup-exe", type=Path, required=True)
     installer.add_argument("--runtime-payload", type=Path, required=True)
@@ -334,6 +349,13 @@ def main(argv: list[str] | None = None) -> int:
                 content_path=args.content, shards_path=args.shards,
                 media_manifest_path=args.media_manifest, policy_path=args.policy,
                 behavioral_evidence=args.behavioral_evidence, receipt_path=args.receipt)
+        elif args.command == "behavior-plan":
+            document = build_scenario_plan(args.policy, args.receipt)
+        elif args.command == "behavior-run":
+            document = run_behavioral_scenarios(
+                package=args.package, policy_path=args.policy,
+                media_manifest_path=args.media_manifest, routes=args.route,
+                timeout_seconds=args.timeout_seconds, receipt_path=args.receipt)
         elif args.command == "package-installer":
             document = create_installer(setup_exe=args.setup_exe,
                 runtime_payload=args.runtime_payload, setup_payload=_artifacts(args.setup_payload),

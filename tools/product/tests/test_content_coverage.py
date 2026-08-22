@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
 
 from tools.product.content_coverage import (ContentCoverageError,
                                             build_content_coverage_ledger)
+from tools.product.behavioral_runner import build_scenario_plan
 
 
 class ContentCoverageTests(unittest.TestCase):
@@ -76,6 +78,35 @@ class ContentCoverageTests(unittest.TestCase):
                     content_path=content, shards_path=shards,
                     media_manifest_path=media, policy_path=policy,
                     behavioral_evidence=[path])
+
+    def test_authenticated_execution_updates_only_proved_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            content, shards, media, policy = self._inputs(root)
+            plan = build_scenario_plan(policy)
+            plan_hash = hashlib.sha256((json.dumps(
+                plan, sort_keys=True, separators=(",", ":")) + "\n").encode()).hexdigest()
+            capture = {"path": "capture.bin", "sha256": "a" * 64, "bytes": 16}
+            routes = ["modes:single-race", "tracks:porto-kora"]
+            evidence = root / "execution.json"
+            evidence.write_text(json.dumps({
+                "schema": "wipeout3se.clean-aot.behavioral-execution.v1",
+                "status": "passed", "game_id": "SCES-02845",
+                "runtime": "installed-compiler-free-product",
+                "external_media_verified": True,
+                "media_manifest_sha256": hashlib.sha256(media.read_bytes()).hexdigest(),
+                "package_manifest_sha256": "b" * 64, "executable_sha256": "c" * 64,
+                "scenario_plan_sha256": plan_hash, "routes": routes,
+                "executions": [{"route": route, "game_instructions": 100,
+                    "authenticated_epoch_sha256": "d" * 64,
+                    "captures": {kind: dict(capture) for kind in
+                                 ("static_trace", "frame", "audio", "save")}}
+                    for route in routes]}), encoding="utf-8")
+            ledger = build_content_coverage_ledger(
+                content_path=content, shards_path=shards, media_manifest_path=media,
+                policy_path=policy, behavioral_evidence=[evidence])
+            self.assertEqual(ledger["behavioral_execution"]["status"], "pass")
+            self.assertEqual(ledger["behavioral_execution"]["executed"], 2)
 
 
 if __name__ == "__main__":

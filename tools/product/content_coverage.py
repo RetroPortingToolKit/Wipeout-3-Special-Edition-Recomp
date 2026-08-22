@@ -12,6 +12,11 @@ if __package__ in {None, ""}:
 else:
     from .release_readiness import write_readiness_receipt
 
+if __package__ in {None, ""}:
+    from behavioral_runner import build_scenario_plan  # type: ignore[import-not-found]
+else:
+    from .behavioral_runner import build_scenario_plan
+
 SCHEMA = "wipeout3se.clean-aot.content-coverage-ledger.v1"
 
 
@@ -33,6 +38,11 @@ def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _is_sha256(value: Any) -> bool:
+    return (isinstance(value, str) and len(value) == 64 and
+            all(character in "0123456789abcdef" for character in value))
+
+
 def build_content_coverage_ledger(*, content_path: Path, shards_path: Path,
                                   media_manifest_path: Path, policy_path: Path,
                                   behavioral_evidence: Sequence[Path] = (),
@@ -41,6 +51,10 @@ def build_content_coverage_ledger(*, content_path: Path, shards_path: Path,
     shards = _load(shards_path)
     media = _load(media_manifest_path)
     policy = _load(policy_path)
+    scenario_plan = build_scenario_plan(policy_path)
+    scenario_plan_sha256 = hashlib.sha256(
+        (json.dumps(scenario_plan, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    ).hexdigest()
     if (content.get("schema") != "wo3se.content-static-coverage.v1" or
             shards.get("schema") != "wo3se.generated-game-shards.v1" or
             media.get("format_version") != 1 or
@@ -89,12 +103,38 @@ def build_content_coverage_ledger(*, content_path: Path, shards_path: Path,
                 document.get("status") != "passed" or
                 document.get("game_id") != policy["game_id"] or
                 document.get("runtime") != "installed-compiler-free-product" or
-                document.get("external_media_verified") is not True):
+                document.get("external_media_verified") is not True or
+                document.get("media_manifest_sha256") != _sha(media_manifest_path) or
+                document.get("scenario_plan_sha256") != scenario_plan_sha256 or
+                any(not _is_sha256(document.get(field))
+                    for field in ("package_manifest_sha256", "executable_sha256",
+                                  "scenario_plan_sha256"))):
             raise ContentCoverageError("behavioral evidence is not eligible clean-product execution")
-        for route in document.get("routes", []):
+        execution_by_route: dict[str, dict[str, Any]] = {}
+        for execution in document.get("executions", []):
+            if not isinstance(execution, dict) or not isinstance(execution.get("route"), str):
+                raise ContentCoverageError("behavioral execution entry is malformed")
+            captures = execution.get("captures", {})
+            if (not isinstance(execution.get("game_instructions"), int) or
+                    execution["game_instructions"] <= 0 or
+                    not _is_sha256(execution.get("authenticated_epoch_sha256")) or
+                    set(captures) != {"static_trace", "frame", "audio", "save"} or
+                    any(not isinstance(item, dict) or not _is_sha256(item.get("sha256")) or
+                        not isinstance(item.get("bytes"), int) or item["bytes"] <= 0
+                        for item in captures.values())):
+                raise ContentCoverageError("behavioral execution capture proof is malformed")
+            if execution["route"] in execution_by_route:
+                raise ContentCoverageError("behavioral execution route is duplicated")
+            execution_by_route[execution["route"]] = execution
+        document_routes = document.get("routes", [])
+        if (not isinstance(document_routes, list) or document_routes != sorted(execution_by_route) or
+                len(document_routes) != len(set(document_routes))):
+            raise ContentCoverageError("behavioral route and execution ledgers disagree")
+        for route in document_routes:
             if not isinstance(route, str):
                 raise ContentCoverageError("behavioral evidence route is malformed")
-            evidence_by_route.setdefault(route, []).append({"path": path.as_posix(), "sha256": _sha(path)})
+            evidence_by_route.setdefault(route, []).append({"receipt": path.name,
+                                                            "sha256": _sha(path)})
 
     required: list[dict[str, Any]] = []
     routes = policy.get("behavioral_routes", {})
@@ -119,7 +159,8 @@ def build_content_coverage_ledger(*, content_path: Path, shards_path: Path,
         else "incomplete-fail-closed", "game_ready": False,
         "inputs": {"content_sha256": _sha(content_path), "game_shards_sha256": _sha(shards_path),
                    "media_manifest_sha256": _sha(media_manifest_path),
-                   "policy_sha256": _sha(policy_path)},
+                   "policy_sha256": _sha(policy_path),
+                   "scenario_plan_sha256": scenario_plan_sha256},
         "media_availability": {"status": "pass" if media_ok else "fail",
             "source": "verified-external-multi-file-cue-bin", "redistributed": False,
             "disc_tracks": 14, "data_payloads": len(payloads), "cdda_tracks": len(audio_tracks),

@@ -320,3 +320,28 @@ authenticated media reads have not occurred. External payload availability and
 static executable coverage pass independently, while all routes without clean
 installed-product execution evidence remain explicitly unexecuted. Graphics
 and current-package soak gates pass.
+
+The behavioral runner derives a deterministic 64-route, 100-Hz scripted-input
+plan from the coverage policy. Each scenario begins with an authenticated game
+boot barrier, then navigates the relevant menu or selection, exercises the
+race, FMV, or audio route, and requests static-trace, frame, audio, and save
+captures. The runner invokes only the installed `Wipeout3SE.exe` and binds every
+capture to the package manifest, executable, external-media manifest, scenario,
+and authenticated RAM epoch hashes:
+
+```powershell
+python tools/product/build_product.py behavior-plan `
+  --policy clean-aot/product/content-coverage-policy.json `
+  --receipt clean-aot/product/evidence/behavioral-scenario-plan.json
+
+python tools/product/build_product.py behavior-run `
+  --package build-product-runtime-135829 `
+  --policy clean-aot/product/content-coverage-policy.json `
+  --media-manifest assets/manifests/wipeout3se-media.json `
+  --receipt clean-aot/product/evidence/behavioral-execution.json
+```
+
+At the current BIOS frontier the executable produces no eligible observation,
+the command exits nonzero, and no execution receipt is written. Synthetic
+harness fixtures test the protocol and hash verifier but are never accepted as
+product evidence.
