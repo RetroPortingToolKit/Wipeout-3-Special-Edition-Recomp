@@ -14,6 +14,10 @@
 #include <string_view>
 #include <vector>
 
+#ifdef CLEAN_AOT_PRODUCT_HAS_EPOCH_BINDINGS
+#include "product_epoch_bindings.hpp"
+#endif
+
 #ifdef CLEAN_AOT_PRODUCT_BINDING_SYMBOL
 extern "C" const clean_aot::runtime::GeneratedExecutableBinding*
 CLEAN_AOT_PRODUCT_BINDING_SYMBOL() noexcept;
@@ -186,7 +190,8 @@ int main(int argc, char** argv) {
     }
     receipt.stage = "bios-bound";
     constexpr std::uint64_t dispatch_limit = 1'000'000U;
-    while (receipt.dispatches < dispatch_limit) {
+    auto run_bound_region = [&] {
+      while (receipt.dispatches < dispatch_limit) {
         const auto status = runtime.dispatch_bios();
         if (status != clean_aot::runtime::DispatchStatus::Executed) {
             receipt.stage = "bios-slice-stopped";
@@ -195,7 +200,25 @@ int main(int argc, char** argv) {
             break;
         }
         ++receipt.dispatches; receipt.instructions += runtime.last_bios_instruction_count();
+      }
+    };
+    run_bound_region();
+#ifdef CLEAN_AOT_PRODUCT_HAS_EPOCH_BINDINGS
+    for (const auto* epoch : clean_aot_product_epoch_bindings()) {
+        if (!epoch || receipt.dispatches == dispatch_limit) break;
+        const clean_aot::runtime::Runtime::AuthenticatedCopiedEpochBinding copied{
+            epoch->variant_identity_sha256, binding->load_start,
+            static_cast<std::uint32_t>(binding->load_end_exclusive - binding->load_start),
+            binding->executable_sha256, epoch->executable_sha256, *epoch};
+        const auto status = runtime.bind_authenticated_copied_epoch(copied);
+        if (status != clean_aot::runtime::DispatchStatus::Bound) {
+            receipt.reason = "authenticated-epoch-bind-rejected";
+            break;
+        }
+        receipt.stage = "bios-bound";
+        run_bound_region();
     }
+#endif
     receipt.stop_pc = runtime.bios_pc();
     if (receipt.dispatches == dispatch_limit) receipt.reason = "bios-dispatch-budget-exhausted";
     if (receipt.stage == "bios-slice-stopped" && workload &&
