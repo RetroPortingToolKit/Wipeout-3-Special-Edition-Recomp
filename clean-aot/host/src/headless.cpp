@@ -134,10 +134,12 @@ HostStatus HeadlessBackend::service_frame() noexcept {
     }
 
     std::uint64_t digest = stats_.frame_digest;
+    const std::size_t visible_row_bytes = static_cast<std::size_t>(
+        frame.surface.width) * bytes_per_pixel(frame.surface.format);
     for (std::uint32_t row = 0U; row < frame.surface.height; ++row) {
         const std::uint8_t* row_start = frame.surface.pixels +
             static_cast<std::size_t>(row) * frame.surface.pitch;
-        digest = fnv1a(digest, row_start, frame.surface.pitch);
+        digest = fnv1a(digest, row_start, visible_row_bytes);
     }
     stats_.frame_digest = digest;
     ++stats_.frames_presented;

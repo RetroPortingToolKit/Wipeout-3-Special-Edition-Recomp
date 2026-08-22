@@ -71,6 +71,28 @@ void test_pacing() {
     MonotonicPacer invalid{FrameSchedule::from_rate(0U)};
     expect(!invalid.start(0U).success(), "zero-rate pacer is rejected");
 
+    TestClock protocol_clock;
+    MonotonicPacer protocol{FrameSchedule::from_rate(100U)};
+    expect(protocol.commit().code == HostCode::not_ready,
+           "unstarted pacer cannot commit");
+    expect(protocol.start(protocol_clock.now).success(),
+           "protocol pacer starts");
+    expect(protocol.commit().code == HostCode::sequence_error,
+           "pacer cannot commit before a successful wait");
+    expect(protocol.wait(protocol_clock).decision == PaceDecision::ready,
+           "protocol wait authorizes one commit");
+    expect(protocol.wait(protocol_clock).decision == PaceDecision::ready,
+           "repeated wait is idempotent before commit");
+    expect(protocol.commit().success(), "authorized commit succeeds");
+    expect(protocol.commit().code == HostCode::sequence_error,
+           "pacer rejects a duplicate commit");
+    protocol_clock.now += 20'000'000U;
+    expect(protocol.wait(protocol_clock).decision == PaceDecision::late,
+           "late protocol wait reports lateness");
+    expect(protocol.wait(protocol_clock).decision == PaceDecision::late,
+           "idempotent wait preserves the original decision");
+    expect(protocol.commit().success(), "late frame can commit once");
+
     TestClock stalled_clock;
     stalled_clock.advance_on_sleep = false;
     MonotonicPacer stalled{FrameSchedule::from_rate(100U)};
@@ -172,6 +194,32 @@ void test_bounded_queue_and_audio() {
     expect(backend.submit_frame(overflow).success(),
            "caller can retry rejected frame after backpressure");
     expect(backend.service().success(), "retried frame is presented");
+
+    std::array<std::uint8_t, 12U> tight_last_row{
+        1U, 2U, 3U, 4U, 99U, 98U, 97U, 96U, 5U, 6U, 7U, 8U};
+    const FrameSubmission pitched{
+        5U, 5U,
+        {tight_last_row.data(),
+         static_cast<std::uint32_t>(tight_last_row.size()),
+         1U, 2U, 8U, PixelFormat::rgba8_unorm}};
+    expect(backend.submit_frame(pitched).success(),
+           "last row may contain only its visible bytes");
+    expect(backend.service().success(),
+           "pitched frame does not read padding beyond the final row");
+
+    FrameSubmission skipped = frame;
+    skipped.sequence = 9U;
+    skipped.update_index = 9U;
+    expect(backend.submit_frame(skipped).success(),
+           "out-of-sequence frame enters the bounded queue");
+    expect(backend.service().code == HostCode::sequence_error,
+           "sequence gap is reported while consuming the bad frame");
+    skipped.sequence = 10U;
+    skipped.update_index = 10U;
+    expect(backend.submit_frame(skipped).success(),
+           "sequence can continue after a reported gap");
+    expect(backend.service().success(),
+           "sequence recovery does not wedge the pending frame");
 
     std::uint8_t one_pixel = 0U;
     const FrameSubmission impossible_frame{
@@ -276,6 +324,26 @@ void test_viewports() {
                  impossible_request, impossible_viewport)
                  .success(),
            "viewport dimensions that cannot fit the contract fail closed");
+
+    for (const auto exact : std::array{
+             clean_aot::host::AspectRatio{4U, 3U},
+             clean_aot::host::AspectRatio{16U, 9U},
+             clean_aot::host::AspectRatio{21U, 9U},
+             clean_aot::host::AspectRatio{32U, 9U},
+             clean_aot::host::AspectRatio{64U, 27U}}) {
+        const ViewportRequest request{3840U, 2160U, 320U, 239U,
+                                      AspectPolicy::custom, exact,
+                                      ScaleMode::fractional};
+        Viewport viewport{};
+        expect(clean_aot::host::calculate_viewport(request, viewport).success(),
+               "fractional exact-ratio viewport is valid");
+        expect(static_cast<std::uint64_t>(viewport.width) * exact.height ==
+                   static_cast<std::uint64_t>(viewport.height) * exact.width,
+               "fractional viewport preserves its exact rational ratio");
+        expect(static_cast<std::uint64_t>(viewport.logical_width) * exact.height ==
+                   static_cast<std::uint64_t>(viewport.logical_height) * exact.width,
+               "logical viewport preserves its exact rational ratio");
+    }
 }
 
 } // namespace

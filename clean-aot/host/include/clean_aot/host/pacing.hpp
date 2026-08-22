@@ -68,7 +68,9 @@ private:
     std::uint64_t frame_index_ = 0U;
     std::uint64_t last_observed_ns_ = 0U;
     std::uint32_t remainder_ = 0U;
+    PaceDecision last_decision_ = PaceDecision::not_started;
     bool started_ = false;
+    bool wait_satisfied_ = false;
 };
 
 } // namespace clean_aot::host

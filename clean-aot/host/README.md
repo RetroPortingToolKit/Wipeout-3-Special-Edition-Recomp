@@ -23,7 +23,7 @@ must use an external fixed render/audio pool when a producer and consumer run
 on different threads.
 
 `calculate_viewport` provides 4:3, 16:9, 21:9, and 32:9 fit policies with
-fractional or largest-fitting-integer scaling. It produces integer pixel
+exact reduced-rational fractional or largest-fitting-integer scaling. It produces integer pixel
 rectangles and has no connection to `MonotonicPacer` or the game clock.
 
 `render_interfaces.hpp` is deliberately only a seam for the later GPU,
@@ -41,8 +41,9 @@ SDL3 3.4.10 source archive and build
   `vkGetInstanceProcAddr` before asking SDL to use the Vulkan driver;
 * uses SDL3's Vulkan-backed GPU device and claimed window, with two frames in
   flight and a fixed descriptor queue;
-* handles bounded SDL event pumping, resize/fullscreen requests, clean device
-  loss signaling, and idle-before-reclaim swapchain recreation;
+* handles bounded SDL event pumping without dropping consumed events,
+  resize/fullscreen requests and transition events, clean device-loss
+  signaling, and idle-before-reclaim swapchain recreation;
 * consumes the embedded SPIR-V sanity shaders at device initialization; and
 * clears a swapchain when no `IFrameEncoder` is installed. Actual game frame
   upload and presentation belongs to the later renderer tranche.
@@ -73,5 +74,6 @@ ctest --test-dir build-host --output-on-failure
 
 The test executable uses a fake monotonic clock and no SDL, GPU, audio device,
 window, or Vulkan loader. It adversarially covers exact 25/50/100 schedules,
-queue-full retry, duplicate/drop detection, 100 batches of 441 stereo frames,
-controller state, resize/fullscreen events, and all four viewport policies.
+wait/commit ordering, queue-full retry, sequence recovery, tight final-row
+storage, 100 batches of 441 stereo frames, controller state,
+resize/fullscreen events, and exact rational viewport policies.

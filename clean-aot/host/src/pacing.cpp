@@ -50,6 +50,8 @@ HostStatus MonotonicPacer::start(std::uint64_t origin_ns) noexcept {
     frame_index_ = 0U;
     last_observed_ns_ = origin_ns;
     remainder_ = 0U;
+    last_decision_ = PaceDecision::not_started;
+    wait_satisfied_ = false;
     started_ = true;
     return HostStatus{};
 }
@@ -57,6 +59,10 @@ HostStatus MonotonicPacer::start(std::uint64_t origin_ns) noexcept {
 PaceResult MonotonicPacer::wait(IMonotonicClock& clock) noexcept {
     if (!started_) {
         return PaceResult{PaceDecision::not_started, 0U, clock.now_ns()};
+    }
+    if (wait_satisfied_) {
+        return PaceResult{
+            last_decision_, deadline_ns_, last_observed_ns_};
     }
 
     std::uint64_t observed = clock.now_ns();
@@ -75,16 +81,25 @@ PaceResult MonotonicPacer::wait(IMonotonicClock& clock) noexcept {
     }
 
     last_observed_ns_ = observed;
+    last_decision_ = observed == deadline_ns_
+        ? PaceDecision::ready
+        : PaceDecision::late;
+    wait_satisfied_ = true;
 
     return PaceResult{
-        observed == deadline_ns_ ? PaceDecision::ready : PaceDecision::late,
-        deadline_ns_,
-        observed};
+        last_decision_, deadline_ns_, observed};
 }
 
 HostStatus MonotonicPacer::commit() noexcept {
     if (!started_ || !schedule_.valid()) {
-        return HostStatus{HostCode::invalid_argument};
+        return HostStatus{HostCode::not_ready};
+    }
+    if (!wait_satisfied_) {
+        return HostStatus{HostCode::sequence_error};
+    }
+
+    if (frame_index_ == std::numeric_limits<std::uint64_t>::max()) {
+        return HostStatus{HostCode::internal_error};
     }
 
     const std::uint64_t whole_nanoseconds =
@@ -92,20 +107,25 @@ HostStatus MonotonicPacer::commit() noexcept {
     const std::uint32_t fractional_nanoseconds = static_cast<std::uint32_t>(
         kNanosecondsPerSecond % schedule_.rate_hz);
     bool overflow = false;
-    deadline_ns_ = add_saturated(deadline_ns_, whole_nanoseconds, overflow);
+    std::uint64_t next_deadline =
+        add_saturated(deadline_ns_, whole_nanoseconds, overflow);
     const std::uint64_t new_remainder =
         static_cast<std::uint64_t>(remainder_) + fractional_nanoseconds;
+    std::uint32_t next_remainder = 0U;
     if (new_remainder >= schedule_.rate_hz) {
-        deadline_ns_ = add_saturated(deadline_ns_, 1U, overflow);
-        remainder_ = static_cast<std::uint32_t>(
+        next_deadline = add_saturated(next_deadline, 1U, overflow);
+        next_remainder = static_cast<std::uint32_t>(
             new_remainder - static_cast<std::uint64_t>(schedule_.rate_hz));
     } else {
-        remainder_ = static_cast<std::uint32_t>(new_remainder);
+        next_remainder = static_cast<std::uint32_t>(new_remainder);
     }
-    if (overflow || frame_index_ == std::numeric_limits<std::uint64_t>::max()) {
+    if (overflow) {
         return HostStatus{HostCode::internal_error};
     }
+    deadline_ns_ = next_deadline;
+    remainder_ = next_remainder;
     ++frame_index_;
+    wait_satisfied_ = false;
     return HostStatus{};
 }
 

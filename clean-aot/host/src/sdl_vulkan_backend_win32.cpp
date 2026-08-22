@@ -57,7 +57,9 @@ constexpr std::size_t kMaxEventsPerService = 32U;
     SDL_Window* window,
     const WindowState& state) noexcept {
     if (window == nullptr || state.pixel_width == 0U ||
-        state.pixel_height == 0U) {
+        state.pixel_height == 0U ||
+        state.pixel_width > static_cast<std::uint32_t>(INT_MAX) ||
+        state.pixel_height > static_cast<std::uint32_t>(INT_MAX)) {
         return false;
     }
     if (!SDL_SetWindowSize(
@@ -95,14 +97,18 @@ struct SdlVulkanPresentation::Impl final {
     FixedSpscQueue<FrameSubmission, kFrameQueueDepth> frames{};
     FixedSpscQueue<HostEvent, kEventQueueDepth> events{};
     FrameSubmission pending_frame{};
+    HostEvent pending_event{};
     WindowState window_state{};
+    FullscreenMode requested_fullscreen = FullscreenMode::windowed;
     bool has_pending_frame = false;
+    bool has_pending_event = false;
     bool sdl_initialized = false;
+    bool sdl_vulkan_loaded = false;
+    bool window_claimed = false;
     bool initialized = false;
     bool shutting_down = false;
     bool device_lost = false;
     bool swapchain_recreation_requested = false;
-    bool event_overflow = false;
     std::uint64_t next_sequence = 0U;
 };
 
@@ -125,7 +131,8 @@ HostStatus SdlVulkanPresentation::initialize() noexcept {
     }
     impl_ = impl;
     impl_->window_state = WindowState{
-        config_.width, config_.height, FullscreenMode::windowed};
+        config_.width, config_.height, config_.fullscreen};
+    impl_->requested_fullscreen = config_.fullscreen;
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         shutdown();
@@ -147,6 +154,7 @@ HostStatus SdlVulkanPresentation::initialize() noexcept {
         shutdown();
         return sdl_failure(HostCode::unsupported);
     }
+    impl_->sdl_vulkan_loaded = true;
 
     const SDL_WindowFlags flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE;
     impl_->window = SDL_CreateWindow(
@@ -167,9 +175,16 @@ HostStatus SdlVulkanPresentation::initialize() noexcept {
         SDL_GPU_SHADERFORMAT_SPIRV,
         config_.debug_gpu,
         "vulkan");
-    if (impl_->device == nullptr ||
-        !SDL_ClaimWindowForGPUDevice(impl_->device, impl_->window) ||
-        !SDL_SetGPUAllowedFramesInFlight(impl_->device, 2U)) {
+    if (impl_->device == nullptr) {
+        shutdown();
+        return sdl_failure(HostCode::unsupported);
+    }
+    if (!SDL_ClaimWindowForGPUDevice(impl_->device, impl_->window)) {
+        shutdown();
+        return sdl_failure(HostCode::unsupported);
+    }
+    impl_->window_claimed = true;
+    if (!SDL_SetGPUAllowedFramesInFlight(impl_->device, 2U)) {
         shutdown();
         return sdl_failure(HostCode::unsupported);
     }
@@ -230,13 +245,16 @@ HostStatus SdlVulkanPresentation::request_window(
     if (impl_ == nullptr || !impl_->initialized || impl_->shutting_down) {
         return sdl_failure(HostCode::shutting_down);
     }
-    if (request.state.pixel_width == 0U || request.state.pixel_height == 0U) {
-        return sdl_failure(HostCode::unsupported);
+    if (request.state.pixel_width == 0U || request.state.pixel_height == 0U ||
+        request.state.pixel_width > static_cast<std::uint32_t>(INT_MAX) ||
+        request.state.pixel_height > static_cast<std::uint32_t>(INT_MAX)) {
+        return sdl_failure(HostCode::invalid_argument);
     }
     if (!apply_window_state(impl_->window, request.state)) {
         return sdl_failure();
     }
     impl_->window_state = request.state;
+    impl_->requested_fullscreen = request.state.fullscreen;
     return HostStatus{};
 }
 
@@ -249,8 +267,9 @@ void SdlVulkanPresentation::mark_device_lost() noexcept {
         HostEventKind::device_lost,
         impl_->window_state,
         HostCode::device_lost};
-    if (!impl_->events.try_push(event)) {
-        impl_->event_overflow = true;
+    if (!impl_->events.try_push(event) && !impl_->has_pending_event) {
+        impl_->pending_event = event;
+        impl_->has_pending_event = true;
     }
 }
 
@@ -263,12 +282,13 @@ HostStatus SdlVulkanPresentation::recreate_swapchain() noexcept {
         return sdl_failure(HostCode::device_lost);
     }
     SDL_ReleaseWindowFromGPUDevice(impl_->device, impl_->window);
+    impl_->window_claimed = false;
     if (!SDL_ClaimWindowForGPUDevice(impl_->device, impl_->window)) {
         mark_device_lost();
         return sdl_failure(HostCode::device_lost);
     }
+    impl_->window_claimed = true;
     impl_->swapchain_recreation_requested = false;
-    impl_->device_lost = false;
     return HostStatus{};
 }
 
@@ -276,6 +296,22 @@ HostStatus SdlVulkanPresentation::service() noexcept {
     if (impl_ == nullptr || !impl_->initialized || impl_->shutting_down) {
         return sdl_failure(HostCode::shutting_down);
     }
+
+    if (impl_->has_pending_event) {
+        if (!impl_->events.try_push(impl_->pending_event)) {
+            return sdl_failure(HostCode::queue_full);
+        }
+        impl_->has_pending_event = false;
+    }
+
+    const auto publish_event = [this](const HostEvent& host_event) noexcept {
+        if (impl_->events.try_push(host_event)) {
+            return true;
+        }
+        impl_->pending_event = host_event;
+        impl_->has_pending_event = true;
+        return false;
+    };
 
     SDL_Event event{};
     std::size_t event_count = 0U;
@@ -287,9 +323,7 @@ HostStatus SdlVulkanPresentation::service() noexcept {
                 HostEventKind::quit_requested,
                 impl_->window_state,
                 HostCode::ok};
-            if (!impl_->events.try_push(quit)) {
-                return sdl_failure(HostCode::queue_full);
-            }
+            (void)publish_event(quit);
             impl_->shutting_down = true;
         } else if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED ||
                    event.type == SDL_EVENT_WINDOW_RESIZED) {
@@ -303,22 +337,35 @@ HostStatus SdlVulkanPresentation::service() noexcept {
                     HostEventKind::window_resized,
                     impl_->window_state,
                     HostCode::ok};
-                if (!impl_->events.try_push(resized)) {
-                    return sdl_failure(HostCode::queue_full);
+                if (!publish_event(resized)) {
+                    break;
                 }
                 impl_->swapchain_recreation_requested = true;
             }
         } else if (event.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN) {
-            impl_->window_state.fullscreen = FullscreenMode::borderless;
+            impl_->window_state.fullscreen = impl_->requested_fullscreen ==
+                    FullscreenMode::windowed
+                ? FullscreenMode::borderless
+                : impl_->requested_fullscreen;
+            const HostEvent changed{HostEventKind::fullscreen_changed,
+                                    impl_->window_state, HostCode::ok};
+            if (!publish_event(changed)) {
+                break;
+            }
         } else if (event.type == SDL_EVENT_WINDOW_LEAVE_FULLSCREEN) {
             impl_->window_state.fullscreen = FullscreenMode::windowed;
+            const HostEvent changed{HostEventKind::fullscreen_changed,
+                                    impl_->window_state, HostCode::ok};
+            if (!publish_event(changed)) {
+                break;
+            }
         }
     }
 
     if (impl_->device_lost) {
         return sdl_failure(HostCode::device_lost);
     }
-    if (impl_->event_overflow) {
+    if (impl_->has_pending_event) {
         return sdl_failure(HostCode::queue_full);
     }
     if (impl_->shutting_down) {
@@ -337,6 +384,8 @@ HostStatus SdlVulkanPresentation::service() noexcept {
     }
     impl_->has_pending_frame = true;
     if (impl_->pending_frame.sequence != impl_->next_sequence) {
+        impl_->next_sequence = impl_->pending_frame.sequence + 1U;
+        impl_->has_pending_frame = false;
         return sdl_failure(HostCode::sequence_error);
     }
 
@@ -420,10 +469,17 @@ HostStatus SdlVulkanPresentation::service() noexcept {
 }
 
 bool SdlVulkanPresentation::poll_event(HostEvent& event) noexcept {
-    if (impl_ == nullptr || !impl_->events.try_pop(event)) {
+    if (impl_ == nullptr) {
         return false;
     }
-    impl_->event_overflow = false;
+    if (impl_->events.try_pop(event)) {
+        return true;
+    }
+    if (!impl_->has_pending_event) {
+        return false;
+    }
+    event = impl_->pending_event;
+    impl_->has_pending_event = false;
     return true;
 }
 
@@ -444,8 +500,9 @@ void SdlVulkanPresentation::shutdown() noexcept {
     impl_->shutting_down = true;
     if (impl_->device != nullptr) {
         (void)SDL_WaitForGPUIdle(impl_->device);
-        if (impl_->window != nullptr) {
+        if (impl_->window != nullptr && impl_->window_claimed) {
             SDL_ReleaseWindowFromGPUDevice(impl_->device, impl_->window);
+            impl_->window_claimed = false;
         }
         SDL_DestroyGPUDevice(impl_->device);
         impl_->device = nullptr;
@@ -454,13 +511,17 @@ void SdlVulkanPresentation::shutdown() noexcept {
         SDL_DestroyWindow(impl_->window);
         impl_->window = nullptr;
     }
-    if (impl_->vulkan_loader != nullptr) {
+    if (impl_->sdl_vulkan_loaded) {
         SDL_Vulkan_UnloadLibrary();
+        impl_->sdl_vulkan_loaded = false;
+    }
+    if (impl_->vulkan_loader != nullptr) {
         FreeLibrary(impl_->vulkan_loader);
         impl_->vulkan_loader = nullptr;
     }
     if (impl_->sdl_initialized) {
-        SDL_Quit();
+        SDL_QuitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD);
+        impl_->sdl_initialized = false;
     }
     delete impl_;
     impl_ = nullptr;
