@@ -38,6 +38,28 @@ public:
         return true;
     }
 };
+class UiStripeDecoder final : public clean_aot::app::IPngDecoder {
+public:
+    bool decode(std::span<const std::uint8_t>, std::uint32_t width,
+                std::uint32_t height,
+                std::vector<std::uint8_t>& rgba8) noexcept override {
+        try {
+            rgba8.assign(static_cast<std::size_t>(width) * height * 4U, 0U);
+            for (std::uint32_t y = 0U; y < height; ++y) {
+                for (std::uint32_t x = 0U; x < width; ++x) {
+                    const std::size_t offset =
+                        (static_cast<std::size_t>(y) * width + x) * 4U;
+                    const std::uint8_t value = (x & 1U) == 0U ? 255U : 0U;
+                    rgba8[offset] = value;
+                    rgba8[offset + 1U] = value;
+                    rgba8[offset + 2U] = value;
+                    rgba8[offset + 3U] = 255U;
+                }
+            }
+            return true;
+        } catch (...) { return false; }
+    }
+};
 class FakeUploader final : public clean_aot::host::IReplacementUploader {
 public:
     clean_aot::host::HostStatus upload_replacement(
@@ -386,6 +408,115 @@ void test_live_replacement_pipeline() {
            "live overlapping VRAM write immediately retires stale GPU handle");
     std::filesystem::remove_all(root);
 }
+void test_live_hd_font_and_banner_compositor() {
+    using namespace clean_aot;
+    const psx::render::ReplacementKey key{0x8043be1bU, 0xd03041bdU};
+    const auto run = [&](app::TitleAssetClass asset_class,
+                         psx::render::ReplacementAssetKind kind,
+                         raster::PresentationMode presentation,
+                         std::uint32_t output_width,
+                         std::uint32_t expected_width,
+                         const char* label) {
+        const auto root = std::filesystem::temp_directory_path() /
+            (asset_class == app::TitleAssetClass::Font
+                 ? "clean-aot-hd-font" : "clean-aot-hd-banner");
+        std::filesystem::remove_all(root);
+        std::filesystem::create_directories(root);
+        const std::array<std::uint8_t, 4U> bytes{7U, 8U, 9U, 10U};
+        { std::ofstream file(root / "ui.png", std::ios::binary);
+          file.write(reinterpret_cast<const char*>(bytes.data()), 4); }
+        const std::array entries{psx::render::ReplacementManifestEntry{
+            kind, key, "ui.png", app::detail::sha256(bytes), 64U, 4U}};
+        auto manifest = psx::render::ReplacementManifest::create(entries, 9U);
+        UiStripeDecoder decoder;
+        host::HeadlessBackend host;
+        app::ReplacementAssetRuntime assets(
+            std::move(*manifest), root, decoder, host);
+        const std::array mappings{app::TitleAssetMapping{key, asset_class}};
+        app::Wip3outUploadKeyPolicy policy(mappings);
+        std::vector<std::uint8_t> bios(512U * 1024U, 0U);
+        runtime::Configuration runtime_config{};
+        runtime_config.bios = bios;
+        runtime::Runtime runtime(runtime_config);
+        auto& gpu = runtime.gpu();
+        const auto send = [&](std::uint32_t word) {
+            expect(gpu.write_gp0(word).accepted, label);
+        };
+        expect(gpu.write_gp1(0x03000000U).accepted &&
+               gpu.write_gp1(0x05000000U).accepted &&
+               gpu.write_gp1(0x06c00200U).accepted &&
+               gpu.write_gp1(0x07040010U).accepted &&
+               gpu.write_gp1(0x08000001U).accepted, label);
+        send(0xa0000000U); send(0U); send((1U << 16U) | 4U);
+        send(0xabcd1234U); send(0xffff0000U);
+        send(0xa0000000U); send(16U); send((1U << 16U) | 16U);
+        for (std::uint32_t value = 0U; value < 16U; value += 2U) {
+            send(value | ((value + 1U) << 16U));
+        }
+        send(0xe1000000U); send(0xe3000000U);
+        send(0xe4000000U | (511U << 10U) | 1023U);
+        send(0x65000000U); send(10U << 16U); send(1U << 16U);
+        send((1U << 16U) | 16U);
+        app::GraphicsConfiguration configuration{};
+        configuration.runtime_scanout = true;
+        configuration.output_width = output_width;
+        configuration.output_height = 2160U;
+        configuration.presentation = presentation;
+        configuration.custom_aspect_width = presentation ==
+                raster::PresentationMode::Generic21x9 ? 21U : 4U;
+        configuration.custom_aspect_height = presentation ==
+                raster::PresentationMode::Generic21x9 ? 9U : 3U;
+        configuration.replacement_assets = &assets;
+        configuration.replacement_policy = &policy;
+        configuration.presentation_resolve =
+            raster::PresentationResolveMode::EdgeAware;
+        configuration.high_resolution_ui = true;
+        configuration.maximum_ui_pixels_per_frame = 4096U;
+        app::RuntimeGraphics graphics(configuration);
+        expect(graphics.present(runtime, host, 0U).success() &&
+               host.service().success(), label);
+        const auto& stats = graphics.ui_stats();
+        expect(graphics.resolved_width() == expected_width &&
+               graphics.resolved_height() == 2160U &&
+               stats.candidates == 1U && stats.composited == 1U &&
+               stats.native_fallbacks == 0U &&
+               stats.pixels_tested <= 4096U &&
+               stats.texture_fetches == stats.pixels_tested &&
+               stats.pixels_written == stats.pixels_tested, label);
+        const auto pixels = graphics.resolved_pixels();
+        const std::uint32_t scale = expected_width / 320U;
+        const std::size_t white =
+            (static_cast<std::size_t>(10U * 9U + 4U) * expected_width) * 3U;
+        const std::size_t black = white + ((scale + 3U) / 4U) * 3U;
+        expect(!pixels.empty() && pixels[white] == 255U &&
+               pixels[white + 1U] == 255U && pixels[white + 2U] == 255U &&
+               pixels[black] == 0U && pixels[black + 1U] == 0U &&
+               pixels[black + 2U] == 0U, label);
+        expect(stats.texture_fetches <= 4096U, label);
+        std::cout << label << " digest: 0x" << std::hex
+                  << graphics.visual_digest() << std::dec << '\n';
+        send(0x65000000U); send(10U << 16U); send(1U << 16U);
+        send((1U << 16U) | 16U);
+        send(0x02000000U); send(0U); send((1U << 16U) | 4U);
+        expect(graphics.present(runtime, host, 1U).success() &&
+               host.service().success() &&
+               graphics.ui_stats().candidates == 2U &&
+               graphics.ui_stats().composited == 1U &&
+               graphics.ui_stats().native_fallbacks == 1U &&
+               assets.stats().invalidated == 1U &&
+               host.stats().replacements_released == 1U,
+               "same-frame producer mutation blocks stale HD UI sampling");
+        std::filesystem::remove_all(root);
+    };
+    run(app::TitleAssetClass::Font,
+        psx::render::ReplacementAssetKind::Font,
+        raster::PresentationMode::Identity4x3, 3840U, 2880U,
+        "4K HD font remains legible within fixed sampling budget");
+    run(app::TitleAssetClass::Banner,
+        psx::render::ReplacementAssetKind::Texture,
+        raster::PresentationMode::Generic21x9, 5120U, 5040U,
+        "ultrawide HD banner remains legible within fixed sampling budget");
+}
 void test_runtime_scanout() {
     std::vector<std::uint8_t> bios(512U * 1024U, 0U);
     clean_aot::runtime::Configuration config{}; config.bios = bios;
@@ -640,6 +771,7 @@ int main() {
     test_precise_raster_perspective_interpolation();
     test_beetle_upload_key_derivation_and_sampling();
     test_live_replacement_pipeline();
+    test_live_hd_font_and_banner_compositor();
     test_runtime_scanout(); test_4k_edge_aware_runtime_resolve();
     test_replacement_runtime(); test_native_png_decode();
     test_title_manifest_and_receipts(); test_missing_asset_native_fallback();

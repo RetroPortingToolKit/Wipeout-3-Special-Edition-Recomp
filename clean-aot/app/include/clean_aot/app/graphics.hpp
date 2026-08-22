@@ -19,9 +19,16 @@ namespace clean_aot::app {
 
 class ReplacementAssetRuntime;
 
+enum class TitleAssetClass : std::uint8_t {
+    Texture,
+    Font,
+    Banner,
+};
+
 struct ReplacementMatch final {
     psx::render::ReplacementAssetKind kind =
         psx::render::ReplacementAssetKind::Texture;
+    TitleAssetClass asset_class = TitleAssetClass::Texture;
     psx::render::ReplacementKey key{};
     raster::VramRect source{};
     gpu::TextureDepth depth = gpu::TextureDepth::Indexed4;
@@ -61,12 +68,6 @@ public:
 enum class FontManifestPolicy : std::uint8_t {
     Disabled,
     ManifestOnly,
-};
-
-enum class TitleAssetClass : std::uint8_t {
-    Texture,
-    Font,
-    Banner,
 };
 
 struct TitleAssetMapping final {
@@ -143,6 +144,8 @@ struct GraphicsConfiguration final {
     raster::PresentationResolveMode presentation_resolve =
         raster::PresentationResolveMode::Native;
     std::uint64_t maximum_resolved_pixels = 5120ULL * 2160ULL;
+    bool high_resolution_ui = true;
+    std::uint64_t maximum_ui_pixels_per_frame = 5120ULL * 2160ULL;
 };
 
 class IPngDecoder {
@@ -248,6 +251,18 @@ public:
         const noexcept;
     [[nodiscard]] const raster::UpscaleStats& upscale_stats() const noexcept;
     [[nodiscard]] std::uint64_t upscale_fallbacks() const noexcept;
+    struct UiStats final {
+        std::uint64_t candidates = 0U;
+        std::uint64_t composited = 0U;
+        std::uint64_t native_fallbacks = 0U;
+        std::uint64_t pixels_tested = 0U;
+        std::uint64_t pixels_written = 0U;
+        std::uint64_t texture_fetches = 0U;
+    };
+    [[nodiscard]] const UiStats& ui_stats() const noexcept;
+    [[nodiscard]] std::span<const std::uint8_t> resolved_pixels() const noexcept;
+    [[nodiscard]] std::uint32_t resolved_width() const noexcept;
+    [[nodiscard]] std::uint32_t resolved_height() const noexcept;
 
 private:
     GraphicsConfiguration configuration_{};
@@ -267,6 +282,15 @@ private:
     std::uint64_t geometry_digest_ = 0U;
     raster::UpscaleStats upscale_stats_{};
     std::uint64_t upscale_fallbacks_ = 0U;
+    struct UiDraw final {
+        gpu::RectangleEvent event{};
+        ReplacementMatch match{};
+        std::uint64_t handle = 0U;
+    };
+    std::vector<UiDraw> ui_draws_{};
+    UiStats ui_stats_{};
+    std::uint32_t resolved_width_ = 0U;
+    std::uint32_t resolved_height_ = 0U;
 };
 
 } // namespace clean_aot::app

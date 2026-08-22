@@ -399,7 +399,8 @@ bool Wip3outUploadKeyPolicy::identify(
     match = {asset_class == TitleAssetClass::Font
             ? psx::render::ReplacementAssetKind::Font
             : psx::render::ReplacementAssetKind::Texture,
-        key, selected->rect, state->draw_mode.depth, selected->generation};
+        *asset_class, key, selected->rect, state->draw_mode.depth,
+        selected->generation};
     ++impl_->stats.identified;
     return true;
 }
@@ -691,7 +692,9 @@ RuntimeGraphics::RuntimeGraphics(GraphicsConfiguration configuration)
              raster::PresentationResolveMode::EdgeAware) &&
         (configuration_.presentation_resolve ==
              raster::PresentationResolveMode::Native ||
-         configuration_.maximum_resolved_pixels != 0U);
+         configuration_.maximum_resolved_pixels != 0U) &&
+        (!configuration_.high_resolution_ui ||
+         configuration_.maximum_ui_pixels_per_frame != 0U);
     const psx::render::ProjectionResult projection =
         psx::render::ProjectionPolicyPlanner::plan({
             configuration_.projection, configuration_.culling,
@@ -717,6 +720,9 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                                           std::uint64_t update_index) noexcept {
     if (!configuration_.runtime_scanout) return {host::HostCode::not_ready};
     try {
+        ui_draws_.clear();
+        resolved_width_ = 0U;
+        resolved_height_ = 0U;
         std::size_t drained = 0U;
         while (auto event = runtime.gpu().pop_event()) {
             if (++drained > gpu::kEventQueueCapacity) {
@@ -744,6 +750,28 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                             handle, match, sampling)) {
                         ++replacement_hits_;
                         use_replacement = true;
+                        if (configuration_.high_resolution_ui &&
+                            match.asset_class != TitleAssetClass::Texture) {
+                            ++ui_stats_.candidates;
+                            const auto* rectangle =
+                                std::get_if<gpu::RectangleEvent>(&*event);
+                            if (rectangle != nullptr && rectangle->textured &&
+                                rectangle->texture_coordinate.has_value() &&
+                                !rectangle->semi_transparent &&
+                                !rectangle->state.mask.check_mask_bit &&
+                                !rectangle->state.mask.set_mask_bit &&
+                                !rectangle->state.draw_mode.rectangle_flip_x &&
+                                !rectangle->state.draw_mode.rectangle_flip_y &&
+                                !rectangle->state.draw_mode.texture_disable) {
+                                try {
+                                    ui_draws_.push_back({*rectangle, match, handle});
+                                } catch (...) {
+                                    ++ui_stats_.native_fallbacks;
+                                }
+                            } else {
+                                ++ui_stats_.native_fallbacks;
+                            }
+                        }
                     }
                     else ++native_fallbacks_;
                 }
@@ -897,6 +925,179 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                 ++upscale_fallbacks_;
             }
         }
+        if (configuration_.high_resolution_ui &&
+            presented.data() == resolved_scanout_.data() && !ui_draws_.empty()) {
+            const bool direct_scanout =
+                planned.plan.pixel_format == raster::ScanoutPixelFormat::Rgb555 &&
+                planned.plan.source_line_step == 1U &&
+                planned.plan.source_field_offset == 0U &&
+                static_cast<std::uint32_t>(planned.plan.vram_start_x_words) +
+                        planned.plan.logical_width <= raster::kVramWidth &&
+                static_cast<std::uint32_t>(planned.plan.vram_start_y) +
+                        planned.plan.logical_height <= raster::kVramHeight;
+            if (!direct_scanout) {
+                ui_stats_.native_fallbacks += ui_draws_.size();
+            } else {
+                std::uint64_t remaining =
+                    configuration_.maximum_ui_pixels_per_frame;
+                const std::int64_t scan_left = planned.plan.vram_start_x_words;
+                const std::int64_t scan_top = planned.plan.vram_start_y;
+                const std::int64_t scan_right =
+                    scan_left + planned.plan.logical_width;
+                const std::int64_t scan_bottom =
+                    scan_top + planned.plan.logical_height;
+                const auto ceil_scale = [](std::uint64_t coordinate,
+                                           std::uint32_t target,
+                                           std::uint32_t source) noexcept {
+                    return static_cast<std::uint32_t>(
+                        (coordinate * target + source - 1U) / source);
+                };
+                for (const UiDraw& draw : ui_draws_) {
+                    raster::ReplacementTexture texture{};
+                    if (configuration_.replacement_assets == nullptr ||
+                        !configuration_.replacement_assets->sampling_texture(
+                            draw.handle, draw.match, texture)) {
+                        ++ui_stats_.native_fallbacks;
+                        continue;
+                    }
+                    const std::int64_t original_left =
+                        static_cast<std::int64_t>(draw.event.origin.x) +
+                        draw.event.state.draw_offset.x;
+                    const std::int64_t original_top =
+                        static_cast<std::int64_t>(draw.event.origin.y) +
+                        draw.event.state.draw_offset.y;
+                    const std::int64_t left = std::max({original_left,
+                        static_cast<std::int64_t>(draw.event.state.draw_area.left),
+                        scan_left});
+                    const std::int64_t top = std::max({original_top,
+                        static_cast<std::int64_t>(draw.event.state.draw_area.top),
+                        scan_top});
+                    const std::int64_t right = std::min({
+                        original_left + draw.event.width,
+                        static_cast<std::int64_t>(
+                            draw.event.state.draw_area.right) + 1,
+                        scan_right});
+                    const std::int64_t bottom = std::min({
+                        original_top + draw.event.height,
+                        static_cast<std::int64_t>(
+                            draw.event.state.draw_area.bottom) + 1,
+                        scan_bottom});
+                    if (right <= left || bottom <= top) {
+                        ++ui_stats_.native_fallbacks;
+                        continue;
+                    }
+                    const std::uint32_t output_left = ceil_scale(
+                        static_cast<std::uint64_t>(left - scan_left),
+                        presented_width, planned.plan.logical_width);
+                    const std::uint32_t output_top = ceil_scale(
+                        static_cast<std::uint64_t>(top - scan_top),
+                        presented_height, planned.plan.logical_height);
+                    const std::uint32_t output_right = ceil_scale(
+                        static_cast<std::uint64_t>(right - scan_left),
+                        presented_width, planned.plan.logical_width);
+                    const std::uint32_t output_bottom = ceil_scale(
+                        static_cast<std::uint64_t>(bottom - scan_top),
+                        presented_height, planned.plan.logical_height);
+                    const std::uint64_t pixels =
+                        static_cast<std::uint64_t>(output_right - output_left) *
+                        (output_bottom - output_top);
+                    if (pixels == 0U || pixels > remaining) {
+                        ++ui_stats_.native_fallbacks;
+                        continue;
+                    }
+                    remaining -= pixels;
+                    const std::int64_t pixels_per_word =
+                        draw.match.depth == gpu::TextureDepth::Indexed4 ? 4 :
+                        draw.match.depth == gpu::TextureDepth::Indexed8 ? 2 : 1;
+                    const std::int64_t native_width =
+                        static_cast<std::int64_t>(draw.match.source.width) *
+                        pixels_per_word;
+                    const std::int64_t native_height = draw.match.source.height;
+                    const std::int64_t page_x =
+                        static_cast<std::int64_t>(
+                            draw.event.state.draw_mode.x_base) * 64;
+                    const std::int64_t page_y =
+                        draw.event.state.draw_mode.y_base;
+                    const std::int64_t denominator_x =
+                        static_cast<std::int64_t>(presented_width) * 2;
+                    const std::int64_t denominator_y =
+                        static_cast<std::int64_t>(presented_height) * 2;
+                    bool touched = false;
+                    for (std::uint32_t y = output_top; y < output_bottom; ++y) {
+                        const std::int64_t local_y_numerator =
+                            scan_top * denominator_y +
+                            static_cast<std::int64_t>(2ULL * y + 1ULL) *
+                                planned.plan.logical_height -
+                            original_top * denominator_y;
+                        const std::int64_t atlas_y_numerator =
+                            (page_y - draw.match.source.y) * denominator_y +
+                            static_cast<std::int64_t>(
+                                draw.event.texture_coordinate->v) * denominator_y +
+                            local_y_numerator;
+                        if (atlas_y_numerator < 0 || native_height <= 0 ||
+                            atlas_y_numerator >= native_height * denominator_y) {
+                            continue;
+                        }
+                        const std::uint32_t sample_y =
+                            static_cast<std::uint32_t>(atlas_y_numerator *
+                                texture.height /
+                                (native_height * denominator_y));
+                        for (std::uint32_t x = output_left; x < output_right; ++x) {
+                            ++ui_stats_.pixels_tested;
+                            const std::int64_t local_x_numerator =
+                                scan_left * denominator_x +
+                                static_cast<std::int64_t>(2ULL * x + 1ULL) *
+                                    planned.plan.logical_width -
+                                original_left * denominator_x;
+                            const std::int64_t atlas_x_numerator =
+                                (page_x - draw.match.source.x) * pixels_per_word *
+                                    denominator_x +
+                                static_cast<std::int64_t>(
+                                    draw.event.texture_coordinate->u) * denominator_x +
+                                local_x_numerator;
+                            if (atlas_x_numerator < 0 || native_width <= 0 ||
+                                atlas_x_numerator >= native_width * denominator_x) {
+                                continue;
+                            }
+                            const std::uint32_t sample_x =
+                                static_cast<std::uint32_t>(atlas_x_numerator *
+                                    texture.width /
+                                    (native_width * denominator_x));
+                            const std::size_t source =
+                                (static_cast<std::size_t>(sample_y) * texture.width +
+                                 sample_x) * 4U;
+                            ++ui_stats_.texture_fetches;
+                            if (texture.rgba8[source + 3U] == 0U) continue;
+                            const auto channel = [&](std::size_t offset) noexcept {
+                                const std::uint32_t value = texture.rgba8[source + offset];
+                                if (draw.event.raw_texture) {
+                                    return static_cast<std::uint8_t>(value);
+                                }
+                                const std::uint32_t modulation = offset == 0U
+                                    ? draw.event.color.red
+                                    : offset == 1U ? draw.event.color.green
+                                                   : draw.event.color.blue;
+                                return static_cast<std::uint8_t>(
+                                    std::min(255U, value * modulation / 128U));
+                            };
+                            const std::size_t destination =
+                                (static_cast<std::size_t>(y) * presented_width + x) * 3U;
+                            resolved_scanout_[destination] = channel(0U);
+                            resolved_scanout_[destination + 1U] = channel(1U);
+                            resolved_scanout_[destination + 2U] = channel(2U);
+                            ++ui_stats_.pixels_written;
+                            touched = true;
+                        }
+                    }
+                    if (touched) ++ui_stats_.composited;
+                    else ++ui_stats_.native_fallbacks;
+                }
+            }
+        }
+        if (presented.data() == resolved_scanout_.data()) {
+            resolved_width_ = presented_width;
+            resolved_height_ = presented_height;
+        }
         host::FrameSubmission submission{};
         const host::HostStatus bound = host::bind_rgb888_frame(
             presented_width, presented_height, presented,
@@ -949,6 +1150,23 @@ const raster::UpscaleStats& RuntimeGraphics::upscale_stats() const noexcept {
 
 std::uint64_t RuntimeGraphics::upscale_fallbacks() const noexcept {
     return upscale_fallbacks_;
+}
+
+const RuntimeGraphics::UiStats& RuntimeGraphics::ui_stats() const noexcept {
+    return ui_stats_;
+}
+
+std::span<const std::uint8_t> RuntimeGraphics::resolved_pixels() const noexcept {
+    if (resolved_width_ == 0U || resolved_height_ == 0U) return {};
+    return resolved_scanout_;
+}
+
+std::uint32_t RuntimeGraphics::resolved_width() const noexcept {
+    return resolved_width_;
+}
+
+std::uint32_t RuntimeGraphics::resolved_height() const noexcept {
+    return resolved_height_;
 }
 
 std::uint64_t RuntimeGraphics::visual_digest() const noexcept {
