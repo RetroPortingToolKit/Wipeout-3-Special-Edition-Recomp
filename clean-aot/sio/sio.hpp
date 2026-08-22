@@ -65,16 +65,29 @@ struct ByteTransfer {
     Cycle acknowledge_width = 0;
 };
 
-// Nominal Sony-compatible timings from the pinned behavioral reference. The
-// device result carries these values explicitly so machine integration can
-// replace them when hardware traces establish a more specific device profile.
-inline constexpr Cycle kNominalAckDelayCycles = 400U;
-inline constexpr Cycle kNominalAckPulseCycles = 100U;
+// Device timing evidence is expressed in the PS1 master/CPU-cycle domain. The
+// pinned behavioral notes put controller ACK delay at 6.8--13.7 us and the
+// measured reference profile at about 450 cycles, with memory cards replying
+// in about 170 cycles. A low ACK pulse lasts about 96 cycles. These are
+// behavioral profile values, not a claim that every controller revision has
+// identical edge placement; the machine layer can replace device metadata
+// when a revision-specific trace is available.
+inline constexpr Cycle kControllerAckDelayCycles = 450U;
+inline constexpr Cycle kMemoryCardAckDelayCycles = 170U;
+inline constexpr Cycle kAckPulseCycles = 96U;
+
+// Compatibility names for callers that used the original nominal profile.
+// SIO0's default device is a controller, so the default lead is the measured
+// controller value rather than an arbitrary zero-cycle response.
+inline constexpr Cycle kNominalAckDelayCycles = kControllerAckDelayCycles;
+inline constexpr Cycle kNominalAckPulseCycles = kAckPulseCycles;
 inline constexpr Cycle kMemoryCardReadLateAckExtraCycles = 31'000U;
-inline constexpr Cycle kMaximumAckLeadCycles = kNominalAckDelayCycles +
-                                                kMemoryCardReadLateAckExtraCycles +
-                                                kNominalAckPulseCycles;
+inline constexpr Cycle kMaximumAckLeadCycles =
+    kMemoryCardAckDelayCycles + kMemoryCardReadLateAckExtraCycles + kAckPulseCycles;
 inline constexpr Cycle kNoEventCycle = std::numeric_limits<Cycle>::max();
+
+inline constexpr Cycle kPadCpuClockHz = 33'868'800U;
+inline constexpr Cycle kPadConfigurationWatchdogCycles = kPadCpuClockHz;
 
 // SIO0 is mapped by the machine layer. These are offsets, not absolute guest
 // addresses, so this component can be reused by any PS1 memory map.
@@ -123,6 +136,11 @@ public:
     virtual void reset() noexcept = 0;
     virtual void on_select(Cycle cycle) noexcept = 0;
     virtual void on_deselect(Cycle cycle) noexcept = 0;
+    // Advances device-local time when the bus scheduler moves without a
+    // byte exchange. Devices without time-based state may keep the default.
+    virtual void advance_to(Cycle cycle) noexcept {
+        (void)cycle;
+    }
     [[nodiscard]] virtual ByteTransfer exchange(std::uint8_t value,
                                                 Cycle cycle) noexcept = 0;
 };
@@ -178,6 +196,11 @@ struct PadSnapshot {
     std::uint8_t pending_key = 0;
     bool command_valid = false;
     bool transaction_done = false;
+    Cycle last_cycle = 0;
+    Cycle watchdog_deadline = 0;
+    bool watchdog_active = false;
+    bool configuration_used = false;
+    bool id_high_suppressed = false;
 };
 
 class PadDevice final : public SioDevice {
@@ -196,6 +219,15 @@ public:
     [[nodiscard]] PadSnapshot snapshot() const noexcept;
     [[nodiscard]] bool restore(const PadSnapshot& snapshot) noexcept;
 
+    // Advances the device clock without starting a serial transaction. A
+    // configuration watchdog expiry is applied before later communication.
+    void advance_to(Cycle cycle) noexcept override;
+
+    // Models the physical Analog-button edge described by the controller
+    // protocol. It stops and locks rumble, changes the LED/mode, and records
+    // the documented post-configuration ID quirk.
+    [[nodiscard]] bool press_analog_button(Cycle cycle) noexcept;
+
     // This is the host/input boundary for a physical Analog-button change.
     // It has no dependency on a windowing or controller API.
     [[nodiscard]] bool set_analog_mode(bool enabled) noexcept;
@@ -203,6 +235,7 @@ public:
 private:
     [[nodiscard]] std::uint8_t normal_id() const noexcept;
     [[nodiscard]] std::uint8_t response_id() const noexcept;
+    [[nodiscard]] std::uint8_t response_id_high() const noexcept;
     [[nodiscard]] std::uint8_t normal_final_phase() const noexcept;
     [[nodiscard]] std::uint8_t analog_or_padding(std::uint8_t phase) const noexcept;
     [[nodiscard]] ByteTransfer exchange_normal(std::uint8_t value,
@@ -213,6 +246,11 @@ private:
                                         std::uint8_t final_phase) noexcept;
     void capture_rumble(std::uint8_t value) noexcept;
     void finish_command() noexcept;
+    void advance_watchdog(Cycle cycle) noexcept;
+    void observe_communication(Cycle cycle) noexcept;
+    void start_watchdog(Cycle cycle) noexcept;
+    void reset_after_watchdog() noexcept;
+    void apply_analog_button(bool enabled) noexcept;
 
     PadState state_{};
     bool selected_ = false;
@@ -223,6 +261,11 @@ private:
     std::uint8_t pending_key_ = 0;
     bool command_valid_ = false;
     bool transaction_done_ = false;
+    Cycle last_cycle_ = 0;
+    Cycle watchdog_deadline_ = 0;
+    bool watchdog_active_ = false;
+    bool configuration_used_ = false;
+    bool id_high_suppressed_ = false;
 };
 
 struct WriteReceipt {
@@ -357,6 +400,7 @@ struct SioSnapshot {
     Cycle baud_timer_value = 0;
     Cycle ack_begin = 0;
     Cycle ack_until = 0;
+    Cycle ack_delay = 0;
     std::uint16_t mode = 0;
     std::uint16_t control = 0;
     std::uint16_t baud = 0;
@@ -386,9 +430,9 @@ class Sio0 final {
 public:
     static constexpr std::size_t kTxCapacity = 2U;
     static constexpr std::size_t kRxCapacity = 8U;
-    static constexpr Cycle kCpuClockHz = 33'868'800U;
+    static constexpr Cycle kCpuClockHz = kPadCpuClockHz;
     static constexpr Cycle kDefaultAckDelayCycles = kNominalAckDelayCycles;
-    static constexpr Cycle kDefaultAckPulseCycles = kNominalAckPulseCycles;
+    static constexpr Cycle kDefaultAckPulseCycles = kAckPulseCycles;
 
     struct Callbacks {
         void (*irq)(void*, bool) noexcept = nullptr;
@@ -464,7 +508,7 @@ private:
     [[nodiscard]] bool complete_transfer() noexcept;
     [[nodiscard]] bool schedule_ack(const ByteTransfer& transfer) noexcept;
     void begin_ack() noexcept;
-    void expire_ack() noexcept;
+    [[nodiscard]] bool expire_ack() noexcept;
     void advance_baud_timer(Cycle elapsed) noexcept;
     void enqueue_rx(std::uint8_t value) noexcept;
     void enqueue_tx(std::uint8_t value, bool tx_enabled) noexcept;
@@ -483,6 +527,7 @@ private:
     Cycle baud_timer_value_ = 0;
     Cycle ack_begin_ = 0;
     Cycle ack_until_ = 0;
+    Cycle ack_delay_ = 0;
     std::uint16_t mode_ = 0;
     std::uint16_t control_ = 0;
     std::uint16_t baud_ = 0;

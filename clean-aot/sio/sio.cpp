@@ -56,6 +56,10 @@ void fnv_add_u32(std::uint64_t& hash, std::uint32_t value) noexcept {
     return value <= maximum;
 }
 
+[[nodiscard]] constexpr bool cycle_add_fits(Cycle base, Cycle delta) noexcept {
+    return base < kNoEventCycle && delta < (kNoEventCycle - base);
+}
+
 } // namespace
 
 PadDevice::PadDevice() noexcept {
@@ -77,10 +81,15 @@ void PadDevice::reset() noexcept {
     pending_key_ = 0;
     command_valid_ = false;
     transaction_done_ = false;
+    last_cycle_ = 0;
+    watchdog_deadline_ = 0;
+    watchdog_active_ = false;
+    configuration_used_ = false;
+    id_high_suppressed_ = false;
 }
 
 void PadDevice::on_select(Cycle cycle) noexcept {
-    (void)cycle;
+    advance_watchdog(cycle);
     selected_ = true;
     addressed_ = false;
     command_ = 0;
@@ -92,7 +101,7 @@ void PadDevice::on_select(Cycle cycle) noexcept {
 }
 
 void PadDevice::on_deselect(Cycle cycle) noexcept {
-    (void)cycle;
+    advance_watchdog(cycle);
     selected_ = false;
     addressed_ = false;
     command_ = 0;
@@ -122,6 +131,86 @@ bool PadDevice::set_analog_mode(bool enabled) noexcept {
     return true;
 }
 
+void PadDevice::advance_watchdog(Cycle cycle) noexcept {
+    if (cycle == kNoEventCycle || cycle < last_cycle_) {
+        return;
+    }
+    last_cycle_ = cycle;
+    if (watchdog_active_ && cycle >= watchdog_deadline_) {
+        reset_after_watchdog();
+    }
+}
+
+void PadDevice::advance_to(Cycle cycle) noexcept {
+    advance_watchdog(cycle);
+}
+
+void PadDevice::observe_communication(Cycle cycle) noexcept {
+    advance_watchdog(cycle);
+    if (selected_ && watchdog_active_) {
+        start_watchdog(last_cycle_);
+    }
+}
+
+void PadDevice::start_watchdog(Cycle cycle) noexcept {
+    if (!cycle_add_fits(cycle, kPadConfigurationWatchdogCycles)) {
+        reset_after_watchdog();
+        return;
+    }
+    watchdog_active_ = true;
+    watchdog_deadline_ = cycle + kPadConfigurationWatchdogCycles;
+}
+
+void PadDevice::reset_after_watchdog() noexcept {
+    const PadInput input = state_.input;
+    state_ = PadState{};
+    state_.input = input;
+    state_.rumble_map.fill(0xFFU);
+    state_.mode_locked = true;
+    addressed_ = false;
+    command_ = 0;
+    phase_ = 0;
+    pending_mode_ = 0;
+    pending_key_ = 0;
+    command_valid_ = false;
+    transaction_done_ = false;
+    watchdog_deadline_ = 0;
+    watchdog_active_ = false;
+    configuration_used_ = false;
+    id_high_suppressed_ = false;
+}
+
+void PadDevice::apply_analog_button(bool enabled) noexcept {
+    const bool had_configuration = configuration_used_;
+    state_.analog_mode = enabled;
+    state_.configuration_mode = false;
+    state_.led_on = enabled;
+    state_.rumble_configured = false;
+    state_.rumble_map.fill(0xFFU);
+    state_.rumble_small = 0;
+    state_.rumble_large = 0;
+    state_.mode_locked = true;
+    id_high_suppressed_ = had_configuration;
+    watchdog_active_ = false;
+    watchdog_deadline_ = 0;
+    addressed_ = false;
+    command_ = 0;
+    phase_ = 0;
+    pending_mode_ = 0;
+    pending_key_ = 0;
+    command_valid_ = false;
+    transaction_done_ = false;
+}
+
+bool PadDevice::press_analog_button(Cycle cycle) noexcept {
+    advance_watchdog(cycle);
+    if (state_.mode_locked) {
+        return false;
+    }
+    apply_analog_button(!state_.analog_mode);
+    return true;
+}
+
 std::uint8_t PadDevice::normal_id() const noexcept {
     if (state_.analog_mode) {
         return 0x73U;
@@ -141,6 +230,10 @@ std::uint8_t PadDevice::normal_id() const noexcept {
 
 std::uint8_t PadDevice::response_id() const noexcept {
     return state_.configuration_mode ? 0xF3U : normal_id();
+}
+
+std::uint8_t PadDevice::response_id_high() const noexcept {
+    return id_high_suppressed_ ? 0x00U : 0x5AU;
 }
 
 std::uint8_t PadDevice::normal_final_phase() const noexcept {
@@ -176,8 +269,8 @@ ByteTransfer PadDevice::response(std::uint8_t value,
     }
     return ByteTransfer{value,
                         more_data,
-                        more_data ? kNominalAckDelayCycles : 0U,
-                        more_data ? kNominalAckPulseCycles : 0U};
+                        more_data ? kControllerAckDelayCycles : 0U,
+                        more_data ? kAckPulseCycles : 0U};
 }
 
 void PadDevice::finish_command() noexcept {
@@ -214,7 +307,7 @@ void PadDevice::capture_rumble(std::uint8_t value) noexcept {
 }
 
 ByteTransfer PadDevice::exchange(std::uint8_t value, Cycle cycle) noexcept {
-    (void)cycle;
+    observe_communication(cycle);
     if (!selected_) {
         return ByteTransfer{};
     }
@@ -226,7 +319,7 @@ ByteTransfer PadDevice::exchange(std::uint8_t value, Cycle cycle) noexcept {
             return ByteTransfer{};
         }
         addressed_ = true;
-        return ByteTransfer{0xFFU, true, kNominalAckDelayCycles, kNominalAckPulseCycles};
+        return ByteTransfer{0xFFU, true, kControllerAckDelayCycles, kAckPulseCycles};
     }
     if (!command_valid_) {
         command_ = value;
@@ -242,8 +335,7 @@ ByteTransfer PadDevice::exchange(std::uint8_t value, Cycle cycle) noexcept {
             finish_command();
             return ByteTransfer{0xFFU, false};
         }
-        return ByteTransfer{response_id(), true, kNominalAckDelayCycles,
-                            kNominalAckPulseCycles};
+        return ByteTransfer{response_id(), true, kControllerAckDelayCycles, kAckPulseCycles};
     }
     if (state_.configuration_mode) {
         return exchange_configuration(value, cycle);
@@ -253,12 +345,11 @@ ByteTransfer PadDevice::exchange(std::uint8_t value, Cycle cycle) noexcept {
 
 ByteTransfer PadDevice::exchange_normal(std::uint8_t value,
                                         Cycle cycle) noexcept {
-    (void)cycle;
     const std::uint8_t final_phase = normal_final_phase();
     if (command_ == 0x42U) {
         switch (phase_) {
         case 1U:
-            return response(0x5AU, final_phase);
+            return response(response_id_high(), final_phase);
         case 2U:
             capture_rumble(value);
             return response(low_byte(state_.input.buttons), final_phase);
@@ -282,7 +373,7 @@ ByteTransfer PadDevice::exchange_normal(std::uint8_t value,
     if (command_ == 0x43U) {
         switch (phase_) {
         case 1U:
-            return response(0x5AU, final_phase);
+            return response(response_id_high(), final_phase);
         case 2U:
             pending_mode_ = value;
             return response(low_byte(state_.input.buttons), final_phase);
@@ -290,6 +381,10 @@ ByteTransfer PadDevice::exchange_normal(std::uint8_t value,
             const std::uint8_t response_value = high_byte(state_.input.buttons);
             if (phase_ == final_phase) {
                 state_.configuration_mode = pending_mode_ == 1U;
+                if (state_.configuration_mode) {
+                    configuration_used_ = true;
+                    start_watchdog(cycle);
+                }
             }
             return response(response_value, final_phase);
         }
@@ -300,6 +395,10 @@ ByteTransfer PadDevice::exchange_normal(std::uint8_t value,
             const std::uint8_t response_value = analog_or_padding(phase_);
             if (phase_ == final_phase) {
                 state_.configuration_mode = pending_mode_ == 1U;
+                if (state_.configuration_mode) {
+                    configuration_used_ = true;
+                    start_watchdog(cycle);
+                }
             }
             return response(response_value, final_phase);
         }
@@ -319,7 +418,7 @@ ByteTransfer PadDevice::exchange_configuration(std::uint8_t value,
     if (command_ == 0x42U) {
         switch (phase_) {
         case 1U:
-            return response(0x5AU, 7U);
+            return response(response_id_high(), 7U);
         case 2U:
             capture_rumble(value);
             return response(low_byte(state_.input.buttons), 7U);
@@ -353,7 +452,7 @@ ByteTransfer PadDevice::exchange_configuration(std::uint8_t value,
                 state_.configuration_mode = false;
             }
         }
-        return response(phase_ == 1U ? 0x5AU : 0x00U, 7U);
+        return response(phase_ == 1U ? response_id_high() : 0x00U, 7U);
     }
 
     if (command_ == 0x44U) {
@@ -374,13 +473,13 @@ ByteTransfer PadDevice::exchange_configuration(std::uint8_t value,
             }
             state_.mode_locked = (pending_key_ & 0x03U) == 0x03U;
         }
-        return response(phase_ == 1U ? 0x5AU : 0x00U, 7U);
+        return response(phase_ == 1U ? response_id_high() : 0x00U, 7U);
     }
 
     if (command_ == 0x45U) {
         switch (phase_) {
         case 1U:
-            return response(0x5AU, 7U);
+            return response(response_id_high(), 7U);
         case 2U:
             return response(0x01U, 7U);
         case 3U:
@@ -406,7 +505,7 @@ ByteTransfer PadDevice::exchange_configuration(std::uint8_t value,
         const std::uint8_t selector = pending_mode_;
         switch (phase_) {
         case 1U:
-            return response(0x5AU, 7U);
+            return response(response_id_high(), 7U);
         case 2U:
         case 3U:
             return response(0x00U, 7U);
@@ -425,8 +524,8 @@ ByteTransfer PadDevice::exchange_configuration(std::uint8_t value,
     }
 
     if (command_ == 0x47U) {
-        constexpr std::array<std::uint8_t, 7> values = {0x5AU, 0x00U, 0x00U, 0x02U,
-                                                         0x00U, 0x01U, 0x00U};
+        const std::array<std::uint8_t, 7> values = {response_id_high(), 0x00U, 0x00U,
+                                                     0x02U, 0x00U, 0x01U, 0x00U};
         return response(values[static_cast<std::size_t>(phase_ - 1U)], 7U);
     }
 
@@ -434,7 +533,7 @@ ByteTransfer PadDevice::exchange_configuration(std::uint8_t value,
         if (phase_ == 2U) {
             pending_mode_ = value;
         }
-        const std::uint8_t value_out = phase_ == 1U ? 0x5AU
+        const std::uint8_t value_out = phase_ == 1U ? response_id_high()
                                   : (phase_ == 6U && pending_mode_ <= 1U ? 0x01U : 0x00U);
         return response(value_out, 7U);
     }
@@ -444,7 +543,7 @@ ByteTransfer PadDevice::exchange_configuration(std::uint8_t value,
             pending_mode_ = value;
         }
         const std::uint8_t selector = pending_mode_;
-        const std::uint8_t value_out = phase_ == 1U ? 0x5AU
+        const std::uint8_t value_out = phase_ == 1U ? response_id_high()
                                   : (phase_ == 5U ? (selector == 0U ? 0x04U
                                                                     : (selector == 1U ? 0x07U : 0x00U))
                                                   : 0x00U);
@@ -452,7 +551,7 @@ ByteTransfer PadDevice::exchange_configuration(std::uint8_t value,
     }
 
     if (command_ == 0x4DU) {
-        const std::uint8_t old_value = phase_ == 1U ? 0x5AU
+        const std::uint8_t old_value = phase_ == 1U ? response_id_high()
                                      : (phase_ <= 7U ? state_.rumble_map[static_cast<std::size_t>(phase_ - 2U)]
                                                      : 0x00U);
         if (phase_ >= 2U && phase_ <= 7U) {
@@ -466,7 +565,7 @@ ByteTransfer PadDevice::exchange_configuration(std::uint8_t value,
 
     // 40h, 41h, 49h, 4Ah, 4Bh, 4Eh and 4Fh are bounded zero-response
     // configuration commands for this PSX DualShock-compatible boundary.
-    return response(phase_ == 1U ? 0x5AU : 0x00U, 7U);
+    return response(phase_ == 1U ? response_id_high() : 0x00U, 7U);
 }
 
 PadSnapshot PadDevice::snapshot() const noexcept {
@@ -480,16 +579,20 @@ PadSnapshot PadDevice::snapshot() const noexcept {
     value.pending_key = pending_key_;
     value.command_valid = command_valid_;
     value.transaction_done = transaction_done_;
+    value.last_cycle = last_cycle_;
+    value.watchdog_deadline = watchdog_deadline_;
+    value.watchdog_active = watchdog_active_;
+    value.configuration_used = configuration_used_;
+    value.id_high_suppressed = id_high_suppressed_;
     return value;
 }
 
 bool PadDevice::restore(const PadSnapshot& snapshot_value) noexcept {
-    for (const std::uint8_t mapping : snapshot_value.state.rumble_map) {
-        if (mapping != 0x00U && mapping != 0x01U && mapping != 0xFFU) {
-            return false;
-        }
-    }
-    if (!snapshot_value.state.rumble_configured &&
+    const bool partial_rumble_command =
+        snapshot_value.command_valid && snapshot_value.command == 0x4DU &&
+        snapshot_value.state.configuration_mode && snapshot_value.phase >= 2U &&
+        snapshot_value.phase <= 7U;
+    if (!snapshot_value.state.rumble_configured && !partial_rumble_command &&
         !std::all_of(snapshot_value.state.rumble_map.begin(),
                      snapshot_value.state.rumble_map.end(),
                      [](std::uint8_t mapping) { return mapping == 0xFFU; })) {
@@ -527,6 +630,22 @@ bool PadDevice::restore(const PadSnapshot& snapshot_value) noexcept {
     if (snapshot_value.state.rumble_small > 1U) {
         return false;
     }
+    if (snapshot_value.last_cycle == kNoEventCycle ||
+        (snapshot_value.watchdog_active &&
+         (!snapshot_value.configuration_used ||
+          snapshot_value.watchdog_deadline <= snapshot_value.last_cycle ||
+          snapshot_value.watchdog_deadline >= kNoEventCycle ||
+          snapshot_value.watchdog_deadline - snapshot_value.last_cycle >
+              kPadConfigurationWatchdogCycles ||
+          !cycle_add_fits(snapshot_value.last_cycle,
+                          snapshot_value.watchdog_deadline - snapshot_value.last_cycle))) ||
+        (!snapshot_value.watchdog_active && snapshot_value.watchdog_deadline != 0U) ||
+        (snapshot_value.state.configuration_mode &&
+         (!snapshot_value.configuration_used || !snapshot_value.watchdog_active)) ||
+        (snapshot_value.id_high_suppressed &&
+         (snapshot_value.state.configuration_mode || !snapshot_value.configuration_used))) {
+        return false;
+    }
     const bool normal_command = snapshot_value.command == 0x42U || snapshot_value.command == 0x43U;
     const bool configuration_command = snapshot_value.command >= 0x40U && snapshot_value.command <= 0x4FU;
     if (snapshot_value.command_valid &&
@@ -562,6 +681,11 @@ bool PadDevice::restore(const PadSnapshot& snapshot_value) noexcept {
     pending_key_ = snapshot_value.pending_key;
     command_valid_ = snapshot_value.command_valid;
     transaction_done_ = snapshot_value.transaction_done;
+    last_cycle_ = snapshot_value.last_cycle;
+    watchdog_deadline_ = snapshot_value.watchdog_deadline;
+    watchdog_active_ = snapshot_value.watchdog_active;
+    configuration_used_ = snapshot_value.configuration_used;
+    id_high_suppressed_ = snapshot_value.id_high_suppressed;
     return true;
 }
 
@@ -655,8 +779,8 @@ ByteTransfer MemoryCard::response(std::uint8_t value,
     }
     return ByteTransfer{value,
                         more_data,
-                        more_data ? kNominalAckDelayCycles + extra_ack_delay : 0U,
-                        more_data ? kNominalAckPulseCycles : 0U};
+                        more_data ? kMemoryCardAckDelayCycles + extra_ack_delay : 0U,
+                        more_data ? kAckPulseCycles : 0U};
 }
 
 bool MemoryCard::valid_address() const noexcept {
@@ -760,6 +884,10 @@ ByteTransfer MemoryCard::exchange(std::uint8_t value, Cycle cycle) noexcept {
         phase_ = Phase::ReadData;
         return response(low_byte(address_), true);
     case Phase::ReadData: {
+        if (!valid_sector_ || !valid_address() || data_index_ >= kSectorSize) {
+            fail_command();
+            return ByteTransfer{};
+        }
         const std::uint8_t response_value = image_[image_offset() + data_index_];
         checksum_ = static_cast<std::uint8_t>(checksum_ ^ response_value);
         if (data_index_ == 127U) {
@@ -920,23 +1048,44 @@ bool MemoryCard::restore(const MemoryCardSnapshot& snapshot_value) noexcept {
         (snapshot_value.flag & 0xF3U) != 0U) {
         return false;
     }
-    const bool idle_transaction = restored_phase == Phase::Idle;
-    if (idle_transaction &&
-        (snapshot_value.valid_sector || snapshot_value.pending_write_valid ||
-         snapshot_value.address != 0U || snapshot_value.data_index != 0U ||
-         snapshot_value.checksum != 0U || snapshot_value.received_checksum != 0U ||
-         snapshot_value.previous_value != 0U ||
-         !std::all_of(snapshot_value.pending_data.begin(), snapshot_value.pending_data.end(),
-                      [](std::uint8_t byte) { return byte == 0U; }))) {
-        return false;
-    }
-    if (snapshot_value.valid_sector &&
-        snapshot_value.address >= static_cast<std::uint16_t>(kSectorCount)) {
-        return false;
-    }
-    if (snapshot_value.pending_write_valid && !snapshot_value.valid_sector) {
-        return false;
-    }
+
+    const bool address_is_valid =
+        snapshot_value.address < static_cast<std::uint16_t>(kSectorCount);
+    const std::uint8_t address_checksum = static_cast<std::uint8_t>(
+        high_byte(snapshot_value.address) ^ low_byte(snapshot_value.address));
+    const bool pending_data_is_zero = std::all_of(
+        snapshot_value.pending_data.begin(), snapshot_value.pending_data.end(),
+        [](std::uint8_t byte) { return byte == 0U; });
+    const bool transaction_is_zero =
+        !snapshot_value.valid_sector && !snapshot_value.pending_write_valid &&
+        snapshot_value.address == 0U && snapshot_value.data_index == 0U &&
+        snapshot_value.checksum == 0U && snapshot_value.received_checksum == 0U &&
+        snapshot_value.previous_value == 0U && pending_data_is_zero;
+    const auto pending_tail_is_zero = [&](std::size_t first) noexcept {
+        return std::all_of(
+            snapshot_value.pending_data.begin() + static_cast<std::ptrdiff_t>(first),
+            snapshot_value.pending_data.end(), [](std::uint8_t byte) { return byte == 0U; });
+    };
+    const auto read_checksum = [&](std::size_t byte_count) noexcept {
+        std::uint8_t checksum = address_checksum;
+        if (!address_is_valid) {
+            return checksum;
+        }
+        const std::size_t offset = static_cast<std::size_t>(snapshot_value.address) *
+                                   kSectorSize;
+        for (std::size_t index = 0U; index < byte_count; ++index) {
+            checksum = static_cast<std::uint8_t>(checksum ^ image_[offset + index]);
+        }
+        return checksum;
+    };
+    const auto write_checksum = [&](std::size_t byte_count) noexcept {
+        std::uint8_t checksum = address_checksum;
+        for (std::size_t index = 0U; index < byte_count; ++index) {
+            checksum = static_cast<std::uint8_t>(checksum ^ snapshot_value.pending_data[index]);
+        }
+        return checksum;
+    };
+
     const bool write_can_be_pending = restored_phase == Phase::WriteData ||
                                       restored_phase == Phase::WriteChecksum ||
                                       restored_phase == Phase::WriteConfirmOne ||
@@ -945,6 +1094,161 @@ bool MemoryCard::restore(const MemoryCardSnapshot& snapshot_value) noexcept {
     if (snapshot_value.pending_write_valid && !write_can_be_pending) {
         return false;
     }
+
+    bool semantic_state_is_valid = false;
+    switch (restored_phase) {
+    case Phase::Idle:
+    case Phase::Command:
+    case Phase::ReadIdOne:
+    case Phase::ReadIdTwo:
+    case Phase::WriteIdOne:
+    case Phase::WriteIdTwo:
+    case Phase::IdDeviceOne:
+    case Phase::IdDeviceTwo:
+    case Phase::IdConfirmOne:
+    case Phase::IdConfirmTwo:
+    case Phase::IdByteZero:
+    case Phase::IdByteOne:
+    case Phase::IdByteTwo:
+    case Phase::IdByteThree:
+        semantic_state_is_valid = transaction_is_zero;
+        break;
+    case Phase::ReadAddressHigh:
+    case Phase::WriteAddressHigh:
+        semantic_state_is_valid = transaction_is_zero;
+        break;
+    case Phase::ReadAddressLow:
+    case Phase::WriteAddressLow:
+        semantic_state_is_valid = !snapshot_value.valid_sector &&
+                                  !snapshot_value.pending_write_valid &&
+                                  low_byte(snapshot_value.address) == 0U &&
+                                  snapshot_value.data_index == 0U &&
+                                  snapshot_value.checksum == 0U &&
+                                  snapshot_value.received_checksum == 0U &&
+                                  snapshot_value.previous_value ==
+                                      high_byte(snapshot_value.address) &&
+                                  pending_data_is_zero;
+        break;
+    case Phase::ReadConfirmOne:
+    case Phase::ReadConfirmTwo:
+    case Phase::ReadConfirmHigh:
+    case Phase::ReadConfirmLow:
+        semantic_state_is_valid = snapshot_value.valid_sector == address_is_valid &&
+                                  !snapshot_value.pending_write_valid &&
+                                  snapshot_value.data_index == 0U &&
+                                  snapshot_value.checksum == address_checksum &&
+                                  snapshot_value.received_checksum == 0U &&
+                                  snapshot_value.previous_value == low_byte(snapshot_value.address) &&
+                                  pending_data_is_zero;
+        break;
+    case Phase::ReadData:
+        // A ReadData state is only reachable after the card has confirmed an
+        // in-range sector. This predicate is deliberately stronger than the
+        // bounds check in exchange(): a forged snapshot cannot defer an OOB
+        // decision until the next byte clocks.
+        semantic_state_is_valid = address_is_valid && snapshot_value.valid_sector &&
+                                  !snapshot_value.pending_write_valid &&
+                                  snapshot_value.received_checksum == 0U &&
+                                  snapshot_value.previous_value == low_byte(snapshot_value.address) &&
+                                  pending_data_is_zero &&
+                                  snapshot_value.checksum == read_checksum(snapshot_value.data_index);
+        break;
+    case Phase::ReadChecksum:
+    case Phase::ReadEnd:
+        semantic_state_is_valid = address_is_valid && snapshot_value.valid_sector &&
+                                  !snapshot_value.pending_write_valid &&
+                                  snapshot_value.data_index == 127U &&
+                                  snapshot_value.received_checksum == 0U &&
+                                  snapshot_value.previous_value == low_byte(snapshot_value.address) &&
+                                  pending_data_is_zero &&
+                                  snapshot_value.checksum == read_checksum(kSectorSize);
+        break;
+    case Phase::WriteData: {
+        const std::size_t completed_bytes = snapshot_value.data_index;
+        const std::uint8_t expected_previous =
+            completed_bytes == 0U
+                ? low_byte(snapshot_value.address)
+                : snapshot_value.pending_data[completed_bytes - 1U];
+        semantic_state_is_valid = snapshot_value.valid_sector == address_is_valid &&
+                                  snapshot_value.pending_write_valid == address_is_valid &&
+                                  snapshot_value.received_checksum == 0U &&
+                                  snapshot_value.previous_value == expected_previous &&
+                                  pending_tail_is_zero(completed_bytes) &&
+                                  snapshot_value.checksum == write_checksum(completed_bytes);
+        break;
+    }
+    case Phase::WriteChecksum:
+        semantic_state_is_valid = snapshot_value.valid_sector == address_is_valid &&
+                                  snapshot_value.pending_write_valid == address_is_valid &&
+                                  snapshot_value.data_index == 127U &&
+                                  snapshot_value.received_checksum == 0U &&
+                                  snapshot_value.previous_value == snapshot_value.pending_data.back() &&
+                                  snapshot_value.checksum == write_checksum(kSectorSize);
+        break;
+    case Phase::WriteConfirmOne:
+    case Phase::WriteConfirmTwo:
+    case Phase::WriteEnd: {
+        const bool checksum_matches =
+            snapshot_value.received_checksum == snapshot_value.checksum;
+        semantic_state_is_valid = snapshot_value.valid_sector == address_is_valid &&
+                                  snapshot_value.pending_write_valid ==
+                                      (address_is_valid && checksum_matches) &&
+                                  snapshot_value.data_index == 127U &&
+                                  snapshot_value.previous_value == snapshot_value.received_checksum &&
+                                  snapshot_value.checksum == write_checksum(kSectorSize) &&
+                                  (!address_is_valid || checksum_matches ||
+                                   (snapshot_value.flag & 0x04U) != 0U);
+        break;
+    }
+    case Phase::Done: {
+        const bool completed_invalid_read =
+            !address_is_valid && !snapshot_value.valid_sector &&
+            !snapshot_value.pending_write_valid && snapshot_value.data_index == 0U &&
+            snapshot_value.checksum == address_checksum &&
+            snapshot_value.received_checksum == 0U &&
+            snapshot_value.previous_value == low_byte(snapshot_value.address) &&
+            pending_data_is_zero;
+        const bool completed_read =
+            address_is_valid && snapshot_value.valid_sector &&
+            !snapshot_value.pending_write_valid && snapshot_value.data_index == 127U &&
+            snapshot_value.checksum == read_checksum(kSectorSize) &&
+            snapshot_value.received_checksum == 0U &&
+            snapshot_value.previous_value == low_byte(snapshot_value.address) &&
+            pending_data_is_zero;
+        const bool checksum_matches =
+            snapshot_value.received_checksum == snapshot_value.checksum;
+        const bool completed_invalid_write =
+            !address_is_valid && !snapshot_value.valid_sector &&
+            !snapshot_value.pending_write_valid && snapshot_value.data_index == 127U &&
+            snapshot_value.previous_value == snapshot_value.received_checksum &&
+            snapshot_value.checksum == write_checksum(kSectorSize);
+        const bool committed_image_matches =
+            !address_is_valid || !checksum_matches ||
+            std::equal(snapshot_value.pending_data.begin(), snapshot_value.pending_data.end(),
+                       image_.begin() + static_cast<std::ptrdiff_t>(
+                                            static_cast<std::size_t>(snapshot_value.address) *
+                                            kSectorSize));
+        const bool completed_write =
+            address_is_valid && snapshot_value.valid_sector &&
+            !snapshot_value.pending_write_valid && snapshot_value.data_index == 127U &&
+            snapshot_value.previous_value == snapshot_value.received_checksum &&
+            snapshot_value.checksum == write_checksum(kSectorSize) &&
+            (!checksum_matches || (snapshot_value.flag & 0x08U) == 0U) &&
+            (!checksum_matches || committed_image_matches) &&
+            (!checksum_matches || (snapshot_value.flag & 0x04U) != 0U ||
+             committed_image_matches);
+        semantic_state_is_valid = transaction_is_zero || completed_invalid_read ||
+                                  completed_read || completed_invalid_write || completed_write;
+        break;
+    }
+    default:
+        semantic_state_is_valid = false;
+        break;
+    }
+    if (!semantic_state_is_valid) {
+        return false;
+    }
+
     const MemoryCardSnapshot before = snapshot();
     phase_ = static_cast<Phase>(snapshot_value.phase);
     selected_ = snapshot_value.selected;
@@ -1095,6 +1399,10 @@ bool Sio0::validate_mmio(std::uint32_t offset,
 }
 
 bool Sio0::advance_to(Cycle cycle) noexcept {
+    if (cycle == kNoEventCycle) {
+        last_error_ = MmioError::CycleOverflow;
+        return false;
+    }
     if (cycle < cycle_) {
         last_error_ = MmioError::TimeWentBackwards;
         return false;
@@ -1119,7 +1427,9 @@ bool Sio0::advance_to(Cycle cycle) noexcept {
         // A pulse ending at the exact byte-completion cycle no longer
         // overlaps an acknowledgement scheduled by that byte.
         if (dsr_ && ack_until_ == next) {
-            expire_ack();
+            if (!expire_ack() && event_error == MmioError::None) {
+                event_error = last_error_;
+            }
         }
         if (shift_active_ && shift_complete_ == next) {
             if (!complete_transfer() && event_error == MmioError::None) {
@@ -1132,6 +1442,11 @@ bool Sio0::advance_to(Cycle cycle) noexcept {
     }
     advance_baud_timer(cycle - cycle_);
     cycle_ = cycle;
+    for (const Slot& slot : slots_) {
+        if (slot.controller != nullptr) {
+            slot.controller->advance_to(cycle);
+        }
+    }
     update_irq();
     if (event_error != MmioError::None) {
         last_error_ = event_error;
@@ -1386,7 +1701,10 @@ bool Sio0::tx_can_start() const noexcept {
 }
 
 bool Sio0::try_start_transfer() noexcept {
-    if (shift_active_ || !tx_can_start()) {
+    // /ACK is the peripheral's request to clock another byte. The hardware
+    // does not begin the next synchronous byte while the request is pending
+    // or while the active-low pulse is asserted.
+    if (shift_active_ || ack_pending_ || dsr_ || !tx_can_start()) {
         return true;
     }
     if (!queued_transfer_window_fits()) {
@@ -1414,16 +1732,22 @@ bool Sio0::schedule_ack(const ByteTransfer& transfer) noexcept {
                             ? kDefaultAckPulseCycles
                             : transfer.acknowledge_width;
     if (!event_time_fits(cycle_, delay)) {
+        ack_begin_ = 0;
+        ack_until_ = 0;
+        ack_delay_ = 0;
         last_error_ = MmioError::CycleOverflow;
         return false;
     }
     ack_begin_ = cycle_ + delay;
     if (!event_time_fits(ack_begin_, std::max<Cycle>(width, 1U))) {
         ack_begin_ = 0;
+        ack_until_ = 0;
+        ack_delay_ = 0;
         last_error_ = MmioError::CycleOverflow;
         return false;
     }
     ack_until_ = ack_begin_ + std::max<Cycle>(width, 1U);
+    ack_delay_ = delay;
     ack_pending_ = true;
     return true;
 }
@@ -1434,11 +1758,14 @@ void Sio0::begin_ack() noexcept {
     update_irq();
 }
 
-void Sio0::expire_ack() noexcept {
+bool Sio0::expire_ack() noexcept {
     dsr_ = false;
     ack_begin_ = 0;
     ack_until_ = 0;
+    ack_delay_ = 0;
+    const bool next_started = try_start_transfer();
     update_irq();
+    return next_started;
 }
 
 bool Sio0::complete_transfer() noexcept {
@@ -1538,6 +1865,7 @@ void Sio0::end_bus_select(Cycle cycle) noexcept {
     dsr_ = false;
     ack_begin_ = 0;
     ack_until_ = 0;
+    ack_delay_ = 0;
 }
 
 void Sio0::apply_control(std::uint16_t value, Cycle cycle) noexcept {
@@ -1794,6 +2122,7 @@ void Sio0::reset(Cycle cycle) noexcept {
     baud_timer_value_ = 0;
     ack_begin_ = 0;
     ack_until_ = 0;
+    ack_delay_ = 0;
     mode_ = 0;
     control_ = 0;
     baud_ = 0;
@@ -1828,6 +2157,7 @@ SioSnapshot Sio0::snapshot() const noexcept {
     value.baud_timer_value = baud_timer_value_;
     value.ack_begin = ack_begin_;
     value.ack_until = ack_until_;
+    value.ack_delay = ack_delay_;
     value.mode = mode_;
     value.control = control_;
     value.baud = baud_;
@@ -1868,67 +2198,6 @@ bool Sio0::restore(const SioSnapshot& snapshot_value) noexcept {
     const bool target_selected = (snapshot_value.control & kControlDtr) != 0U;
     constexpr Cycle maximum_bit_period =
         static_cast<Cycle>(std::numeric_limits<std::uint16_t>::max()) * 64U;
-    constexpr Cycle maximum_baud_timer = maximum_bit_period / 2U;
-    const bool valid_shift = snapshot_value.shift_active
-                                 ? snapshot_value.tx_count != 0U &&
-                                        snapshot_value.shift_bit_period != 0U &&
-                                        snapshot_value.shift_bit_period <= maximum_bit_period &&
-                                        snapshot_value.shift_complete > snapshot_value.cycle &&
-                                        snapshot_value.shift_complete - snapshot_value.cycle <=
-                                            snapshot_value.shift_bit_period * 8U &&
-                                        event_time_fits(snapshot_value.shift_complete,
-                                                        kMaximumAckLeadCycles)
-                                 : snapshot_value.shift_bit_period == 0U &&
-                                        snapshot_value.shift_complete <= snapshot_value.cycle;
-    const bool valid_baud_timer = snapshot_value.baud_timer_running
-                                      ? snapshot_value.baud_timer_value != 0U &&
-                                            snapshot_value.baud_timer_value <= maximum_baud_timer
-                                      : snapshot_value.baud_timer_value == 0U;
-    const bool active_can_ack = snapshot_value.active_device != DeviceKind::None &&
-                                !snapshot_value.addressing;
-    const bool valid_ack = snapshot_value.ack_pending
-                                      ? !snapshot_value.dsr && target_selected && active_can_ack &&
-                                      snapshot_value.ack_begin > snapshot_value.cycle &&
-                                      snapshot_value.ack_until > snapshot_value.ack_begin &&
-                                      snapshot_value.ack_until < kNoEventCycle
-                               : snapshot_value.dsr
-                                      ? target_selected && active_can_ack &&
-                                            snapshot_value.ack_begin <= snapshot_value.cycle &&
-                                            snapshot_value.ack_until > snapshot_value.cycle &&
-                                            snapshot_value.ack_until < kNoEventCycle
-                                      : snapshot_value.ack_begin == 0U &&
-                                            snapshot_value.ack_until == 0U;
-    const bool valid_selection = target_selected
-                                      ? (snapshot_value.addressing
-                                             ? snapshot_value.active_device == DeviceKind::None
-                                             : true)
-                                      : snapshot_value.addressing &&
-                                            snapshot_value.active_device == DeviceKind::None &&
-                                            !snapshot_value.ack_pending && !snapshot_value.dsr;
-    if (snapshot_value.tx_head >= kTxCapacity || snapshot_value.tx_count > kTxCapacity ||
-        snapshot_value.rx_head >= kRxCapacity || snapshot_value.rx_count > kRxCapacity ||
-         !valid_port(snapshot_value.selected_port) || !valid_device_kind ||
-         snapshot_value.selected_port != control_port ||
-         (snapshot_value.control & static_cast<std::uint16_t>(~supported_control)) != 0U ||
-         (snapshot_value.mode & static_cast<std::uint16_t>(~kSio0ModeWritableMask)) != 0U ||
-         !valid_shift || !valid_baud_timer || !valid_ack ||
-         !valid_selection ||
-         (!snapshot_value.shift_active && snapshot_value.tx_count > 1U) ||
-         (snapshot_value.device_conflict &&
-          (!target_selected || snapshot_value.addressing ||
-           snapshot_value.active_device != DeviceKind::None)) ||
-        (snapshot_value.forced_receive &&
-         (snapshot_value.control & kControlRxEnable) == 0U)) {
-        last_error_ = MmioError::SnapshotInvalid;
-        return false;
-    }
-    if (target_selected &&
-        device_for(snapshot_value.selected_port, snapshot_value.active_device) == nullptr &&
-        snapshot_value.active_device != DeviceKind::None) {
-        last_error_ = MmioError::NoDevice;
-        return false;
-    }
-
     const auto snapshot_factor = [&snapshot_value]() noexcept -> Cycle {
         switch (snapshot_value.mode & kModeFactorMask) {
         case 2U:
@@ -1946,6 +2215,88 @@ bool Sio0::restore(const SioSnapshot& snapshot_value) noexcept {
         (snapshot_value.mode & kModeLengthMask) == kModeLengthMask &&
         (snapshot_value.mode & kModeParityEnable) == 0U &&
         (snapshot_value.mode & kModeClockPolarity) == 0U;
+    const Cycle snapshot_baud_reload = std::max<Cycle>(snapshot_bit_period / 2U, 1U);
+    const bool valid_shift = snapshot_value.shift_active
+                                 ? snapshot_value.tx_count != 0U &&
+                                        snapshot_mode_supported &&
+                                        snapshot_value.shift_bit_period == snapshot_bit_period &&
+                                        snapshot_value.shift_bit_period <= maximum_bit_period &&
+                                        snapshot_value.shift_complete > snapshot_value.cycle &&
+                                        snapshot_value.shift_complete - snapshot_value.cycle <=
+                                            snapshot_value.shift_bit_period * 8U &&
+                                        event_time_fits(snapshot_value.shift_complete,
+                                                        kMaximumAckLeadCycles)
+                                 : snapshot_value.shift_bit_period == 0U &&
+                                        snapshot_value.shift_complete <= snapshot_value.cycle;
+    const bool valid_baud_timer = snapshot_value.baud_timer_running
+                                      ? snapshot_value.baud_timer_value != 0U &&
+                                            snapshot_value.baud_timer_value <= snapshot_baud_reload
+                                      : snapshot_value.baud_timer_value == 0U;
+    const bool active_can_ack = snapshot_value.active_device != DeviceKind::None &&
+                                !snapshot_value.addressing;
+    const Cycle maximum_ack_delay = snapshot_value.active_device == DeviceKind::MemoryCard
+                                        ? kMemoryCardAckDelayCycles +
+                                              kMemoryCardReadLateAckExtraCycles
+                                        : kControllerAckDelayCycles;
+    const bool valid_ack_window =
+        snapshot_value.ack_until > snapshot_value.ack_begin &&
+        snapshot_value.ack_until - snapshot_value.ack_begin == kAckPulseCycles &&
+        snapshot_value.ack_until < kNoEventCycle;
+    const bool valid_ack_delay =
+        (snapshot_value.active_device == DeviceKind::Controller &&
+         snapshot_value.ack_delay == kControllerAckDelayCycles) ||
+        (snapshot_value.active_device == DeviceKind::MemoryCard &&
+         (snapshot_value.ack_delay == kMemoryCardAckDelayCycles ||
+          snapshot_value.ack_delay ==
+              kMemoryCardAckDelayCycles + kMemoryCardReadLateAckExtraCycles));
+    const bool valid_ack = snapshot_value.ack_pending
+                                      ? !snapshot_value.dsr && target_selected && active_can_ack &&
+                                      valid_ack_delay &&
+                                      snapshot_value.ack_begin > snapshot_value.cycle &&
+                                      snapshot_value.ack_begin - snapshot_value.cycle <=
+                                          maximum_ack_delay &&
+                                      valid_ack_window
+                               : snapshot_value.dsr
+                                      ? target_selected && active_can_ack &&
+                                            valid_ack_delay &&
+                                            snapshot_value.ack_begin <= snapshot_value.cycle &&
+                                            snapshot_value.ack_until > snapshot_value.cycle &&
+                                            valid_ack_window
+                                      : snapshot_value.ack_begin == 0U &&
+                                            snapshot_value.ack_until == 0U &&
+                                            snapshot_value.ack_delay == 0U;
+    const bool valid_selection = target_selected
+                                      ? (snapshot_value.addressing
+                                             ? snapshot_value.active_device == DeviceKind::None
+                                             : true)
+                                      : snapshot_value.addressing &&
+                                            snapshot_value.active_device == DeviceKind::None &&
+                                            !snapshot_value.ack_pending && !snapshot_value.dsr;
+    if (snapshot_value.cycle == kNoEventCycle || snapshot_value.tx_head >= kTxCapacity ||
+        snapshot_value.tx_count > kTxCapacity ||
+        snapshot_value.rx_head >= kRxCapacity || snapshot_value.rx_count > kRxCapacity ||
+         !valid_port(snapshot_value.selected_port) || !valid_device_kind ||
+         snapshot_value.selected_port != control_port ||
+         (snapshot_value.control & static_cast<std::uint16_t>(~supported_control)) != 0U ||
+         (snapshot_value.mode & static_cast<std::uint16_t>(~kSio0ModeWritableMask)) != 0U ||
+         !valid_shift || !valid_baud_timer || !valid_ack ||
+         !valid_selection ||
+         (!snapshot_value.shift_active && snapshot_value.tx_count > 1U) ||
+         snapshot_value.device_conflict || snapshot_value.ack_collision ||
+         snapshot_value.parity_error || snapshot_value.bad_stop ||
+         (snapshot_value.rx_overrun && snapshot_value.rx_count != kRxCapacity) ||
+        (snapshot_value.forced_receive &&
+         (snapshot_value.control & kControlRxEnable) == 0U)) {
+        last_error_ = MmioError::SnapshotInvalid;
+        return false;
+    }
+    if (target_selected &&
+        device_for(snapshot_value.selected_port, snapshot_value.active_device) == nullptr &&
+        snapshot_value.active_device != DeviceKind::None) {
+        last_error_ = MmioError::NoDevice;
+        return false;
+    }
+
     bool queued_window_valid = true;
     if (snapshot_mode_supported && snapshot_value.tx_count != 0U) {
         Cycle start = snapshot_value.cycle;
@@ -2004,6 +2355,7 @@ bool Sio0::restore(const SioSnapshot& snapshot_value) noexcept {
     baud_timer_value_ = snapshot_value.baud_timer_value;
     ack_begin_ = snapshot_value.ack_begin;
     ack_until_ = snapshot_value.ack_until;
+    ack_delay_ = snapshot_value.ack_delay;
     mode_ = snapshot_value.mode;
     control_ = snapshot_value.control;
     baud_ = snapshot_value.baud;

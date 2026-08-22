@@ -1,0 +1,4585 @@
+{
+  "classification": "external permitted asset metadata; replacement-key semantics require independent runtime validation",
+  "duplicate_payloads": [
+    {
+      "keys": [
+        "d281cf44-2a49f962",
+        "d281cf44-c7f17a42"
+      ],
+      "sha256": "219b8e6e0e599301f5f0a75ace7f6de4cb5a2f09a1d8d0bd38b511ca2d7b9a9f"
+    },
+    {
+      "keys": [
+        "9baf7823-1749a14f",
+        "9baf7823-faf1226f"
+      ],
+      "sha256": "3e2fccf2acb100512a3851b0c16f1c9f5c8de1aa81c37a1bc66102e3ebb7c293"
+    },
+    {
+      "keys": [
+        "2e50440e-29c8ca64",
+        "2e50440e-c94a357b"
+      ],
+      "sha256": "4f5127d71f2436e79bc036a86d062924b2f5863f156483440e28a1af4a9d7d4f"
+    },
+    {
+      "keys": [
+        "6db36176-5344422c",
+        "6db36176-befcc10c"
+      ],
+      "sha256": "6625067d37baa6e0142598cc07b947ad942f705e771c3007d828c19b781cd827"
+    },
+    {
+      "keys": [
+        "a829386f-611a189e",
+        "a829386f-8ca29bbe"
+      ],
+      "sha256": "7ca2eb9ab5cbc5f8cf6bca2fb75a68901b8f4ded23b3a08ca49df2e970644de7"
+    },
+    {
+      "keys": [
+        "742fa76f-383d5fe3",
+        "742fa76f-d8bfa0fc"
+      ],
+      "sha256": "7eb688438b26c1b4b123feb8cb1c2a053472a26d83107bb6e608dba8b995865f"
+    },
+    {
+      "keys": [
+        "2e50440e-56289c8d",
+        "2e50440e-b6aa6392"
+      ],
+      "sha256": "9573a85884342fb4561b65a23ae38e9ce8629c720c9d27873560cfb862d7f896"
+    },
+    {
+      "keys": [
+        "416c9fa-70883050",
+        "416c9fa-9d30b370"
+      ],
+      "sha256": "a8dcb4bf4587063fdaa4cf5cb0b8ba73381be0ef41fc8516bd45adf533876792"
+    },
+    {
+      "keys": [
+        "bda80a4e-3795a37",
+        "bda80a4e-e962f81b"
+      ],
+      "sha256": "b0720bb6f8d1b48659396b7270d96984d6f0d2ab42137f0b1b5b5edf55ca7ef9"
+    },
+    {
+      "keys": [
+        "f699cd0b-1f3fb8ac",
+        "f699cd0b-f2873b8c"
+      ],
+      "sha256": "b32abe98024625f2d5c3ba346d7696fd2068df94ce4b1cf4a5276c9790004f50"
+    },
+    {
+      "keys": [
+        "8609555d-5b7c09f7",
+        "8609555d-a51479e2"
+      ],
+      "sha256": "b529b2b2f8ea26cc15838101a052f1a2d1bc2772507ce91233aea0668122f190"
+    },
+    {
+      "keys": [
+        "15a2f5b1-30f5f515",
+        "15a2f5b1-dd4d7635"
+      ],
+      "sha256": "b7e02651a32f9c6ab456dae93fcbd559e6053c1c957596865085593dc5dbf44f"
+    }
+  ],
+  "mapping_count": 390,
+  "missing_mapping_count": 98,
+  "missing_mappings": [
+    {
+      "key": "17967c70-a45085b7",
+      "logical_path": "In Game/Billboards/18 - LS102-MG71/AG-S.png"
+    },
+    {
+      "key": "17970de9-cbccbc4",
+      "logical_path": "Main Menu/Team/Ship/8 - Icaras/Droid.png"
+    },
+    {
+      "key": "18698b0-836168c4",
+      "logical_path": "In Game/Billboards/18 - LS102-MG71/Assegai.png"
+    },
+    {
+      "key": "18e446ff-d7224eb2",
+      "logical_path": "Main Menu/Team/Ship/6 - AG-S/Drag.png"
+    },
+    {
+      "key": "190425d-7e2a304a",
+      "logical_path": "Main Menu/Team/Ship/7 - Assegai/Standard/Frame1.png"
+    },
+    {
+      "key": "1a96f88a-d1c7a23c",
+      "logical_path": "In Game/Ships/3 - Auricom/VR/Grey.png"
+    },
+    {
+      "key": "1abf97a6-14b7a9e0",
+      "logical_path": "In Game/Ships/2 - Goteki 45/VR/Pastel Orange.png"
+    },
+    {
+      "key": "1ce62a77-8ea1b423",
+      "logical_path": "Main Menu/Team/Ship/3 - Auricom/Standard/Frame3.png"
+    },
+    {
+      "key": "1da23834-3305166",
+      "logical_path": "In Game/Billboards/20 - LS104-AW73/Goteki 45.png"
+    },
+    {
+      "key": "1e1b3e5e-125f678d",
+      "logical_path": "Main Menu/Team/Ship/1 - FEISAR/Droid.png"
+    },
+    {
+      "key": "1e680ea0-8a735387",
+      "logical_path": "In Game/Billboards/19 - LS103-AW72/Pirhana.png"
+    },
+    {
+      "key": "23be67e0-c006fee8",
+      "logical_path": "Main Menu/Team/Ship/7 - Assegai/Standard/Frame2.png"
+    },
+    {
+      "key": "2519ab24-69e14b88",
+      "logical_path": "In Game/Billboards/18 - LS102-MG71/Icaras.png"
+    },
+    {
+      "key": "29a07dd-cd19c33c",
+      "logical_path": "Main Menu/Team/Ship/7 - Assegai/Droid.png"
+    },
+    {
+      "key": "29ab835-9395e44d",
+      "logical_path": "In Game/Billboards/18 - LS102-MG71/Goteki 45.png"
+    },
+    {
+      "key": "2e206169-ef35d018",
+      "logical_path": "In Game/Ships/3 - Auricom/VR/Blue.png"
+    },
+    {
+      "key": "2feeb4bd-d39cb3d2",
+      "logical_path": "In Game/Ships/3 - Auricom/VR/Blue-Grey 1.png"
+    },
+    {
+      "key": "30a03480-6513d5e1",
+      "logical_path": "In Game/Billboards/17 - LS101-NP62/Pirhana.png"
+    },
+    {
+      "key": "31d0a5e4-3b4cdd97",
+      "logical_path": "Main Menu/Team/Ship/4 - Pirhana/Standard/Frame1.png"
+    },
+    {
+      "key": "327cdef0-470e1cb4",
+      "logical_path": "Main Menu/Team/Ship/8 - Icaras/Standard/Frame2.png"
+    },
+    {
+      "key": "32aed7f2-13647f70",
+      "logical_path": "Main Menu/Team/Ship/3 - Auricom/Standard/Frame2.png"
+    },
+    {
+      "key": "32ca58d6-141416b",
+      "logical_path": "Main Menu/Team/Ship/2 - Goteki 45/Drag.png"
+    },
+    {
+      "key": "371d0f7d-4a108815",
+      "logical_path": "Main Menu/Team/Ship/2 - Goteki 45/Standard/Frame2.png"
+    },
+    {
+      "key": "3f930daa-4a59c2e1",
+      "logical_path": "In Game/Ships/5 - Qirex/VR/Cyan.png"
+    },
+    {
+      "key": "41685e31-a02f57e6",
+      "logical_path": "Main Menu/Team/Ship/5 - Qirex/Drag.png"
+    },
+    {
+      "key": "41865946-fa25ad0a",
+      "logical_path": "In Game/Tracks/Rescue Droid/Part 3.png"
+    },
+    {
+      "key": "439166ea-cade23ae",
+      "logical_path": "In Game/Tracks/Rescue Droid/Part 1.png"
+    },
+    {
+      "key": "44b88a66-b5285ab1",
+      "logical_path": "In Game/Billboards/19 - LS103-AW72/AG-S.png"
+    },
+    {
+      "key": "47cc70e0-732c03af",
+      "logical_path": "Main Menu/Team/Ship/4 - Pirhana/Drag.png"
+    },
+    {
+      "key": "4f6afec4-bcb03d85",
+      "logical_path": "In Game/Ships/4 - Pirhana/VR/Red.png"
+    },
+    {
+      "key": "53574549-ca822682",
+      "logical_path": "Main Menu/Team/Ship/2 - Goteki 45/Droid.png"
+    },
+    {
+      "key": "59463d82-6396013b",
+      "logical_path": "In Game/Ships/8 - Icaras/VR/Dark Pink.png"
+    },
+    {
+      "key": "5972482c-659517d2",
+      "logical_path": "In Game/Billboards/17 - LS101-NP62/Icaras.png"
+    },
+    {
+      "key": "5c06bff8-88147a97",
+      "logical_path": "In Game/Ships/6 - AG-S/VR/White.png"
+    },
+    {
+      "key": "6337b31f-8b9142f8",
+      "logical_path": "In Game/Ships/1 - FEISAR/VR/Turquoise.png"
+    },
+    {
+      "key": "655d047a-4fde5fa",
+      "logical_path": "In Game/Billboards/20 - LS104-AW73/Icaras.png"
+    },
+    {
+      "key": "68f17c9d-77998795",
+      "logical_path": "Main Menu/Team/Ship/5 - Qirex/Standard/Frame2.png"
+    },
+    {
+      "key": "6b34a406-13f7d6af",
+      "logical_path": "Main Menu/Team/Ship/1 - FEISAR/Standard/Frame2.png"
+    },
+    {
+      "key": "6b7038cd-ea742122",
+      "logical_path": "Main Menu/Team/Ship/1 - FEISAR/Drag.png"
+    },
+    {
+      "key": "6f3fec58-f5fb608e",
+      "logical_path": "In Game/Billboards/19 - LS103-AW72/The Designers Republic.png"
+    },
+    {
+      "key": "755a8917-9aed1d59",
+      "logical_path": "Main Menu/Team/Ship/4 - Pirhana/Standard/Frame3.png"
+    },
+    {
+      "key": "7776aa4f-f571dd3a",
+      "logical_path": "Main Menu/Team/Ship/7 - Assegai/Drag.png"
+    },
+    {
+      "key": "791b0d5e-4e826174",
+      "logical_path": "Main Menu/Team/Ship/1 - FEISAR/Standard/Frame1.png"
+    },
+    {
+      "key": "7c3085ca-2a9e7d32",
+      "logical_path": "In Game/Billboards/17 - LS101-NP62/The Designers Republic.png"
+    },
+    {
+      "key": "7d8539ed-d0d35b9e",
+      "logical_path": "Main Menu/Team/Ship/6 - AG-S/Droid.png"
+    },
+    {
+      "key": "81cdf3a1-4346addf",
+      "logical_path": "In Game/Billboards/20 - LS104-AW73/Pirhana.png"
+    },
+    {
+      "key": "830c0a85-ab97002e",
+      "logical_path": "Main Menu/Team/Ship/4 - Pirhana/Standard/Frame2.png"
+    },
+    {
+      "key": "83edb773-bc449e6d",
+      "logical_path": "In Game/Billboards/20 - LS104-AW73/AG-S.png"
+    },
+    {
+      "key": "8465b60-990ddc2",
+      "logical_path": "Main Menu/Team/Ship/3 - Auricom/Droid.png"
+    },
+    {
+      "key": "85fdc353-29f543bf",
+      "logical_path": "In Game/Billboards/20 - LS104-AW73/FEISAR.png"
+    },
+    {
+      "key": "8821d431-237d44ee",
+      "logical_path": "In Game/Ships/6 - AG-S/VR/Red.png"
+    },
+    {
+      "key": "8821d431-7d049ef2",
+      "logical_path": "In Game/Ships/7 - Assegai/VR/Khaki.png"
+    },
+    {
+      "key": "88c04895-b0cfe605",
+      "logical_path": "Main Menu/Team/Ship/8 - Icaras/Standard/Frame1.png"
+    },
+    {
+      "key": "96a9d2e6-81e343cb",
+      "logical_path": "Main Menu/Team/Ship/3 - Auricom/Standard/Frame1.png"
+    },
+    {
+      "key": "9712466-6c6f25c",
+      "logical_path": "In Game/Tracks/Rescue Droid/Part 2.png"
+    },
+    {
+      "key": "974c76ce-84fb38b1",
+      "logical_path": "Main Menu/Team/Ship/6 - AG-S/Standard/Frame2.png"
+    },
+    {
+      "key": "978d8556-9121c5bb",
+      "logical_path": "In Game/Billboards/17 - LS101-NP62/FEISAR.png"
+    },
+    {
+      "key": "a12340c5-e708a24e",
+      "logical_path": "Main Menu/Team/Ship/1 - FEISAR/Standard/Frame3.png"
+    },
+    {
+      "key": "a7186b82-62aa978b",
+      "logical_path": "In Game/Ships/1 - FEISAR/VR/Cyan-Grey.png"
+    },
+    {
+      "key": "a9f9c1de-79606c05",
+      "logical_path": "Main Menu/Team/Ship/6 - AG-S/Standard/Frame1.png"
+    },
+    {
+      "key": "aa8fd01-822caac7",
+      "logical_path": "In Game/Billboards/18 - LS102-MG71/Pirhana.png"
+    },
+    {
+      "key": "ab0782f4-45ae8b48",
+      "logical_path": "In Game/Tracks/Rescue Droid/Propeller 3.png"
+    },
+    {
+      "key": "b5236a84-99ea20a0",
+      "logical_path": "In Game/Ships/4 - Pirhana/VR/Yellow.png"
+    },
+    {
+      "key": "b6ed0a89-55f2e9a",
+      "logical_path": "Main Menu/Team/Ship/5 - Qirex/Droid.png"
+    },
+    {
+      "key": "b6f3d7ec-19ec6904",
+      "logical_path": "In Game/Billboards/17 - LS101-NP62/Goteki 45.png"
+    },
+    {
+      "key": "ba625780-5387b4fb",
+      "logical_path": "In Game/Ships/1 - FEISAR/VR/Yellow.png"
+    },
+    {
+      "key": "bbfd1839-13ca6419",
+      "logical_path": "In Game/Billboards/17 - LS101-NP62/AG-S.png"
+    },
+    {
+      "key": "bc1c1ad0-9085e5c1",
+      "logical_path": "Main Menu/Team/Ship/8 - Icaras/Drag.png"
+    },
+    {
+      "key": "be29d9e8-d35dede7",
+      "logical_path": "In Game/Tracks/Rescue Droid/Propeller 4.png"
+    },
+    {
+      "key": "c0dd79d4-eacae820",
+      "logical_path": "Main Menu/Team/Ship/3 - Auricom/Drag.png"
+    },
+    {
+      "key": "c2826a85-32a6075a",
+      "logical_path": "Main Menu/Team/Ship/4 - Pirhana/Droid.png"
+    },
+    {
+      "key": "c5e357d0-f3e7211d",
+      "logical_path": "In Game/Ships/3 - Auricom/VR/Blue-Grey 2.png"
+    },
+    {
+      "key": "cedfcf83-55de3a01",
+      "logical_path": "In Game/Ships/8 - Icaras/VR/Dark Orange.png"
+    },
+    {
+      "key": "cf5317e5-8710ac59",
+      "logical_path": "Main Menu/Team/Ship/5 - Qirex/Standard/Frame3.png"
+    },
+    {
+      "key": "d053154b-dc368212",
+      "logical_path": "In Game/Billboards/17 - LS101-NP62/Assegai.png"
+    },
+    {
+      "key": "d343c167-59e5424e",
+      "logical_path": "In Game/Ships/8 - Icaras/VR/Light Pink.png"
+    },
+    {
+      "key": "d3676a9-f51a355",
+      "logical_path": "In Game/Ships/5 - Qirex/VR/Purple.png"
+    },
+    {
+      "key": "d7ef67ed-6e9a1a9f",
+      "logical_path": "In Game/Billboards/18 - LS102-MG71/The Designers Republic.png"
+    },
+    {
+      "key": "d7ef67ed-b40e87cd",
+      "logical_path": "In Game/Billboards/20 - LS104-AW73/The Designers Republic.png"
+    },
+    {
+      "key": "d8457c49-f8e6ed40",
+      "logical_path": "Main Menu/Team/Ship/6 - AG-S/Standard/Frame3.png"
+    },
+    {
+      "key": "d84cc5f3-de0692ab",
+      "logical_path": "In Game/Tracks/Rescue Droid/Part 5.png"
+    },
+    {
+      "key": "e53c49be-330e59b5",
+      "logical_path": "In Game/Billboards/20 - LS104-AW73/Auricom.png"
+    },
+    {
+      "key": "e5e06b8e-124922da",
+      "logical_path": "Main Menu/Team/Ship/7 - Assegai/Standard/Frame3.png"
+    },
+    {
+      "key": "e7e6e922-45ae8b48",
+      "logical_path": "In Game/Tracks/Rescue Droid/Propeller 2.png"
+    },
+    {
+      "key": "e7ecb387-a90390ea",
+      "logical_path": "In Game/Billboards/18 - LS102-MG71/Auricom.png"
+    },
+    {
+      "key": "e80579b1-7671840a",
+      "logical_path": "In Game/Ships/7 - Assegai/VR/Khaki-Cyan.png"
+    },
+    {
+      "key": "e8c7ab77-d5cc51b0",
+      "logical_path": "Main Menu/Team/Ship/2 - Goteki 45/Standard/Frame3.png"
+    },
+    {
+      "key": "ea286c63-cee6761c",
+      "logical_path": "In Game/Ships/8 - Icaras/VR/Dark Orange-Dark Pink.png"
+    },
+    {
+      "key": "eda9c80d-6175ad96",
+      "logical_path": "In Game/Billboards/18 - LS102-MG71/FEISAR.png"
+    },
+    {
+      "key": "f11c9ba8-216e833a",
+      "logical_path": "In Game/Billboards/19 - LS103-AW72/Goteki 45.png"
+    },
+    {
+      "key": "f1b8d574-bc1a24e8",
+      "logical_path": "In Game/Billboards/17 - LS101-NP62/Auricom.png"
+    },
+    {
+      "key": "f1ba9531-e0400610",
+      "logical_path": "Main Menu/Team/Ship/2 - Goteki 45/Standard/Frame1.png"
+    },
+    {
+      "key": "f3c3a387-5044d6a4",
+      "logical_path": "In Game/Ships/1 - FEISAR/VR/Turquoise-Yellow.png"
+    },
+    {
+      "key": "f40a7c9f-31cf5e8a",
+      "logical_path": "Main Menu/Team/Ship/8 - Icaras/Standard/Frame3.png"
+    },
+    {
+      "key": "f58b7896-45ae8b48",
+      "logical_path": "In Game/Tracks/Rescue Droid/Propeller 1.png"
+    },
+    {
+      "key": "f690a15a-b5b41ff0",
+      "logical_path": "Main Menu/Team/Ship/5 - Qirex/Standard/Frame1.png"
+    },
+    {
+      "key": "fccd643c-2d642c6b",
+      "logical_path": "In Game/Tracks/Rescue Droid/Part 4.png"
+    },
+    {
+      "key": "fd9b8f70-d9effc87",
+      "logical_path": "In Game/Billboards/19 - LS103-AW72/Assegai.png"
+    }
+  ],
+  "schema": "wo3se.external-texture-pack.v1",
+  "source": {
+    "commit": "039a0690448047401cef251594327a25fcc73fad",
+    "hashes_ini_sha256": "9cfb23b92d72bc1233a76958621ddae7ab049493a7d2651fdd1a12e1455e5c71",
+    "readme_sha256": "4f45f9a19adc526780fdd45cb740218f1eb84bbf51d3e6430049328cf049bee5",
+    "repository": "princepeter64/Wip3out-HD-Texture-Pack"
+  },
+  "status": "valid-partial-pack",
+  "texture_count": 292,
+  "textures": [
+    {
+      "file": "11b5d8d9-41d69974.png",
+      "key": "11b5d8d9-41d69974",
+      "logical_path": "Main Menu/Bar/Grey.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 112,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "1e1cbfe7130f25f771c5ef4a1dc22bf889adf27fb5dc0d041be9ab9290d797e1",
+      "size": 609
+    },
+    {
+      "file": "12c6abf2-cd89eec1.png",
+      "key": "12c6abf2-cd89eec1",
+      "logical_path": "Main Menu/Screen Text/Other/Arrow Right.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "38ba96c0801a0415972d3100b04b3756a80c90b17bfc03d1401f8bdf0aa0c0e2",
+      "size": 3187
+    },
+    {
+      "file": "15a2f5b1-30f5f515.png",
+      "key": "15a2f5b1-30f5f515",
+      "logical_path": "Main Menu/Medal/Challenge/Main Menu/Silver/F7200.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "b7e02651a32f9c6ab456dae93fcbd559e6053c1c957596865085593dc5dbf44f",
+      "size": 3517
+    },
+    {
+      "file": "15a2f5b1-dd4d7635.png",
+      "key": "15a2f5b1-dd4d7635",
+      "logical_path": "Main Menu/Medal/Challenge/In Game/Silver/F7200.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "b7e02651a32f9c6ab456dae93fcbd559e6053c1c957596865085593dc5dbf44f",
+      "size": 3517
+    },
+    {
+      "file": "15c1678d-97d07531.png",
+      "key": "15c1678d-97d07531",
+      "logical_path": "Main Menu/Track/Text/Classic League/Terramax.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "4a08b910918d7e91513676ab3b3a632e2ff8256ec8291bebf74fc1ba8342f297",
+      "size": 3299
+    },
+    {
+      "file": "165b417a-73930e96.png",
+      "key": "165b417a-73930e96",
+      "logical_path": "PlayStation BIOS/SCPH-5000/Logo R.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 1600
+      },
+      "sha256": "976c4f31cb88fd045b6e11078f67c6960211e0c0341c283fdd19742ced437b2a",
+      "size": 24406
+    },
+    {
+      "file": "185dd905-d9ca8374.png",
+      "key": "185dd905-d9ca8374",
+      "logical_path": "Main Menu/Team/Text/Wip3out/Ship/Shield.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 72,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "335d3fb118bdb9d1608826f44190f82428890b87ea88d33c799ed311fedf15c8",
+      "size": 2231
+    },
+    {
+      "file": "1a7388c3-d1fdf620.png",
+      "key": "1a7388c3-d1fdf620",
+      "logical_path": "Main Menu/Track/Class/Wip3out League/Mega Mall.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "3599bf9fd7455901f9214a0965686642f8b5b3220bb4a202ab4d19b246a9ac8e",
+      "size": 3083
+    },
+    {
+      "file": "1ab7e1a0-30872383.png",
+      "key": "1ab7e1a0-30872383",
+      "logical_path": "Main Menu/Team/Text/Wip3out/Number/02.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "b1f5d97e545a3a0d0d9b5086cf4f7f9cfb60cbded584e9fb2fbf8420660ef27f",
+      "size": 1288
+    },
+    {
+      "file": "1b38a555-43272ba2.png",
+      "key": "1b38a555-43272ba2",
+      "logical_path": "Main Menu/Track/Class/Wip3out League/Manor Top.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "cb01bef503430a5e3964e217973c076c3f68e0e5cb329f9725efc2b8f5fc748c",
+      "size": 3390
+    },
+    {
+      "file": "1fa0b453-bc2e80d2.png",
+      "key": "1fa0b453-bc2e80d2",
+      "logical_path": "PlayStation BIOS/Sony-1.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 2048
+      },
+      "sha256": "24255fc63d562a621f784db3d43e2237daca9cbeafb439d789d7422f73784eac",
+      "size": 15626
+    },
+    {
+      "file": "20b05d94-6c05fe45.png",
+      "key": "20b05d94-6c05fe45",
+      "logical_path": "Main Menu/Track/Class/Classic League/Terramax.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "926ad068d399a1731853873518c6f82be7aef828222da4fa86c075c89dffc43e",
+      "size": 2473
+    },
+    {
+      "file": "222d18d0-c757e695.png",
+      "key": "222d18d0-c757e695",
+      "logical_path": "Main Menu/Track/Class/Classic League/Arridos IV.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "0fa2f83891794598080531faf8661e8a273ff33fcd620ba7d240029dca07ed05",
+      "size": 2957
+    },
+    {
+      "file": "2239f140-fd909892.png",
+      "key": "2239f140-fd909892",
+      "logical_path": "Main Menu/Track/Class/Wip3out League/Terminal.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 352
+      },
+      "sha256": "b6a2f9be3f3924555a7234bcec9da3f96ee14471f7264bf960cfd1cddf06178b",
+      "size": 2113
+    },
+    {
+      "file": "23805160-d3669bd1.png",
+      "key": "23805160-d3669bd1",
+      "logical_path": "Main Menu/Team/Text/FEISAR.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "0fb878aa785793c8a49b8bad15fc4b57de78514ab958722afb6feeab86b54e60",
+      "size": 2154
+    },
+    {
+      "file": "2449f45a-4575a7af.png",
+      "key": "2449f45a-4575a7af",
+      "logical_path": "Main Menu/Screen Text/Mode/Time Trial.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "7d10a2d52dad800ecaa53ac24372b0b9c6788152b69b3dd49c2801a407ad40a4",
+      "size": 1988
+    },
+    {
+      "file": "254b8583-1fa05319.png",
+      "key": "254b8583-1fa05319",
+      "logical_path": "Main Menu/Track/Bar/Long/Track 6.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "a836dbe3e26bf5e16e368add3b11ffe4c988d63a4ef0422c1dc598b847514cc7",
+      "size": 2474
+    },
+    {
+      "file": "254b8583-25499ed5.png",
+      "key": "254b8583-25499ed5",
+      "logical_path": "Main Menu/Track/Bar/Long/Track 7.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "a8f2a6cfcdeafa846d0b09e06cf5d6044eb5d3c76dcc00c722cecb208604a82b",
+      "size": 2521
+    },
+    {
+      "file": "254b8583-38851370.png",
+      "key": "254b8583-38851370",
+      "logical_path": "Main Menu/Track/Bar/Short/Track 4.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "289ce8b468817bbe59df36c5b35d8a005028c8bee589d92d8e744bc5892191d8",
+      "size": 2414
+    },
+    {
+      "file": "254b8583-4ccdd642.png",
+      "key": "254b8583-4ccdd642",
+      "logical_path": "Main Menu/Track/Bar/Short/Track 5.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "905a79bf2bb12a86a00d27866dc614f024037ae3634bf694f13b5d4b91d99bad",
+      "size": 2528
+    },
+    {
+      "file": "254b8583-51f06245.png",
+      "key": "254b8583-51f06245",
+      "logical_path": "Main Menu/Track/Bar/Short/Track 1.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "86863484f77fec841d88205092ff6d82783f847e22705ec6f0356c593f4cdd8d",
+      "size": 2554
+    },
+    {
+      "file": "254b8583-5606eed2.png",
+      "key": "254b8583-5606eed2",
+      "logical_path": "Main Menu/Track/Bar/Short/Track 8.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "e8de140938264e3d9efe67d6620a25481b76c61e79dd13d24196c8ab966b81da",
+      "size": 2499
+    },
+    {
+      "file": "254b8583-71a6ef55.png",
+      "key": "254b8583-71a6ef55",
+      "logical_path": "Main Menu/Track/Bar/Long/Track 5.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "300a888d083ac38821dcffc82e49c5007d681054424e474fff11580d5f6d5319",
+      "size": 2528
+    },
+    {
+      "file": "254b8583-849258e3.png",
+      "key": "254b8583-849258e3",
+      "logical_path": "Main Menu/Track/Bar/Long/Track 3.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "5b66f7c5d6f09d82c26aac274c9dfcfbacded00a239385b3767c34ffa90cd505",
+      "size": 2466
+    },
+    {
+      "file": "254b8583-868b9f1e.png",
+      "key": "254b8583-868b9f1e",
+      "logical_path": "Main Menu/Track/Bar/Long/Track 8.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "76af45fd04f2bbcf8b82d08c2b1843d34e07845ceca03994ba179f545491cac3",
+      "size": 2492
+    },
+    {
+      "file": "254b8583-941c1a84.png",
+      "key": "254b8583-941c1a84",
+      "logical_path": "Main Menu/Track/Bar/Short/Track 2.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "2d052840dea001e529709886f0564e76c5e2b95f89dd7c466dd620f4491e1572",
+      "size": 2470
+    },
+    {
+      "file": "254b8583-957a50d0.png",
+      "key": "254b8583-957a50d0",
+      "logical_path": "Main Menu/Track/Bar/Short/Track 6.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "758232acc8f79ddb5b5efdd8ded8ef8c28ae595569e2ad0912b8d8c2c8bc03fc",
+      "size": 2476
+    },
+    {
+      "file": "254b8583-986644bd.png",
+      "key": "254b8583-986644bd",
+      "logical_path": "Main Menu/Track/Bar/Long/Track 2.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "9017c960b5d2862eb66930fb7cc0191df1e144e38d6b4b3d2fc5ef28646d2a97",
+      "size": 2464
+    },
+    {
+      "file": "254b8583-ab99c6fb.png",
+      "key": "254b8583-ab99c6fb",
+      "logical_path": "Main Menu/Track/Bar/Long/Track 4.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "2ef5a77398eae6a00c0183a940682044345248bbbfb6da722c9110fe1fa1655a",
+      "size": 2410
+    },
+    {
+      "file": "254b8583-ad31a749.png",
+      "key": "254b8583-ad31a749",
+      "logical_path": "Main Menu/Track/Bar/Long/Track 1.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "3f3444bbe00730b54281123911e573ddc5bfbadc8592470043a6ff6eaeea6a75",
+      "size": 2545
+    },
+    {
+      "file": "254b8583-d1ced366.png",
+      "key": "254b8583-d1ced366",
+      "logical_path": "Main Menu/Track/Bar/Short/Track 7.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "cd498e6b3954c41749b0230c69103853f3225cd421ee19a9a36046e5aa91af29",
+      "size": 2525
+    },
+    {
+      "file": "254b8583-e8d19401.png",
+      "key": "254b8583-e8d19401",
+      "logical_path": "Main Menu/Track/Bar/Short/Track 3.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "945ca46914eb4ab410ce79a94307530e9b045fb4e8b368b608b0068d901a547c",
+      "size": 2473
+    },
+    {
+      "file": "25f2f965-d21e2cb5.png",
+      "key": "25f2f965-d21e2cb5",
+      "logical_path": "Main Menu/Team/Text/Wip3out/Ship/Speed.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 72,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "045720075e7930943381da9340d8d23ee44e0d87837f0c96b99fb665f582aa41",
+      "size": 2403
+    },
+    {
+      "file": "263bded9-923388b5.png",
+      "key": "263bded9-923388b5",
+      "logical_path": "Main Menu/Team/Text/Goteki 45.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "e15d647f9d3fbdcc815b150d4bb5187b6b8b77483ee224468b350f8ecdcec9c6",
+      "size": 3087
+    },
+    {
+      "file": "26c50f59-daf37c5f.png",
+      "key": "26c50f59-daf37c5f",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Shield.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 256,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "d221fab2b0963e83ecfcb49e8012035f003ea2d8dc6ff45a3de6b8e04a6e97f9",
+      "size": 1959
+    },
+    {
+      "file": "277056b7-260e95d4.png",
+      "key": "277056b7-260e95d4",
+      "logical_path": "In Game/HUD/Box/Time/Blue Big.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "f7c124828ce427e41794394fea0e6cf51e27fd391dad710e9e48d111d2b0f982",
+      "size": 544
+    },
+    {
+      "file": "277056b7-691e0a0f.png",
+      "key": "277056b7-691e0a0f",
+      "logical_path": "In Game/HUD/Box/Item/No Item.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "587808416e61644124f81370f33c4db69f0eb3dc6da002eb6e35ae2f045457c0",
+      "size": 603
+    },
+    {
+      "file": "277056b7-b6cd152d.png",
+      "key": "277056b7-b6cd152d",
+      "logical_path": "In Game/HUD/Box/Item/Offensive.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "49b9e61ac929a59f5bc40acd9f19b508d84f9d3d5ce5a621d4bb19839057b545",
+      "size": 606
+    },
+    {
+      "file": "277056b7-ea89c6e7.png",
+      "key": "277056b7-ea89c6e7",
+      "logical_path": "In Game/HUD/Box/Arrow Box.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "8be781f2dff58271e0477896cc00c2ec6068c3b035cdf1a68ad9dc747b171aeb",
+      "size": 615
+    },
+    {
+      "file": "277056b7-fe71a732.png",
+      "key": "277056b7-fe71a732",
+      "logical_path": "In Game/HUD/Box/Item/Defensive.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "de2dcbc273f9e830342bc979f3d52d9031bc135eee4bec5a4daf00f0dd66a22a",
+      "size": 603
+    },
+    {
+      "file": "2861aea8-41e26c01.png",
+      "key": "2861aea8-41e26c01",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Energy Drain/Bar.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "8cd2c67149430b2a4720cf08aaf2531baf716f9e71438bb28e9560442ac00ccc",
+      "size": 659
+    },
+    {
+      "file": "2a0a51a8-daf37c5f.png",
+      "key": "2a0a51a8-daf37c5f",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Reflector.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 256,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "026e0c61d4723f2689fdb4dab869f31bdad01d22ebfda09a418c71b58085802f",
+      "size": 1694
+    },
+    {
+      "file": "2a5e8698-cd57d48a.png",
+      "key": "2a5e8698-cd57d48a",
+      "logical_path": "Main Menu/Title Screen/Psygnosis Logo Text.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 72,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "c752e764ad6e548985f7db36253eb07d696c58fd0f6d81650feded06f0caf34a",
+      "size": 5469
+    },
+    {
+      "file": "2b722408-8c350a91.png",
+      "key": "2b722408-8c350a91",
+      "logical_path": "In Game/HUD/Arrow/Arrow 1.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "3b09d392e790cd41a3c6e38cc8023c5e5948e78493281455eee7829347910ecc",
+      "size": 1040
+    },
+    {
+      "file": "2b722408-91a6100a.png",
+      "key": "2b722408-91a6100a",
+      "logical_path": "In Game/HUD/Arrow/Arrow 3.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "9246c1781f11f7ff18c235da63f22d89bfa78448b1df4e36bdc41f350a5a8bb3",
+      "size": 1066
+    },
+    {
+      "file": "2b722408-c63bdd6.png",
+      "key": "2b722408-c63bdd6",
+      "logical_path": "In Game/HUD/Arrow/Arrow 2.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "9170856da72ed3e2f3464966fabaff82d3cd4562a7c186e30706e5cfcd51b17c",
+      "size": 1055
+    },
+    {
+      "file": "2b722408-f75fe79f.png",
+      "key": "2b722408-f75fe79f",
+      "logical_path": "In Game/HUD/Arrow/Arrow 4.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "679aab48b9ab100ab7765c5de3f4c1aacd591ac12c7d4b32c8b91a87247b2635",
+      "size": 1070
+    },
+    {
+      "file": "2c55f72a-862cab54.png",
+      "key": "2c55f72a-862cab54",
+      "logical_path": "Main Menu/Track/Text/Wip3out League/Porto Kora.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 576
+      },
+      "sha256": "3d3900d864b269a162c1264ecc5a886393d38a4fa694e499e7ead2b746d96519",
+      "size": 3807
+    },
+    {
+      "file": "2d0bb39a-4672c07e.png",
+      "key": "2d0bb39a-4672c07e",
+      "logical_path": "Main Menu/Class/Not Selected/Phantom.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "2999f34cdafa87ed20df67682a5f8cf0602d081c4bcaf968e12692c2bf83791c",
+      "size": 3201
+    },
+    {
+      "file": "2e50440e-29c8ca64.png",
+      "key": "2e50440e-29c8ca64",
+      "logical_path": "Main Menu/Medal/Challenge/Main Menu/Silver/Medal.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "4f5127d71f2436e79bc036a86d062924b2f5863f156483440e28a1af4a9d7d4f",
+      "size": 2264
+    },
+    {
+      "file": "2e50440e-56289c8d.png",
+      "key": "2e50440e-56289c8d",
+      "logical_path": "Main Menu/Medal/Challenge/Main Menu/Gold/Medal.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "9573a85884342fb4561b65a23ae38e9ce8629c720c9d27873560cfb862d7f896",
+      "size": 2580
+    },
+    {
+      "file": "2e50440e-b6aa6392.png",
+      "key": "2e50440e-b6aa6392",
+      "logical_path": "Main Menu/Medal/Challenge/In Game/Gold/Medal.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "9573a85884342fb4561b65a23ae38e9ce8629c720c9d27873560cfb862d7f896",
+      "size": 2580
+    },
+    {
+      "file": "2e50440e-c94a357b.png",
+      "key": "2e50440e-c94a357b",
+      "logical_path": "Main Menu/Medal/Challenge/In Game/Silver/Medal.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "4f5127d71f2436e79bc036a86d062924b2f5863f156483440e28a1af4a9d7d4f",
+      "size": 2264
+    },
+    {
+      "file": "2ec0bbf3-e7eb9d65.png",
+      "key": "2ec0bbf3-e7eb9d65",
+      "logical_path": "Main Menu/Track/Class/Wip3out League/P-Mar Project.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "033cf3ea50abeaf7106e893dc1690309a780d88cd24654dc34e9f1d293bfefbe",
+      "size": 3815
+    },
+    {
+      "file": "2ef147c5-cd89eec1.png",
+      "key": "2ef147c5-cd89eec1",
+      "logical_path": "Main Menu/Screen Text/Other/Arrow Up.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "8a9a31306cf26290b2258d233d473532407c4adec5946a09b62e9384d062c92e",
+      "size": 2931
+    },
+    {
+      "file": "30709e82-5d9ee307.png",
+      "key": "30709e82-5d9ee307",
+      "logical_path": "Main Menu/Screen Text/Class/Rapier Class.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "a2dd0850eb499409d3ef1407849303cceb9ffb452e75c8476323bfea6666ba8d",
+      "size": 3963
+    },
+    {
+      "file": "3244b4b6-fc2bc38a.png",
+      "key": "3244b4b6-fc2bc38a",
+      "logical_path": "Main Menu/Track/Text/Classic League/Gare Europa.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "7a708ec48c94cb27e431d5c8718d8421b9b9c7ffc44498872bb496668c1256ac",
+      "size": 4320
+    },
+    {
+      "file": "344baf93-8bbc2f6a.png",
+      "key": "344baf93-8bbc2f6a",
+      "logical_path": "Main Menu/Screen Text/Mode/Prototype.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "a5de83e431506d10965aae9f6af58bce6451994858176e1be243fcb7a15ea5c2",
+      "size": 3022
+    },
+    {
+      "file": "36ac453-22696403.png",
+      "key": "36ac453-22696403",
+      "logical_path": "Main Menu/Team/Text/Wip3out/Track/Length KM.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 72,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "133b5f3d9e0abfcdd4e4869936462c3ba12678bc05e8285a91f1ed8c0de6ca18",
+      "size": 3638
+    },
+    {
+      "file": "36d8677d-a49e245c.png",
+      "key": "36d8677d-a49e245c",
+      "logical_path": "Main Menu/Team/Text/Wip3out/Ship/Handling.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 72,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "0668b71581774e9ed3893ab32d8e5b3a92961411bdcc99ca8d6cf5d3b7ecb12b",
+      "size": 3074
+    },
+    {
+      "file": "38140c77-5f7f43dd.png",
+      "key": "38140c77-5f7f43dd",
+      "logical_path": "Main Menu/Track/Text/Wip3out League/P-Mar Project.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "ac6115138515736b4fc0c6894aa26cf8ef3923aa8457e4822cdd0e761fde6f57",
+      "size": 4235
+    },
+    {
+      "file": "3dc173e1-3da5d410.png",
+      "key": "3dc173e1-3da5d410",
+      "logical_path": "Font/Main Menu/F500/S06 Dark.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "6ad4e026c5cf1e1aa3cfd0828640808902dba1895013d541c91a9cf2fb3651fa",
+      "size": 10215
+    },
+    {
+      "file": "3dc173e1-41e26c01.png",
+      "key": "3dc173e1-41e26c01",
+      "logical_path": "Font/In Game/F500 S06 Red.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "3312a8ccccb898ade4049a7df3685ab2ebc240de58bf3e103cae7c9932c8b907",
+      "size": 10200
+    },
+    {
+      "file": "3dc173e1-7205c45b.png",
+      "key": "3dc173e1-7205c45b",
+      "logical_path": "Font/In Game/F500 S06 Grey.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "772adaef05b308dc7674f5dbd9d98988636dcd67cba24eb99fef839749b48ee9",
+      "size": 10219
+    },
+    {
+      "file": "3dc173e1-8ec51178.png",
+      "key": "3dc173e1-8ec51178",
+      "logical_path": "Font/In Game/F500 S06 Light BG.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "2989ded5dd5bad6939730e78ad0682c6be65b5db017a5430e3d242fbd9ac2542",
+      "size": 10294
+    },
+    {
+      "file": "3dc173e1-94f476b1.png",
+      "key": "3dc173e1-94f476b1",
+      "logical_path": "Font/In Game/F500 S06 Light.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "1436b24b5f8d0a0489233d3468efd689d0df357e7cbd4e1b5bcb465dac1caf4c",
+      "size": 10225
+    },
+    {
+      "file": "3f38d996-f2cb8736.png",
+      "key": "3f38d996-f2cb8736",
+      "logical_path": "Main Menu/Track/Text/Wip3out League/Manor Top.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "4cc4ed3e629aadca9c8fc17ba2b439a86b5f008ff6a8e6d6dad74301c4b5a6fc",
+      "size": 3629
+    },
+    {
+      "file": "3f8127b9-8721a8d2.png",
+      "key": "3f8127b9-8721a8d2",
+      "logical_path": "Main Menu/Team/Text/Auricom.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "876b2812e1c8b6e61c0df0add4fd072bf1628a01cf7c2ca9fdaf1438a7f6ed1f",
+      "size": 3306
+    },
+    {
+      "file": "3ff18444-22696403.png",
+      "key": "3ff18444-22696403",
+      "logical_path": "Main Menu/Team/Text/Arrow Down.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 72,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "36ef197c816ec7ffc528a92a4efdd1711d7235e86a5bdffb621c62b1f7854f26",
+      "size": 820
+    },
+    {
+      "file": "4056e6d7-951de2e1.png",
+      "key": "4056e6d7-951de2e1",
+      "logical_path": "Main Menu/Class/Not Selected/Venom.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "8782e1ac46c441ee70976fb6e340a6abf0511fb16fe49b3e46738e32e31b6c5f",
+      "size": 2960
+    },
+    {
+      "file": "415f3330-cd57d48a.png",
+      "key": "415f3330-cd57d48a",
+      "logical_path": "Main Menu/Title Screen/UK-IT.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "7de724ca68df7fb2574c2141e93a9e01acec9649006467fd09d526a6be5e0d73",
+      "size": 1910
+    },
+    {
+      "file": "416c9fa-70883050.png",
+      "key": "416c9fa-70883050",
+      "logical_path": "Main Menu/Medal/Challenge/Main Menu/Bronze/F7200.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "a8dcb4bf4587063fdaa4cf5cb0b8ba73381be0ef41fc8516bd45adf533876792",
+      "size": 3855
+    },
+    {
+      "file": "416c9fa-9d30b370.png",
+      "key": "416c9fa-9d30b370",
+      "logical_path": "Main Menu/Medal/Challenge/In Game/Bronze/F7200.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "a8dcb4bf4587063fdaa4cf5cb0b8ba73381be0ef41fc8516bd45adf533876792",
+      "size": 3855
+    },
+    {
+      "file": "41b203a9-bab61426.png",
+      "key": "41b203a9-bab61426",
+      "logical_path": "Main Menu/Screen Text/Mode/Challenge.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "461040ad107759ea0a07d36388777f64bb9d455515483aac00cf43180e7ccd74",
+      "size": 2670
+    },
+    {
+      "file": "421fdb44-7859d502.png",
+      "key": "421fdb44-7859d502",
+      "logical_path": "Main Menu/Title Screen/Button.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "ae8e823d23f3fe1cb3311e924c81ad8c9d57181c78ac7aff13ac9502f7482078",
+      "size": 1965
+    },
+    {
+      "file": "4cb2ec4e-3da5d410.png",
+      "key": "4cb2ec4e-3da5d410",
+      "logical_path": "Font/Main Menu/F500/S13 Dark.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 896,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "5f9575f438a7068551323e5712f2e2b423311871b6c9171e24f07658e1811416",
+      "size": 34958
+    },
+    {
+      "file": "4cb2ec4e-7205c45b.png",
+      "key": "4cb2ec4e-7205c45b",
+      "logical_path": "Font/Main Menu/F500/S13 Grey.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 896,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "acfb1cd4b4503a19a1bf0e02ed9fc7d0a4fe50b6ef08c397d6a5072e1867903e",
+      "size": 35008
+    },
+    {
+      "file": "4cb2ec4e-8ec51178.png",
+      "key": "4cb2ec4e-8ec51178",
+      "logical_path": "Font/In Game/F500 S13 Contenders MP.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 896,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "740f1158ecb97bbe503b052b0cc4f704f153c584f72e9c26c8d24bf036d6fa8a",
+      "size": 18420
+    },
+    {
+      "file": "4cb2ec4e-94f476b1.png",
+      "key": "4cb2ec4e-94f476b1",
+      "logical_path": "Font/Main Menu/F500/S13 Light.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 896,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "7651d3d83baccc6902a2ea16c66d7ed246fabb923aa09d724608ffb1ab5fbd48",
+      "size": 34922
+    },
+    {
+      "file": "4cb2ec4e-b6e6caeb.png",
+      "key": "4cb2ec4e-b6e6caeb",
+      "logical_path": "Font/In Game/F500 S13 Orange.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 896,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "d9a0c179b5c59b7e6bf485d931e7af120f8d569e43b86b3e1ab4959a78dea413",
+      "size": 34917
+    },
+    {
+      "file": "4e925d77-dc368722.png",
+      "key": "4e925d77-dc368722",
+      "logical_path": "In Game/HUD/Pickup/Offensive/Mines.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 256,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "2f703eab65135d60571a1c783a3ced729295ac062ecaf9d1085dde03b8dae40c",
+      "size": 894
+    },
+    {
+      "file": "508f9587-4f8d0f5d.png",
+      "key": "508f9587-4f8d0f5d",
+      "logical_path": "Main Menu/Track/Text/Wip3out League/Sampa Run.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "e5ccf8236a0c0f97917091b2ed2029ac14f40c28344c173f6fd6434f011fecd2",
+      "size": 3765
+    },
+    {
+      "file": "510b88aa-b543597c.png",
+      "key": "510b88aa-b543597c",
+      "logical_path": "Main Menu/Track/Class/Wip3out League/Hi-Fumii.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "fe482d87a6518eb3778d177f0e3833de04d1f501aee18f5c60b7f43fcdaa3b73",
+      "size": 1462
+    },
+    {
+      "file": "5123968c-aff6572c.png",
+      "key": "5123968c-aff6572c",
+      "logical_path": "Main Menu/Screen Text/Mode/Single Race.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "ed98e43f0a34319aa40e3ed21db8ecbaee4a4df23af4024e86950e034df454db",
+      "size": 3395
+    },
+    {
+      "file": "525cc3f8-3be5b36e.png",
+      "key": "525cc3f8-3be5b36e",
+      "logical_path": "Main Menu/Track/Text/Classic League/Altima VII.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "54244a9f7d7c93d282f90aea693293cbd81f480030a4c9a9f5ef1d8e6e95a1ca",
+      "size": 2600
+    },
+    {
+      "file": "5364b88d-dc368722.png",
+      "key": "5364b88d-dc368722",
+      "logical_path": "In Game/HUD/Pickup/Offensive/Missiles.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 256,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "7c52c65270a26ce83e7562e52fc837b97eb174657aea24dbd6ec72f86ee48d50",
+      "size": 2518
+    },
+    {
+      "file": "566d56ad-fe8287a1.png",
+      "key": "566d56ad-fe8287a1",
+      "logical_path": "Main Menu/Team/Class/AG-S.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "153d538b8dc2dcd75bf983e38f22c4d4b47f4fc6155036a964a704e40e442c79",
+      "size": 2111
+    },
+    {
+      "file": "5c01fde9-733ef256.png",
+      "key": "5c01fde9-733ef256",
+      "logical_path": "PlayStation BIOS/Computer Entertainment.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 480,
+        "interlaced": false,
+        "width": 1920
+      },
+      "sha256": "b861f717f963f8eec7a1a10a01b9f46e9dbdc4f7bf3702f139d1886cfa637310",
+      "size": 26959
+    },
+    {
+      "file": "5c141f95-3da5d410.png",
+      "key": "5c141f95-3da5d410",
+      "logical_path": "Main Menu/Bar/Outline.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "388e9f3b195d42cbb0fa67e13c1a0b6efdb76f7e95a26ccc74dbb4fe2f55bcd5",
+      "size": 453
+    },
+    {
+      "file": "5dcf6aa4-1315513d.png",
+      "key": "5dcf6aa4-1315513d",
+      "logical_path": "In Game/Tracks/321Go/Frame4.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1024,
+        "interlaced": false,
+        "width": 1536
+      },
+      "sha256": "af9b1ea31670ae43150f70dc9ccfe203e073ac8fc0d31316f12194b6960918f0",
+      "size": 73676
+    },
+    {
+      "file": "5dcf6aa4-4d792d36.png",
+      "key": "5dcf6aa4-4d792d36",
+      "logical_path": "In Game/Tracks/321Go/Frame1.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1024,
+        "interlaced": false,
+        "width": 1536
+      },
+      "sha256": "23f14e719fbae5888132bb2c579296462604b7bc9b9884294bdd498e389823cf",
+      "size": 78196
+    },
+    {
+      "file": "5dcf6aa4-5463b595.png",
+      "key": "5dcf6aa4-5463b595",
+      "logical_path": "In Game/Tracks/321Go/Frame3.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1024,
+        "interlaced": false,
+        "width": 1536
+      },
+      "sha256": "fee808cad75294be8570ccbf33e75fb12cf7e50f24e53124f21b8cc37257996b",
+      "size": 73818
+    },
+    {
+      "file": "5dcf6aa4-96724c6b.png",
+      "key": "5dcf6aa4-96724c6b",
+      "logical_path": "In Game/Tracks/321Go/Frame2.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1024,
+        "interlaced": false,
+        "width": 1536
+      },
+      "sha256": "51ae12f3bb96dba4168a68cfabb5fd1de597c87060bfa6b77792eb6fd48be01f",
+      "size": 73740
+    },
+    {
+      "file": "5e347536-c25e48f8.png",
+      "key": "5e347536-c25e48f8",
+      "logical_path": "Main Menu/Track/Text/Classic League/Sagarmatha.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "353fbae11599729c2ec2adc6ca5e8f54b2f4517b46161f47ca978d2d02039ae1",
+      "size": 4019
+    },
+    {
+      "file": "5fe9e228-cd57d48a.png",
+      "key": "5fe9e228-cd57d48a",
+      "logical_path": "Main Menu/Title Screen/US.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 80,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "0dfec66c6cdc193f5e1d16756d684346d2f316bcd2d79cb76f08d9543936ae8f",
+      "size": 1859
+    },
+    {
+      "file": "6108bae3-dfb8abec.png",
+      "key": "6108bae3-dfb8abec",
+      "logical_path": "Main Menu/Team/Text/Assegai.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "31662ea04653638aee85383abee750e953856c9c772cc1dae69942ed2f560153",
+      "size": 2647
+    },
+    {
+      "file": "65827f71-cd57d48a.png",
+      "key": "65827f71-cd57d48a",
+      "logical_path": "Main Menu/Title Screen/Format NTSC.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 80,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "a558052590d03d1de0efff6ce6ad32ea217c653beda4c688822064ca6db50326",
+      "size": 4960
+    },
+    {
+      "file": "6836c6cc-bc2e80d2.png",
+      "key": "6836c6cc-bc2e80d2",
+      "logical_path": "PlayStation BIOS/SCPH-5000/SCEI.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "d00fa9b6201f914ff214f47334b093c278674a013cebff39e160442d2b0c18d4",
+      "size": 4894
+    },
+    {
+      "file": "68dd441d-41e26c01.png",
+      "key": "68dd441d-41e26c01",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Energy Drain/Plus.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "0bdfc10b3e3d2a50d37c48110a8680faee1ebea217ccfbdd05a4681770ade5ec",
+      "size": 883
+    },
+    {
+      "file": "690f0a8-956d52de.png",
+      "key": "690f0a8-956d52de",
+      "logical_path": "In Game/Ships/Shadows/Qirex-Assegai.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1792,
+        "interlaced": false,
+        "width": 1024
+      },
+      "sha256": "0bb18a5bc81301b74a29aaa4e7d5a75054b57ba44fe12dca253ede0bcb92d92d",
+      "size": 27240
+    },
+    {
+      "file": "690f0a8-b4142d01.png",
+      "key": "690f0a8-b4142d01",
+      "logical_path": "In Game/Ships/Shadows/AG-S-Goteki 45.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1792,
+        "interlaced": false,
+        "width": 1024
+      },
+      "sha256": "5d6df102fc86fde1f9420863fc9393389ce492d82bb696c92c12faf6b923189e",
+      "size": 28139
+    },
+    {
+      "file": "690f0a8-d0dd1cce.png",
+      "key": "690f0a8-d0dd1cce",
+      "logical_path": "In Game/Ships/Shadows/Auricom-Icaras.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1792,
+        "interlaced": false,
+        "width": 1024
+      },
+      "sha256": "2ddccb705afb13a8beb506f6e22d6cf6f8ff68f77abe0168f22a3459f1a0bb72",
+      "size": 26292
+    },
+    {
+      "file": "690f0a8-f1b612f.png",
+      "key": "690f0a8-f1b612f",
+      "logical_path": "In Game/Ships/Shadows/FEISAR-Pirhana.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1792,
+        "interlaced": false,
+        "width": 1024
+      },
+      "sha256": "6341965757d6917ef3059c72d545d70a6497dc268dd806d48d719f444f298187",
+      "size": 29539
+    },
+    {
+      "file": "6993f076-2bac1494.png",
+      "key": "6993f076-2bac1494",
+      "logical_path": "Main Menu/Track/Class/Classic League/Gare Europa.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "b4d0c0040256577dafef0ec421194512835e0c7470f8587beeddbdeb78fe5e2b",
+      "size": 3558
+    },
+    {
+      "file": "6b411011-273d3b40.png",
+      "key": "6b411011-273d3b40",
+      "logical_path": "Font/Main Menu/Helvetica/S05 Accents Grey.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 256,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "4ac2f4ca572d2a616ffb7162ecaeb610ee4dc0f7532c9ae567c7a01360791277",
+      "size": 50534
+    },
+    {
+      "file": "6db36176-5344422c.png",
+      "key": "6db36176-5344422c",
+      "logical_path": "Main Menu/Medal/Challenge/Main Menu/Gold/F7200.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "6625067d37baa6e0142598cc07b947ad942f705e771c3007d828c19b781cd827",
+      "size": 3327
+    },
+    {
+      "file": "6db36176-befcc10c.png",
+      "key": "6db36176-befcc10c",
+      "logical_path": "Main Menu/Medal/Challenge/In Game/Gold/F7200.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "6625067d37baa6e0142598cc07b947ad942f705e771c3007d828c19b781cd827",
+      "size": 3327
+    },
+    {
+      "file": "6ec6516a-9d34066e.png",
+      "key": "6ec6516a-9d34066e",
+      "logical_path": "Main Menu/Track/Class/Classic League/Phenitia Park.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "923631dc87c54bdf44d1e0f25e3ff38714474e1dbf06018b70323a2e91fea3cd",
+      "size": 2629
+    },
+    {
+      "file": "7320fc06-41e26c01.png",
+      "key": "7320fc06-41e26c01",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Energy Drain/Drain.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "5bc9f0c473671e032e55629a9aafd0ef93139ae6ed161022335989c98a574d10",
+      "size": 4597
+    },
+    {
+      "file": "7363a14f-dc368722.png",
+      "key": "7363a14f-dc368722",
+      "logical_path": "In Game/HUD/Pickup/Offensive/Rockets.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 256,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "5c935f45c3e4963a6330e8e8a75cdbb58631b05808546c4c36831ad1d31f52ec",
+      "size": 2003
+    },
+    {
+      "file": "73db131d-346ea959.png",
+      "key": "73db131d-346ea959",
+      "logical_path": "In Game/HUD/Multiplayer/Bar/Speed/Purple.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "a6b6d3c5a4227007dc9b465015497730c0b0209f327558b390339b12686ed98f",
+      "size": 375
+    },
+    {
+      "file": "742fa76f-383d5fe3.png",
+      "key": "742fa76f-383d5fe3",
+      "logical_path": "Main Menu/Medal/Challenge/In Game/Bronze/Medal.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "7eb688438b26c1b4b123feb8cb1c2a053472a26d83107bb6e608dba8b995865f",
+      "size": 2370
+    },
+    {
+      "file": "742fa76f-d8bfa0fc.png",
+      "key": "742fa76f-d8bfa0fc",
+      "logical_path": "Main Menu/Medal/Challenge/Main Menu/Bronze/Medal.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "7eb688438b26c1b4b123feb8cb1c2a053472a26d83107bb6e608dba8b995865f",
+      "size": 2370
+    },
+    {
+      "file": "74b80940-dfb8abec.png",
+      "key": "74b80940-dfb8abec",
+      "logical_path": "Main Menu/Team/Class/Assegai.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "3817a38630ec2479195c00c52e1992e0f71da3eff9ab5ba48f5b0bc161be2d9d",
+      "size": 2926
+    },
+    {
+      "file": "75f5e38b-3da5d410.png",
+      "key": "75f5e38b-3da5d410",
+      "logical_path": "Font/Main Menu/F500/S15 Dark.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 896,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "73e77cf55c11ad63368eaebe64b210d4c0c1a4759e9afad2b8787edb698f9903",
+      "size": 35378
+    },
+    {
+      "file": "75f5e38b-7205c45b.png",
+      "key": "75f5e38b-7205c45b",
+      "logical_path": "Font/Main Menu/F500/S15 Grey.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 896,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "acb4666be5c5346060c6627591b42a5b7558ff04c723d2ca33df87aab8b5d4bb",
+      "size": 35381
+    },
+    {
+      "file": "75f5e38b-8ec51178.png",
+      "key": "75f5e38b-8ec51178",
+      "logical_path": "Font/In Game/F500 S15 Contenders SP.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 896,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "3d7ae302ebefca8eeb407849f4d5412147d599643a8cbbd726ab09de36746330",
+      "size": 18578
+    },
+    {
+      "file": "75f5e38b-94f476b1.png",
+      "key": "75f5e38b-94f476b1",
+      "logical_path": "Font/Main Menu/F500/S15 Light.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 896,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "5aa20b5f0cdf9e6ddf8a867f7376bc93ae3121f0e8fed69f70078f9bdffac86b",
+      "size": 35409
+    },
+    {
+      "file": "75f5e38b-b6e6caeb.png",
+      "key": "75f5e38b-b6e6caeb",
+      "logical_path": "Font/In Game/F500 S15 Orange.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 896,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "8224d578fc2fc65ba94d9cc7fa70ef02f54edc72af6ba912a8842a9a0bac63ba",
+      "size": 35405
+    },
+    {
+      "file": "76cdff8c-6d9d0587.png",
+      "key": "76cdff8c-6d9d0587",
+      "logical_path": "Main Menu/Track/Text/Wip3out League/Hi-Fumii.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "3d3549b70900b19766804fffff7a97900e33eba2926e4869c5b2b3e381900bc3",
+      "size": 1463
+    },
+    {
+      "file": "7723c8d2-40fda53a.png",
+      "key": "7723c8d2-40fda53a",
+      "logical_path": "In Game/Tracks/Rescue Droid/Screen 1.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 768,
+        "interlaced": false,
+        "width": 768
+      },
+      "sha256": "1b78b5bc6b63da686a409af210d880ee381e192e58bcee408e1d19fed916a4b6",
+      "size": 27054
+    },
+    {
+      "file": "7723c8d2-560c1fe1.png",
+      "key": "7723c8d2-560c1fe1",
+      "logical_path": "In Game/Tracks/Rescue Droid/Screen 2.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 768,
+        "interlaced": false,
+        "width": 768
+      },
+      "sha256": "6e71553fcfd20135b23ac26bd1e03dcf876acb32f98535f8141f42ef20671722",
+      "size": 5907
+    },
+    {
+      "file": "776c4803-daf37c5f.png",
+      "key": "776c4803-daf37c5f",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Energy Drain.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 256,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "54c49316643bae4f254eff800339692167fa802dccdde5feea80c6e9629646b4",
+      "size": 1187
+    },
+    {
+      "file": "7dbbc6c2-2890c075.png",
+      "key": "7dbbc6c2-2890c075",
+      "logical_path": "Main Menu/Team/Text/Wip3out/Track/Lap Record.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 72,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "f216b38556c0379e1c77c1f85fd6b719240f9b3b12418f3e742144e8acc8657b",
+      "size": 4077
+    },
+    {
+      "file": "7e9a921b-9c7b7edb.png",
+      "key": "7e9a921b-9c7b7edb",
+      "logical_path": "Main Menu/Track/Text/Wip3out League/Stanza Inter.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 576
+      },
+      "sha256": "afc210be5f9cac489a9bc418e025bdf28061872ab9f48bb156519322e472dc0e",
+      "size": 3693
+    },
+    {
+      "file": "7ed446a2-55bec38d.png",
+      "key": "7ed446a2-55bec38d",
+      "logical_path": "Main Menu/Track/Text/Classic League/Odessa Keys.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "9ded09e8e2a77b1ce69e477000e8a3c985de8ed2f9f25a158ffc2a225715d817",
+      "size": 4488
+    },
+    {
+      "file": "7f77f34b-346ea959.png",
+      "key": "7f77f34b-346ea959",
+      "logical_path": "In Game/HUD/Bar/Speed/Purple.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "4dde1d59fb307a72728171902cff4944bce560b20339f27ef777de08f902c5ed",
+      "size": 338
+    },
+    {
+      "file": "817064f3-5d9c0833.png",
+      "key": "817064f3-5d9c0833",
+      "logical_path": "In Game/HUD/Multiplayer/Bar/Energy/Light.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "57fde121cd0dff798e50a689042f2d9b6b6b9588010f3d0488e93d190602884f",
+      "size": 370
+    },
+    {
+      "file": "817064f3-7205c45b.png",
+      "key": "817064f3-7205c45b",
+      "logical_path": "In Game/HUD/Multiplayer/Bar/Energy/Dark.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "12d513244e27f16a67128ae72cfc038ca49925b9dc19d5fe556b68c008c1b56c",
+      "size": 373
+    },
+    {
+      "file": "817064f3-7b49694d.png",
+      "key": "817064f3-7b49694d",
+      "logical_path": "In Game/HUD/Multiplayer/Bar/Energy/Brown.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "e965995975f7bc210550df3883c32e9f84f736bb210e77c2c231819ca48fb788",
+      "size": 378
+    },
+    {
+      "file": "81ba6b84-a59032d9.png",
+      "key": "81ba6b84-a59032d9",
+      "logical_path": "Main Menu/Team/Class/Pirhana.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "634ccc811a62956a136867f97c3fd41df0837de521d8c0ef79c80ee2a7a67f22",
+      "size": 2128
+    },
+    {
+      "file": "82ec4d88-7da1dcbd.png",
+      "key": "82ec4d88-7da1dcbd",
+      "logical_path": "Main Menu/Track/Class/Wip3out League/Sampa Run.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "dc8d9b88e470b3cde4b2d8d7d721d899b3b50a2a8fed80d441d2045ab5d544d5",
+      "size": 3358
+    },
+    {
+      "file": "84f25a62-be1bf8bb.png",
+      "key": "84f25a62-be1bf8bb",
+      "logical_path": "PlayStation BIOS/TM.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 160
+      },
+      "sha256": "c41c0b7d0f403f1bbfae6464772d400ce30801fd6ff69168e185e6e09788ad4a",
+      "size": 815
+    },
+    {
+      "file": "8609555d-5b7c09f7.png",
+      "key": "8609555d-5b7c09f7",
+      "logical_path": "Main Menu/Track/Class/Wip3out League/Porto Kora (2).png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "b529b2b2f8ea26cc15838101a052f1a2d1bc2772507ce91233aea0668122f190",
+      "size": 3505
+    },
+    {
+      "file": "8609555d-a51479e2.png",
+      "key": "8609555d-a51479e2",
+      "logical_path": "Main Menu/Track/Class/Wip3out League/Porto Kora (1).png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "b529b2b2f8ea26cc15838101a052f1a2d1bc2772507ce91233aea0668122f190",
+      "size": 3505
+    },
+    {
+      "file": "861ad9f1-273d3b40.png",
+      "key": "861ad9f1-273d3b40",
+      "logical_path": "Font/Main Menu/Helvetica/S05 Grey.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 512,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "49242cac8366b2029786ac494b7e7de45d83b8a69cfaea49af5ca152f49dd39b",
+      "size": 109660
+    },
+    {
+      "file": "861ad9f1-5888b400.png",
+      "key": "861ad9f1-5888b400",
+      "logical_path": "Font/Main Menu/Helvetica/S05 Light.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 512,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "2458af3c79f75c090a924616526f259d586885c40a92d8f06d806ab99da43fab",
+      "size": 105815
+    },
+    {
+      "file": "87a488e0-bc2e80d2.png",
+      "key": "87a488e0-bc2e80d2",
+      "logical_path": "PlayStation BIOS/SCPH-5001/Sony-3.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 768
+      },
+      "sha256": "6662107ae387c57e9a3e2d8e172d705624d8169e4daa5a6a2e3577568e9f0b4a",
+      "size": 3693
+    },
+    {
+      "file": "882192dd-b9663eb0.png",
+      "key": "882192dd-b9663eb0",
+      "logical_path": "Main Menu/Team/Text/Wip3out/Number/03.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "cdf2e419764ec8a70e1b7af116a471e713186909afcda8df6c793e4966d14f4b",
+      "size": 1332
+    },
+    {
+      "file": "88a80d27-d3669bd1.png",
+      "key": "88a80d27-d3669bd1",
+      "logical_path": "Main Menu/Team/Class/FEISAR.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "46db763427732a6a0171d845292ea72de654b3543f7471356e672dc8b4cac87a",
+      "size": 2039
+    },
+    {
+      "file": "88f032e7-3da5d410.png",
+      "key": "88f032e7-3da5d410",
+      "logical_path": "Main Menu/Screen Text/Other/Wip3out/No-Player Icon.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 272,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "d66134bf5a8dd5a70f2e1e793b042fba04eab65550badcb62c5a6c34957186bd",
+      "size": 3704
+    },
+    {
+      "file": "894d696e-4a993446.png",
+      "key": "894d696e-4a993446",
+      "logical_path": "Main Menu/Team/Text/Screen Approved.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 72,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "4389a73ac4f97de061256c1c04a1c9c17dd508e97588af0bcb55949465a6646c",
+      "size": 5335
+    },
+    {
+      "file": "8bb1d0f8-5d9ee307.png",
+      "key": "8bb1d0f8-5d9ee307",
+      "logical_path": "Main Menu/Class/Not Selected/Rapier.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "32f020c0589817988a3cd577d8b424004374295af3d1ea103d15ed1172d7dbf7",
+      "size": 2311
+    },
+    {
+      "file": "8cb24699-7859d502.png",
+      "key": "8cb24699-7859d502",
+      "logical_path": "Main Menu/Title Screen/Press Start.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "7113e81c5c0f82c3dcdd07066fe0fa47ee29cab7f6fbbe25b1080fef543b1b95",
+      "size": 3565
+    },
+    {
+      "file": "90b4a8d1-f89abdec.png",
+      "key": "90b4a8d1-f89abdec",
+      "logical_path": "Main Menu/Team/Class/Icaras.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "66ff3bf1c231bfa1cd3b9e87acd2ca46c1b093a9b1e21fc447c61f7dc6d00862",
+      "size": 2799
+    },
+    {
+      "file": "90facb08-1219ff42.png",
+      "key": "90facb08-1219ff42",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Shield/Frame 10.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "c1d874da66f8be61ac19a3a8784e8941163ce7a80d0a364376b7dfce839a0712",
+      "size": 2583
+    },
+    {
+      "file": "90facb08-167c4c7e.png",
+      "key": "90facb08-167c4c7e",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Shield/Frame 07.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "e30cd36f54259ac199302d2ce7efff16e9c569d16cd1070e1a2ac39abccfbf72",
+      "size": 2581
+    },
+    {
+      "file": "90facb08-29be35f6.png",
+      "key": "90facb08-29be35f6",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Shield/Frame 11.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "9da2d003c5ec63e275d97d1a4a7d15c71115f85a04f29790191ffb2705b08f4e",
+      "size": 2578
+    },
+    {
+      "file": "90facb08-2ae07ed0.png",
+      "key": "90facb08-2ae07ed0",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Shield/Frame 05.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "3a00d4929948133c07704d42cfc7cfb8e03ccf7fd0fd513da6116f2220d1ea13",
+      "size": 2584
+    },
+    {
+      "file": "90facb08-2f359e5f.png",
+      "key": "90facb08-2f359e5f",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Cloak.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "e5a5050d52d8c121b9c39abbef030bd822b4b397270641a60aa42fdc408999a1",
+      "size": 1959
+    },
+    {
+      "file": "90facb08-34ecde2d.png",
+      "key": "90facb08-34ecde2d",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Shield/Frame 04.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "594be6ec5ff85298863342fcba657da02872f6dac8e7366b16e63f77ffafffed",
+      "size": 2582
+    },
+    {
+      "file": "90facb08-365f0932.png",
+      "key": "90facb08-365f0932",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Shield/Frame 09.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "12ab099489b7f8bcbd42f23e2cad6223a089cf6d88874afc00b1b0dfd560b413",
+      "size": 2584
+    },
+    {
+      "file": "90facb08-44a28a8d.png",
+      "key": "90facb08-44a28a8d",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Reflector/Frame 2.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "0fbcaa602945afcc731631103f9de371a73e68b3eb47e65431d7fea567058b19",
+      "size": 2287
+    },
+    {
+      "file": "90facb08-659731c8.png",
+      "key": "90facb08-659731c8",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Shield/Frame 01.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "ef5221c4640d902f99d4ce8f64eb1918e2331ba4ee2602affd875eb08ac93a03",
+      "size": 2583
+    },
+    {
+      "file": "90facb08-66deed8.png",
+      "key": "90facb08-66deed8",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Shield/Frame 08.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "64cd72fa74138f66fd1e1d6cd99628a8451079e2ee7e66a2b23c3148463c00a1",
+      "size": 2584
+    },
+    {
+      "file": "90facb08-7547c88c.png",
+      "key": "90facb08-7547c88c",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Shield/Frame 12.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "751d374403b8ecc71714c2fb10d005c3beea22e7646762a89d8ea3c9d3f1cb9a",
+      "size": 2578
+    },
+    {
+      "file": "90facb08-92672fdf.png",
+      "key": "90facb08-92672fdf",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Shield/Frame 06.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "73f9836eec1807cca6cf276068ed71ebde9f9f53ffa17ec7cce57d3829bda7cf",
+      "size": 2582
+    },
+    {
+      "file": "90facb08-9b991378.png",
+      "key": "90facb08-9b991378",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Shield/Frame 13.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "33fa05d9b42b60164ab57f1e2c49ec7eeea19feb466aa2f9d1a2fad5d880cd6d",
+      "size": 2583
+    },
+    {
+      "file": "90facb08-ba23903d.png",
+      "key": "90facb08-ba23903d",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Shield/Frame 15.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "cc5bea6963b50332acf172447fc4529497e36c260e9f69a0936bd343a06a7cc4",
+      "size": 2580
+    },
+    {
+      "file": "90facb08-bb0c1f68.png",
+      "key": "90facb08-bb0c1f68",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Shield/Frame 03.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "4e168fc54e270c5d651387dc910ae7ce66202a04c0bc25db490d42967f1d33cb",
+      "size": 2583
+    },
+    {
+      "file": "90facb08-bdc0aec1.png",
+      "key": "90facb08-bdc0aec1",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Shield/Frame 14.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "cc78a652eda4c05e6cf1ad2b9faa4a30ba9f682db15b7bbd85edf6433c1aae9d",
+      "size": 2581
+    },
+    {
+      "file": "90facb08-c1ac5fab.png",
+      "key": "90facb08-c1ac5fab",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Shield/Frame 02.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "8f0c7854ff5fdc2a6aca311d8e6e84c5416ce921d5b366f588d29fde78a690b2",
+      "size": 2581
+    },
+    {
+      "file": "90facb08-d141ed82.png",
+      "key": "90facb08-d141ed82",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Auto-Pilot.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "924b984ce7f8f24c8344f668d8e6706312f369a4a91afd6e73f9083198df7fdf",
+      "size": 3339
+    },
+    {
+      "file": "90facb08-e84df2c1.png",
+      "key": "90facb08-e84df2c1",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Reflector/Frame 1.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "790a945aa03557b27877372506d77eb6aa63b52343f92d67bd468d7f59e3669d",
+      "size": 2289
+    },
+    {
+      "file": "90facb08-f6125c32.png",
+      "key": "90facb08-f6125c32",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Reflector/Frame 3.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "68ea2b6a3acf9b2a0de6556317b95e6dfa06cbf0b31f9034403a3972ee124b69",
+      "size": 2289
+    },
+    {
+      "file": "90facb08-fab221b2.png",
+      "key": "90facb08-fab221b2",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Icons/Reflector/Frame 4.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "a4d1cae3cb4742d68be1e934dfb25e60264b6dc2b1b2889ad6806fdf8b15215e",
+      "size": 2288
+    },
+    {
+      "file": "9111cdce-b90f7ba0.png",
+      "key": "9111cdce-b90f7ba0",
+      "logical_path": "In Game/Billboards/17 - LS101-NP62/Qirex.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 512,
+        "interlaced": false,
+        "width": 2048
+      },
+      "sha256": "68b5da33342e28718bbff35ee4c658aac6089e0eddc73e0d97ce3aa7242e9dbe",
+      "size": 47905
+    },
+    {
+      "file": "94fcf38b-226ae03d.png",
+      "key": "94fcf38b-226ae03d",
+      "logical_path": "Main Menu/Track/Text/Classic League/Talons Reach.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "c7cabcb7848d3fb91e68c9c69743390e010f466c0f0f0626626dc92215ea3704",
+      "size": 4310
+    },
+    {
+      "file": "9630682b-7754f549.png",
+      "key": "9630682b-7754f549",
+      "logical_path": "Main Menu/Medal/Class/Gold Medal.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "0f8ff14d504c8e77e9c7f7ba9402b79d5bceea43e4d586b9a3d73c510d40db11",
+      "size": 455
+    },
+    {
+      "file": "9630682b-8b4a3a0.png",
+      "key": "9630682b-8b4a3a0",
+      "logical_path": "Main Menu/Medal/Class/Silver Medal.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "1a679d0083ed0dff783c25092567aaa7e899a26e7398ded34624b8b66695b405",
+      "size": 448
+    },
+    {
+      "file": "9630682b-f9c3c938.png",
+      "key": "9630682b-f9c3c938",
+      "logical_path": "Main Menu/Medal/Class/Bronze Medal.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "7385ecbf7f31ea8ab0167d1c0e14d75d60027b59602a4e831bbf6b47e3dddf03",
+      "size": 455
+    },
+    {
+      "file": "97a2db09-b5405fde.png",
+      "key": "97a2db09-b5405fde",
+      "logical_path": "Main Menu/Screen Text/Mode/Tournament.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "1892791719497bf641c7434abcadda1a395931b3df35cea86e64f5e2679ecfd7",
+      "size": 3123
+    },
+    {
+      "file": "9805fa74-b5f360a9.png",
+      "key": "9805fa74-b5f360a9",
+      "logical_path": "Main Menu/Track/Text/Classic League/Arridos IV.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "59a37c34b7ea0c5d0d24bdf1e9be3c5175de00becca23061b380bb00e3a26ae7",
+      "size": 3919
+    },
+    {
+      "file": "984db9c6-287fbaf2.png",
+      "key": "984db9c6-287fbaf2",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Short/Goteki 45.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "16a13b480370f6661820eb9abe5060a0fc42e4ecd9cea9fa26a808e172958e7a",
+      "size": 1488
+    },
+    {
+      "file": "984db9c6-3446311b.png",
+      "key": "984db9c6-3446311b",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Short/AG-S.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "4d138d59d194e043d3bdbc086f820f4164e101d54f000395ae4ac4304f7443c4",
+      "size": 1435
+    },
+    {
+      "file": "984db9c6-65e44423.png",
+      "key": "984db9c6-65e44423",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Long/Qirex.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "66d0cad578ccd007780e17029020a56138e2aafa144db5563919ed42cb48f7e8",
+      "size": 1480
+    },
+    {
+      "file": "984db9c6-6a04323f.png",
+      "key": "984db9c6-6a04323f",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Short/Auricom.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "30167ac5418ccd4110f71df7b855bd911e4f94892e6a704c91af772d88a49be5",
+      "size": 1259
+    },
+    {
+      "file": "984db9c6-6e8c451f.png",
+      "key": "984db9c6-6e8c451f",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Long/Pirhana.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "37508cd5e7493eebb61a3e2fd53487ac1916d6c003754fe5c98e5fbc1630f91c",
+      "size": 1260
+    },
+    {
+      "file": "984db9c6-79bfebb0.png",
+      "key": "984db9c6-79bfebb0",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Short/Qirex.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "1b75d38263860027acdfb83f42e464ab56fc149ff062af24d625288f0c2e619a",
+      "size": 1525
+    },
+    {
+      "file": "984db9c6-85399a6d.png",
+      "key": "984db9c6-85399a6d",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Long/AG-S.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "1e1c41d07cd098cd3e9999fa997382c8de7a7d0456c4a7db275f5dcb175af6b3",
+      "size": 1441
+    },
+    {
+      "file": "984db9c6-91553f76.png",
+      "key": "984db9c6-91553f76",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Long/FEISAR.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "d9d50b5bdff5143f753317e97c8151f7b29638775586985727357e541cbab54b",
+      "size": 1272
+    },
+    {
+      "file": "984db9c6-a12ce67a.png",
+      "key": "984db9c6-a12ce67a",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Short/Pirhana.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "41844534cae8a6587b0573734344e32d417332a991bdc9e6d41ae18479f354fd",
+      "size": 1257
+    },
+    {
+      "file": "984db9c6-a184d751.png",
+      "key": "984db9c6-a184d751",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Short/FEISAR.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "38a575ea1b4ca3ebf2e22cb27311d63215ea277ad822903141b646f6dbc0e35a",
+      "size": 1418
+    },
+    {
+      "file": "984db9c6-a1dd23e3.png",
+      "key": "984db9c6-a1dd23e3",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Long/Assegai.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "d4968e49e9ffcb8db74d704261eac893f4f81a2da8ee1e0378ae31c87ca24873",
+      "size": 1426
+    },
+    {
+      "file": "984db9c6-a2571a4b.png",
+      "key": "984db9c6-a2571a4b",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Long/Icaras.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "00c7bf932f970ef09710304850c0db87bb7e43ea5a2e0a0d55e2073801408d67",
+      "size": 1469
+    },
+    {
+      "file": "984db9c6-a4bc2818.png",
+      "key": "984db9c6-a4bc2818",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Long/Auricom.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "b0eba2a4e28b68a4e27241e21bea9bd03abb229bff0609cd5d527d4cd9468d43",
+      "size": 1263
+    },
+    {
+      "file": "984db9c6-be29bf68.png",
+      "key": "984db9c6-be29bf68",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Short/Icaras.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "b5ed98da1449332e3b4e5342734b508bac2c4bb90be933c0125a2b34937f25de",
+      "size": 1465
+    },
+    {
+      "file": "984db9c6-d254b437.png",
+      "key": "984db9c6-d254b437",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Long/Goteki 45.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "786a905326b9765c4562cb50eb10d07884881df4a693d438f2d0f9dd8f958b99",
+      "size": 1454
+    },
+    {
+      "file": "984db9c6-ea2912c4.png",
+      "key": "984db9c6-ea2912c4",
+      "logical_path": "Main Menu/Team/Colour Breakdown/Short/Assegai.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 200,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "f79279318eb3ee308152d0fbad585d618ca8d9d54b3f74a9d3d06052e1b1fe83",
+      "size": 1423
+    },
+    {
+      "file": "99061c4-131af276.png",
+      "key": "99061c4-131af276",
+      "logical_path": "Main Menu/Screen Text/Class/Phantom Class.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "8c0a007a116db38266232a548c680fd596fe0814013526cc18347216f6f82e19",
+      "size": 4935
+    },
+    {
+      "file": "9baf7823-1749a14f.png",
+      "key": "9baf7823-1749a14f",
+      "logical_path": "Main Menu/Medal/Challenge/Main Menu/Text/Kills.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "3e2fccf2acb100512a3851b0c16f1c9f5c8de1aa81c37a1bc66102e3ebb7c293",
+      "size": 1758
+    },
+    {
+      "file": "9baf7823-faf1226f.png",
+      "key": "9baf7823-faf1226f",
+      "logical_path": "Main Menu/Medal/Challenge/In Game/Text/Kills.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "3e2fccf2acb100512a3851b0c16f1c9f5c8de1aa81c37a1bc66102e3ebb7c293",
+      "size": 1758
+    },
+    {
+      "file": "9ccbd381-daf37c5f.png",
+      "key": "9ccbd381-daf37c5f",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Auto-Pilot.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 256,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "4631ee98149d95669d8e8f27564d5b7db3ff52b5abadda74827048974c3ae1ab",
+      "size": 2267
+    },
+    {
+      "file": "9d313133-6c518538.png",
+      "key": "9d313133-6c518538",
+      "logical_path": "Main Menu/Track/Class/Classic League/Talons Reach.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "7832b5116f9d326e55f27bddaecdb0ae1898cc689ddc7d70348f2338ea4d6bde",
+      "size": 3390
+    },
+    {
+      "file": "9e9ad021-240e36ce.png",
+      "key": "9e9ad021-240e36ce",
+      "logical_path": "Main Menu/Class/Selected/Phantom.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "608fdd2ac620327cfd2d685be454ef8c5201297a61e482f5990af318e507ed9e",
+      "size": 3467
+    },
+    {
+      "file": "9f04194f-a59032d9.png",
+      "key": "9f04194f-a59032d9",
+      "logical_path": "Main Menu/Team/Text/Pirhana.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "d5cab93ab48bcbb5a5f956fe85fad91fd081627ccd1f589a3a206d055c2f0b39",
+      "size": 2797
+    },
+    {
+      "file": "9fdb9e3b-fe49e6ab.png",
+      "key": "9fdb9e3b-fe49e6ab",
+      "logical_path": "Main Menu/Screen Text/Other/Three.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "05be7e96cfe5397c16e41d164766aff33f3b9eb12e4a2e7d0c897ca843335f5f",
+      "size": 966
+    },
+    {
+      "file": "a00baff-fa829a2f.png",
+      "key": "a00baff-fa829a2f",
+      "logical_path": "Main Menu/Team/Text/Wip3out/Number/01.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "a6c6dd21e8b9a8fb14f7c35fe560d7c05342bda80aba1729349073e75ad6b94f",
+      "size": 1021
+    },
+    {
+      "file": "a154479a-cd57d48a.png",
+      "key": "a154479a-cd57d48a",
+      "logical_path": "Main Menu/Title Screen/DE-ES.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "762499f2307d9045f171d0388e989e9eccfeef3531d443262b8c348660b920cf",
+      "size": 2384
+    },
+    {
+      "file": "a619b64b-a22487ae.png",
+      "key": "a619b64b-a22487ae",
+      "logical_path": "Main Menu/Track/Text/Wip3out League/Terminal.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "506a4b56f9843a687433b217489771ca7521d41cb1f6704b39b579299e2b3b9c",
+      "size": 2272
+    },
+    {
+      "file": "a829386f-611a189e.png",
+      "key": "a829386f-611a189e",
+      "logical_path": "Main Menu/Medal/Challenge/Main Menu/Text/Pos-Time-Kills.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "7ca2eb9ab5cbc5f8cf6bca2fb75a68901b8f4ded23b3a08ca49df2e970644de7",
+      "size": 4882
+    },
+    {
+      "file": "a829386f-8ca29bbe.png",
+      "key": "a829386f-8ca29bbe",
+      "logical_path": "Main Menu/Medal/Challenge/In Game/Text/Pos-Time-Kills.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 896
+      },
+      "sha256": "7ca2eb9ab5cbc5f8cf6bca2fb75a68901b8f4ded23b3a08ca49df2e970644de7",
+      "size": 4882
+    },
+    {
+      "file": "a9a9d408-daf37c5f.png",
+      "key": "a9a9d408-daf37c5f",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Cloak.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 256,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "a9eb3d5ac8a068bcb7de7d4f707b3d10ce62c83493b9ad5d472e749e87af6787",
+      "size": 1303
+    },
+    {
+      "file": "aad73d5f-9e6623a9.png",
+      "key": "aad73d5f-9e6623a9",
+      "logical_path": "Main Menu/Track/Class/Classic League/Sagarmatha.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "c165fb728ee3e15a76d51181b935cab2722a5135679ef22eaedb0ebd4bfc2042",
+      "size": 3299
+    },
+    {
+      "file": "adedee56-daf37c5f.png",
+      "key": "adedee56-daf37c5f",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Force Wall.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 256,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "3eeee1509bf0c1e7484482a8cbaf8799cd2155170ea9f3bda6edd90268c0ff61",
+      "size": 1699
+    },
+    {
+      "file": "b18a3f8-3da5d410.png",
+      "key": "b18a3f8-3da5d410",
+      "logical_path": "Main Menu/Bar/Dark.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "54c001d38b39f69a073a0f6153eeff3c896b1ba26245a37fe74bf7922c1226ca",
+      "size": 659
+    },
+    {
+      "file": "b1c34ca4-dc368722.png",
+      "key": "b1c34ca4-dc368722",
+      "logical_path": "In Game/HUD/Pickup/Offensive/Quake Disruptor.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 256,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "98734e4d810b823579905215d6136fcb90d674bcf656ed0fa06292b1030c658c",
+      "size": 2372
+    },
+    {
+      "file": "b222d8a6-f671c703.png",
+      "key": "b222d8a6-f671c703",
+      "logical_path": "Main Menu/Screen Text/Mode/Eliminator.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "503795823518139d644e85d3e3c652b81d2459062f152dc644deb6586a183a6c",
+      "size": 2815
+    },
+    {
+      "file": "b243f48d-fe8287a1.png",
+      "key": "b243f48d-fe8287a1",
+      "logical_path": "Main Menu/Team/Text/AG-S.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "c8909b3246f25dcaf8d2e2b6677bc5a10a249be1eb529e2bd673ad7cbefe1e8d",
+      "size": 2369
+    },
+    {
+      "file": "b770b466-77627500.png",
+      "key": "b770b466-77627500",
+      "logical_path": "Main Menu/Screen Text/Class/Venom Class.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "31728854a47bc3aea85cfee8b1d403a2db8f2a62d7aad2556154a0a72db112c6",
+      "size": 4545
+    },
+    {
+      "file": "b9607029-dabda898.png",
+      "key": "b9607029-dabda898",
+      "logical_path": "Main Menu/Team/Class/Qirex.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "ddd735361332248771c7946905d9e19606d6dad5cda2b10892ccbb5a43a42341",
+      "size": 2493
+    },
+    {
+      "file": "bbbf5cbb-19e27676.png",
+      "key": "bbbf5cbb-19e27676",
+      "logical_path": "In Game/HUD/Box/Position.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "f0414b8284fc88f5019da3dbcf5cc4d84290d200279de4cc9d5c517cfb0cceeb",
+      "size": 747
+    },
+    {
+      "file": "bbbf5cbb-74acd8f4.png",
+      "key": "bbbf5cbb-74acd8f4",
+      "logical_path": "In Game/HUD/Box/Contenders Remaining.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "46dbf2e680feab43da3b94810b6254559c4a999d5f029ad5f5c81088e3d1f597",
+      "size": 803
+    },
+    {
+      "file": "bbbf5cbb-97160312.png",
+      "key": "bbbf5cbb-97160312",
+      "logical_path": "In Game/HUD/Box/Item/Item Box.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "3a0e7bd2109547ab3467cba050f8f3a059e1fe32433cca619b3bc14a328bd928",
+      "size": 754
+    },
+    {
+      "file": "bbbf5cbb-b05e258f.png",
+      "key": "bbbf5cbb-b05e258f",
+      "logical_path": "In Game/HUD/Bar/Base.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "1daf45891de433d5334dd99d1982270623c99e7ed598c9472bb8d78da861353d",
+      "size": 842
+    },
+    {
+      "file": "bbbf5cbb-cc3263e5.png",
+      "key": "bbbf5cbb-cc3263e5",
+      "logical_path": "In Game/HUD/Box/Time.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "2c8e4bddd151c56f385575265d3eaf5637bacf889ed36f220009059e49c47538",
+      "size": 760
+    },
+    {
+      "file": "bd7f89fa-cd57d48a.png",
+      "key": "bd7f89fa-cd57d48a",
+      "logical_path": "Main Menu/Title Screen/Format PAL.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 80,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "6724c5b97f8400edc7c51121e73e9563f73aea1dbbe920291344658b46009e10",
+      "size": 3994
+    },
+    {
+      "file": "bda80a4e-3795a37.png",
+      "key": "bda80a4e-3795a37",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Shield Gradient 1.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 512,
+        "interlaced": false,
+        "width": 64
+      },
+      "sha256": "b0720bb6f8d1b48659396b7270d96984d6f0d2ab42137f0b1b5b5edf55ca7ef9",
+      "size": 1459
+    },
+    {
+      "file": "bda80a4e-e962f81b.png",
+      "key": "bda80a4e-e962f81b",
+      "logical_path": "In Game/HUD/Pickup/Defensive/Shield Gradient 2.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 512,
+        "interlaced": false,
+        "width": 64
+      },
+      "sha256": "b0720bb6f8d1b48659396b7270d96984d6f0d2ab42137f0b1b5b5edf55ca7ef9",
+      "size": 1459
+    },
+    {
+      "file": "bf07ff68-a025246d.png",
+      "key": "bf07ff68-a025246d",
+      "logical_path": "Main Menu/Screen Text/Mode/Main Menu.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "5f60abe56ce0988670fe315401a9637dc95dd7d82b7973608ac9f7d3a3e2b7d9",
+      "size": 2463
+    },
+    {
+      "file": "bfd5825a-712aa77d.png",
+      "key": "bfd5825a-712aa77d",
+      "logical_path": "Main Menu/Title Screen/Psygnosis Logo.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 160,
+        "interlaced": false,
+        "width": 192
+      },
+      "sha256": "a8a426127add50cc1db9bcf15e352f3176da71926d81c7ef88d959f0fea21c9b",
+      "size": 28726
+    },
+    {
+      "file": "c0ac707d-bc2e80d2.png",
+      "key": "c0ac707d-bc2e80d2",
+      "logical_path": "PlayStation BIOS/Licensed-2.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 2048
+      },
+      "sha256": "61ec187fb7d9c8d64b6f74827a8ac8b420fb60b6e1894cbd967c6b6ece2868ae",
+      "size": 5579
+    },
+    {
+      "file": "c2cfba0e-bc2e80d2.png",
+      "key": "c2cfba0e-bc2e80d2",
+      "logical_path": "PlayStation BIOS/SCPH-5000/Sony-2.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 2048
+      },
+      "sha256": "3e135a0ca11002bdd8ae85f5e290a1474faef112440ad036af875e4fa59c118c",
+      "size": 10588
+    },
+    {
+      "file": "c2eb1e8b-cd57d48a.png",
+      "key": "c2eb1e8b-cd57d48a",
+      "logical_path": "Main Menu/Title Screen/FR.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 80,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "883680b5e52d4018ccde0a82401b12cc6a2c77455203aa115c62165888a0a787",
+      "size": 1317
+    },
+    {
+      "file": "c35e75d7-8559290a.png",
+      "key": "c35e75d7-8559290a",
+      "logical_path": "Main Menu/Team/Text/Wip3out/Track/Circuit Record.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 72,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "ed0885ac146982a3008b23f5ada6f0ffe01d4ccab4ae8f9621ea45f6cb0980ad",
+      "size": 4743
+    },
+    {
+      "file": "c67af4e0-354158d1.png",
+      "key": "c67af4e0-354158d1",
+      "logical_path": "Main Menu/Team/Text/Wip3out/Number/04.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "f63cf249cacfc7d569173476fe7ecc19fc08a23cdf58839fa9f8df4dfd438f7a",
+      "size": 1155
+    },
+    {
+      "file": "cae67c5d-251b2280.png",
+      "key": "cae67c5d-251b2280",
+      "logical_path": "Main Menu/Track/Text/Wip3out League/Mega Mall.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "6722144f469fd8f099cba69f17dd7fd87c1e66769bd75890427f30577d6847c5",
+      "size": 2874
+    },
+    {
+      "file": "ce45d5d5-7edf801c.png",
+      "key": "ce45d5d5-7edf801c",
+      "logical_path": "Main Menu/Team/Text/Wip3out/Number/05.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "2061991dc93949fb9fd736a93d82e5ec393efa17f193270e18d549141e6ec08e",
+      "size": 1347
+    },
+    {
+      "file": "ceee297a-bc2e80d2.png",
+      "key": "ceee297a-bc2e80d2",
+      "logical_path": "PlayStation BIOS/Licensed-1.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 2048
+      },
+      "sha256": "01a7c9609e1ffd4b5467e08b4cf92b38c30cee780ee3e77dd47ee8da038602a5",
+      "size": 7709
+    },
+    {
+      "file": "cf275cbb-352aebea.png",
+      "key": "cf275cbb-352aebea",
+      "logical_path": "Main Menu/Screen Text/Other/Player Icon.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 136,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "6e9d79219d25b39307cd57a7b0798d77f226381416e04022c5ae4e5fdfe0374b",
+      "size": 1229
+    },
+    {
+      "file": "cf63b296-41e26c01.png",
+      "key": "cf63b296-41e26c01",
+      "logical_path": "In Game/HUD/Multiplayer/Wrong Way.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 256,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "00eee01900025702254369943a19b5e851b0bf4035b1bf7482651a8a3923549d",
+      "size": 2076
+    },
+    {
+      "file": "d046e2b6-7205c45b.png",
+      "key": "d046e2b6-7205c45b",
+      "logical_path": "In Game/HUD/Box/Time/Dark.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "ce48c662a0523f66968d0ec377e97fce3cf421d2641d62e600347bd25b0ed9db",
+      "size": 321
+    },
+    {
+      "file": "d046e2b6-94f476b1.png",
+      "key": "d046e2b6-94f476b1",
+      "logical_path": "In Game/HUD/Box/Time/Light.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "9f2a12375507cc21d9b76abcba8433975de6a88ccfa38e4ed20a16dc48d35308",
+      "size": 324
+    },
+    {
+      "file": "d046e2b6-f5ed32cf.png",
+      "key": "d046e2b6-f5ed32cf",
+      "logical_path": "In Game/HUD/Box/Time/Blue Small.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "25778fae986dfcb96708e6e92510f86debfc9c49711f84a5d0d98cf07a7d29a6",
+      "size": 327
+    },
+    {
+      "file": "d20dee94-273d3b40.png",
+      "key": "d20dee94-273d3b40",
+      "logical_path": "Font/Main Menu/Helvetica/S07 Grey.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 576,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "71b5cfd45fc8df3d61fcc92249c7c740c7912143d5fac31d9ac9b561cb9090a0",
+      "size": 143894
+    },
+    {
+      "file": "d20dee94-5888b400.png",
+      "key": "d20dee94-5888b400",
+      "logical_path": "Font/Main Menu/Helvetica/S07 Light.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 576,
+        "interlaced": false,
+        "width": 4096
+      },
+      "sha256": "62a807462d83df333db83fda815e65bf9a0915a8836775f90ff0dea73c0cd431",
+      "size": 138837
+    },
+    {
+      "file": "d281cf44-2a49f962.png",
+      "key": "d281cf44-2a49f962",
+      "logical_path": "Main Menu/Medal/Challenge/Main Menu/Text/Time.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "219b8e6e0e599301f5f0a75ace7f6de4cb5a2f09a1d8d0bd38b511ca2d7b9a9f",
+      "size": 1060
+    },
+    {
+      "file": "d281cf44-c7f17a42.png",
+      "key": "d281cf44-c7f17a42",
+      "logical_path": "Main Menu/Medal/Challenge/In Game/Text/Time.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "219b8e6e0e599301f5f0a75ace7f6de4cb5a2f09a1d8d0bd38b511ca2d7b9a9f",
+      "size": 1060
+    },
+    {
+      "file": "d3b99b98-9c6d05ed.png",
+      "key": "d3b99b98-9c6d05ed",
+      "logical_path": "In Game/Billboards/18 - LS102-MG71/Qirex.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 512,
+        "interlaced": false,
+        "width": 2048
+      },
+      "sha256": "879a9afdbcba34e0afc3e2a9716b037825483ddfad949d009e18be3a3b156c3e",
+      "size": 47093
+    },
+    {
+      "file": "d503ec30-f110c99d.png",
+      "key": "d503ec30-f110c99d",
+      "logical_path": "Main Menu/Track/Class/Wip3out League/Stanza Inter.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "b22b56f63d14afa1e7ca6f2e3e4b9ec85f5781df6455413a0473888113418d3b",
+      "size": 3081
+    },
+    {
+      "file": "d6585efa-bc2e80d2.png",
+      "key": "d6585efa-bc2e80d2",
+      "logical_path": "PlayStation BIOS/SCPH-5002/Sony-2.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 2048
+      },
+      "sha256": "be3f9acea7be100cf2c5f0fd111fc26da25dfc1aad5820e8b905bab8ca2574a3",
+      "size": 11403
+    },
+    {
+      "file": "dae6c560-be1bf8bb.png",
+      "key": "dae6c560-be1bf8bb",
+      "logical_path": "PlayStation BIOS/TM.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 96,
+        "interlaced": false,
+        "width": 192
+      },
+      "sha256": "b7f1601e32491c64af57a2ff0ac1196e35bc99e1523068b1d57185a4f892e948",
+      "size": 825
+    },
+    {
+      "file": "db99d6c8-863b6690.png",
+      "key": "db99d6c8-863b6690",
+      "logical_path": "Main Menu/Track/Class/Classic League/Altima VII.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "a7229af0ecfc235793f1b304eb8c238abacd6bebcdaa9a6861297b4f18a31595",
+      "size": 1774
+    },
+    {
+      "file": "de6eb938-bc2e80d2.png",
+      "key": "de6eb938-bc2e80d2",
+      "logical_path": "PlayStation BIOS/SCPH-5002/SCEE.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "a100ac45cb900801dcf055c1f4bc1c22dba76dbd0b461a790560d409ca740fd4",
+      "size": 4861
+    },
+    {
+      "file": "def26934-63decded.png",
+      "key": "def26934-63decded",
+      "logical_path": "Main Menu/Team/Text/Icaras.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "2f0aaa9d7712c1fe102117a50777f2f84b52de9b0dd962813afac2e849f5e2f2",
+      "size": 2723
+    },
+    {
+      "file": "df335c8c-7205c45b.png",
+      "key": "df335c8c-7205c45b",
+      "logical_path": "In Game/HUD/Multiplayer/Bar/Speed/Dark.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "e0f516dec574b2d69dfb62c76b36a2978f83f823de3c003a52aba2b9a31ce71a",
+      "size": 370
+    },
+    {
+      "file": "df335c8c-f5ed32cf.png",
+      "key": "df335c8c-f5ed32cf",
+      "logical_path": "In Game/HUD/Multiplayer/Bar/Speed/Blue.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "fc9e223e98b4479a67ede835f8b562d922fe16fba8bcf9ee180d561d20578f6b",
+      "size": 375
+    },
+    {
+      "file": "e0465b6f-e09ef93c.png",
+      "key": "e0465b6f-e09ef93c",
+      "logical_path": "In Game/Billboards/20 - LS104-AW73/Qirex.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 512,
+        "interlaced": false,
+        "width": 2048
+      },
+      "sha256": "31cb94150667235912cad8bbdfe2506ee26d5d2b6bc470d0a9b9f8800b415f66",
+      "size": 43093
+    },
+    {
+      "file": "e068926a-923388b5.png",
+      "key": "e068926a-923388b5",
+      "logical_path": "Main Menu/Team/Class/Goteki 45.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "5e842f99d2110552bb290f157f9b6950e147f57ba6f3a3c4bfa3ccb4de97cc92",
+      "size": 2969
+    },
+    {
+      "file": "e109f497-bc2e80d2.png",
+      "key": "e109f497-bc2e80d2",
+      "logical_path": "PlayStation BIOS/SCPH-5002/Sony-3.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 768
+      },
+      "sha256": "a126eafb042000eac08db028da8d76acd2e1d6c94303083a6f653a1eba438ca5",
+      "size": 3288
+    },
+    {
+      "file": "e5857fdb-94f476b1.png",
+      "key": "e5857fdb-94f476b1",
+      "logical_path": "Main Menu/Bar/Light.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 112,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "3e9a97e6f212a827bcc32c77271c7b3450c031b2f96af3cb64c4576bc3d170d3",
+      "size": 789
+    },
+    {
+      "file": "e5857fdb-f5ed32cf.png",
+      "key": "e5857fdb-f5ed32cf",
+      "logical_path": "Main Menu/Bar/Blue.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 112,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "e3315e12e06f8f48fb591bb22143229992664f4e888fcae7406a1732b0afe682",
+      "size": 809
+    },
+    {
+      "file": "e8a8dde-322b5399.png",
+      "key": "e8a8dde-322b5399",
+      "logical_path": "Main Menu/Title Screen/Arrow Right.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 40,
+        "interlaced": false,
+        "width": 64
+      },
+      "sha256": "7d631d05f445561425dc6187875d2b395b2a9e6cfc32f113e0fbc2c464c159bf",
+      "size": 317
+    },
+    {
+      "file": "e8b06b34-bc2e80d2.png",
+      "key": "e8b06b34-bc2e80d2",
+      "logical_path": "PlayStation BIOS/SCPH-5001/SCEA.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "67eecf102a64d0d7aff213d70eac7fe781fe48dc76a2ebdd2b5486392fad77d1",
+      "size": 6246
+    },
+    {
+      "file": "e8ddd606-464bd66f.png",
+      "key": "e8ddd606-464bd66f",
+      "logical_path": "Main Menu/Team/Text/Wip3out/Ship/Thrust.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 72,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "a9c3b9fd13dba59585c968f368c8fabcf3854e410b2417de9b6e78cdb6f0b456",
+      "size": 2409
+    },
+    {
+      "file": "e9856148-8721a8d2.png",
+      "key": "e9856148-8721a8d2",
+      "logical_path": "Main Menu/Team/Class/Auricom.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "7322930ad0d23de740f52d40b1802d591509a5604a344b4a77139f4b05b88d7b",
+      "size": 3003
+    },
+    {
+      "file": "eb4988cb-e3b09ccd.png",
+      "key": "eb4988cb-e3b09ccd",
+      "logical_path": "Main Menu/Class/Not Selected/Vector.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "165f524787c265a2f113db8ccb00ad2fe1546b4fad2b2b3393252ec0998366f1",
+      "size": 3227
+    },
+    {
+      "file": "eb59bd18-cd57d48a.png",
+      "key": "eb59bd18-cd57d48a",
+      "logical_path": "Main Menu/Title Screen/Further Information.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 960
+      },
+      "sha256": "9b0a08a6fd745716a1ef4ba0d67b8ca44f19c7a0187d782de1ca44970ab9430e",
+      "size": 5670
+    },
+    {
+      "file": "ecd4100a-e337e367.png",
+      "key": "ecd4100a-e337e367",
+      "logical_path": "Main Menu/Screen Text/Class/Vector Class.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "bc7d1fc9e41359403c2a34c95c7a85bac4a3f75bed207c23dce333d0c10e8a32",
+      "size": 4127
+    },
+    {
+      "file": "ecf20f59-5d9c0833.png",
+      "key": "ecf20f59-5d9c0833",
+      "logical_path": "In Game/HUD/Bar/Energy/Light.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "b55f2d22a2dc720ba43e98ecdc856925fbf1aa0f7b05d81c7848fa4bbaf863d9",
+      "size": 335
+    },
+    {
+      "file": "ecf20f59-7205c45b.png",
+      "key": "ecf20f59-7205c45b",
+      "logical_path": "In Game/HUD/Bar/Energy/Dark.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "557564b997ae92bc6861d43e9caefb349749380da525c2bd1f350fd18e42ca61",
+      "size": 338
+    },
+    {
+      "file": "ecf20f59-7b49694d.png",
+      "key": "ecf20f59-7b49694d",
+      "logical_path": "In Game/HUD/Bar/Energy/Brown.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "b8af17cea4ad94eb6e7b13627f71ae0c376c2b0368cf0b6d72d264bb92aff388",
+      "size": 342
+    },
+    {
+      "file": "edde3ee0-3b40eaf5.png",
+      "key": "edde3ee0-3b40eaf5",
+      "logical_path": "Main Menu/Team/Text/Colour Breakdown.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 832
+      },
+      "sha256": "4dd7d03b1cbf4141f853472d5cb37bd3ca6af971f595598312f82e8203ba9fc5",
+      "size": 5783
+    },
+    {
+      "file": "f18abc7d-cdf68733.png",
+      "key": "f18abc7d-cdf68733",
+      "logical_path": "Main Menu/Track/Class/Classic League/Odessa Keys.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 88,
+        "interlaced": false,
+        "width": 320
+      },
+      "sha256": "bbb340dcb3715309e3748387169e710c60ea03525f17b4b17b3c9fe3aa254efe",
+      "size": 3888
+    },
+    {
+      "file": "f1b0f819-bc2e80d2.png",
+      "key": "f1b0f819-bc2e80d2",
+      "logical_path": "PlayStation BIOS/SCPH-5001/Sony-2.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 2048
+      },
+      "sha256": "73c29ab37c9f97f34ad064dd9e64bc14bd2602e3378faac38d3301b9070c5033",
+      "size": 12648
+    },
+    {
+      "file": "f1b4a400-dc368722.png",
+      "key": "f1b4a400-dc368722",
+      "logical_path": "In Game/HUD/Pickup/Offensive/Plasma Beam.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 256,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "89f70210f9a32bb048cea184880e8b58367bf3a1f5b425e219a325718f43b670",
+      "size": 2577
+    },
+    {
+      "file": "f1c3a895-19955f07.png",
+      "key": "f1c3a895-19955f07",
+      "logical_path": "In Game/Tracks/321Go/Frame9.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1024,
+        "interlaced": false,
+        "width": 1536
+      },
+      "sha256": "b08d6045af1c3ea92a08588977075b6b63406e2951a73b476cf88041c484995b",
+      "size": 80233
+    },
+    {
+      "file": "f1c3a895-2233a1b6.png",
+      "key": "f1c3a895-2233a1b6",
+      "logical_path": "In Game/Tracks/321Go/Frame10.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1024,
+        "interlaced": false,
+        "width": 1536
+      },
+      "sha256": "8213f3c63445378689db41c83815c2ed4deb68ee70d99484ffe41283f59dc38c",
+      "size": 75612
+    },
+    {
+      "file": "f1c3a895-4ed1833e.png",
+      "key": "f1c3a895-4ed1833e",
+      "logical_path": "In Game/Tracks/321Go/Frame5.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1024,
+        "interlaced": false,
+        "width": 1536
+      },
+      "sha256": "a8e1dc1059c8a366b668166a2cdb5570b18cb23639b706de902a274f6ed10dc2",
+      "size": 70790
+    },
+    {
+      "file": "f1c3a895-75777d8f.png",
+      "key": "f1c3a895-75777d8f",
+      "logical_path": "In Game/Tracks/321Go/Frame12.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1024,
+        "interlaced": false,
+        "width": 1536
+      },
+      "sha256": "e66d9e29c2b9347238cf370565c924fb028cac6df7bca4443249fc9d11bc98aa",
+      "size": 75521
+    },
+    {
+      "file": "f1c3a895-8cc07ac0.png",
+      "key": "f1c3a895-8cc07ac0",
+      "logical_path": "In Game/Tracks/321Go/Frame7.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1024,
+        "interlaced": false,
+        "width": 1536
+      },
+      "sha256": "5e9c4f4872f70e2a438a0745da5d32df34384f69fbd49d51cb64aa48860dec91",
+      "size": 74447
+    },
+    {
+      "file": "f1c3a895-8fc7a4.png",
+      "key": "f1c3a895-8fc7a4",
+      "logical_path": "In Game/Tracks/321Go/Frame6.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1024,
+        "interlaced": false,
+        "width": 1536
+      },
+      "sha256": "5b250f07c82c7d65177e2b136873245505674d53fd9aa60ab8ad318517b31ac0",
+      "size": 72772
+    },
+    {
+      "file": "f1c3a895-9cf24251.png",
+      "key": "f1c3a895-9cf24251",
+      "logical_path": "In Game/Tracks/321Go/Frame8.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1024,
+        "interlaced": false,
+        "width": 1536
+      },
+      "sha256": "b625e81db917d7109de01aeea8e8e12062f015ad4e2981b7b431fd9465fbd566",
+      "size": 77296
+    },
+    {
+      "file": "f1c3a895-a754bce0.png",
+      "key": "f1c3a895-a754bce0",
+      "logical_path": "In Game/Tracks/321Go/Frame11.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 1024,
+        "interlaced": false,
+        "width": 1536
+      },
+      "sha256": "c6216d91c93216532a4ab333276866916b04e6065190751d1c9b8e4401429229",
+      "size": 72611
+    },
+    {
+      "file": "f24e42c0-24042209.png",
+      "key": "f24e42c0-24042209",
+      "logical_path": "PlayStation BIOS/Sony.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 384,
+        "interlaced": false,
+        "width": 1920
+      },
+      "sha256": "99e3c5853a2e648fd5f30595b0e039938c05b123d872eb6e4acbcccb28d8dbdb",
+      "size": 21316
+    },
+    {
+      "file": "f3933a47-681e35c7.png",
+      "key": "f3933a47-681e35c7",
+      "logical_path": "In Game/HUD/Multiplayer/Box/Position.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "8dd0b93698760f2f51b404452fe22e77460a6ac85a95e46ce9c88a4585d4a7c7",
+      "size": 754
+    },
+    {
+      "file": "f3933a47-920e637c.png",
+      "key": "f3933a47-920e637c",
+      "logical_path": "In Game/HUD/Multiplayer/Box/Contenders Remaining.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "b040b6a9279a5caa0320ffeab23b2e35f4ef8823c23147dcd2cdc18119003a64",
+      "size": 797
+    },
+    {
+      "file": "f3933a47-cbd87732.png",
+      "key": "f3933a47-cbd87732",
+      "logical_path": "In Game/HUD/Multiplayer/Bar/Time-Base.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 512
+      },
+      "sha256": "14a082452cf910a09f7857dbe4824f6fce43db74ceff84d553c5b2d29b5151a6",
+      "size": 934
+    },
+    {
+      "file": "f4154700-8c5750db.png",
+      "key": "f4154700-8c5750db",
+      "logical_path": "Main Menu/Class/Selected/Vector.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "e99570f335f88d3fffb0dbc7fd0aabd0b8368f7d88c2d201fd4aa8b33bd3c707",
+      "size": 3461
+    },
+    {
+      "file": "f4acad11-a5b61308.png",
+      "key": "f4acad11-a5b61308",
+      "logical_path": "Main Menu/Track/Text/Classic League/Phenitia Park.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "93a0387aeb422649bb5f6f4225fd4ebc1eac56fec330471b610821b5fae29161",
+      "size": 3302
+    },
+    {
+      "file": "f4b2870-8283ea21.png",
+      "key": "f4b2870-8283ea21",
+      "logical_path": "Main Menu/Class/Selected/Rapier.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "9e72c80e4a97d7e0b6b7742bd2e826f74ddf8b9c0e0e3d5a7cbb561c7bbcaad0",
+      "size": 2444
+    },
+    {
+      "file": "f594a4e3-accab2f3.png",
+      "key": "f594a4e3-accab2f3",
+      "logical_path": "Main Menu/Class/Selected/Venom.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 128,
+        "interlaced": false,
+        "width": 384
+      },
+      "sha256": "2138702a2790c1c4b1332561070d9e8ec0a0d792c27794a96bec83762db8f44a",
+      "size": 3207
+    },
+    {
+      "file": "f699cd0b-1f3fb8ac.png",
+      "key": "f699cd0b-1f3fb8ac",
+      "logical_path": "Main Menu/Medal/Challenge/Main Menu/Text/Position.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "b32abe98024625f2d5c3ba346d7696fd2068df94ce4b1cf4a5276c9790004f50",
+      "size": 2946
+    },
+    {
+      "file": "f699cd0b-f2873b8c.png",
+      "key": "f699cd0b-f2873b8c",
+      "logical_path": "Main Menu/Medal/Challenge/In Game/Text/Position.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "b32abe98024625f2d5c3ba346d7696fd2068df94ce4b1cf4a5276c9790004f50",
+      "size": 2946
+    },
+    {
+      "file": "f6c8ba56-dabda898.png",
+      "key": "f6c8ba56-dabda898",
+      "logical_path": "Main Menu/Team/Text/Qirex.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 48,
+        "interlaced": false,
+        "width": 448
+      },
+      "sha256": "2d34eb906df10f3bb28a78d8620fd396389cfb0334ed3c6510896d2df07a5aa9",
+      "size": 2961
+    },
+    {
+      "file": "f7a96f10-7205c45b.png",
+      "key": "f7a96f10-7205c45b",
+      "logical_path": "In Game/HUD/Bar/Speed/Dark.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "00a8f1461f1902bb6f27eb06a06a9cea90cd1c839a19063089bcdd85615f6630",
+      "size": 365
+    },
+    {
+      "file": "f7a96f10-f5ed32cf.png",
+      "key": "f7a96f10-f5ed32cf",
+      "logical_path": "In Game/HUD/Bar/Speed/Blue.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 128
+      },
+      "sha256": "177b116184be41ea01d244e4f9adeb99f75348ee265afaada744ce515f61164e",
+      "size": 370
+    },
+    {
+      "file": "fa79f378-cd89eec1.png",
+      "key": "fa79f378-cd89eec1",
+      "logical_path": "Main Menu/Screen Text/Other/Wip3out/Player Icon.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 272,
+        "interlaced": false,
+        "width": 256
+      },
+      "sha256": "8f1136250121d14a5d3bc8f9e7dafaadb2a2eca83d31773117b2024bad774a91",
+      "size": 2433
+    },
+    {
+      "file": "fb41cb9-3b40eaf5.png",
+      "key": "fb41cb9-3b40eaf5",
+      "logical_path": "Main Menu/Team/Text/Color Breakdown.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 32,
+        "interlaced": false,
+        "width": 832
+      },
+      "sha256": "eb01041300a7417c5996ecfb4b64918eae3709da679140ae206a6131777ceab3",
+      "size": 5143
+    },
+    {
+      "file": "fbeed42e-2165363a.png",
+      "key": "fbeed42e-2165363a",
+      "logical_path": "Main Menu/Screen Text/Other/WIPEOUT v3-0.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 64,
+        "interlaced": false,
+        "width": 640
+      },
+      "sha256": "4d03848676d738b0694eca0e5c596555c192cded830d7fb8d67f62155119e0b2",
+      "size": 4164
+    },
+    {
+      "file": "fcc733be-f1a2182d.png",
+      "key": "fcc733be-f1a2182d",
+      "logical_path": "PlayStation BIOS/Logo TM.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 320,
+        "interlaced": false,
+        "width": 1600
+      },
+      "sha256": "b182ba234ac2bc9235ba84eb8229a34b2ccf16da5ae65419dedf97de6458edf5",
+      "size": 22938
+    },
+    {
+      "file": "fe137a10-c40f2edf.png",
+      "key": "fe137a10-c40f2edf",
+      "logical_path": "In Game/Billboards/19 - LS103-AW72/Qirex.png",
+      "png": {
+        "bit_depth": 8,
+        "color_type": 6,
+        "height": 512,
+        "interlaced": false,
+        "width": 2048
+      },
+      "sha256": "4abc32d01e739bfafa43caf5e7db9c80ffd5d9010efc7a5bca6c6f3e4d149456",
+      "size": 42510
+    }
+  ],
+  "total_texture_bytes": 2890854
+}

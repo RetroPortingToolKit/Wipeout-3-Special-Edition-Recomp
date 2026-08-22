@@ -93,6 +93,52 @@ constexpr std::array<std::int16_t, 512u> kInterpolationTable = {
     0x5997, 0x599E, 0x59A4, 0x59A9, 0x59AD, 0x59B0, 0x59B2, 0x59B3,
 };
 
+/*
+ * The documented SPU reverb resampler is a centred 39-tap half-band FIR.
+ * These are the public hexadecimal coefficients, represented in signed
+ * Q15.  The input path consumes one filtered phase every other native tick;
+ * the output path zero-stuffs the alternating core samples and doubles the
+ * accumulated value after zero-insertion so a constant signal retains unity
+ * gain.
+ */
+constexpr std::array<std::int16_t, ReverbFirTapCount> kReverbFir = {
+    -0x0001, 0x0000, 0x0002, 0x0000, -0x000A, 0x0000, 0x0023, 0x0000,
+    -0x0067, 0x0000, 0x010A, 0x0000, -0x0268, 0x0000, 0x0534, 0x0000,
+    -0x0B90, 0x0000, 0x2806, 0x4000, 0x2806, 0x0000, -0x0B90, 0x0000,
+    0x0534, 0x0000, -0x0268, 0x0000, 0x010A, 0x0000, -0x0067, 0x0000,
+    0x0023, 0x0000, -0x000A, 0x0000, 0x0002, 0x0000, -0x0001,
+};
+
+constexpr std::int32_t reverb_fir_coefficient_sum() noexcept {
+    std::int32_t sum = 0;
+    for (const std::int16_t coefficient : kReverbFir) {
+        sum += coefficient;
+    }
+    return sum;
+}
+
+static_assert(kReverbFir.size() == ReverbFirTapCount);
+static_assert(kReverbFir[ReverbFirDelaySamples] == 0x4000);
+static_assert(reverb_fir_coefficient_sum() == 0x7FFEu);
+
+constexpr bool interpolation_table_is_normalized() noexcept {
+    for (std::size_t phase = 0u; phase < 256u; ++phase) {
+        const std::int32_t sum =
+            kInterpolationTable[phase] +
+            kInterpolationTable[0x0FFu - phase] +
+            kInterpolationTable[0x100u + phase] +
+            kInterpolationTable[0x1FFu - phase];
+        if (sum < 0x7F7F || sum > 0x7F81) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static_assert(kInterpolationTable.front() == -1);
+static_assert(kInterpolationTable.back() == 0x59B3);
+static_assert(interpolation_table_is_normalized());
+
 constexpr std::uint8_t kSnapshotMagic[8u] = {
     static_cast<std::uint8_t>('S'), static_cast<std::uint8_t>('P'),
     static_cast<std::uint8_t>('U'), static_cast<std::uint8_t>('S'),
@@ -259,8 +305,9 @@ std::int32_t Device::arithmetic_shift_right(std::int32_t value,
     if (wide >= 0) {
         return static_cast<std::int32_t>(wide / divisor);
     }
-    const std::int64_t magnitude = -wide;
-    return static_cast<std::int32_t>(-((magnitude + divisor - 1) / divisor));
+    const std::int64_t quotient = wide / divisor;
+    const std::int64_t remainder = wide % divisor;
+    return static_cast<std::int32_t>(quotient - (remainder != 0 ? 1 : 0));
 }
 
 std::int64_t Device::arithmetic_shift_right(std::int64_t value,
@@ -275,8 +322,9 @@ std::int64_t Device::arithmetic_shift_right(std::int64_t value,
     if (value >= 0) {
         return value / divisor;
     }
-    const std::int64_t magnitude = -value;
-    return -((magnitude + divisor - 1) / divisor);
+    const std::int64_t quotient = value / divisor;
+    const std::int64_t remainder = value % divisor;
+    return quotient - (remainder != 0 ? 1 : 0);
 }
 
 std::int16_t Device::saturate_i16(std::int64_t value) noexcept {
@@ -343,7 +391,10 @@ std::uint32_t Device::wrap_ram(std::uint32_t address) noexcept {
 namespace {
 
 std::int32_t signed32_from_bits(std::uint32_t bits) noexcept {
-    if ((bits & 0x80000000u) == 0u) {
+    constexpr std::uint32_t sign_bit = static_cast<std::uint32_t>(1u)
+                                       << (std::numeric_limits<std::uint32_t>::digits -
+                                           1u);
+    if ((bits & sign_bit) == 0u) {
         return static_cast<std::int32_t>(bits);
     }
     return static_cast<std::int32_t>(static_cast<std::int64_t>(bits) -
@@ -370,6 +421,11 @@ void Device::reset() noexcept {
     external_volume_left_ = 0;
     external_volume_right_ = 0;
     control_ = 0u;
+    effective_control_ = 0u;
+    pending_control_mode_ = 0u;
+    pending_control_mode_valid_ = false;
+    pending_key_on_mask_ = 0u;
+    pending_key_off_mask_ = 0u;
     transfer_control_ = 0u;
     transfer_address_register_ = 0u;
     transfer_current_byte_ = 0u;
@@ -391,6 +447,15 @@ void Device::reset() noexcept {
     sample_counter_ = 0u;
     reverb_hold_left_ = 0;
     reverb_hold_right_ = 0;
+    reverb_input_left_.fill(0);
+    reverb_input_right_.fill(0);
+    reverb_output_history_left_.fill(0);
+    reverb_output_history_right_.fill(0);
+    reverb_history_index_ = 0u;
+    dma_read_request_ready_ = false;
+    transfer_busy_ = false;
+    unknown_control_registers_.fill(0u);
+    unknown_internal_registers_.fill(0u);
     irq_pending_ = false;
     audio_source_ = AudioSource::Cdda;
     cdda_fifo_ = StereoFifo<AudioFifoCapacity>{};
@@ -401,9 +466,67 @@ void Device::reset() noexcept {
 void Device::write_volume(VolumeControl& volume,
                           std::uint16_t raw) noexcept {
     volume.raw = raw;
+    /* A later sweep write supersedes an as-yet unapplied fixed write. */
+    volume.pending_fixed = false;
     if ((raw & 0x8000u) == 0u) {
-        volume.current = decode_fixed_volume(raw);
-        volume.counter = 0u;
+        /*
+         * The SPU samples fixed-volume writes at the native 44.1 kHz
+         * boundary.  Keep the programmed register visible immediately, but
+         * defer the internal level/counter update until the next boundary.
+         */
+        volume.pending_current = decode_fixed_volume(raw);
+        volume.pending_counter = 0u;
+        volume.pending_fixed = true;
+    }
+}
+
+void Device::apply_pending_events() noexcept {
+    bool control_applied = false;
+    if (pending_control_mode_valid_) {
+        apply_control(static_cast<std::uint16_t>(
+            (effective_control_ & static_cast<std::uint16_t>(~0x003Fu)) |
+            (pending_control_mode_ & 0x003Fu)));
+        pending_control_mode_valid_ = false;
+        control_applied = true;
+    }
+
+    const auto apply_volume = [](VolumeControl& volume) noexcept {
+        if (!volume.pending_fixed) {
+            return;
+        }
+        volume.current = volume.pending_current;
+        volume.counter = volume.pending_counter;
+        volume.pending_fixed = false;
+    };
+    apply_volume(main_left_);
+    apply_volume(main_right_);
+    for (Voice& voice : voices_) {
+        apply_volume(voice.left_volume);
+        apply_volume(voice.right_volume);
+    }
+
+    /* Key writes are sampled at the same native device boundary. */
+    if (pending_key_on_mask_ != 0u) {
+        key_on(pending_key_on_mask_);
+        pending_key_on_mask_ = 0u;
+    }
+    if (pending_key_off_mask_ != 0u) {
+        key_off(pending_key_off_mask_);
+        pending_key_off_mask_ = 0u;
+    }
+    for (Voice& voice : voices_) {
+        if (voice.pending_current_adsr_valid) {
+            voice.current_adsr_register = voice.pending_current_adsr;
+            voice.adsr_volume = to_i16(voice.pending_current_adsr);
+            voice.pending_current_adsr_valid = false;
+        }
+    }
+
+    if (!control_applied &&
+        transfer_mode(effective_control_) == TransferMode::DmaRead &&
+        !dma_read_request_ready_) {
+        /* SPUSTAT.DRQ is not asserted on the same boundary as DMA-read mode. */
+        dma_read_request_ready_ = true;
     }
 }
 
@@ -426,11 +549,8 @@ void Device::advance_volume(VolumeControl& volume) noexcept {
         step *= static_cast<std::int32_t>(1u << (11u - shift));
     }
     std::uint32_t increment = shift > 11u
-                                 ? (0x8000u >> std::min(shift - 11u, 15u))
+                                 ? (0x8000u >> (shift - 11u))
                                  : 0x8000u;
-    if ((step_value | (shift << 2u)) != 0x7Fu && increment == 0u) {
-        increment = 1u;
-    }
     if (exponential && decreasing) {
         step = saturate_i32(arithmetic_shift_right(
             static_cast<std::int64_t>(step) * volume.current, 15u));
@@ -439,12 +559,18 @@ void Device::advance_volume(VolumeControl& volume) noexcept {
         if (shift < 10u) {
             step = arithmetic_shift_right(step, 2u);
         } else if (shift >= 11u) {
-            increment = std::max(increment >> 2u, 1u);
+            increment >>= 2u;
         } else {
             step = arithmetic_shift_right(step, 1u);
-            increment = std::max(increment >> 1u, 1u);
+            increment >>= 1u;
         }
     }
+
+    const std::uint32_t encoded_rate = step_value | (shift << 2u);
+    if (encoded_rate == 0x7Fu) {
+        return;
+    }
+    increment = std::max(increment, 1u);
 
     const std::uint32_t next_counter =
         static_cast<std::uint32_t>(volume.counter) + increment;
@@ -454,11 +580,7 @@ void Device::advance_volume(VolumeControl& volume) noexcept {
     }
     std::int32_t level = static_cast<std::int32_t>(volume.current) + step;
     if (!decreasing) {
-        if (negative_phase) {
-            level = std::clamp(level, -32768, 0);
-        } else {
-            level = std::clamp(level, -32768, 32767);
-        }
+        level = std::clamp(level, -32768, 32767);
     } else if (negative_phase) {
         level = std::clamp(level, -32768, 0);
     } else {
@@ -503,30 +625,23 @@ void Device::key_off(std::uint32_t mask) noexcept {
     }
 }
 
-void Device::set_voice_mask(std::uint32_t& destination,
-                            std::uint32_t value) noexcept {
-    destination = value & ((1u << VoiceCount) - 1u);
-}
-
 void Device::apply_control(std::uint16_t value) noexcept {
     const bool previously_enabled =
-        (control_ & ControlIrqEnable) != 0u &&
-        (control_ & ControlEnable) != 0u;
-    const TransferMode previous_mode = transfer_mode(control_);
-    if (previous_mode == TransferMode::ManualWrite) {
-        service_transfer_fifo();
-    }
-    control_ = value;
-    const TransferMode next_mode = transfer_mode(control_);
-    if (next_mode == TransferMode::ManualWrite) {
-        service_transfer_fifo();
-    }
-    if ((control_ & ControlIrqEnable) == 0u) {
+        (effective_control_ & ControlIrqEnable) != 0u &&
+        (effective_control_ & ControlEnable) != 0u;
+    const TransferMode previous_mode = transfer_mode(effective_control_);
+    effective_control_ = value;
+    const TransferMode next_mode = transfer_mode(effective_control_);
+    if ((effective_control_ & ControlIrqEnable) == 0u) {
         irq_pending_ = false;
     } else if (!previously_enabled &&
-               (control_ & ControlEnable) != 0u && irq_pending_ &&
+               (effective_control_ & ControlEnable) != 0u && irq_pending_ &&
                irq_callback_ != nullptr) {
         irq_callback_(irq_user_);
+    }
+    if (next_mode != TransferMode::DmaRead ||
+        previous_mode != TransferMode::DmaRead) {
+        dma_read_request_ready_ = false;
     }
 }
 
@@ -536,10 +651,14 @@ void Device::apply_transfer_control(std::uint16_t value) noexcept {
 
 void Device::touch_ram_range(std::uint32_t start,
                              std::uint32_t bytes) noexcept {
+    if ((effective_control_ & (ControlEnable | ControlIrqEnable)) !=
+        (ControlEnable | ControlIrqEnable)) {
+        return;
+    }
+    const std::uint32_t irq_byte =
+        static_cast<std::uint32_t>(irq_address_register_) * 8u;
     for (std::uint32_t offset = 0u; offset < bytes; offset += 2u) {
         const std::uint32_t address = wrap_ram(start + offset);
-        const std::uint32_t irq_byte =
-            static_cast<std::uint32_t>(irq_address_register_) * 8u;
         if (address == irq_byte) {
             trigger_irq();
         }
@@ -547,8 +666,8 @@ void Device::touch_ram_range(std::uint32_t start,
 }
 
 void Device::trigger_irq() noexcept {
-    if ((control_ & ControlIrqEnable) == 0u ||
-        (control_ & ControlEnable) == 0u) {
+    if ((effective_control_ & ControlIrqEnable) == 0u ||
+        (effective_control_ & ControlEnable) == 0u) {
         return;
     }
     const bool was_pending = irq_pending_;
@@ -590,7 +709,7 @@ std::uint16_t Device::read_transfer_word() noexcept {
             transfer_fifo_count_ - 1u);
         return value;
     }
-    if (transfer_mode(control_) == TransferMode::DmaRead) {
+    if (transfer_mode(effective_control_) == TransferMode::DmaRead) {
         const std::uint16_t value = read_ram_word(transfer_current_byte_);
         advance_transfer_address();
         return value;
@@ -652,50 +771,59 @@ void Device::advance_transfer_address() noexcept {
 }
 
 DmaResult Device::dma_write(std::span<const std::uint16_t> words) noexcept {
-    if (transfer_mode(control_) != TransferMode::DmaWrite) {
+    if (transfer_mode(effective_control_) != TransferMode::DmaWrite) {
         return DmaResult{DmaFault::WrongTransferMode, 0u};
     }
     if (words.size() > MaxDmaHalfwordsPerCall) {
         return DmaResult{DmaFault::TooManyHalfwords, 0u};
     }
+    transfer_busy_ = true;
     const std::uint32_t transfer_type =
         static_cast<std::uint32_t>((transfer_control_ >> 1u) & 0x7u);
-    std::size_t transferred = 0u;
-    if (transfer_type == 0u || transfer_type == 1u || transfer_type >= 6u) {
-        const std::uint16_t fill_value = words.empty() ? 0u : words.back();
-        for (std::size_t index = 0u; index < words.size(); ++index) {
-            write_transfer_word(fill_value);
-            transferred += 1u;
-        }
-    } else if (transfer_type == 2u) {
-        for (const std::uint16_t word : words) {
-            write_transfer_word(word);
-            transferred += 1u;
-        }
-    } else {
-        const std::size_t repeat = transfer_type == 3u
-                                       ? 2u
-                                       : (transfer_type == 4u ? 4u : 8u);
-        for (std::size_t index = 0u; index < words.size(); index += repeat) {
-            const std::size_t source_index = transfer_type == 5u
-                                                 ? index + repeat - 1u
-                                                 : index;
-            if (source_index >= words.size()) {
-                break;
+    for (std::size_t chunk_offset = 0u; chunk_offset < words.size();
+         chunk_offset += TransferFifoCapacity) {
+        const std::size_t chunk_size = std::min(
+            TransferFifoCapacity, words.size() - chunk_offset);
+        const auto chunk = words.subspan(chunk_offset, chunk_size);
+        if (transfer_type == 0u || transfer_type == 1u ||
+            transfer_type >= 6u) {
+            const std::uint16_t fill_value = chunk.back();
+            for (std::size_t index = 0u; index < chunk.size(); ++index) {
+                write_transfer_word(fill_value);
             }
-            for (std::size_t repeat_index = 0u; repeat_index < repeat;
-                 ++repeat_index) {
-                write_transfer_word(words[source_index]);
+        } else if (transfer_type == 2u) {
+            for (const std::uint16_t word : chunk) {
+                write_transfer_word(word);
+            }
+        } else {
+            const std::size_t repeat = transfer_type == 3u
+                                           ? 2u
+                                           : (transfer_type == 4u ? 4u : 8u);
+            for (std::size_t index = 0u; index < chunk.size();
+                 index += repeat) {
+                const std::size_t source_index = transfer_type == 5u
+                                                     ? index + repeat - 1u
+                                                     : index;
+                if (source_index >= chunk.size()) {
+                    break;
+                }
+                for (std::size_t repeat_index = 0u;
+                     repeat_index < repeat; ++repeat_index) {
+                    write_transfer_word(chunk[source_index]);
+                }
             }
         }
-        transferred = words.size();
     }
-    return DmaResult{DmaFault::None, transferred};
+    transfer_busy_ = false;
+    return DmaResult{DmaFault::None, words.size()};
 }
 
 DmaResult Device::dma_read(std::span<std::uint16_t> words) noexcept {
-    if (transfer_mode(control_) != TransferMode::DmaRead) {
+    if (transfer_mode(effective_control_) != TransferMode::DmaRead) {
         return DmaResult{DmaFault::WrongTransferMode, 0u};
+    }
+    if (!dma_read_request_ready_) {
+        return DmaResult{DmaFault::RequestNotReady, 0u};
     }
     if (words.size() > MaxDmaHalfwordsPerCall) {
         return DmaResult{DmaFault::TooManyHalfwords, 0u};
@@ -752,7 +880,7 @@ DmaResult Device::dma_read(DmaReadCallback callback,
             return DmaResult{result.fault, transferred + result.transferred_halfwords};
         }
         if (!callback(std::span<const std::uint16_t>(chunk.data(), count), user)) {
-            return DmaResult{DmaFault::CallbackRejected, transferred};
+            return DmaResult{DmaFault::CallbackRejected, transferred + count};
         }
         transferred += count;
     }
@@ -761,7 +889,6 @@ DmaResult Device::dma_read(DmaReadCallback callback,
 
 void Device::decode_block(Voice& voice, std::uint32_t address) noexcept {
     const std::uint32_t block_address = wrap_ram(address);
-    touch_ram_range(block_address, static_cast<std::uint32_t>(AdpcmBlockBytes));
 
     const std::uint8_t header = sound_ram_[block_address];
     voice.block_flags = sound_ram_[wrap_ram(block_address + 1u)];
@@ -786,11 +913,12 @@ void Device::decode_block(Voice& voice, std::uint32_t address) noexcept {
             sign_extend(static_cast<std::uint32_t>(nibble), 4u);
         const std::int32_t shifted = arithmetic_shift_right(
             signed_nibble * 4096, static_cast<unsigned>(shift));
-        const std::int32_t prediction = arithmetic_shift_right(
+        const std::int32_t predictor_sum =
             previous * static_cast<std::int32_t>(kPredictorOne[filter_number]) +
-                previous_previous *
-                    static_cast<std::int32_t>(kPredictorTwo[filter_number]),
-            6u);
+            previous_previous *
+                static_cast<std::int32_t>(kPredictorTwo[filter_number]);
+        const std::int32_t prediction = arithmetic_shift_right(
+            predictor_sum + 32, 6u);
         const std::int16_t decoded = saturate_i16(
             static_cast<std::int64_t>(shifted) + prediction);
         voice.block_samples[sample_index] = decoded;
@@ -808,6 +936,22 @@ void Device::decode_block(Voice& voice, std::uint32_t address) noexcept {
         voice.repeat_address_units = static_cast<std::uint16_t>(
             block_address / 8u);
     }
+}
+
+void Device::touch_voice_ram(const Voice& voice) noexcept {
+    /*
+     * The SPU owns two documented voice reads every 44.1 kHz tick even for
+     * voices that are inaudible or have completed release.  The third slot
+     * in the public timing note is intentionally not synthesized here: its
+     * address is unresolved and must not become a guessed IRQ source.
+     */
+    const std::uint32_t block_address = voice.current_address_bytes;
+    touch_ram_range(block_address, 2u);
+    const std::uint32_t sample_index = std::min(
+        static_cast<std::uint32_t>(voice.pitch_counter >> 12u), 27u);
+    const std::uint32_t data_word = sample_index / 4u;
+    touch_ram_range(wrap_ram(block_address + 2u + data_word * 2u),
+                    2u);
 }
 
 void Device::finish_block(Voice& voice) noexcept {
@@ -921,7 +1065,7 @@ std::uint32_t Device::pitch_step(const Voice& voice,
 
 std::int16_t Device::next_noise() noexcept {
     const std::int32_t step = 4 + static_cast<std::int32_t>(
-        (control_ & ControlNoiseStepMask) >> 8u);
+        (effective_control_ & ControlNoiseStepMask) >> 8u);
     noise_timer_ -= step;
     if (noise_timer_ < 0) {
         const std::uint16_t bits = bits_of_i16(noise_level_);
@@ -932,7 +1076,7 @@ std::int16_t Device::next_noise() noexcept {
             static_cast<std::uint16_t>(bits << 1u) | parity);
         noise_level_ = to_i16(shifted);
         const std::uint32_t shift = static_cast<std::uint32_t>(
-            (control_ & ControlNoiseShiftMask) >> 10u);
+            (effective_control_ & ControlNoiseShiftMask) >> 10u);
         const std::int32_t period = static_cast<std::int32_t>(
             0x20000u >> std::min(shift, 15u));
         noise_timer_ += period;
@@ -941,14 +1085,6 @@ std::int16_t Device::next_noise() noexcept {
         }
     }
     return noise_level_;
-}
-
-void Device::begin_adsr(Voice& voice) noexcept {
-    voice.active = true;
-    voice.phase = AdsrPhase::Attack;
-    voice.adsr_volume = 0;
-    voice.current_adsr_register = 0u;
-    voice.adsr_counter = 0u;
 }
 
 void Device::release_adsr(Voice& voice) noexcept {
@@ -972,8 +1108,8 @@ std::int32_t Device::adsr_step(const Voice& voice,
         step_value = (voice.adsr_low >> 8u) & 0x3u;
         break;
     case AdsrPhase::Decay:
-        shift = (voice.adsr_low >> 4u) & 0xFu;
-        step_value = 7u;
+        shift = (((voice.adsr_low >> 4u) & 0xFu) << 1u) | 1u;
+        step_value = 0u;
         break;
     case AdsrPhase::Sustain:
         shift = (voice.adsr_high >> 8u) & 0x1Fu;
@@ -981,7 +1117,7 @@ std::int32_t Device::adsr_step(const Voice& voice,
         break;
     case AdsrPhase::Release:
         shift = voice.adsr_high & 0x1Fu;
-        step_value = 7u;
+        step_value = 0u;
         break;
     case AdsrPhase::Off:
         return 0;
@@ -995,24 +1131,29 @@ std::int32_t Device::adsr_step(const Voice& voice,
         step *= static_cast<std::int32_t>(1u << (11u - shift));
     }
     std::uint32_t increment = shift > 11u
-                                 ? (0x8000u >> std::min(shift - 11u, 15u))
+                                 ? (0x8000u >> (shift - 11u))
                                  : 0x8000u;
-    if ((step_value | (shift << 2u)) != 0x7Fu && increment == 0u) {
-        increment = 1u;
-    }
     if (exponential && increasing && level > 0x6000) {
         if (shift < 10u) {
             step = arithmetic_shift_right(step, 2u);
         } else if (shift >= 11u) {
-            increment = std::max(increment >> 2u, 1u);
+            increment >>= 2u;
         } else {
             step = arithmetic_shift_right(step, 1u);
-            increment = std::max(increment >> 1u, 1u);
+            increment >>= 1u;
         }
     } else if (exponential && !increasing) {
         step = saturate_i32(arithmetic_shift_right(
             static_cast<std::int64_t>(step) * level, 15u));
     }
+
+    const std::uint32_t encoded_rate = step_value | (shift << 2u);
+    const bool fixed_step_phase = voice.phase == AdsrPhase::Decay ||
+                                  voice.phase == AdsrPhase::Release;
+    if (encoded_rate == 0x7Fu || (fixed_step_phase && shift == 0x1Fu)) {
+        return 0;
+    }
+    increment = std::max(increment, 1u);
 
     const std::uint32_t next_counter =
         static_cast<std::uint32_t>(counter) + increment;
@@ -1078,23 +1219,6 @@ void Device::advance_adsr(Voice& voice) noexcept {
     }
 }
 
-std::int16_t Device::voice_source(Voice& voice,
-                                  std::int16_t previous_output,
-                                  std::size_t index) noexcept {
-    if (!voice.active) {
-        return 0;
-    }
-    const bool noise = (noise_enable_mask_ &
-                        static_cast<std::uint32_t>(1u << index)) != 0u;
-    const std::int16_t source = noise ? next_noise() : interpolate(voice);
-    const std::int16_t after_adsr = static_cast<std::int16_t>(multiply_q15(
-        static_cast<std::int32_t>(source),
-        static_cast<std::int32_t>(voice.adsr_volume)));
-    static_cast<void>(previous_output);
-    static_cast<void>(index);
-    return after_adsr;
-}
-
 std::uint32_t Device::wrap_reverb(std::int64_t address) const noexcept {
     const std::uint32_t base = std::min(
         static_cast<std::uint32_t>(reverb_base_register_) * 8u,
@@ -1127,134 +1251,165 @@ void Device::write_reverb_sample(std::uint32_t address,
     write_ram_word(address, bits_of_i16(sample));
 }
 
-StereoSample Device::process_reverb(std::int16_t left_input,
-                                    std::int16_t right_input,
-                                    bool write_buffer) noexcept {
+std::int16_t Device::reverb_fir_sample(
+    const std::array<std::int16_t, ReverbFirTapCount>& history,
+    bool interpolate) const noexcept {
+    std::int64_t sum = 0;
+    for (std::size_t tap = 0u; tap < ReverbFirTapCount; ++tap) {
+        const std::size_t history_index =
+            (static_cast<std::size_t>(reverb_history_index_) +
+             ReverbFirTapCount - tap) %
+            ReverbFirTapCount;
+        const std::int64_t product =
+            static_cast<std::int64_t>(history[history_index]) *
+            static_cast<std::int64_t>(kReverbFir[tap]);
+        sum += arithmetic_shift_right(product, 15u);
+    }
+    if (interpolate) {
+        sum *= 2;
+    }
+    return saturate_i16(sum);
+}
+
+std::int16_t Device::reverb_multiply(std::int32_t left,
+                                     std::int32_t right) const noexcept {
+    /* The public measurements require 16-bit saturation between stages. */
+    return saturate_i16(multiply_q15_wide(left, right));
+}
+
+StereoSample Device::process_reverb_side(bool right_channel,
+                                          std::int16_t input,
+                                          bool write_buffer) noexcept {
     const auto volume = [this](std::size_t index) noexcept {
         return to_i16(reverb_registers_[index]);
     };
     const std::int16_t v_wall = volume(7u);
     const std::int16_t v_iir = volume(2u);
-    const std::int32_t lin = multiply_q15(left_input, volume(30u));
-    const std::int32_t rin = multiply_q15(right_input, volume(31u));
 
-    const std::uint32_t same_l_address = reverb_address(reverb_registers_[10u]);
-    const std::uint32_t same_r_address = reverb_address(reverb_registers_[11u]);
-    const std::uint32_t diff_l_address = reverb_address(reverb_registers_[18u]);
-    const std::uint32_t diff_r_address = reverb_address(reverb_registers_[19u]);
-    const std::int32_t old_same_l = read_reverb_sample(
-        wrap_reverb(static_cast<std::int64_t>(same_l_address) - 2));
-    const std::int32_t old_same_r = read_reverb_sample(
-        wrap_reverb(static_cast<std::int64_t>(same_r_address) - 2));
-    const std::int32_t old_diff_l = read_reverb_sample(
-        wrap_reverb(static_cast<std::int64_t>(diff_l_address) - 2));
-    const std::int32_t old_diff_r = read_reverb_sample(
-        wrap_reverb(static_cast<std::int64_t>(diff_r_address) - 2));
-    const std::int32_t delayed_same_l = read_reverb_sample(
-        reverb_address(reverb_registers_[16u]));
-    const std::int32_t delayed_same_r = read_reverb_sample(
-        reverb_address(reverb_registers_[17u]));
-    const std::int32_t delayed_diff_l = read_reverb_sample(
-        reverb_address(reverb_registers_[25u]));
-    const std::int32_t delayed_diff_r = read_reverb_sample(
-        reverb_address(reverb_registers_[24u]));
+    const std::size_t same_address_index = right_channel ? 11u : 10u;
+    const std::size_t same_delay_index = right_channel ? 17u : 16u;
+    const std::size_t diff_address_index = right_channel ? 19u : 18u;
+    /* Different-side reflection deliberately crosses channels. */
+    const std::size_t diff_delay_index = right_channel
+                                              ? 24u /* dLDIFF */
+                                              : 25u /* dRDIFF */;
+    const std::uint32_t same_address =
+        reverb_address(reverb_registers_[same_address_index]);
+    const std::uint32_t diff_address =
+        reverb_address(reverb_registers_[diff_address_index]);
+    const std::int16_t old_same = read_reverb_sample(
+        wrap_reverb(static_cast<std::int64_t>(same_address) - 2));
+    const std::int16_t old_diff = read_reverb_sample(
+        wrap_reverb(static_cast<std::int64_t>(diff_address) - 2));
+    const std::int16_t delayed_same = read_reverb_sample(
+        reverb_address(reverb_registers_[same_delay_index]));
+    const std::int16_t delayed_diff = read_reverb_sample(
+        reverb_address(reverb_registers_[diff_delay_index]));
 
-    const auto reflection = [v_wall, v_iir](std::int32_t input,
-                                             std::int32_t delayed,
-                                             std::int32_t old) noexcept {
-        const std::int64_t before = static_cast<std::int64_t>(input) +
-                                    Device::multiply_q15(delayed, v_wall) - old;
-        return Device::saturate_i16(
-            Device::multiply_q15_wide(before, v_iir) + old);
+    const std::int16_t input_scaled = reverb_multiply(
+        input, volume(right_channel ? 31u : 30u));
+    const auto reflection = [this, v_wall, v_iir](std::int16_t reflected_input,
+                                                  std::int16_t delayed,
+                                                  std::int16_t old) noexcept {
+        const std::int16_t wall = reverb_multiply(delayed, v_wall);
+        const std::int16_t before = saturate_i16(
+            static_cast<std::int32_t>(reflected_input) +
+            static_cast<std::int32_t>(wall) - static_cast<std::int32_t>(old));
+        const std::int16_t filtered = reverb_multiply(before, v_iir);
+        const std::int16_t result = saturate_i16(
+            static_cast<std::int32_t>(filtered) + static_cast<std::int32_t>(old));
+        if (v_iir == static_cast<std::int16_t>(-0x8000)) {
+            /* Documented SCPH-1001 quirk: the stored result is negated. */
+            return saturate_i16(-static_cast<std::int32_t>(result));
+        }
+        return result;
     };
-    const std::int16_t same_l = reflection(lin, delayed_same_l, old_same_l);
-    const std::int16_t same_r = reflection(rin, delayed_same_r, old_same_r);
-    const std::int16_t diff_l = reflection(lin, delayed_diff_l, old_diff_l);
-    const std::int16_t diff_r = reflection(rin, delayed_diff_r, old_diff_r);
+
     if (write_buffer) {
-        write_reverb_sample(same_l_address, same_l);
-        write_reverb_sample(same_r_address, same_r);
-        write_reverb_sample(diff_l_address, diff_l);
-        write_reverb_sample(diff_r_address, diff_r);
+        write_reverb_sample(same_address,
+                            reflection(input_scaled, delayed_same, old_same));
+        write_reverb_sample(diff_address,
+                            reflection(input_scaled, delayed_diff, old_diff));
+    } else {
+        /* With reverb writes disabled, the same bus slots are reads. */
+        static_cast<void>(read_reverb_sample(same_address));
+        static_cast<void>(read_reverb_sample(diff_address));
     }
 
-    const auto comb = [this, &volume](std::size_t first,
-                                      std::size_t second,
-                                      std::size_t third,
-                                      std::size_t fourth,
-                                      std::size_t v_index) noexcept {
-        std::int64_t value = 0;
-        value += multiply_q15_wide(
-            read_reverb_sample(reverb_address(reverb_registers_[first])),
-            volume(v_index));
-        value += multiply_q15_wide(
-            read_reverb_sample(reverb_address(reverb_registers_[second])),
-            volume(v_index + 1u));
-        value += multiply_q15_wide(
-            read_reverb_sample(reverb_address(reverb_registers_[third])),
-            volume(v_index + 2u));
-        value += multiply_q15_wide(
-            read_reverb_sample(reverb_address(reverb_registers_[fourth])),
-            volume(v_index + 3u));
-        return saturate_i16(value);
+    const auto comb = [this, &volume](std::array<std::size_t, 4u> addresses,
+                                      std::size_t volume_index) noexcept {
+        std::int32_t value = 0;
+        for (std::size_t index = 0u; index < addresses.size(); ++index) {
+            const std::int16_t sample = read_reverb_sample(
+                reverb_address(reverb_registers_[addresses[index]]));
+            const std::int16_t term =
+                reverb_multiply(sample, volume(volume_index + index));
+            value = saturate_i16(value + static_cast<std::int32_t>(term));
+        }
+        return static_cast<std::int16_t>(value);
     };
-    std::int32_t out_l = comb(12u, 14u, 20u, 22u, 3u);
-    std::int32_t out_r = comb(13u, 15u, 21u, 23u, 3u);
+    const std::array<std::size_t, 4u> comb_addresses = right_channel
+                                                           ? std::array<std::size_t, 4u>{13u, 15u, 21u, 23u}
+                                                           : std::array<std::size_t, 4u>{12u, 14u, 20u, 22u};
+    std::int16_t output = comb(comb_addresses, 3u);
 
-    const auto all_pass = [this, &volume, write_buffer](std::int32_t input,
-                                                         std::size_t address_index,
-                                                         std::size_t depth_index,
-                                                         std::int32_t& output)
+    const auto all_pass = [this, &volume, write_buffer](std::int16_t input_value,
+                                                        std::size_t address_index,
+                                                        std::size_t depth_index,
+                                                        std::int16_t& output_value)
         noexcept {
         const std::uint32_t address =
             reverb_address(reverb_registers_[address_index]);
-        const std::int32_t delayed = read_reverb_sample(wrap_reverb(
+        const std::int16_t delayed = read_reverb_sample(wrap_reverb(
             static_cast<std::int64_t>(address) -
             static_cast<std::int64_t>(sign_extend(
                 reverb_registers_[depth_index], 16u)) * 8));
+        const std::int16_t coefficient = volume(depth_index == 0u ? 8u : 9u);
         const std::int16_t first = saturate_i16(
-            static_cast<std::int64_t>(input) -
-            multiply_q15(delayed, volume(depth_index == 0u ? 8u : 9u)));
+            static_cast<std::int32_t>(input_value) -
+            static_cast<std::int32_t>(reverb_multiply(delayed, coefficient)));
         if (write_buffer) {
             write_reverb_sample(address, first);
+        } else {
+            static_cast<void>(read_reverb_sample(address));
         }
-        output = saturate_i16(
-            multiply_q15_wide(first,
-                              volume(depth_index == 0u ? 8u : 9u)) + delayed);
+        output_value = saturate_i16(
+            static_cast<std::int32_t>(reverb_multiply(first, coefficient)) +
+            static_cast<std::int32_t>(delayed));
     };
-    all_pass(out_l, 26u, 0u, out_l);
-    all_pass(out_r, 27u, 0u, out_r);
-    all_pass(out_l, 28u, 1u, out_l);
-    all_pass(out_r, 29u, 1u, out_r);
+    const std::size_t apf1_address = right_channel ? 27u : 26u;
+    const std::size_t apf2_address = right_channel ? 29u : 28u;
+    all_pass(output, apf1_address, 0u, output);
+    all_pass(output, apf2_address, 1u, output);
 
-    reverb_cursor_byte_ = wrap_reverb(
-        static_cast<std::int64_t>(reverb_cursor_byte_) + 2);
-    const std::int16_t output_left = saturate_i16(
-        multiply_q15_wide(out_l, to_i16(reverb_output_left_)));
-    const std::int16_t output_right = saturate_i16(
-        multiply_q15_wide(out_r, to_i16(reverb_output_right_)));
-    return StereoSample{output_left, output_right};
+    if (right_channel) {
+        reverb_cursor_byte_ = wrap_reverb(
+            static_cast<std::int64_t>(reverb_cursor_byte_) + 2);
+    }
+    const std::int16_t output_scaled = reverb_multiply(
+        output, to_i16(right_channel ? reverb_output_right_
+                                     : reverb_output_left_));
+    return right_channel ? StereoSample{0, output_scaled}
+                         : StereoSample{output_scaled, 0};
 }
 
 template <std::size_t Capacity>
 PushResult Device::push_fifo(StereoFifo<Capacity>& fifo,
                              std::span<const StereoSample> samples) noexcept {
-    PushResult result{};
-    for (const StereoSample& sample : samples) {
-        if (fifo.count == Capacity) {
-            fifo.overflow = true;
-            fifo.overflow_count += 1u;
-            result.dropped += 1u;
-            result.overflow = true;
-            continue;
-        }
-        fifo.samples[fifo.tail] = sample;
+    const std::size_t available = Capacity - fifo.count;
+    const std::size_t accepted = std::min(available, samples.size());
+    for (std::size_t index = 0u; index < accepted; ++index) {
+        fifo.samples[fifo.tail] = samples[index];
         fifo.tail = static_cast<std::uint16_t>(
             (static_cast<std::size_t>(fifo.tail) + 1u) % Capacity);
         fifo.count = static_cast<std::uint16_t>(fifo.count + 1u);
-        result.accepted += 1u;
     }
-    return result;
+    const std::size_t dropped = samples.size() - accepted;
+    if (dropped != 0u) {
+        fifo.overflow = true;
+        fifo.overflow_count += static_cast<std::uint64_t>(dropped);
+    }
+    return PushResult{accepted, dropped, dropped != 0u};
 }
 
 template <std::size_t Capacity>
@@ -1288,13 +1443,16 @@ bool Device::pop_fifo(StereoFifo<Capacity>& fifo,
 }
 
 StereoSample Device::read_cd_sample(bool needed) noexcept {
-    if (!needed) {
-        return StereoSample{0, 0};
-    }
     StereoSample sample{0, 0};
     if (audio_source_ == AudioSource::Cdda) {
+        if (!needed && cdda_fifo_.count == 0u) {
+            return sample;
+        }
         static_cast<void>(pop_fifo(cdda_fifo_, sample));
     } else {
+        if (!needed && xa_fifo_.count == 0u) {
+            return sample;
+        }
         static_cast<void>(pop_fifo(xa_fifo_, sample));
     }
     return sample;
@@ -1311,23 +1469,23 @@ StereoSample Device::read_external_sample(bool needed) noexcept {
 
 void Device::capture_sample(std::size_t channel,
                             std::int16_t sample,
-                            bool enabled) noexcept {
-    if (!enabled) {
-        return;
-    }
+                            bool irq_enabled) noexcept {
     const std::size_t byte_offset =
         capture_offset(channel, static_cast<std::size_t>(capture_index_));
-    write_ram_word(static_cast<std::uint32_t>(byte_offset), bits_of_i16(sample));
+    const std::uint32_t address = static_cast<std::uint32_t>(byte_offset);
+    if (irq_enabled) {
+        touch_ram_range(address, 2u);
+    }
+    const std::uint16_t bits = bits_of_i16(sample);
+    sound_ram_[address] = static_cast<std::uint8_t>(bits & 0x00FFu);
+    sound_ram_[address + 1u] = static_cast<std::uint8_t>(bits >> 8u);
 }
 
 void Device::capture_voice_samples(std::int16_t voice_one,
-                                   std::int16_t voice_three) noexcept {
-    const bool enabled = (transfer_control_ & 0x0008u) != 0u;
-    if (!enabled) {
-        return;
-    }
-    capture_sample(2u, voice_one, true);
-    capture_sample(3u, voice_three, true);
+                                   std::int16_t voice_three,
+                                   bool irq_enabled) noexcept {
+    capture_sample(2u, voice_one, irq_enabled);
+    capture_sample(3u, voice_three, irq_enabled);
 }
 
 bool Device::is_known_even_offset(std::uint32_t offset) const noexcept {
@@ -1340,6 +1498,14 @@ bool Device::is_known_even_offset(std::uint32_t offset) const noexcept {
     }
     if (offset >= InternalVoiceVolumeBase &&
         offset < InternalVoiceVolumeBase + InternalVoiceVolumeBytes) {
+        return true;
+    }
+    if (offset >= UnknownControlBase &&
+        offset < UnknownControlBase + UnknownControlBytes) {
+        return true;
+    }
+    if (offset >= UnknownInternalBase &&
+        offset < UnknownInternalBase + UnknownInternalBytes) {
         return true;
     }
     switch (offset) {
@@ -1359,6 +1525,7 @@ bool Device::is_known_even_offset(std::uint32_t offset) const noexcept {
     case ReverbEnable + 2u:
     case EndFlags:
     case EndFlags + 2u:
+    case UnknownStatus:
     case ReverbBase:
     case IrqAddress:
     case TransferAddress:
@@ -1463,6 +1630,18 @@ MmioReadResult Device::read_mmio16(std::uint32_t offset) noexcept {
                               bits_of_i16(voices_[voice_index]
                                               .right_volume.current)};
     }
+    if (offset >= UnknownControlBase &&
+        offset < UnknownControlBase + UnknownControlBytes) {
+        return MmioReadResult{
+            MmioFault::None,
+            unknown_control_registers_[(offset - UnknownControlBase) / 2u]};
+    }
+    if (offset >= UnknownInternalBase &&
+        offset < UnknownInternalBase + UnknownInternalBytes) {
+        return MmioReadResult{
+            MmioFault::None,
+            unknown_internal_registers_[(offset - UnknownInternalBase) / 2u]};
+    }
     switch (offset) {
     case MainVolume:
         return MmioReadResult{MmioFault::None,
@@ -1506,6 +1685,8 @@ MmioReadResult Device::read_mmio16(std::uint32_t offset) noexcept {
     case EndFlags + 2u:
         return MmioReadResult{MmioFault::None,
                               static_cast<std::uint16_t>(end_flags_ >> 16u)};
+    case UnknownStatus:
+        return MmioReadResult{MmioFault::None, 0u};
     case ReverbBase:
         return MmioReadResult{MmioFault::None, reverb_base_register_};
     case IrqAddress:
@@ -1514,7 +1695,7 @@ MmioReadResult Device::read_mmio16(std::uint32_t offset) noexcept {
         return MmioReadResult{MmioFault::None, transfer_address_register_};
     case TransferFifo:
         if (transfer_fifo_count_ == 0u &&
-            transfer_mode(control_) != TransferMode::DmaRead) {
+            transfer_mode(effective_control_) != TransferMode::DmaRead) {
             return MmioReadResult{MmioFault::TransferFifoUnderflow, 0u};
         }
         return MmioReadResult{MmioFault::None, read_transfer_word()};
@@ -1523,16 +1704,19 @@ MmioReadResult Device::read_mmio16(std::uint32_t offset) noexcept {
     case TransferControl:
         return MmioReadResult{MmioFault::None, transfer_control_};
     case Status: {
-        std::uint16_t status = static_cast<std::uint16_t>(control_ & 0x003Fu);
-        if (transfer_mode(control_) != TransferMode::Stop) {
+        std::uint16_t status = static_cast<std::uint16_t>(
+            effective_control_ & 0x003Fu);
+        if ((effective_control_ & 0x0020u) != 0u) {
             status |= StatusTransferRequest;
         }
-        if (transfer_fifo_count_ != 0u) {
+        if (transfer_fifo_count_ != 0u || transfer_busy_) {
             status |= StatusTransferBusy;
         }
-        if (transfer_mode(control_) == TransferMode::DmaRead) {
+        if (transfer_mode(effective_control_) == TransferMode::DmaRead &&
+            dma_read_request_ready_) {
             status |= StatusDmaReadRequest;
-        } else if (transfer_mode(control_) == TransferMode::DmaWrite) {
+        } else if (transfer_mode(effective_control_) == TransferMode::DmaWrite &&
+                   !transfer_busy_) {
             status |= StatusDmaWriteRequest;
         }
         if ((transfer_control_ & 0x000Cu) != 0u && capture_index_ >= 256u) {
@@ -1591,7 +1775,8 @@ MmioWriteResult Device::write_mmio16(std::uint32_t offset,
             return MmioWriteResult{MmioFault::None, value};
         case 12u:
             voice.current_adsr_register = value;
-            voice.adsr_volume = to_i16(value);
+            voice.pending_current_adsr = value;
+            voice.pending_current_adsr_valid = true;
             return MmioWriteResult{MmioFault::None, value};
         case 14u:
             voice.repeat_address_units = value;
@@ -1609,6 +1794,16 @@ MmioWriteResult Device::write_mmio16(std::uint32_t offset,
         offset < InternalVoiceVolumeBase + InternalVoiceVolumeBytes) {
         return MmioWriteResult{MmioFault::ReadOnly, 0u};
     }
+    if (offset >= UnknownControlBase &&
+        offset < UnknownControlBase + UnknownControlBytes) {
+        unknown_control_registers_[(offset - UnknownControlBase) / 2u] = value;
+        return MmioWriteResult{MmioFault::None, value};
+    }
+    if (offset >= UnknownInternalBase &&
+        offset < UnknownInternalBase + UnknownInternalBytes) {
+        unknown_internal_registers_[(offset - UnknownInternalBase) / 2u] = value;
+        return MmioWriteResult{MmioFault::None, value};
+    }
     switch (offset) {
     case MainVolume:
         write_volume(main_left_, value);
@@ -1623,17 +1818,19 @@ MmioWriteResult Device::write_mmio16(std::uint32_t offset,
         reverb_output_right_ = value;
         return MmioWriteResult{MmioFault::None, value};
     case KeyOn:
-        key_on(value);
+        pending_key_on_mask_ |= value;
         return MmioWriteResult{MmioFault::None, value};
     case KeyOn + 2u:
-        key_on(static_cast<std::uint32_t>(value & 0x00FFu) << 16u);
+        pending_key_on_mask_ |=
+            static_cast<std::uint32_t>(value & 0x00FFu) << 16u;
         return MmioWriteResult{MmioFault::None,
                                static_cast<std::uint16_t>(value & 0x00FFu)};
     case KeyOff:
-        key_off(value);
+        pending_key_off_mask_ |= value;
         return MmioWriteResult{MmioFault::None, value};
     case KeyOff + 2u:
-        key_off(static_cast<std::uint32_t>(value & 0x00FFu) << 16u);
+        pending_key_off_mask_ |=
+            static_cast<std::uint32_t>(value & 0x00FFu) << 16u;
         return MmioWriteResult{MmioFault::None,
                                static_cast<std::uint16_t>(value & 0x00FFu)};
     case PitchModulation:
@@ -1666,6 +1863,7 @@ MmioWriteResult Device::write_mmio16(std::uint32_t offset,
                                static_cast<std::uint16_t>(value & 0x00FFu)};
     case EndFlags:
     case EndFlags + 2u:
+    case UnknownStatus:
         return MmioWriteResult{MmioFault::ReadOnly, 0u};
     case ReverbBase:
         reverb_base_register_ = value;
@@ -1689,9 +1887,26 @@ MmioWriteResult Device::write_mmio16(std::uint32_t offset,
         transfer_fifo_count_ = static_cast<std::uint8_t>(
             transfer_fifo_count_ + 1u);
         return MmioWriteResult{MmioFault::None, value};
-    case Control:
-        apply_control(value);
+    case Control: {
+        control_ = value;
+        const bool previously_armed =
+            (effective_control_ & (ControlEnable | ControlIrqEnable)) ==
+            (ControlEnable | ControlIrqEnable);
+        effective_control_ = static_cast<std::uint16_t>(
+            (effective_control_ & 0x003Fu) | (value & 0xFFC0u));
+        const bool armed =
+            (effective_control_ & (ControlEnable | ControlIrqEnable)) ==
+            (ControlEnable | ControlIrqEnable);
+        if (!armed) {
+            irq_pending_ = false;
+        } else if (!previously_armed && irq_pending_ &&
+                   irq_callback_ != nullptr) {
+            irq_callback_(irq_user_);
+        }
+        pending_control_mode_ = static_cast<std::uint16_t>(value & 0x003Fu);
+        pending_control_mode_valid_ = true;
         return MmioWriteResult{MmioFault::None, value};
+    }
     case TransferControl:
         apply_transfer_control(value);
         return MmioWriteResult{MmioFault::None,
@@ -1802,22 +2017,36 @@ RenderResult Device::render(std::span<StereoSample> output) noexcept {
     if (output.size() > MaxRenderSamplesPerCall) {
         return RenderResult{RenderFault::TooManySamples, 0u};
     }
-    const bool voice_enabled = (control_ & ControlEnable) != 0u &&
-                               (control_ & ControlMute) != 0u;
-    const bool capture_cd = (transfer_control_ & 0x0004u) != 0u;
-    const bool capture_voice = (transfer_control_ & 0x0008u) != 0u;
-    const bool cd_needed = (control_ & ControlCdEnable) != 0u ||
-                           (control_ & ControlCdReverb) != 0u || capture_cd;
+    if (!output.empty()) {
+        /* Apply the first queued write before deriving this call's clock view. */
+        apply_pending_events();
+    }
+    const bool voice_enabled = (effective_control_ & ControlEnable) != 0u &&
+                               (effective_control_ & ControlMute) != 0u;
+    const bool cd_needed = (effective_control_ & ControlCdEnable) != 0u ||
+                           (effective_control_ & ControlCdReverb) != 0u;
     const bool external_needed =
-        (control_ & ControlExternalEnable) != 0u ||
-        (control_ & ControlExternalReverb) != 0u;
+        (effective_control_ & ControlExternalEnable) != 0u ||
+        (effective_control_ & ControlExternalReverb) != 0u;
+    const bool ram_irq_enabled =
+        (effective_control_ & (ControlEnable | ControlIrqEnable)) ==
+        (ControlEnable | ControlIrqEnable);
+    const bool capture_irq_enabled =
+        ram_irq_enabled && (transfer_control_ & 0x000Cu) != 0u;
 
+    bool first_sample = true;
     for (StereoSample& destination : output) {
+        if (!first_sample) {
+            apply_pending_events();
+        }
+        first_sample = false;
+        if (transfer_mode(effective_control_) == TransferMode::ManualWrite) {
+            service_transfer_fifo();
+        }
         const StereoSample cd_sample = read_cd_sample(cd_needed);
         const StereoSample external_sample =
             read_external_sample(external_needed);
-        const bool has_noise = noise_enable_mask_ != 0u;
-        const std::int16_t noise_sample = has_noise ? next_noise() : 0;
+        const std::int16_t noise_sample = next_noise();
         std::int16_t previous_voice_output = 0;
         std::int16_t capture_voice_one = 0;
         std::int16_t capture_voice_three = 0;
@@ -1832,11 +2061,16 @@ RenderResult Device::render(std::span<StereoSample> output) noexcept {
             std::int16_t source = 0;
             const bool noise = (noise_enable_mask_ &
                                 static_cast<std::uint32_t>(1u << index)) != 0u;
+            if (voice.active && voice.pitch != 0u) {
+                ensure_block(voice);
+            }
+            if (ram_irq_enabled) {
+                touch_voice_ram(voice);
+            }
             if (voice.active) {
                 if (noise) {
                     source = noise_sample;
                 } else if (voice.pitch != 0u) {
-                    ensure_block(voice);
                     source = interpolate(voice);
                 }
             }
@@ -1877,56 +2111,67 @@ RenderResult Device::render(std::span<StereoSample> output) noexcept {
             }
         }
 
-        const bool cd_enabled = (control_ & ControlCdEnable) != 0u;
-        const bool external_enabled =
-            (control_ & ControlExternalEnable) != 0u;
-        if (cd_enabled) {
+        if ((effective_control_ & (ControlCdEnable | ControlCdReverb)) != 0u) {
             const std::int32_t cd_left = multiply_q15(
                 cd_sample.left, cd_volume_left_);
             const std::int32_t cd_right = multiply_q15(
                 cd_sample.right, cd_volume_right_);
-            dry_left += cd_left;
-            dry_right += cd_right;
-            if ((control_ & ControlCdReverb) != 0u) {
+            if ((effective_control_ & ControlCdEnable) != 0u) {
+                dry_left += cd_left;
+                dry_right += cd_right;
+            }
+            if ((effective_control_ & ControlCdReverb) != 0u) {
                 reverb_input_left += cd_left;
                 reverb_input_right += cd_right;
             }
         }
-        if (external_enabled) {
+        if ((effective_control_ &
+             (ControlExternalEnable | ControlExternalReverb)) != 0u) {
             const std::int32_t external_left = multiply_q15(
                 external_sample.left, external_volume_left_);
             const std::int32_t external_right = multiply_q15(
                 external_sample.right, external_volume_right_);
-            dry_left += external_left;
-            dry_right += external_right;
-            if ((control_ & ControlExternalReverb) != 0u) {
+            if ((effective_control_ & ControlExternalEnable) != 0u) {
+                dry_left += external_left;
+                dry_right += external_right;
+            }
+            if ((effective_control_ & ControlExternalReverb) != 0u) {
                 reverb_input_left += external_left;
                 reverb_input_right += external_right;
             }
         }
 
-        if (capture_cd) {
-            capture_sample(0u, cd_sample.left, true);
-            capture_sample(1u, cd_sample.right, true);
-        }
-        if (capture_voice) {
-            capture_voice_samples(capture_voice_one, capture_voice_three);
-        }
-        if (capture_cd || capture_voice) {
-            capture_index_ = static_cast<std::uint16_t>(
-                (static_cast<std::uint32_t>(capture_index_) + 1u) %
-                CaptureSamplesPerHalf);
-        }
+        capture_sample(0u, cd_sample.left, capture_irq_enabled);
+        capture_sample(1u, cd_sample.right, capture_irq_enabled);
+        capture_voice_samples(capture_voice_one, capture_voice_three,
+                              capture_irq_enabled);
+        capture_index_ = static_cast<std::uint16_t>(
+            (static_cast<std::uint32_t>(capture_index_) + 1u) %
+            CaptureSamplesPerHalf);
 
         const std::int16_t reverb_input_l = saturate_i16(reverb_input_left);
         const std::int16_t reverb_input_r = saturate_i16(reverb_input_right);
-        if ((sample_counter_ & 1u) == 0u) {
-            const StereoSample wet = process_reverb(
-                reverb_input_l, reverb_input_r,
-                (control_ & ControlReverbEnable) != 0u);
-            reverb_hold_left_ = wet.left;
-            reverb_hold_right_ = wet.right;
-        }
+        const std::size_t reverb_index = reverb_history_index_;
+        reverb_input_left_[reverb_index] = reverb_input_l;
+        reverb_input_right_[reverb_index] = reverb_input_r;
+        const std::int16_t filtered_left =
+            reverb_fir_sample(reverb_input_left_, false);
+        const std::int16_t filtered_right =
+            reverb_fir_sample(reverb_input_right_, false);
+        const bool write_reverb =
+            (effective_control_ & ControlReverbEnable) != 0u;
+        const StereoSample core_output =
+            (sample_counter_ & 1u) == 0u
+                ? process_reverb_side(false, filtered_left, write_reverb)
+                : process_reverb_side(true, filtered_right, write_reverb);
+        reverb_output_history_left_[reverb_index] = core_output.left;
+        reverb_output_history_right_[reverb_index] = core_output.right;
+        const std::int16_t wet_left =
+            reverb_fir_sample(reverb_output_history_left_, true);
+        const std::int16_t wet_right =
+            reverb_fir_sample(reverb_output_history_right_, true);
+        reverb_hold_left_ = wet_left;
+        reverb_hold_right_ = wet_right;
         const std::int64_t main_left = multiply_q15_wide(
             dry_left, main_left_.current);
         const std::int64_t main_right = multiply_q15_wide(
@@ -1939,8 +2184,15 @@ RenderResult Device::render(std::span<StereoSample> output) noexcept {
         advance_volume(main_left_);
         advance_volume(main_right_);
         sample_counter_ += 1u;
+        reverb_history_index_ = static_cast<std::uint8_t>(
+            (reverb_index + 1u) % ReverbFirTapCount);
     }
     return RenderResult{RenderFault::None, output.size()};
+}
+
+RenderResult Device::render_100hz_update(
+    std::span<StereoSample, SamplesPer100HzUpdate> output) noexcept {
+    return render(output);
 }
 
 template <typename Sink>
@@ -1952,6 +2204,10 @@ void Device::serialize_payload(Sink& sink) const noexcept {
         sink.put_u16(volume.raw);
         sink.put_u16(bits_of_i16(volume.current));
         sink.put_u16(volume.counter);
+        sink.put_u16(bits_of_i16(volume.pending_current));
+        sink.put_u16(volume.pending_counter);
+        sink.put_u8(volume.pending_fixed ? 1u : 0u);
+        sink.put_u8(0u);
     };
     for (const Voice& voice : voices_) {
         put_volume(voice.left_volume);
@@ -1980,6 +2236,9 @@ void Device::serialize_payload(Sink& sink) const noexcept {
         }
         sink.put_u16(bits_of_i16(voice.adsr_volume));
         sink.put_u16(voice.adsr_counter);
+        sink.put_u16(voice.pending_current_adsr);
+        sink.put_u8(voice.pending_current_adsr_valid ? 1u : 0u);
+        sink.put_u8(0u);
     }
     put_volume(main_left_);
     put_volume(main_right_);
@@ -1990,6 +2249,13 @@ void Device::serialize_payload(Sink& sink) const noexcept {
     sink.put_u16(bits_of_i16(external_volume_left_));
     sink.put_u16(bits_of_i16(external_volume_right_));
     sink.put_u16(control_);
+    sink.put_u16(effective_control_);
+    sink.put_u16(pending_control_mode_);
+    sink.put_u8(pending_control_mode_valid_ ? 1u : 0u);
+    sink.put_u32(pending_key_on_mask_);
+    sink.put_u32(pending_key_off_mask_);
+    sink.put_u8(dma_read_request_ready_ ? 1u : 0u);
+    sink.put_u8(transfer_busy_ ? 1u : 0u);
     sink.put_u16(transfer_control_);
     sink.put_u16(transfer_address_register_);
     sink.put_u16(irq_address_register_);
@@ -2014,6 +2280,25 @@ void Device::serialize_payload(Sink& sink) const noexcept {
     sink.put_u8(static_cast<std::uint8_t>(audio_source_));
     sink.put_u16(bits_of_i16(reverb_hold_left_));
     sink.put_u16(bits_of_i16(reverb_hold_right_));
+    for (const std::uint16_t value : unknown_control_registers_) {
+        sink.put_u16(value);
+    }
+    for (const std::uint16_t value : unknown_internal_registers_) {
+        sink.put_u16(value);
+    }
+    for (const std::int16_t sample : reverb_input_left_) {
+        sink.put_u16(bits_of_i16(sample));
+    }
+    for (const std::int16_t sample : reverb_input_right_) {
+        sink.put_u16(bits_of_i16(sample));
+    }
+    for (const std::int16_t sample : reverb_output_history_left_) {
+        sink.put_u16(bits_of_i16(sample));
+    }
+    for (const std::int16_t sample : reverb_output_history_right_) {
+        sink.put_u16(bits_of_i16(sample));
+    }
+    sink.put_u8(reverb_history_index_);
 
     const auto put_fifo = [&sink](const StereoFifo<AudioFifoCapacity>& fifo)
         noexcept {
@@ -2154,10 +2439,16 @@ bool Device::validate_payload(SnapshotReader& reader) const noexcept {
         static_cast<void>(reader.get_u16());
         static_cast<void>(reader.get_u16());
         static_cast<void>(reader.get_u16());
+        static_cast<void>(reader.get_u16());
+        static_cast<void>(reader.get_u16());
+        const std::uint8_t pending = reader.get_u8();
+        const std::uint8_t reserved = reader.get_u8();
+        return pending <= 1u && reserved == 0u;
     };
+    bool volumes_valid = true;
     for (std::size_t index = 0u; index < VoiceCount; ++index) {
-        validate_volume();
-        validate_volume();
+        volumes_valid = validate_volume() && volumes_valid;
+        volumes_valid = validate_volume() && volumes_valid;
         static_cast<void>(reader.get_u16());
         static_cast<void>(reader.get_u16());
         static_cast<void>(reader.get_u16());
@@ -2178,15 +2469,24 @@ bool Device::validate_payload(SnapshotReader& reader) const noexcept {
         reader.skip(AdpcmSamplesPerBlock * sizeof(std::uint16_t));
         static_cast<void>(reader.get_u16());
         static_cast<void>(reader.get_u16());
+        static_cast<void>(reader.get_u16());
+        const std::uint8_t pending_adsr_valid = reader.get_u8();
+        const std::uint8_t pending_adsr_reserved = reader.get_u8();
         if (current_address > RamMask || block_address > RamMask ||
-            pitch_counter >= kBlockSpanFixed || block_sample_index > 28u ||
+            (current_address & 0x7u) != 0u ||
+            (block_address & 0x7u) != 0u ||
+            pitch_counter >= kBlockSpanFixed ||
+            block_sample_index >= AdpcmSamplesPerBlock ||
+            block_sample_index != static_cast<std::uint8_t>(
+                                      pitch_counter >> 12u) ||
             phase > static_cast<std::uint8_t>(AdsrPhase::Release) ||
-            block_valid > 1u || active > 1u) {
+            block_valid > 1u || active > 1u || pending_adsr_valid > 1u ||
+            pending_adsr_reserved != 0u) {
             return false;
         }
     }
-    validate_volume();
-    validate_volume();
+    volumes_valid = validate_volume() && volumes_valid;
+    volumes_valid = validate_volume() && volumes_valid;
     static_cast<void>(reader.get_u16());
     static_cast<void>(reader.get_u16());
     static_cast<void>(reader.get_u16());
@@ -2194,6 +2494,13 @@ bool Device::validate_payload(SnapshotReader& reader) const noexcept {
     static_cast<void>(reader.get_u16());
     static_cast<void>(reader.get_u16());
     static_cast<void>(reader.get_u16());
+    static_cast<void>(reader.get_u16());
+    const std::uint16_t pending_control_mode = reader.get_u16();
+    const std::uint8_t pending_control = reader.get_u8();
+    static_cast<void>(reader.get_u32());
+    static_cast<void>(reader.get_u32());
+    const std::uint8_t dma_ready = reader.get_u8();
+    const std::uint8_t transfer_busy = reader.get_u8();
     const std::uint16_t transfer_control = reader.get_u16();
     static_cast<void>(reader.get_u16());
     static_cast<void>(reader.get_u16());
@@ -2216,6 +2523,9 @@ bool Device::validate_payload(SnapshotReader& reader) const noexcept {
     const std::uint8_t source = reader.get_u8();
     static_cast<void>(reader.get_u16());
     static_cast<void>(reader.get_u16());
+    reader.skip(UnknownControlBytes + UnknownInternalBytes);
+    reader.skip(4u * ReverbFirTapCount * sizeof(std::int16_t));
+    const std::uint8_t reverb_history_index = reader.get_u8();
     const auto validate_fifo = [&reader]() noexcept {
         const std::uint16_t head = reader.get_u16();
         const std::uint16_t tail = reader.get_u16();
@@ -2225,8 +2535,11 @@ bool Device::validate_payload(SnapshotReader& reader) const noexcept {
         static_cast<void>(reader.get_u64());
         static_cast<void>(reader.get_u64());
         reader.skip(AudioFifoCapacity * sizeof(StereoSample));
+        const std::size_t expected_tail =
+            (static_cast<std::size_t>(head) + count) % AudioFifoCapacity;
         return head < AudioFifoCapacity && tail < AudioFifoCapacity &&
-               count <= AudioFifoCapacity && underflow <= 1u && overflow <= 1u;
+               count <= AudioFifoCapacity && tail == expected_tail &&
+               underflow <= 1u && overflow <= 1u;
     };
     const bool cdda_valid = validate_fifo();
     const bool xa_valid = validate_fifo();
@@ -2234,16 +2547,28 @@ bool Device::validate_payload(SnapshotReader& reader) const noexcept {
     reader.skip(32u * sizeof(std::uint16_t));
     const std::uint32_t reverb_base_bytes =
         static_cast<std::uint32_t>(reverb_base) * 8u;
-    return reader.good && cdda_valid && xa_valid && external_valid &&
+    const std::uint32_t expected_transfer_tail =
+        (static_cast<std::uint32_t>(transfer_head) + transfer_count) %
+        static_cast<std::uint32_t>(TransferFifoCapacity);
+    return reader.good && volumes_valid && cdda_valid && xa_valid && external_valid &&
+           (pending_control <= 1u) &&
+           (pending_control_mode & ~0x003Fu) == 0u && dma_ready <= 1u &&
+           transfer_busy <= 1u &&
            (transfer_control & ~kTransferControlMask) == 0u &&
            transfer_head < TransferFifoCapacity &&
-           transfer_tail < TransferFifoCapacity && transfer_count <= 32u &&
+           transfer_tail < TransferFifoCapacity &&
+           transfer_count <= TransferFifoCapacity &&
+           transfer_tail == expected_transfer_tail &&
            capture_index < CaptureSamplesPerHalf && irq <= 1u && source <= 1u &&
            noise_timer >= 0 && noise_timer <= 0x1FFFF &&
-           transfer_current <= RamMask && reverb_cursor <= ReverbEndByte &&
+           transfer_current <= RamMask && (transfer_current & 1u) == 0u &&
+           reverb_cursor >= reverb_base_bytes &&
+           reverb_cursor <= ReverbEndByte && (reverb_cursor & 1u) == 0u &&
            reverb_base_bytes <= RamMask && (pmon & 0xFF000000u) == 0u &&
            (non & 0xFF000000u) == 0u && (eon & 0xFF000000u) == 0u &&
-           (endx & 0xFF000000u) == 0u && reader.position == SnapshotPayloadBytes;
+           (endx & 0xFF000000u) == 0u &&
+           reverb_history_index < ReverbFirTapCount &&
+           reader.position == SnapshotPayloadBytes;
 }
 
 bool Device::deserialize_payload(SnapshotReader& reader) noexcept {
@@ -2254,6 +2579,10 @@ bool Device::deserialize_payload(SnapshotReader& reader) noexcept {
         volume.raw = reader.get_u16();
         volume.current = Device::to_i16(reader.get_u16());
         volume.counter = reader.get_u16();
+        volume.pending_current = Device::to_i16(reader.get_u16());
+        volume.pending_counter = reader.get_u16();
+        volume.pending_fixed = reader.get_u8() != 0u;
+        static_cast<void>(reader.get_u8());
     };
     for (Voice& voice : voices_) {
         get_volume(voice.left_volume);
@@ -2282,6 +2611,9 @@ bool Device::deserialize_payload(SnapshotReader& reader) noexcept {
         }
         voice.adsr_volume = Device::to_i16(reader.get_u16());
         voice.adsr_counter = reader.get_u16();
+        voice.pending_current_adsr = reader.get_u16();
+        voice.pending_current_adsr_valid = reader.get_u8() != 0u;
+        static_cast<void>(reader.get_u8());
     }
     get_volume(main_left_);
     get_volume(main_right_);
@@ -2292,6 +2624,13 @@ bool Device::deserialize_payload(SnapshotReader& reader) noexcept {
     external_volume_left_ = to_i16(reader.get_u16());
     external_volume_right_ = to_i16(reader.get_u16());
     control_ = reader.get_u16();
+    effective_control_ = reader.get_u16();
+    pending_control_mode_ = reader.get_u16();
+    pending_control_mode_valid_ = reader.get_u8() != 0u;
+    pending_key_on_mask_ = reader.get_u32();
+    pending_key_off_mask_ = reader.get_u32();
+    dma_read_request_ready_ = reader.get_u8() != 0u;
+    transfer_busy_ = reader.get_u8() != 0u;
     transfer_control_ = reader.get_u16();
     transfer_address_register_ = reader.get_u16();
     irq_address_register_ = reader.get_u16();
@@ -2316,6 +2655,25 @@ bool Device::deserialize_payload(SnapshotReader& reader) noexcept {
     audio_source_ = static_cast<AudioSource>(reader.get_u8());
     reverb_hold_left_ = to_i16(reader.get_u16());
     reverb_hold_right_ = to_i16(reader.get_u16());
+    for (std::uint16_t& value : unknown_control_registers_) {
+        value = reader.get_u16();
+    }
+    for (std::uint16_t& value : unknown_internal_registers_) {
+        value = reader.get_u16();
+    }
+    for (std::int16_t& sample : reverb_input_left_) {
+        sample = to_i16(reader.get_u16());
+    }
+    for (std::int16_t& sample : reverb_input_right_) {
+        sample = to_i16(reader.get_u16());
+    }
+    for (std::int16_t& sample : reverb_output_history_left_) {
+        sample = to_i16(reader.get_u16());
+    }
+    for (std::int16_t& sample : reverb_output_history_right_) {
+        sample = to_i16(reader.get_u16());
+    }
+    reverb_history_index_ = reader.get_u8();
     const auto get_fifo = [&reader](StereoFifo<AudioFifoCapacity>& fifo) noexcept {
         fifo.head = reader.get_u16();
         fifo.tail = reader.get_u16();

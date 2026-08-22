@@ -105,7 +105,11 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
                 auto [delay_it, delay_inserted] = instructions.try_emplace(
                     delay_address, decode_instruction(delay_address, image.read_u32(delay_address)));
                 if (is_control_transfer(delay_it->second.kind)) {
-                    throw IrError("control transfer in a delay slot is not supported by this tranche");
+                    std::ostringstream message;
+                    message << "control transfer at 0x" << std::hex << pc
+                            << " owns a control transfer in delay slot 0x"
+                            << delay_address;
+                    throw IrError(message.str());
                 }
                 (void)inserted;
                 (void)delay_inserted;
@@ -133,7 +137,10 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
 
     for (const GuestAddress leader : leaders) {
         if (delay_slots.contains(leader)) {
-            throw IrError("region entry or direct edge lands in a delay slot");
+            std::ostringstream message;
+            message << "region entry or direct edge 0x" << std::hex << leader
+                    << " lands in a delay slot";
+            throw IrError(message.str());
         }
     }
 

@@ -20,6 +20,13 @@ extern "C" {
 #define CLEAN_AOT_MACHINE_STATUS_OK 0u
 #define CLEAN_AOT_MACHINE_STATUS_INVALID_ARGUMENT 1u
 #define CLEAN_AOT_MACHINE_STATUS_INVALID_RATE 2u
+#define CLEAN_AOT_MACHINE_STATUS_INVALID_CPU_MULTIPLIER 3u
+/* A frame would overflow a public timing counter; no state was advanced. */
+#define CLEAN_AOT_MACHINE_STATUS_OVERFLOW 4u
+
+/* The generic scheduler accepts positive CPU multipliers in the inclusive
+ * range (0, 10].  Inputs are reduced before this bound is tested. */
+#define CLEAN_AOT_MACHINE_MAX_CPU_MULTIPLIER_WHOLE 10u
 
 #define CLEAN_AOT_MACHINE_EVENT_MODE_SWITCH 1u
 #define CLEAN_AOT_MACHINE_EVENT_VBLANK 2u
@@ -45,6 +52,15 @@ typedef struct clean_aot_machine_event {
     uint64_t cumulative;
     /* VBLANK: 1/100-second quanta; MODE_SWITCH: old Hz; CDDA: phase / 100. */
     uint64_t auxiliary;
+    /* Immutable reduced CPU-retirement multiplier for this machine. */
+    uint64_t cpu_multiplier_numerator;
+    uint64_t cpu_multiplier_denominator;
+    /*
+     * CPU cycles retired cumulatively at this logical event boundary.
+     * MODE_SWITCH and VBLANK precede the frame's CPU budget; CPU_CYCLES and
+     * later domain events include that budget.
+     */
+    uint64_t cpu_retirement_total;
 } clean_aot_machine_event;
 
 /* The callback must not retain event or re-enter this machine instance. */
@@ -71,12 +87,35 @@ typedef struct clean_aot_machine_frame_receipt {
     uint64_t event_sequence_end;
     /* FNV-1a receipt digest after this frame's events. */
     uint64_t digest;
+    /* Immutable reduced CPU-retirement multiplier for this machine. */
+    uint64_t cpu_multiplier_numerator;
+    uint64_t cpu_multiplier_denominator;
+    /* Exact cumulative CPU cycles retired through this frame. */
+    uint64_t cpu_retirement_total;
 } clean_aot_machine_frame_receipt;
 
 typedef struct clean_aot_machine clean_aot_machine;
 
 clean_aot_machine* clean_aot_machine_create(uint32_t initial_vblank_hz);
+/* Returns NULL for an invalid rate, invalid multiplier, or allocation failure. */
+clean_aot_machine* clean_aot_machine_create_with_cpu_multiplier(
+    uint32_t initial_vblank_hz,
+    uint64_t cpu_multiplier_numerator,
+    uint64_t cpu_multiplier_denominator);
 void clean_aot_machine_destroy(clean_aot_machine* machine);
+
+/* Reduces and validates an exact CPU multiplier without allocating a machine.
+ * Output pointers must be non-null and distinct. */
+clean_aot_machine_status clean_aot_machine_canonicalize_cpu_multiplier(
+    uint64_t input_numerator,
+    uint64_t input_denominator,
+    uint64_t* canonical_numerator,
+    uint64_t* canonical_denominator);
+
+clean_aot_machine_status clean_aot_machine_get_cpu_multiplier(
+    const clean_aot_machine* machine,
+    uint64_t* numerator,
+    uint64_t* denominator);
 
 clean_aot_machine_status clean_aot_machine_set_vblank_rate(
     clean_aot_machine* machine,

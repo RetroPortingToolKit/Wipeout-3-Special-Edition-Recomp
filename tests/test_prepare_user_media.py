@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[1]
 PROVENANCE = ROOT / "tools" / "provenance"
@@ -42,12 +43,12 @@ class PrepareUserMediaTests(unittest.TestCase):
         self.cue = self.root / "input.cue"
         self.cue.write_text(
             'FILE "track01.bin" BINARY\n'
-            '  TRACK 01 MODE2/2352\n'
-            '    INDEX 01 00:00:00\n'
+            "  TRACK 01 MODE2/2352\n"
+            "    INDEX 01 00:00:00\n"
             'FILE "track02.bin" BINARY\n'
-            '  TRACK 02 AUDIO\n'
-            '    INDEX 00 00:00:00\n'
-            '    INDEX 01 00:02:00\n',
+            "  TRACK 02 AUDIO\n"
+            "    INDEX 00 00:00:00\n"
+            "    INDEX 01 00:02:00\n",
             encoding="utf-8",
         )
         manifest = {
@@ -95,6 +96,41 @@ class PrepareUserMediaTests(unittest.TestCase):
         (self.root / "track01.bin").write_bytes(b"redump")
         with self.assertRaises(prepare_user_media.verify_media.VerificationError):
             prepare_user_media.stage(self.args(self.root / "prepared"))
+
+    def test_cli_writes_receipt_and_refuses_overwrite(self) -> None:
+        output = self.root / "prepared"
+        receipt = self.root / "receipt.json"
+        argv = [
+            "--cue",
+            str(self.cue),
+            "--output",
+            str(output),
+            "--manifest",
+            str(self.manifest),
+            "--json-out",
+            str(receipt),
+        ]
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(prepare_user_media.main(argv), 0)
+        self.assertEqual(json.loads(receipt.read_text())["status"], "ok")
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.assertEqual(prepare_user_media.main(argv), 2)
+
+    def test_cli_rejects_duplicate_outputs_before_staging(self) -> None:
+        duplicate = self.root / "duplicate"
+        argv = [
+            "--cue",
+            str(self.cue),
+            "--output",
+            str(duplicate),
+            "--manifest",
+            str(self.manifest),
+            "--json-out",
+            str(duplicate),
+        ]
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.assertEqual(prepare_user_media.main(argv), 2)
+        self.assertFalse(duplicate.exists())
 
 
 if __name__ == "__main__":

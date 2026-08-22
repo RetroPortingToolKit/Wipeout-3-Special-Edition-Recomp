@@ -1,0 +1,32 @@
+{
+  "dxc": {
+    "dxcompiler_dll_sha256": "b86a738ece4c05dbe2d9bbb29668a2ccb28a0740773c9b027cdc61e8d07b4d75",
+    "dxc_exe_sha256": "b9cff94181248e080804b385da8964b6319fd07760721baa9053a891cf7a727f",
+    "dxil_dll_sha256": "058f2f52a680c38b223a5615b7df969def21f77e577562e5099d971dede992de",
+    "package": "Microsoft.DirectX.ShaderCompiler",
+    "scope": "user",
+    "version": "1.9.2602.17"
+  },
+  "renderdoc": {
+    "archive_sha256": "bd665c348a8245d10a1f513e35b83603edc1a78006277583d09ec0769286eea4",
+    "archive_url": "https://renderdoc.org/stable/1.45/RenderDoc_1.45_64.zip",
+    "commit": "2fc0bc04cb95499635f63986a55bc6f67849dd9f",
+    "qrenderdoc_exe_sha256": "c9904905fe380b2869d48c7a4209c2331370e0bfda502a24da26ec4031cf885b",
+    "renderdoc_dll_sha256": "313f450bfa1f7f7d5f50cc7ee80d9f99b68d3fe873e25eb865ff0433e359f7b3",
+    "renderdoccmd_exe_sha256": "273352017e23e890fe9134de0157d1fe556676a4c6004bfe3265db1a4648ed07",
+    "signer_subject": "CN=Baldur Scott Karlsson, O=Baldur Scott Karlsson, S=Scotland, C=GB",
+    "signer_thumbprint": "F91353AE1E90CBEFF15585165D1611C5CE72E346",
+    "signatures": "valid",
+    "version": "1.45"
+  },
+  "schema": "wipeout3se.development-toolchain.v1",
+  "vulkan_runtime": {
+    "discrete_device": "NVIDIA GeForce RTX 4080 SUPER",
+    "discrete_device_id": "0x2702",
+    "discrete_vendor_id": "0x10de",
+    "driver": "NVIDIA 610.88",
+    "instance_version": "1.4.341",
+    "sdk_installation": "not-required",
+    "sdk_note": "The SDK installer required elevation and rolled back. The clean host must use pinned headers, dynamic vulkan-1.dll loading, and verified precompiled shaders."
+  }
+}

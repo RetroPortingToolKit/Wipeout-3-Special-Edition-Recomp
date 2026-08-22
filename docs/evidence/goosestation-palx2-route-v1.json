@@ -1,0 +1,67 @@
+{
+  "capture": {
+    "container_bytes": 331565504,
+    "container_sha256": "20909adf8ba9572898632b52a218e08e5b10b70c98c4bf9d34dfb08f1c7c234c",
+    "container_tracked": false,
+    "decoded_audio_bytes": 20387332,
+    "decoded_audio_pcm_sha256": "e7bfccc517d8069c89bfab88c8509b998aa7fd9a3e53f2160b946d37401b4565",
+    "decoded_audio_stereo_frames": 5096833,
+    "decoded_video_framemd5_sha256": "50b11435a295a658e1f8a5084e555044d32bea6416d6ed41a29ae22a0f240559",
+    "distinct_full_route_video_frames": 3211,
+    "lossless_audio_codec": "pcm_s16le",
+    "lossless_video_codec": "ffv1",
+    "race_windows": [
+      {
+        "decoded_frames": 100,
+        "distinct_frames": 100,
+        "start_second": 93
+      },
+      {
+        "decoded_frames": 100,
+        "distinct_frames": 100,
+        "start_second": 100
+      },
+      {
+        "decoded_frames": 100,
+        "distinct_frames": 100,
+        "start_second": 110
+      }
+    ],
+    "sample_rate_hz": 44100,
+    "video_packets": 11500
+  },
+  "content": {
+    "bios_sha256": "71af94d1e47a68c11e8fdb9f8368040601514a42a5a399cda48c7d3bff1e99d3",
+    "prepared_cue_sha256": "2ce46ed06710c5f82081d0592fca8beb6cb0e29dedb956140d1150af75f0be92",
+    "prepared_track01_sha256": "397b8a30f401bbd9d12904d6054946474ce4746bdf19565a8db534d65ba179e1",
+    "serial": "SCES-02845"
+  },
+  "input": {
+    "patched_input_values": 51520,
+    "replay_frames": 11499,
+    "replay_sha256": "bf3579c489befb664be8dad2b1fae685ce0dbfe7e7a902d9f644d98802ec1058",
+    "route_end_frame_exclusive": 9220,
+    "route_sha256": "e28aefbd61d5a682d81abd7ae7b7681c0282b8588293fd212d476b8fdca80661",
+    "route_start_frame": 6000
+  },
+  "provenance": {
+    "ffmpeg_package": "7:8.0.1-3ubuntu2",
+    "goosestation_builder_commit": "d9a14b7de510fa9e5810737a18fe7da51d5443d9",
+    "goosestation_core_sha256": "1bbb6603cfb94a7109a45690f10638ce5c7a5cfae48943238fa7503e4aa91ada",
+    "goosestation_patch_sha256": "d4280837e6d3d49018cb85f90a3fc636e0a7bbf0b18a5cd282d0d04e6cac0456",
+    "retroarch_binary_sha256": "b74b401106ecac95029737f859ef784ad9ac8f5a57651c39ff9769e370312fe5",
+    "retroarch_package": "1.22.2+dfsg-2ubuntu1",
+    "retroarch_replay_source_commit": "69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576",
+    "upstream_duckstation_commit": "a233ec1fb7f46181e77e6d2a52446ad6f0a7c54f"
+  },
+  "schema": "wipeout3se.oracle.goosestation-palx2-route.v1",
+  "status": "behavior-reference-only",
+  "timing": {
+    "audio_frames_per_video_packet_ratio": "5096833/11500",
+    "decoded_audio_duration_ratio_seconds": "5096833/44100",
+    "exact_product_audio_frames_per_100hz_update": 441,
+    "exact_product_target_hz": 100,
+    "goosestation_reported_palx2_fps": "99.49",
+    "note": "Frame hashes prove distinct presentation frames in the sampled live-race windows, not distinct simulation states. GooseStation PALx2 is a behavior reference and is not the clean static product acceptance path."
+  }
+}

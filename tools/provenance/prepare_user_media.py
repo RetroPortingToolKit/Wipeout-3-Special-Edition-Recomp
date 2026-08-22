@@ -14,26 +14,36 @@ from pathlib import Path
 
 import verify_media
 
-
-FILE_RE = re.compile(r'^(\s*FILE\s+)(?:"([^"]+)"|(\S+))(\s+\S+\s*)$', re.I)
+FILE_RE = re.compile(r'^(\s*FILE\s+)(?:"([^"]+)"|(\S+))(\s+\S+\s*)$', re.IGNORECASE)
 
 
 def copy_file(source: Path, destination: Path) -> None:
     if destination.exists():
-        raise verify_media.VerificationError(f"refusing to overwrite staged file: {destination}")
+        raise verify_media.VerificationError(
+            f"refusing to overwrite staged file: {destination}"
+        )
     shutil.copy2(source, destination)
 
 
-def rewrite_cue(source_cue: Path, destination_cue: Path, staged_names: dict[Path, str]) -> None:
+def rewrite_cue(
+    source_cue: Path, destination_cue: Path, staged_names: dict[Path, str]
+) -> None:
     output: list[str] = []
-    for line_number, line in enumerate(source_cue.read_text(encoding="utf-8-sig").splitlines(), 1):
+    for line_number, line in enumerate(
+        source_cue.read_text(encoding="utf-8-sig").splitlines(), 1
+    ):
         match = FILE_RE.match(line)
         if not match:
             output.append(line)
             continue
         relative = match.group(2) or match.group(3)
-        assert relative is not None
-        source_path = (source_cue.parent / Path(relative.replace("\\", os.sep))).resolve()
+        if relative is None:
+            raise verify_media.VerificationError(
+                f"missing FILE path at {source_cue}:{line_number}"
+            )
+        source_path = (
+            source_cue.parent / Path(relative.replace("\\", os.sep))
+        ).resolve()
         if source_path not in staged_names:
             raise verify_media.VerificationError(
                 f"unmapped FILE entry at {source_cue}:{line_number}: {relative}"
@@ -49,9 +59,13 @@ def stage(args: argparse.Namespace) -> dict[str, object]:
     verify_media.require_equal("CUE track count", len(source_tracks), expected_count)
 
     if args.output.exists():
-        raise verify_media.VerificationError(f"refusing to overwrite output directory: {args.output}")
+        raise verify_media.VerificationError(
+            f"refusing to overwrite output directory: {args.output}"
+        )
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = Path(tempfile.mkdtemp(prefix=f"{args.output.name}.tmp-", dir=args.output.parent))
+    temporary = Path(
+        tempfile.mkdtemp(prefix=f"{args.output.name}.tmp-", dir=args.output.parent)
+    )
     try:
         track_kind, _ = verify_media.identify_track_01(
             source_tracks[0]["path"], manifest, args.b3sum
@@ -62,7 +76,9 @@ def stage(args: argparse.Namespace) -> dict[str, object]:
             source = item["path"].resolve()
             name = source.name
             if name.lower() in used_names:
-                raise verify_media.VerificationError(f"duplicate staged basename: {name}")
+                raise verify_media.VerificationError(
+                    f"duplicate staged basename: {name}"
+                )
             used_names.add(name.lower())
             staged_names[source] = name
 
@@ -79,7 +95,9 @@ def stage(args: argparse.Namespace) -> dict[str, object]:
         elif track_kind == "hueponik_pal":
             copy_file(source_tracks[0]["path"], staged_track_01)
         else:  # pragma: no cover - identify_track_01 rejects unknown identities
-            raise verify_media.VerificationError(f"unsupported Track 01 identity: {track_kind}")
+            raise verify_media.VerificationError(
+                f"unsupported Track 01 identity: {track_kind}"
+            )
 
         for item in source_tracks[1:]:
             copy_file(item["path"], temporary / staged_names[item["path"].resolve()])
@@ -119,14 +137,40 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--xdelta3")
     parser.add_argument("--bios", type=Path)
     parser.add_argument("--b3sum")
+    parser.add_argument(
+        "--json-out",
+        type=Path,
+        help="optional new verification receipt; existing files are refused",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.json_out:
+            if args.json_out.exists():
+                raise verify_media.VerificationError(
+                    f"refusing to overwrite evidence output: {args.json_out}"
+                )
+            if os.path.normcase(
+                str(args.json_out.resolve(strict=False))
+            ) == os.path.normcase(str(args.output.resolve(strict=False))):
+                raise verify_media.VerificationError(
+                    "prepared-media and evidence outputs must be distinct"
+                )
         report = stage(args)
-        sys.stdout.write(json.dumps(report, indent=2, sort_keys=True) + "\n")
+        payload = json.dumps(report, indent=2, sort_keys=True) + "\n"
+        if args.json_out:
+            args.json_out.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                with args.json_out.open("x", encoding="utf-8", newline="\n") as stream:
+                    stream.write(payload)
+            except FileExistsError as error:
+                raise verify_media.VerificationError(
+                    f"refusing to overwrite evidence output: {args.json_out}"
+                ) from error
+        sys.stdout.write(payload)
         return 0
     except (OSError, ValueError, verify_media.VerificationError) as error:
         sys.stderr.write(f"media preparation failed: {error}\n")

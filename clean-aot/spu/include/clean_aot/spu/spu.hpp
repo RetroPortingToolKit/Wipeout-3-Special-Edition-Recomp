@@ -17,6 +17,20 @@ static constexpr std::size_t AudioFifoCapacity = 2048u;
 static constexpr std::size_t TransferFifoCapacity = 32u;
 static constexpr std::size_t MaxDmaHalfwordsPerCall = 4096u;
 static constexpr std::size_t MaxRenderSamplesPerCall = 8192u;
+static constexpr std::uint32_t OutputSampleRateHz = 44'100u;
+static constexpr std::uint32_t RemasterUpdateRateHz = 100u;
+static constexpr std::size_t SamplesPer25HzUpdate = 1'764u;
+static constexpr std::size_t SamplesPer50HzUpdate = 882u;
+static constexpr std::size_t SamplesPer100HzUpdate = 441u;
+static constexpr std::size_t ReverbFirTapCount = 39u;
+static constexpr std::size_t ReverbFirDelaySamples = 19u;
+static constexpr std::size_t ReverbCombinedDelaySamples = 38u;
+
+static_assert(OutputSampleRateHz % RemasterUpdateRateHz == 0u);
+static_assert(OutputSampleRateHz / RemasterUpdateRateHz ==
+              SamplesPer100HzUpdate);
+static_assert(OutputSampleRateHz / 50u == SamplesPer50HzUpdate);
+static_assert(OutputSampleRateHz / 25u == SamplesPer25HzUpdate);
 
 struct StereoSample final {
     std::int16_t left;
@@ -86,6 +100,7 @@ struct InputStatus final {
 enum class DmaFault : std::uint8_t {
     None,
     WrongTransferMode,
+    RequestNotReady,
     TooManyHalfwords,
     CallbackRejected,
 };
@@ -174,6 +189,7 @@ public:
     static constexpr std::uint32_t NoiseEnable = 0x0194u;
     static constexpr std::uint32_t ReverbEnable = 0x0198u;
     static constexpr std::uint32_t EndFlags = 0x019Cu;
+    static constexpr std::uint32_t UnknownStatus = 0x01A0u;
     static constexpr std::uint32_t ReverbBase = 0x01A2u;
     static constexpr std::uint32_t IrqAddress = 0x01A4u;
     static constexpr std::uint32_t TransferAddress = 0x01A6u;
@@ -184,10 +200,14 @@ public:
     static constexpr std::uint32_t CdVolume = 0x01B0u;
     static constexpr std::uint32_t ExternalVolume = 0x01B4u;
     static constexpr std::uint32_t CurrentMainVolume = 0x01B8u;
+    static constexpr std::uint32_t UnknownControlBase = 0x01BCu;
+    static constexpr std::uint32_t UnknownControlBytes = 0x0004u;
     static constexpr std::uint32_t ReverbRegisterBase = 0x01C0u;
     static constexpr std::uint32_t ReverbRegisterBytes = 0x0040u;
     static constexpr std::uint32_t InternalVoiceVolumeBase = 0x0200u;
     static constexpr std::uint32_t InternalVoiceVolumeBytes = 0x0060u;
+    static constexpr std::uint32_t UnknownInternalBase = 0x0260u;
+    static constexpr std::uint32_t UnknownInternalBytes = 0x0020u;
 
     static constexpr std::uint16_t ControlCdEnable = 0x0001u;
     static constexpr std::uint16_t ControlExternalEnable = 0x0002u;
@@ -210,16 +230,17 @@ public:
 
     static constexpr std::uint32_t SnapshotHeaderBytes = 24u;
     static constexpr std::uint32_t SnapshotDigestBytes = 8u;
-    static constexpr std::uint32_t SnapshotVersion = 1u;
-    static constexpr std::size_t VolumeSnapshotBytes = 6u;
-    static constexpr std::size_t VoiceSnapshotBytes = 111u;
+    static constexpr std::uint32_t SnapshotVersion = 3u;
+    static constexpr std::size_t VolumeSnapshotBytes = 12u;
+    static constexpr std::size_t VoiceSnapshotBytes = 127u;
     static constexpr std::size_t AudioFifoSnapshotBytes =
         6u + 2u + 16u + (AudioFifoCapacity * sizeof(StereoSample));
     static constexpr std::size_t SnapshotPayloadBytes =
         SoundRamBytes + (VoiceCount * VoiceSnapshotBytes) +
-        (2u * VolumeSnapshotBytes) + 4u + 4u + 4u + 10u + 4u + 4u + 8u +
+        (2u * VolumeSnapshotBytes) + 4u + 4u + 4u + 25u + 4u + 4u + 8u +
         16u + 3u + (TransferFifoCapacity * sizeof(std::uint16_t)) + 2u +
-        6u + 1u + 1u + 4u +
+        6u + 1u + 1u + 4u + UnknownControlBytes + UnknownInternalBytes +
+        (4u * ReverbFirTapCount * sizeof(std::int16_t)) + 1u +
         (3u * AudioFifoSnapshotBytes) + (32u * sizeof(std::uint16_t));
     static constexpr std::size_t SnapshotBytes =
         SnapshotHeaderBytes + SnapshotPayloadBytes + SnapshotDigestBytes;
@@ -236,6 +257,11 @@ public:
 
     [[nodiscard]] VoiceView voice_state(std::size_t voice) const noexcept;
 
+    /*
+     * Callbacks are synchronous, non-owning, and intentionally absent from
+     * snapshots/digests. The caller must keep `user` alive and must not
+     * re-enter this Device from either callback.
+     */
     void set_irq_callback(IrqCallback callback, void* user) noexcept;
     [[nodiscard]] bool irq_pending() const noexcept;
     void acknowledge_irq() noexcept;
@@ -261,6 +287,8 @@ public:
 
     [[nodiscard]] RenderResult render(
         std::span<StereoSample> output) noexcept;
+    [[nodiscard]] RenderResult render_100hz_update(
+        std::span<StereoSample, SamplesPer100HzUpdate> output) noexcept;
 
     [[nodiscard]] std::span<const std::uint8_t> sound_ram() const noexcept;
 
@@ -285,6 +313,9 @@ private:
         std::uint16_t raw{0u};
         std::int16_t current{0};
         std::uint16_t counter{0u};
+        std::int16_t pending_current{0};
+        std::uint16_t pending_counter{0u};
+        bool pending_fixed{false};
     };
 
     struct Voice final {
@@ -310,6 +341,8 @@ private:
         std::array<std::int16_t, AdpcmSamplesPerBlock> block_samples{};
         std::int16_t adsr_volume{0};
         std::uint16_t adsr_counter{0u};
+        std::uint16_t pending_current_adsr{0u};
+        bool pending_current_adsr_valid{false};
     };
 
     template <std::size_t Capacity>
@@ -344,6 +377,11 @@ private:
     std::int16_t external_volume_left_{0};
     std::int16_t external_volume_right_{0};
     std::uint16_t control_{0u};
+    std::uint16_t effective_control_{0u};
+    std::uint16_t pending_control_mode_{0u};
+    bool pending_control_mode_valid_{false};
+    std::uint32_t pending_key_on_mask_{0u};
+    std::uint32_t pending_key_off_mask_{0u};
     std::uint16_t transfer_control_{0u};
     std::uint16_t transfer_address_register_{0u};
     std::uint32_t transfer_current_byte_{0u};
@@ -365,6 +403,19 @@ private:
     std::uint64_t sample_counter_{0u};
     std::int16_t reverb_hold_left_{0};
     std::int16_t reverb_hold_right_{0};
+    std::array<std::int16_t, ReverbFirTapCount> reverb_input_left_{};
+    std::array<std::int16_t, ReverbFirTapCount> reverb_input_right_{};
+    std::array<std::int16_t, ReverbFirTapCount>
+        reverb_output_history_left_{};
+    std::array<std::int16_t, ReverbFirTapCount>
+        reverb_output_history_right_{};
+    std::uint8_t reverb_history_index_{0u};
+    bool dma_read_request_ready_{false};
+    bool transfer_busy_{false};
+    std::array<std::uint16_t, UnknownControlBytes / 2u>
+        unknown_control_registers_{};
+    std::array<std::uint16_t, UnknownInternalBytes / 2u>
+        unknown_internal_registers_{};
     bool irq_pending_{false};
     AudioSource audio_source_{AudioSource::Cdda};
     IrqCallback irq_callback_{nullptr};
@@ -402,10 +453,9 @@ private:
     void reset_voice(Voice& voice) noexcept;
     void write_volume(VolumeControl& volume, std::uint16_t raw) noexcept;
     void advance_volume(VolumeControl& volume) noexcept;
+    void apply_pending_events() noexcept;
     void key_on(std::uint32_t mask) noexcept;
     void key_off(std::uint32_t mask) noexcept;
-    void set_voice_mask(std::uint32_t& destination,
-                        std::uint32_t value) noexcept;
     void apply_control(std::uint16_t value) noexcept;
     void apply_transfer_control(std::uint16_t value) noexcept;
     void service_transfer_fifo() noexcept;
@@ -420,6 +470,7 @@ private:
     [[nodiscard]] std::uint16_t read_ram_word(std::uint32_t address) noexcept;
 
     void decode_block(Voice& voice, std::uint32_t address) noexcept;
+    void touch_voice_ram(const Voice& voice) noexcept;
     void finish_block(Voice& voice) noexcept;
     void ensure_block(Voice& voice) noexcept;
     void advance_block(Voice& voice) noexcept;
@@ -433,7 +484,6 @@ private:
                                             std::size_t index) const noexcept;
     [[nodiscard]] std::int16_t next_noise() noexcept;
 
-    void begin_adsr(Voice& voice) noexcept;
     void release_adsr(Voice& voice) noexcept;
     void advance_adsr(Voice& voice) noexcept;
     [[nodiscard]] std::int32_t adsr_step(const Voice& voice,
@@ -442,10 +492,6 @@ private:
                                          std::int32_t level,
                                          std::uint16_t& counter) const
         noexcept;
-    [[nodiscard]] std::int16_t voice_source(Voice& voice,
-                                            std::int16_t previous_output,
-                                            std::size_t index) noexcept;
-
     template <std::size_t Capacity>
     static PushResult push_fifo(StereoFifo<Capacity>& fifo,
                                 std::span<const StereoSample> samples) noexcept;
@@ -461,13 +507,21 @@ private:
     [[nodiscard]] StereoSample read_external_sample(bool needed) noexcept;
     void capture_sample(std::size_t channel,
                         std::int16_t sample,
-                        bool enabled) noexcept;
+                        bool irq_enabled) noexcept;
     void capture_voice_samples(std::int16_t voice_one,
-                               std::int16_t voice_three) noexcept;
+                               std::int16_t voice_three,
+                               bool irq_enabled) noexcept;
 
-    [[nodiscard]] StereoSample process_reverb(std::int16_t left_input,
-                                              std::int16_t right_input,
-                                              bool write_buffer) noexcept;
+    [[nodiscard]] std::int16_t reverb_fir_sample(
+        const std::array<std::int16_t, ReverbFirTapCount>& history,
+        bool interpolate) const noexcept;
+    [[nodiscard]] StereoSample process_reverb_side(
+        bool right_channel,
+        std::int16_t input,
+        bool write_buffer) noexcept;
+    [[nodiscard]] std::int16_t reverb_multiply(std::int32_t left,
+                                               std::int32_t right) const
+        noexcept;
     [[nodiscard]] std::int16_t read_reverb_sample(std::uint32_t address) noexcept;
     void write_reverb_sample(std::uint32_t address,
                              std::int16_t sample) noexcept;

@@ -47,14 +47,18 @@ that could exhaust the cycle domain is rejected atomically with
 `CycleOverflow`; queued bytes and MMIO state are left unchanged.
 
 Acknowledgements are scheduled events rather than being asserted at transfer
-completion. The documented nominal profile begins `/ACK` 400 CPU cycles after
-the byte and holds it for 100 cycles; an original Sony-card read adds the
+completion. The pinned signal evidence says that a controller ACK is delayed
+within a 6.8--13.7 microsecond window, that the measured controller profile is
+about 450 CPU cycles, that a memory card responds in about 170 cycles, and
+that the low pulse lasts about 96 cycles. An original Sony-card read adds the
 documented approximate 31,000-cycle delay at its late-ACK point. These values
 are explicit `ByteTransfer` metadata, and `next_event_cycle()` lets the machine
-scheduler advance without consulting host time. A caller that clocks another
-acknowledged byte while an ACK is pending gets a sticky `ack_collision()`
-receipt and the overlapping pulse is dropped fail-closed. Hardware-trace
-calibration can replace the nominal profile without changing protocol code.
+scheduler advance without consulting host time. A queued byte may occupy the
+holding register while an ACK is pending, but its clocking begins only after
+the ACK pulse ends. `ack_collision()` remains a fail-closed receipt for an
+incompatible future device profile; the built-in pad/card paths do not create
+overlapping ACK pulses. Hardware-trace calibration can replace the profile
+without changing protocol code.
 
 ## Typed devices
 
@@ -68,10 +72,19 @@ address is considered only after `/CS` is toggled.
 
 `PadDevice` supports the digital poll, analog poll, command-43 configuration
 entry/exit, LED/mode command 44, controller status queries, and command-4D
-rumble mapping used by DualShock-compatible PS1 controllers. Input values,
-LED state, motor mapping, and motor values are plain data; no host API is
-called. Pressure-sensitive DualShock2 extensions and undocumented commands are
-outside this tranche and return bounded zero responses or fail closed.
+rumble mapping used by DualShock-compatible PS1 controllers. All documented
+mapping bytes `00h..FEh` are retained; only `00h` and `01h` have motor effects
+in this two-motor model, while other legal values remain opaque protocol
+outputs. Input values, LED state, motor mapping, and motor values are plain
+data; no host API is called. Configuration-mode communication refreshes the
+documented approximately one-second watchdog. Watchdog expiry and the exposed
+physical Analog-button edge stop and lock rumble, select digital/analog mode,
+and preserve the documented post-configuration `00h` ID-high quirk. The
+physical-button boundary is explicit (`press_analog_button`); callers may use
+`set_analog_mode` for a direct unlocked host/input initialization. Advancing
+`Sio0` also advances attached pad watchdogs during idle bus time. Pressure-
+sensitive DualShock2 extensions and undocumented commands are outside this
+tranche and return bounded zero responses or fail closed.
 
 `MemoryCard` accepts exactly one caller-owned 128 KiB raw image. It implements
 Sony read (`0x52`), write (`0x57`), and card-ID (`0x53`) framing, address
@@ -94,9 +107,12 @@ Both devices and SIO0 expose fixed-size value snapshots. A memory-card
 snapshot includes an image fingerprint and protocol fingerprint, so restoring
 against a changed caller image fails closed. Restore device snapshots after a
 bus snapshot when restoring a transaction that was selected at the time of the
-capture. SIO snapshots also retain the free-running baud timer and all pending
-transfer/ACK event times. They are C++ value-state snapshots, not a stable
-on-disk serialization ABI.
+capture. Read-data snapshots must prove an in-range sector and the exact
+reachable checksum/protocol prefix before they can be restored. SIO snapshots
+retain the free-running baud timer and all pending transfer/ACK event times;
+their bit periods, ACK widths, SIO0 error flags, FIFO bounds, and IRQ state are
+validated against reachable hardware states. They are C++ value-state
+snapshots, not a stable on-disk serialization ABI.
 
 The SIO reset strobe resets only SIO registers, FIFOs, timing, and IRQ state.
 It deliberately does not power-cycle attached caller-owned pads or cards;
@@ -112,5 +128,5 @@ extensions, card filesystem policy, host persistence, and title-specific input
 mapping are not implemented here. The component does not claim exact silicon
 behavior for those cases. Sub-cycle electrical edge placement and
 revision-specific ACK latency still require hardware traces during machine
-integration; the constants above are documented nominal values, not a claim of
-revision-exact electrical edges.
+integration; the constants above are measured behavioral profile values, not a
+claim of revision-exact electrical edges.

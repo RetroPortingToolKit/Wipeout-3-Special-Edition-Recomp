@@ -73,18 +73,36 @@ a page/region boundary belongs to the same validated identity as its branch.
 
 ## Timing contract
 
-- R3000A clock: 33,868,800 Hz.
+- Nominal R3000A clock: 33,868,800 Hz. CPU retirement has an independent,
+  exact rational multiplier; device and media clocks do not inherit it.
 - SPU output: 44,100 samples/s.
 - CDDA: 75 sectors/s.
-- 25 Hz: 1,354,752 CPU cycles and 1,764 samples per VBlank.
-- 50 Hz: 677,376 CPU cycles and 882 samples per VBlank.
-- 100 Hz: 338,688 CPU cycles and 441 samples per VBlank.
+- PAL x2 doubles the CRTC/video clock from 50 to 100 Hz without doubling the
+  SPU or CD-ROM clocks. It is a simulation cadence, not frame duplication.
+- At a 100% CPU multiplier, 25/50/100 Hz provide 1,354,752 / 677,376 /
+  338,688 CPU cycles per VBlank. The selected product multiplier scales only
+  those CPU budgets and must be fixed by measured race acceptance, never by
+  host-loop speed or an adaptive controller.
+- 25/50/100 Hz produce 1,764 / 882 / 441 SPU samples per VBlank regardless of
+  CPU multiplier.
 - At 100 Hz, exactly three CDDA sectors span four simulation frames.
+- Every generated memory transaction that can reach MMIO carries its raw
+  architectural issue cycle across the native ABI. A generated shard may keep
+  registers resident, but it may not hide that timestamp in private state or
+  expose a stale caller snapshot to timers, SIO, DMA, GPU, CD-ROM, or SPU.
+  Device deadlines stop retirement at an instruction boundary; the scheduler
+  advances native device time, updates interrupt lines, and only then resumes
+  generated code. Wait states are charged once after the transaction and never
+  converted into device time by the generated region.
 
 The host presenter consumes completed simulation frames; it does not invent
 duplicate internal updates. A 3,600-frame 100-Hz proof therefore requires 3,600
-distinct game advances, 1,219,276,800 CPU cycles, 1,587,600 SPU samples, and
-2,700 CDDA sectors of timeline advancement.
+distinct game advances, exactly 1,587,600 SPU samples, and 2,700 CDDA sectors
+of timeline advancement. Its expected CPU-cycle total is
+`1,219,276,800 * multiplier_numerator / multiplier_denominator`, with exact
+rational carry. The product multiplier must be high enough for hueponik's
+100-FPS/max-detail update to finish every 10 ms simulation interval at 1.00x,
+then remain pinned and covered by deterministic receipts.
 
 ## Enhancement contract
 

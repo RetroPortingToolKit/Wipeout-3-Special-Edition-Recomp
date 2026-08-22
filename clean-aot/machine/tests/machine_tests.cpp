@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -66,12 +68,17 @@ void test_100_hz_3600_frames() {
         require(receipt.timebase_ticks == 1, "100 Hz timebase quantum");
         require(receipt.cpu_cycles == 338'688,
                 "100 Hz exact CPU cycles per VBlank");
+        require(receipt.cpu_multiplier_numerator == 1 &&
+                    receipt.cpu_multiplier_denominator == 1,
+                "stock CPU multiplier is explicit and canonical");
         require(receipt.spu_samples == 441,
                 "100 Hz exact SPU samples per VBlank");
         require(receipt.cdda_sectors == expected_cdda,
                 "100 Hz rational CDDA allocation");
         require(receipt.total_cpu_cycles == reference_timebase * 338'688,
                 "100 Hz cumulative CPU cycles");
+        require(receipt.cpu_retirement_total == receipt.total_cpu_cycles,
+                "100 Hz CPU retirement total is explicit");
         require(receipt.total_spu_samples == reference_timebase * 441,
                 "100 Hz cumulative SPU samples");
         require(receipt.total_cdda_sectors == reference_cdda_total,
@@ -128,6 +135,9 @@ void test_fixed_modes() {
         require(receipt.timebase_ticks == 2, "50 Hz timebase quantum");
         require(receipt.cpu_cycles == 677'376,
                 "50 Hz exact CPU cycles per VBlank");
+        require(receipt.cpu_multiplier_numerator == 1 &&
+                    receipt.cpu_multiplier_denominator == 1,
+                "50 Hz stock multiplier is explicit");
         require(receipt.spu_samples == 882,
                 "50 Hz exact SPU samples per VBlank");
         require(receipt.cdda_sectors == (frame % 2 == 0 ? 1 : 2),
@@ -143,6 +153,205 @@ void test_fixed_modes() {
             "25 Hz exact SPU samples per VBlank");
     require(receipt.cdda_sectors == 3,
             "25 Hz exact CDDA sectors per VBlank");
+}
+
+void test_nine_x_independent_clocks() {
+    Machine machine(VBlankRate::Hz100, 9, 1);
+    EventLog log;
+    const FrameReceipt first = machine.step_frame(EventLog::collect, &log);
+
+    require(first.cpu_multiplier_numerator == 9 &&
+                first.cpu_multiplier_denominator == 1,
+            "9x multiplier is canonical in the receipt");
+    require(first.cpu_cycles == 3'048'192 &&
+                first.total_cpu_cycles == 3'048'192 &&
+                first.cpu_retirement_total == 3'048'192,
+            "9x 100 Hz CPU retirement is exactly 3,048,192 cycles");
+    require(first.spu_samples == 441,
+            "9x CPU multiplier does not accelerate SPU samples");
+    require(first.cdda_sectors == 0 && first.cdda_phase == 75,
+            "9x CPU multiplier does not accelerate CDDA");
+    require(log.events.size() == 4, "9x frame event count");
+    for (const Event& event : log.events) {
+        require(event.cpu_multiplier_numerator == 9 &&
+                    event.cpu_multiplier_denominator == 1,
+                "9x multiplier is explicit on every event");
+    }
+    require(log.events[0].kind == CLEAN_AOT_MACHINE_EVENT_VBLANK &&
+                log.events[0].cpu_retirement_total == 0,
+            "frame-start VBlank observes prior CPU retirement");
+    for (std::size_t index = 1; index < log.events.size(); ++index) {
+        require(log.events[index].cpu_retirement_total == 3'048'192,
+                "post-budget events observe new CPU retirement");
+    }
+
+    const FrameReceipt second = machine.step_frame();
+    require(second.cpu_cycles == 3'048'192 && second.cdda_sectors == 1,
+            "9x second 100 Hz frame keeps independent clock budgets");
+
+    Machine stock(VBlankRate::Hz100);
+    require(stock.step_frame().digest != first.digest,
+            "CPU multiplier participates in deterministic digest");
+}
+
+void test_fractional_multiplier_carry_and_one_hour() {
+    constexpr std::uint64_t seconds = 3'600;
+    constexpr std::uint64_t frames = seconds * 100;
+    constexpr std::uint64_t multiplier_numerator = 133;
+    constexpr std::uint64_t multiplier_denominator = 100;
+    const std::uint64_t cycles_per_tick = Machine::CpuCyclesPerTimebaseTick;
+    Machine machine(VBlankRate::Hz100, 266, 200);
+    const Machine::CpuMultiplier multiplier = machine.cpu_multiplier();
+    require(multiplier.numerator == multiplier_numerator &&
+                multiplier.denominator == multiplier_denominator,
+            "fractional multiplier is reduced at construction");
+
+    std::uint64_t exact_numerator = 0;
+    std::uint64_t expected_total = 0;
+    std::uint64_t expected_cdda_numerator = 0;
+    std::uint64_t expected_cdda_total = 0;
+    FrameReceipt receipt{};
+    bool saw_fractional_carry = false;
+
+    for (std::uint64_t frame = 0; frame < frames; ++frame) {
+        receipt = machine.step_frame();
+        exact_numerator += cycles_per_tick * multiplier_numerator;
+        const std::uint64_t next_total =
+            exact_numerator / multiplier_denominator;
+        const std::uint64_t expected_cpu = next_total - expected_total;
+        expected_total = next_total;
+        expected_cdda_numerator += 75;
+        const std::uint64_t next_cdda_total = expected_cdda_numerator / 100;
+        const std::uint64_t expected_cdda =
+            next_cdda_total - expected_cdda_total;
+        expected_cdda_total = next_cdda_total;
+
+        require(receipt.cpu_cycles == expected_cpu,
+                "fractional CPU multiplier uses exact carry");
+        require(receipt.total_cpu_cycles == expected_total &&
+                    receipt.cpu_retirement_total == expected_total,
+                "fractional CPU cumulative total is exact");
+        require(receipt.spu_samples == 441,
+                "fractional CPU multiplier leaves SPU at 441 samples");
+        require(receipt.cdda_sectors == expected_cdda,
+                "fractional CPU multiplier leaves CDDA on native phase");
+        if (receipt.cpu_cycles != cycles_per_tick * multiplier_numerator /
+                                      multiplier_denominator) {
+            saw_fractional_carry = true;
+        }
+    }
+
+    require(saw_fractional_carry,
+            "fractional multiplier produces a non-integral carry case");
+    require(receipt.total_cpu_cycles == cycles_per_tick *
+                                             multiplier_numerator * 3'600,
+            "fractional one-hour CPU total has no drift");
+    require(receipt.total_spu_samples == Machine::SpuHz * seconds,
+            "fractional one-hour SPU total has no drift");
+    require(receipt.total_cdda_sectors ==
+                Machine::CddaSectorsPerSecond * seconds,
+            "fractional one-hour CDDA total has no drift");
+    require(receipt.cdda_phase == 0 &&
+                receipt.elapsed_timebase_ticks == frames,
+            "fractional one-hour native timeline has no drift");
+}
+
+void test_invalid_cpu_multipliers() {
+    Machine::CpuMultiplier canonical{};
+    require(!Machine::canonicalize_cpu_multiplier(0, 1, canonical),
+            "zero CPU multiplier numerator is rejected");
+    require(!Machine::canonicalize_cpu_multiplier(1, 0, canonical),
+            "zero CPU multiplier denominator is rejected");
+    require(!Machine::canonicalize_cpu_multiplier(11, 1, canonical),
+            "CPU multiplier above 10x is rejected");
+    require(!Machine::canonicalize_cpu_multiplier(1'001, 100, canonical),
+            "fractional CPU multiplier above 10x is rejected");
+    require(Machine::canonicalize_cpu_multiplier(20, 2, canonical) &&
+                canonical.numerator == 10 && canonical.denominator == 1,
+            "inclusive 10x boundary is accepted and canonicalized");
+    require(Machine::canonicalize_cpu_multiplier(
+                std::numeric_limits<std::uint64_t>::max(),
+                std::numeric_limits<std::uint64_t>::max(), canonical) &&
+                canonical.numerator == 1 && canonical.denominator == 1,
+            "large reducible CPU multiplier is canonicalized safely");
+
+    bool threw = false;
+    try {
+        Machine invalid(VBlankRate::Hz100, 0, 1);
+        (void)invalid;
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    require(threw, "C++ constructor rejects invalid CPU multiplier");
+}
+
+void test_full_width_cpu_multiplier_carry() {
+    constexpr std::uint64_t maximum =
+        std::numeric_limits<std::uint64_t>::max();
+    Machine::CpuMultiplier canonical{};
+    require(Machine::canonicalize_cpu_multiplier(maximum - 1, maximum,
+                                                 canonical) &&
+                canonical.numerator == maximum - 1 &&
+                canonical.denominator == maximum,
+            "full-width canonical multiplier below 1x is accepted");
+
+    Machine almost_one(VBlankRate::Hz100, maximum - 1, maximum);
+    const FrameReceipt first = almost_one.step_frame();
+    const FrameReceipt second = almost_one.step_frame();
+    require(first.cpu_cycles == Machine::CpuCyclesPerTimebaseTick - 1 &&
+                second.cpu_cycles == Machine::CpuCyclesPerTimebaseTick &&
+                second.total_cpu_cycles ==
+                    Machine::CpuCyclesPerTimebaseTick * 2 - 1,
+            "full-width multiplier advances with exact carry");
+    require(first.spu_samples == 441 && first.cdda_sectors == 0 &&
+                second.spu_samples == 441 && second.cdda_sectors == 1,
+            "full-width CPU multiplier leaves native clocks unchanged");
+    require(first.cpu_multiplier_numerator == maximum - 1 &&
+                first.cpu_multiplier_denominator == maximum,
+            "full-width canonical multiplier is preserved in receipts");
+
+    require(Machine::canonicalize_cpu_multiplier(1, maximum, canonical) &&
+                canonical.numerator == 1 &&
+                canonical.denominator == maximum,
+            "smallest full-width positive multiplier is accepted");
+    Machine tiny(VBlankRate::Hz100, 1, maximum);
+    const FrameReceipt tiny_receipt = tiny.step_frame();
+    require(tiny_receipt.cpu_cycles == 0 &&
+                tiny_receipt.cpu_retirement_total == 0 &&
+                tiny_receipt.spu_samples == 441 &&
+                tiny_receipt.cdda_sectors == 0,
+            "sub-cycle retirement carry does not stall native devices");
+
+    Machine maximum_rate(VBlankRate::Hz100, 20, 2);
+    const FrameReceipt maximum_receipt = maximum_rate.step_frame();
+    require(maximum_receipt.cpu_cycles ==
+                Machine::CpuCyclesPerTimebaseTick * 10 &&
+                maximum_receipt.spu_samples == 441 &&
+                maximum_receipt.cdda_sectors == 0,
+            "inclusive 10x multiplier scales retirement only");
+}
+
+void test_multiplier_mode_switches() {
+    Machine machine(VBlankRate::Hz100, 9, 1);
+    const VBlankRate rates[] = {VBlankRate::Hz100, VBlankRate::Hz50,
+                                VBlankRate::Hz25, VBlankRate::Hz100};
+    const std::uint32_t quanta[] = {1, 2, 4, 1};
+    std::uint64_t elapsed = 0;
+    for (std::size_t index = 0; index < 4; ++index) {
+        require(machine.set_vblank_rate(rates[index]),
+                "9x mode switch is accepted");
+        const FrameReceipt receipt = machine.step_frame();
+        elapsed += quanta[index];
+        require(receipt.timebase_ticks == quanta[index],
+                "mode switch preserves native timebase quantum");
+        require(receipt.total_cpu_cycles == elapsed * 338'688 * 9,
+                "mode switch scales CPU only");
+        require(receipt.total_spu_samples == elapsed * 441,
+                "mode switch keeps SPU on native clock");
+        require(receipt.cpu_multiplier_numerator == 9 &&
+                    receipt.cpu_multiplier_denominator == 1,
+                "mode switch cannot mutate immutable CPU multiplier");
+    }
 }
 
 void test_one_hour_has_no_drift() {
@@ -261,7 +470,12 @@ void test_mode_switching_is_repeatable() {
         require(a.sequence == b.sequence && a.frame_index == b.frame_index &&
                     a.kind == b.kind && a.vblank_hz == b.vblank_hz &&
                     a.amount == b.amount && a.cumulative == b.cumulative &&
-                    a.auxiliary == b.auxiliary,
+                    a.auxiliary == b.auxiliary &&
+                    a.cpu_multiplier_numerator ==
+                        b.cpu_multiplier_numerator &&
+                    a.cpu_multiplier_denominator ==
+                        b.cpu_multiplier_denominator &&
+                    a.cpu_retirement_total == b.cpu_retirement_total,
                 "repeatable event receipt");
     }
 
@@ -327,6 +541,12 @@ void test_mode_switch_preserves_fractional_phase_and_event_order() {
                 log.events[3].kind == CLEAN_AOT_MACHINE_EVENT_SPU_SAMPLES &&
                 log.events[4].kind == CLEAN_AOT_MACHINE_EVENT_CDDA_SECTORS,
             "switch frame retains documented event order");
+    require(log.events[0].cpu_retirement_total == 338'688 &&
+                log.events[1].cpu_retirement_total == 338'688 &&
+                log.events[2].cpu_retirement_total == 1'693'440 &&
+                log.events[3].cpu_retirement_total == 1'693'440 &&
+                log.events[4].cpu_retirement_total == 1'693'440,
+            "switch and VBlank precede the switched frame CPU budget");
 
     require(machine.set_vblank_rate(VBlankRate::Hz50),
             "switch to 50 Hz at nonzero phase");
@@ -341,8 +561,8 @@ void test_mode_switch_preserves_fractional_phase_and_event_order() {
 }
 
 void test_reset_restores_initial_state() {
-    Machine machine(VBlankRate::Hz50);
-    Machine fresh(VBlankRate::Hz50);
+    Machine machine(VBlankRate::Hz50, 266, 200);
+    Machine fresh(VBlankRate::Hz50, 133, 100);
     (void)machine.step_frame();
     require(machine.set_vblank_rate(VBlankRate::Hz100),
             "queue mode switch before reset");
@@ -351,6 +571,9 @@ void test_reset_restores_initial_state() {
     require(machine.vblank_rate() == VBlankRate::Hz50,
             "reset restores construction rate");
     require(machine.frame_count() == 0, "reset restores frame count");
+    require(machine.cpu_multiplier().numerator == 133 &&
+                machine.cpu_multiplier().denominator == 100,
+            "reset preserves immutable CPU multiplier");
     require(machine.receipt_digest() == fresh.receipt_digest(),
             "reset restores digest seed");
 
@@ -389,11 +612,56 @@ void test_c_abi() {
     clean_aot_machine_reset(nullptr);
     clean_aot_machine_destroy(nullptr);
 
+    std::uint64_t canonical_numerator = 99;
+    std::uint64_t canonical_denominator = 99;
+    require(clean_aot_machine_canonicalize_cpu_multiplier(
+                266, 200, &canonical_numerator, &canonical_denominator) ==
+                CLEAN_AOT_MACHINE_STATUS_OK &&
+                canonical_numerator == 133 && canonical_denominator == 100,
+            "C ABI canonicalizes an exact fractional multiplier");
+    require(clean_aot_machine_canonicalize_cpu_multiplier(
+                0, 1, &canonical_numerator, &canonical_denominator) ==
+                CLEAN_AOT_MACHINE_STATUS_INVALID_CPU_MULTIPLIER &&
+                canonical_numerator == 0 && canonical_denominator == 0,
+            "C ABI rejects zero CPU multiplier");
+    require(clean_aot_machine_canonicalize_cpu_multiplier(
+                1, 0, &canonical_numerator, &canonical_denominator) ==
+                CLEAN_AOT_MACHINE_STATUS_INVALID_CPU_MULTIPLIER,
+            "C ABI rejects zero CPU denominator");
+    require(clean_aot_machine_canonicalize_cpu_multiplier(
+                11, 1, &canonical_numerator, &canonical_denominator) ==
+                CLEAN_AOT_MACHINE_STATUS_INVALID_CPU_MULTIPLIER,
+            "C ABI rejects CPU multiplier above 10x");
+    require(clean_aot_machine_canonicalize_cpu_multiplier(
+                1, 1, nullptr, &canonical_denominator) ==
+                CLEAN_AOT_MACHINE_STATUS_INVALID_ARGUMENT,
+            "C ABI rejects null canonical output");
+    require(clean_aot_machine_canonicalize_cpu_multiplier(
+                1, 1, &canonical_numerator, &canonical_numerator) ==
+                CLEAN_AOT_MACHINE_STATUS_INVALID_ARGUMENT,
+            "C ABI rejects aliased canonical outputs");
+    require(clean_aot_machine_create_with_cpu_multiplier(100, 0, 1) ==
+                nullptr,
+            "C ABI multiplier factory rejects zero numerator");
+    require(clean_aot_machine_create_with_cpu_multiplier(100, 11, 1) ==
+                nullptr,
+            "C ABI multiplier factory rejects out-of-range multiplier");
+    require(clean_aot_machine_create_with_cpu_multiplier(13, 1, 1) ==
+                nullptr,
+            "C ABI multiplier factory rejects invalid rate");
+
     clean_aot_machine* machine =
         clean_aot_machine_create(CLEAN_AOT_MACHINE_VBLANK_100);
     require(machine != nullptr, "C ABI creates machine");
     require(clean_aot_machine_get_vblank_rate(machine) == 100,
             "C ABI reports initial rate");
+    std::uint64_t machine_numerator = 0;
+    std::uint64_t machine_denominator = 0;
+    require(clean_aot_machine_get_cpu_multiplier(
+                machine, &machine_numerator, &machine_denominator) ==
+                CLEAN_AOT_MACHINE_STATUS_OK &&
+                machine_numerator == 1 && machine_denominator == 1,
+            "C ABI stock factory reports 1/1 multiplier");
 
     CEventLog log;
     clean_aot_machine_frame_receipt receipt{};
@@ -429,6 +697,42 @@ void test_c_abi() {
     require(clean_aot_machine_frame_count(machine) == 0,
             "C ABI reset frame count");
     clean_aot_machine_destroy(machine);
+
+    clean_aot_machine* nine_x =
+        clean_aot_machine_create_with_cpu_multiplier(100, 18, 2);
+    require(nine_x != nullptr, "C ABI creates canonicalized 9x machine");
+    require(clean_aot_machine_get_cpu_multiplier(
+                nine_x, &machine_numerator, &machine_denominator) ==
+                CLEAN_AOT_MACHINE_STATUS_OK &&
+                machine_numerator == 9 && machine_denominator == 1,
+            "C ABI reports reduced 9x multiplier");
+    clean_aot_machine_frame_receipt nine_receipt{};
+    CEventLog nine_log;
+    require(clean_aot_machine_step_frame(nine_x, CEventLog::collect, &nine_log,
+                                         &nine_receipt) ==
+                CLEAN_AOT_MACHINE_STATUS_OK,
+            "C ABI advances 9x machine");
+    require(nine_receipt.cpu_cycles == 3'048'192 &&
+                nine_receipt.spu_samples == 441 &&
+                nine_receipt.cdda_sectors == 0 &&
+                nine_receipt.cpu_retirement_total == 3'048'192 &&
+                nine_receipt.cpu_multiplier_numerator == 9 &&
+                nine_receipt.cpu_multiplier_denominator == 1,
+            "C ABI exposes independent 9x receipt clocks");
+    require(nine_log.events.size() == 4 &&
+                nine_log.events[1].cpu_multiplier_numerator == 9 &&
+                nine_log.events[1].cpu_multiplier_denominator == 1 &&
+                nine_log.events[1].cpu_retirement_total == 3'048'192,
+            "C ABI event exposes 9x CPU retirement metadata");
+    require(clean_aot_machine_get_cpu_multiplier(nine_x, nullptr,
+                                                 &machine_denominator) ==
+                CLEAN_AOT_MACHINE_STATUS_INVALID_ARGUMENT,
+            "C ABI rejects null multiplier query output");
+    require(clean_aot_machine_get_cpu_multiplier(
+                nine_x, &machine_numerator, &machine_numerator) ==
+                CLEAN_AOT_MACHINE_STATUS_INVALID_ARGUMENT,
+            "C ABI rejects aliased multiplier query outputs");
+    clean_aot_machine_destroy(nine_x);
 }
 
 } // namespace
@@ -436,6 +740,11 @@ void test_c_abi() {
 int main() {
     test_100_hz_3600_frames();
     test_fixed_modes();
+    test_nine_x_independent_clocks();
+    test_fractional_multiplier_carry_and_one_hour();
+    test_invalid_cpu_multipliers();
+    test_full_width_cpu_multiplier_carry();
+    test_multiplier_mode_switches();
     test_one_hour_has_no_drift();
     test_mode_switching_is_repeatable();
     test_unobserved_mode_change_is_collapsed();

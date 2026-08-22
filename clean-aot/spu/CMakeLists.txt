@@ -53,9 +53,10 @@ foreach(target IN LISTS _clean_aot_spu_targets)
         if(CLEAN_AOT_SPU_ENABLE_SANITIZERS)
             target_compile_options(${target} PRIVATE
                 -fsanitize=address,undefined -fno-omit-frame-pointer
+                -fno-sanitize-recover=all
             )
             target_link_options(${target} PRIVATE
-                -fsanitize=address,undefined
+                -fsanitize=address,undefined -fno-sanitize-recover=all
             )
         endif()
     endif()

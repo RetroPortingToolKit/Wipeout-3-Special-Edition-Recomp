@@ -1,6 +1,7 @@
 #include "machine.hpp"
 
 #include <new>
+#include <stdexcept>
 #include <utility>
 
 namespace {
@@ -34,6 +35,43 @@ void digest_event(std::uint64_t& digest,
     digest_u64(digest, event.amount);
     digest_u64(digest, event.cumulative);
     digest_u64(digest, event.auxiliary);
+    digest_u64(digest, event.cpu_multiplier_numerator);
+    digest_u64(digest, event.cpu_multiplier_denominator);
+    digest_u64(digest, event.cpu_retirement_total);
+}
+
+bool add_rational_parts(std::uint64_t denominator,
+                        std::uint64_t right_whole,
+                        std::uint64_t right_remainder,
+                        std::uint64_t& left_whole,
+                        std::uint64_t& left_remainder) noexcept {
+    if (denominator == 0 || left_remainder >= denominator ||
+        right_remainder >= denominator) {
+        return false;
+    }
+    if (right_whole >
+        std::numeric_limits<std::uint64_t>::max() - left_whole) {
+        return false;
+    }
+
+    std::uint64_t sum_whole = left_whole + right_whole;
+    std::uint64_t sum_remainder = 0;
+    const std::uint64_t distance_to_denominator =
+        denominator - right_remainder;
+    if (left_remainder >= distance_to_denominator) {
+        if (sum_whole == std::numeric_limits<std::uint64_t>::max()) {
+            return false;
+        }
+        ++sum_whole;
+        sum_remainder = left_remainder - distance_to_denominator;
+    } else {
+        /* This addition is bounded by denominator - 1. */
+        sum_remainder = left_remainder + right_remainder;
+    }
+
+    left_whole = sum_whole;
+    left_remainder = sum_remainder;
+    return true;
 }
 
 void forward_c_callback(const clean_aot_machine_event& event, void* context) {
@@ -48,24 +86,64 @@ void forward_c_callback(const clean_aot_machine_event& event, void* context) {
 namespace clean_aot::machine {
 
 Machine::RationalAccumulator::RationalAccumulator(
-    std::uint64_t frequency,
+    std::uint64_t numerator,
     std::uint64_t denominator) noexcept
-    : frequency_hz(frequency),
-      denominator_hz(denominator),
+    : rate_numerator(numerator),
+      rate_denominator(denominator),
       remainder(0),
       total(0) {}
 
-std::uint64_t Machine::RationalAccumulator::advance(
-    std::uint64_t timebase_ticks) noexcept {
-    /* The configured frequencies and timebase make this product bounded well
-     * inside uint64_t. Keeping the remainder separate makes the result exact
-     * and makes changing VBlank denominators lossless. */
-    const std::uint64_t numerator =
-        frequency_hz * timebase_ticks + remainder;
-    const std::uint64_t whole = numerator / denominator_hz;
-    remainder = numerator % denominator_hz;
-    total += whole;
-    return whole;
+bool Machine::RationalAccumulator::preview(
+    std::uint64_t units,
+    AdvanceResult& result) const noexcept {
+    if (rate_denominator == 0 || remainder >= rate_denominator) {
+        return false;
+    }
+
+    /*
+     * Accumulate units * rate_numerator / rate_denominator without ever
+     * forming the potentially overflowing numerator product. Each pair is an
+     * exact whole/remainder value with a shared denominator. Binary doubling
+     * makes the work logarithmic in units and remains portable to MSVC, where
+     * unsigned __int128 is unavailable.
+     */
+    std::uint64_t accumulated_whole = 0;
+    std::uint64_t accumulated_remainder = remainder;
+    std::uint64_t term_whole = rate_numerator / rate_denominator;
+    std::uint64_t term_remainder = rate_numerator % rate_denominator;
+    std::uint64_t remaining_units = units;
+
+    while (remaining_units != 0) {
+        if ((remaining_units & 1U) != 0 &&
+            !add_rational_parts(rate_denominator, term_whole, term_remainder,
+                                accumulated_whole,
+                                accumulated_remainder)) {
+            return false;
+        }
+        remaining_units >>= 1U;
+        if (remaining_units != 0) {
+            const std::uint64_t prior_whole = term_whole;
+            const std::uint64_t prior_remainder = term_remainder;
+            if (!add_rational_parts(rate_denominator, prior_whole,
+                                    prior_remainder, term_whole,
+                                    term_remainder)) {
+                return false;
+            }
+        }
+    }
+
+    if (accumulated_whole >
+        std::numeric_limits<std::uint64_t>::max() - total) {
+        return false;
+    }
+    result = AdvanceResult{accumulated_whole, accumulated_remainder,
+                           total + accumulated_whole};
+    return true;
+}
+
+void Machine::RationalAccumulator::commit(const AdvanceResult& result) noexcept {
+    remainder = result.remainder;
+    total = result.total;
 }
 
 void Machine::RationalAccumulator::reset() noexcept {
@@ -91,10 +169,63 @@ std::uint32_t Machine::timebase_ticks_for_rate(
     return static_cast<std::uint32_t>(TimebaseHz / rate);
 }
 
+bool Machine::canonicalize_cpu_multiplier(
+    std::uint64_t input_numerator,
+    std::uint64_t input_denominator,
+    CpuMultiplier& canonical) noexcept {
+    if (input_numerator == 0 || input_denominator == 0) {
+        return false;
+    }
+
+    std::uint64_t numerator = input_numerator;
+    std::uint64_t denominator = input_denominator;
+    while (denominator != 0) {
+        const std::uint64_t remainder = numerator % denominator;
+        numerator = denominator;
+        denominator = remainder;
+    }
+    const std::uint64_t divisor = numerator;
+    numerator = input_numerator / divisor;
+    denominator = input_denominator / divisor;
+
+    const std::uint64_t whole = numerator / denominator;
+    const std::uint64_t fractional = numerator % denominator;
+    if (whole > MaxCpuMultiplierWhole ||
+        (whole == MaxCpuMultiplierWhole && fractional != 0)) {
+        return false;
+    }
+
+    canonical = CpuMultiplier{numerator, denominator};
+    return true;
+}
+
+Machine::CpuMultiplier Machine::checked_cpu_multiplier(
+    std::uint64_t input_numerator,
+    std::uint64_t input_denominator) {
+    CpuMultiplier canonical{};
+    if (!canonicalize_cpu_multiplier(input_numerator, input_denominator,
+                                     canonical)) {
+        throw std::invalid_argument("invalid CPU multiplier");
+    }
+    return canonical;
+}
+
 Machine::Machine(VBlankRate initial_rate)
+    : Machine(initial_rate, CpuMultiplier{1, 1}) {}
+
+Machine::Machine(VBlankRate initial_rate,
+                 std::uint64_t cpu_multiplier_numerator,
+                 std::uint64_t cpu_multiplier_denominator)
+    : Machine(initial_rate,
+              CpuMultiplier{cpu_multiplier_numerator,
+                            cpu_multiplier_denominator}) {}
+
+Machine::Machine(VBlankRate initial_rate, CpuMultiplier requested_multiplier)
     : initial_rate_hz_(supported_rate(rate_value(initial_rate))
                            ? rate_value(initial_rate)
                            : CLEAN_AOT_MACHINE_VBLANK_100),
+      cpu_multiplier_(checked_cpu_multiplier(requested_multiplier.numerator,
+                                             requested_multiplier.denominator)),
       current_rate_hz_(initial_rate_hz_),
       pending_mode_switch_(false),
       pending_mode_switch_from_hz_(0),
@@ -102,9 +233,14 @@ Machine::Machine(VBlankRate initial_rate)
       elapsed_timebase_ticks_(0),
       next_event_sequence_(0),
       digest_(kFnvOffsetBasis),
-      cpu_clock_(CpuHz, TimebaseHz),
+      cpu_clock_(cpu_multiplier_.numerator,
+                 cpu_multiplier_.denominator),
       spu_clock_(SpuHz, TimebaseHz),
       cdda_clock_(CddaSectorsPerSecond, TimebaseHz) {}
+
+Machine::CpuMultiplier Machine::cpu_multiplier() const noexcept {
+    return cpu_multiplier_;
+}
 
 bool Machine::set_vblank_rate(VBlankRate rate) {
     const std::uint32_t new_rate = rate_value(rate);
@@ -136,6 +272,9 @@ VBlankRate Machine::vblank_rate() const noexcept {
 }
 
 void Machine::emit(Event event, EventSink sink, void* user) noexcept {
+    event.cpu_multiplier_numerator = cpu_multiplier_.numerator;
+    event.cpu_multiplier_denominator = cpu_multiplier_.denominator;
+    event.cpu_retirement_total = cpu_clock_.total;
     event.sequence = next_event_sequence_++;
     digest_event(digest_, event);
     if (sink != nullptr) {
@@ -147,6 +286,24 @@ FrameReceipt Machine::step_frame(EventSink sink, void* user) {
     const std::uint64_t frame_index = frame_count_;
     const std::uint32_t timebase_ticks =
         timebase_ticks_for_rate(current_rate_hz_);
+    const std::uint64_t event_count = pending_mode_switch_ ? 5 : 4;
+
+    RationalAccumulator::AdvanceResult cpu_preview{};
+    RationalAccumulator::AdvanceResult spu_preview{};
+    RationalAccumulator::AdvanceResult cdda_preview{};
+    const std::uint64_t stock_cpu_cycles =
+        CpuCyclesPerTimebaseTick * timebase_ticks;
+    const bool counters_fit =
+        cpu_clock_.preview(stock_cpu_cycles, cpu_preview) &&
+        spu_clock_.preview(timebase_ticks, spu_preview) &&
+        cdda_clock_.preview(timebase_ticks, cdda_preview);
+    if (!counters_fit || frame_count_ == std::numeric_limits<std::uint64_t>::max() ||
+        elapsed_timebase_ticks_ >
+            std::numeric_limits<std::uint64_t>::max() - timebase_ticks ||
+        next_event_sequence_ >
+            std::numeric_limits<std::uint64_t>::max() - event_count) {
+        throw std::overflow_error("machine timing counter overflow");
+    }
 
     FrameReceipt receipt{};
     receipt.frame_index = frame_index;
@@ -167,9 +324,9 @@ FrameReceipt Machine::step_frame(EventSink sink, void* user) {
         pending_mode_switch_from_hz_ = 0;
     }
 
-    const std::uint64_t cpu_cycles = cpu_clock_.advance(timebase_ticks);
-    const std::uint64_t spu_samples = spu_clock_.advance(timebase_ticks);
-    const std::uint64_t cdda_sectors = cdda_clock_.advance(timebase_ticks);
+    const std::uint64_t cpu_cycles = cpu_preview.amount;
+    const std::uint64_t spu_samples = spu_preview.amount;
+    const std::uint64_t cdda_sectors = cdda_preview.amount;
 
     ++frame_count_;
     elapsed_timebase_ticks_ += timebase_ticks;
@@ -183,6 +340,7 @@ FrameReceipt Machine::step_frame(EventSink sink, void* user) {
     vblank_event.auxiliary = timebase_ticks;
     emit(vblank_event, sink, user);
 
+    cpu_clock_.commit(cpu_preview);
     Event cpu_event{};
     cpu_event.frame_index = frame_index;
     cpu_event.kind = CLEAN_AOT_MACHINE_EVENT_CPU_CYCLES;
@@ -191,6 +349,7 @@ FrameReceipt Machine::step_frame(EventSink sink, void* user) {
     cpu_event.cumulative = cpu_clock_.total;
     emit(cpu_event, sink, user);
 
+    spu_clock_.commit(spu_preview);
     Event spu_event{};
     spu_event.frame_index = frame_index;
     spu_event.kind = CLEAN_AOT_MACHINE_EVENT_SPU_SAMPLES;
@@ -199,6 +358,7 @@ FrameReceipt Machine::step_frame(EventSink sink, void* user) {
     spu_event.cumulative = spu_clock_.total;
     emit(spu_event, sink, user);
 
+    cdda_clock_.commit(cdda_preview);
     Event cdda_event{};
     cdda_event.frame_index = frame_index;
     cdda_event.kind = CLEAN_AOT_MACHINE_EVENT_CDDA_SECTORS;
@@ -218,6 +378,9 @@ FrameReceipt Machine::step_frame(EventSink sink, void* user) {
     receipt.elapsed_timebase_ticks = elapsed_timebase_ticks_;
     receipt.event_sequence_end = next_event_sequence_ - 1;
     receipt.digest = digest_;
+    receipt.cpu_multiplier_numerator = cpu_multiplier_.numerator;
+    receipt.cpu_multiplier_denominator = cpu_multiplier_.denominator;
+    receipt.cpu_retirement_total = cpu_clock_.total;
     return receipt;
 }
 
@@ -248,6 +411,13 @@ struct clean_aot_machine {
     explicit clean_aot_machine(std::uint32_t rate)
         : impl(static_cast<clean_aot::machine::VBlankRate>(rate)) {}
 
+    clean_aot_machine(std::uint32_t rate,
+                      std::uint64_t cpu_multiplier_numerator,
+                      std::uint64_t cpu_multiplier_denominator)
+        : impl(static_cast<clean_aot::machine::VBlankRate>(rate),
+               cpu_multiplier_numerator,
+               cpu_multiplier_denominator) {}
+
     clean_aot::machine::Machine impl;
 };
 
@@ -267,8 +437,67 @@ clean_aot_machine* clean_aot_machine_create(
     }
 }
 
+clean_aot_machine* clean_aot_machine_create_with_cpu_multiplier(
+    std::uint32_t initial_vblank_hz,
+    std::uint64_t cpu_multiplier_numerator,
+    std::uint64_t cpu_multiplier_denominator) {
+    if (initial_vblank_hz != CLEAN_AOT_MACHINE_VBLANK_25 &&
+        initial_vblank_hz != CLEAN_AOT_MACHINE_VBLANK_50 &&
+        initial_vblank_hz != CLEAN_AOT_MACHINE_VBLANK_100) {
+        return nullptr;
+    }
+    clean_aot::machine::Machine::CpuMultiplier canonical{};
+    if (!clean_aot::machine::Machine::canonicalize_cpu_multiplier(
+            cpu_multiplier_numerator, cpu_multiplier_denominator,
+            canonical)) {
+        return nullptr;
+    }
+    try {
+        return new clean_aot_machine(initial_vblank_hz, canonical.numerator,
+                                     canonical.denominator);
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    }
+}
+
 void clean_aot_machine_destroy(clean_aot_machine* machine) {
     delete machine;
+}
+
+clean_aot_machine_status clean_aot_machine_canonicalize_cpu_multiplier(
+    std::uint64_t input_numerator,
+    std::uint64_t input_denominator,
+    std::uint64_t* canonical_numerator,
+    std::uint64_t* canonical_denominator) {
+    if (canonical_numerator == nullptr || canonical_denominator == nullptr ||
+        canonical_numerator == canonical_denominator) {
+        return CLEAN_AOT_MACHINE_STATUS_INVALID_ARGUMENT;
+    }
+    *canonical_numerator = 0;
+    *canonical_denominator = 0;
+    clean_aot::machine::Machine::CpuMultiplier canonical{};
+    if (!clean_aot::machine::Machine::canonicalize_cpu_multiplier(
+            input_numerator, input_denominator, canonical)) {
+        return CLEAN_AOT_MACHINE_STATUS_INVALID_CPU_MULTIPLIER;
+    }
+    *canonical_numerator = canonical.numerator;
+    *canonical_denominator = canonical.denominator;
+    return CLEAN_AOT_MACHINE_STATUS_OK;
+}
+
+clean_aot_machine_status clean_aot_machine_get_cpu_multiplier(
+    const clean_aot_machine* machine,
+    std::uint64_t* numerator,
+    std::uint64_t* denominator) {
+    if (machine == nullptr || numerator == nullptr || denominator == nullptr ||
+        numerator == denominator) {
+        return CLEAN_AOT_MACHINE_STATUS_INVALID_ARGUMENT;
+    }
+    const clean_aot::machine::Machine::CpuMultiplier multiplier =
+        machine->impl.cpu_multiplier();
+    *numerator = multiplier.numerator;
+    *denominator = multiplier.denominator;
+    return CLEAN_AOT_MACHINE_STATUS_OK;
 }
 
 clean_aot_machine_status clean_aot_machine_set_vblank_rate(
@@ -300,13 +529,21 @@ clean_aot_machine_status clean_aot_machine_step_frame(
         return CLEAN_AOT_MACHINE_STATUS_INVALID_ARGUMENT;
     }
     if (callback == nullptr) {
-        *receipt = machine->impl.step_frame();
-        return CLEAN_AOT_MACHINE_STATUS_OK;
+        try {
+            *receipt = machine->impl.step_frame();
+            return CLEAN_AOT_MACHINE_STATUS_OK;
+        } catch (const std::overflow_error&) {
+            return CLEAN_AOT_MACHINE_STATUS_OVERFLOW;
+        }
     }
     std::pair<clean_aot_machine_event_callback, void*> callback_context{
         callback, user};
-    *receipt = machine->impl.step_frame(forward_c_callback, &callback_context);
-    return CLEAN_AOT_MACHINE_STATUS_OK;
+    try {
+        *receipt = machine->impl.step_frame(forward_c_callback, &callback_context);
+        return CLEAN_AOT_MACHINE_STATUS_OK;
+    } catch (const std::overflow_error&) {
+        return CLEAN_AOT_MACHINE_STATUS_OVERFLOW;
+    }
 }
 
 void clean_aot_machine_reset(clean_aot_machine* machine) {

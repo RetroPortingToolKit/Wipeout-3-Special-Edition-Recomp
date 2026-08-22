@@ -30,13 +30,33 @@ using EventSink = void (*)(const Event& event, void* user);
 
 class Machine final {
 public:
+    struct CpuMultiplier {
+        std::uint64_t numerator;
+        std::uint64_t denominator;
+    };
+
+    static constexpr std::uint64_t TimebaseHz = 100;
     static constexpr std::uint64_t CpuHz = 33'868'800;
+    static constexpr std::uint64_t CpuCyclesPerTimebaseTick =
+        CpuHz / TimebaseHz;
     static constexpr std::uint64_t SpuHz = 44'100;
     static constexpr std::uint64_t CddaSectorsPerSecond = 75;
-    static constexpr std::uint64_t TimebaseHz = 100;
     static constexpr std::uint64_t MaxTimebaseTicksPerFrame = 4;
+    static constexpr std::uint64_t MaxCpuMultiplierWhole =
+        CLEAN_AOT_MACHINE_MAX_CPU_MULTIPLIER_WHOLE;
 
     explicit Machine(VBlankRate initial_rate = VBlankRate::Hz100);
+    Machine(VBlankRate initial_rate, CpuMultiplier cpu_multiplier);
+    Machine(VBlankRate initial_rate,
+            std::uint64_t cpu_multiplier_numerator,
+            std::uint64_t cpu_multiplier_denominator);
+
+    /* Returns a reduced multiplier only when it is positive and <= 10x. */
+    static bool canonicalize_cpu_multiplier(
+        std::uint64_t input_numerator,
+        std::uint64_t input_denominator,
+        CpuMultiplier& canonical) noexcept;
+    CpuMultiplier cpu_multiplier() const noexcept;
 
     bool set_vblank_rate(VBlankRate rate);
     VBlankRate vblank_rate() const noexcept;
@@ -50,24 +70,36 @@ public:
 
 private:
     struct RationalAccumulator {
-        std::uint64_t frequency_hz;
-        std::uint64_t denominator_hz;
+        struct AdvanceResult {
+            std::uint64_t amount;
+            std::uint64_t remainder;
+            std::uint64_t total;
+        };
+
+        std::uint64_t rate_numerator;
+        std::uint64_t rate_denominator;
         std::uint64_t remainder;
         std::uint64_t total;
 
-        RationalAccumulator(std::uint64_t frequency,
+        RationalAccumulator(std::uint64_t numerator,
                             std::uint64_t denominator) noexcept;
-        std::uint64_t advance(std::uint64_t timebase_ticks) noexcept;
+        bool preview(std::uint64_t units,
+                     AdvanceResult& result) const noexcept;
+        void commit(const AdvanceResult& result) noexcept;
         void reset() noexcept;
     };
 
     static std::uint32_t rate_value(VBlankRate rate) noexcept;
     static bool supported_rate(std::uint32_t rate) noexcept;
     static std::uint32_t timebase_ticks_for_rate(std::uint32_t rate) noexcept;
+    static CpuMultiplier checked_cpu_multiplier(
+        std::uint64_t input_numerator,
+        std::uint64_t input_denominator);
 
     void emit(Event event, EventSink sink, void* user) noexcept;
 
     const std::uint32_t initial_rate_hz_;
+    const CpuMultiplier cpu_multiplier_;
     std::uint32_t current_rate_hz_;
     bool pending_mode_switch_;
     std::uint32_t pending_mode_switch_from_hz_;
@@ -82,6 +114,10 @@ private:
 
 static_assert(Machine::CpuHz % Machine::TimebaseHz == 0,
               "CPU clock must be integral at the machine timebase");
+static_assert(Machine::CpuCyclesPerTimebaseTick *
+                      Machine::MaxTimebaseTicksPerFrame <=
+                  std::numeric_limits<std::uint64_t>::max(),
+              "stock CPU frame product must not overflow");
 static_assert(Machine::SpuHz % Machine::TimebaseHz == 0,
               "SPU clock must be integral at the machine timebase");
 static_assert(Machine::CddaSectorsPerSecond < Machine::TimebaseHz,

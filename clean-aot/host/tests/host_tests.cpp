@@ -1,0 +1,294 @@
+#include "clean_aot/host/headless.hpp"
+#include "clean_aot/host/pacing.hpp"
+#include "clean_aot/host/viewport.hpp"
+
+#include <array>
+#include <cstdint>
+#include <iostream>
+#include <limits>
+
+namespace {
+
+using clean_aot::host::AspectPolicy;
+using clean_aot::host::FrameSchedule;
+using clean_aot::host::FrameSubmission;
+using clean_aot::host::HeadlessBackend;
+using clean_aot::host::HostCode;
+using clean_aot::host::IMonotonicClock;
+using clean_aot::host::MonotonicPacer;
+using clean_aot::host::PaceDecision;
+using clean_aot::host::PixelFormat;
+using clean_aot::host::ScaleMode;
+using clean_aot::host::StereoAudioBatch;
+using clean_aot::host::Viewport;
+using clean_aot::host::ViewportRequest;
+
+struct TestClock final : IMonotonicClock {
+    std::uint64_t now = 10'000U;
+    std::uint64_t sleeps = 0U;
+    bool advance_on_sleep = true;
+
+    [[nodiscard]] std::uint64_t now_ns() const noexcept override {
+        return now;
+    }
+
+    void sleep_until_ns(std::uint64_t deadline_ns) noexcept override {
+        ++sleeps;
+        if (advance_on_sleep && deadline_ns > now) {
+            now = deadline_ns;
+        }
+    }
+};
+
+int failures = 0;
+
+void expect(bool condition, const char* message) {
+    if (!condition) {
+        ++failures;
+        std::cerr << "FAIL: " << message << '\n';
+    }
+}
+
+void test_pacing() {
+    for (const std::uint32_t rate : {25U, 50U, 100U}) {
+        TestClock clock;
+        MonotonicPacer pacer{FrameSchedule::from_rate(rate)};
+        expect(pacer.start(clock.now).success(), "pacer starts once");
+        for (std::uint64_t index = 0U; index < 400U; ++index) {
+            const auto result = pacer.wait(clock);
+            expect(result.decision == PaceDecision::ready,
+                   "exact fake clock is ready at each deadline");
+            const std::uint64_t ideal = 10'000U +
+                (index * 1'000'000'000ULL) / rate;
+            expect(result.deadline_ns == ideal,
+                   "rational deadline has no accumulated drift");
+            expect(pacer.commit().success(), "pacer commits exactly once");
+        }
+        expect(clock.sleeps == 399U, "pacer sleeps only before future deadlines");
+        expect(pacer.frame_index() == 400U, "pacer frame index is exact");
+    }
+
+    MonotonicPacer invalid{FrameSchedule::from_rate(0U)};
+    expect(!invalid.start(0U).success(), "zero-rate pacer is rejected");
+
+    TestClock stalled_clock;
+    stalled_clock.advance_on_sleep = false;
+    MonotonicPacer stalled{FrameSchedule::from_rate(100U)};
+    expect(stalled.start(stalled_clock.now).success(),
+           "stalled-clock pacer starts");
+    expect(stalled.wait(stalled_clock).decision == PaceDecision::ready,
+           "stalled-clock pacer reaches its origin");
+    expect(stalled.commit().success(), "stalled-clock pacer advances");
+    expect(stalled.wait(stalled_clock).decision == PaceDecision::clock_stalled,
+           "pacer rejects a sleep that did not reach its deadline");
+}
+
+void test_headless_frame_schedules() {
+    constexpr std::uint64_t kFNVPrime = 1'099'511'628'211ULL;
+    for (const std::uint32_t rate : {25U, 50U, 100U}) {
+        HeadlessBackend backend;
+        TestClock clock;
+        MonotonicPacer pacer{FrameSchedule::from_rate(rate)};
+        std::array<std::array<std::uint8_t, 16U>, 300U> frame_pixels{};
+        std::uint64_t expected_digest = 1469598103934665603ULL;
+        expect(pacer.start(clock.now).success(), "schedule starts");
+
+        for (std::uint64_t index = 0U; index < 300U; ++index) {
+            expect(pacer.wait(clock).decision != PaceDecision::not_started,
+                   "frame is not submitted before its deadline");
+            for (std::size_t byte = 0U; byte < frame_pixels[index].size();
+                 ++byte) {
+                frame_pixels[index][byte] = static_cast<std::uint8_t>(
+                    (index * 17U + byte) & 0xffU);
+            }
+            for (const std::uint8_t byte : frame_pixels[index]) {
+                expected_digest ^= byte;
+                expected_digest *= kFNVPrime;
+            }
+            const FrameSubmission submission{
+                index,
+                index,
+                {frame_pixels[index].data(),
+                 static_cast<std::uint32_t>(frame_pixels[index].size()), 2U,
+                 2U, 8U, PixelFormat::rgba8_unorm}};
+            HostCode submit_code = backend.submit_frame(submission).code;
+            if (submit_code == HostCode::queue_full) {
+                expect(backend.service().success(),
+                       "backpressure drains the oldest queued frame");
+                submit_code = backend.submit_frame(submission).code;
+            }
+            expect(submit_code == HostCode::ok,
+                   "headless accepts or retries every ordered frame");
+            expect(pacer.commit().success(), "frame schedule advances once");
+
+            if (index % 11U == 7U) {
+                expect(backend.service().success(),
+                       "adversarial burst drains its first frame");
+                expect(backend.service().success(),
+                       "adversarial burst drains its second frame");
+            }
+        }
+        for (std::size_t drain = 0U; drain < 300U &&
+             backend.stats().frames_presented < 300U; ++drain) {
+            expect(backend.service().success(),
+                   "all backlogged frames drain in order");
+        }
+        expect(backend.stats().frames_submitted == 300U,
+               "headless submitted every scheduled frame");
+        expect(backend.stats().frames_presented == 300U,
+               "headless presented every scheduled frame");
+        expect(backend.stats().sequence_errors == 0U,
+               "headless did not duplicate or drop ordered frames");
+        expect(backend.stats().queue_full_errors != 0U,
+               "adversarial schedule exercised bounded backpressure");
+        expect(backend.stats().frame_digest == expected_digest,
+               "presented frame bytes match every submitted frame exactly");
+    }
+}
+
+void test_bounded_queue_and_audio() {
+    HeadlessBackend backend;
+    std::array<std::uint8_t, 16U> pixels{};
+    const FrameSubmission frame{
+        0U,
+        0U,
+        {pixels.data(), static_cast<std::uint32_t>(pixels.size()),
+         2U, 2U, 8U, PixelFormat::rgba8_unorm}};
+    for (std::uint64_t index = 0U; index < 4U; ++index) {
+        FrameSubmission queued = frame;
+        queued.sequence = index;
+        queued.update_index = index;
+        expect(backend.submit_frame(queued).success(),
+               "bounded queue accepts its capacity");
+    }
+    FrameSubmission overflow = frame;
+    overflow.sequence = 4U;
+    overflow.update_index = 4U;
+    expect(backend.submit_frame(overflow).code == HostCode::queue_full,
+           "bounded queue rejects instead of overwriting");
+    for (std::uint64_t index = 0U; index < 4U; ++index) {
+        expect(backend.service().success(), "queued frame drains in order");
+    }
+    expect(backend.submit_frame(overflow).success(),
+           "caller can retry rejected frame after backpressure");
+    expect(backend.service().success(), "retried frame is presented");
+
+    std::uint8_t one_pixel = 0U;
+    const FrameSubmission impossible_frame{
+        5U,
+        5U,
+        {&one_pixel,
+         std::numeric_limits<std::uint32_t>::max(),
+         std::numeric_limits<std::uint32_t>::max(),
+         std::numeric_limits<std::uint32_t>::max(),
+         std::numeric_limits<std::uint32_t>::max(),
+         PixelFormat::rgba8_unorm}};
+    expect(backend.submit_frame(impossible_frame).code ==
+               HostCode::invalid_argument,
+           "overflowing frame storage is rejected without arithmetic wrap");
+
+    std::array<std::int16_t, 882U> samples{};
+    for (std::size_t index = 0U; index < samples.size(); ++index) {
+        samples[index] = static_cast<std::int16_t>(index & 0x7fffU);
+    }
+    StereoAudioBatch bad{0U, samples.data(), 440U};
+    expect(backend.submit_audio(bad).code == HostCode::invalid_argument,
+           "short audio batch is rejected");
+    bad.sample_frames = 442U;
+    expect(backend.submit_audio(bad).code == HostCode::invalid_argument,
+           "long audio batch is rejected");
+
+    for (std::uint64_t update = 0U; update < 100U; ++update) {
+        const StereoAudioBatch audio{update, samples.data(), 441U};
+        expect(backend.submit_audio(audio).success(),
+               "exact stereo audio batch is accepted");
+        expect(backend.service().success(), "exact audio batch is consumed");
+    }
+    expect(backend.stats().audio_batches_consumed == 100U,
+           "all audio batches are consumed");
+    expect(backend.stats().audio_sample_frames == 44'100U,
+           "100 Hz audio totals exactly 44.1 kHz");
+
+    clean_aot::host::ControllerState controller{};
+    controller.connected_mask = 1U;
+    controller.buttons = 0x4000U;
+    expect(backend.submit_controller(controller).success(),
+           "controller state is accepted");
+    expect(backend.service().success(), "controller state is serviced");
+    expect(backend.stats().controller.buttons == 0x4000U,
+           "controller state is not rewritten by presentation timing");
+
+    clean_aot::host::WindowRequest window{{1920U, 1080U,
+                                           clean_aot::host::FullscreenMode::borderless}};
+    expect(backend.request_window(window).success(), "window request accepted");
+    clean_aot::host::HostEvent event{};
+    expect(backend.poll_event(event), "window event is observable");
+    expect(event.kind == clean_aot::host::HostEventKind::fullscreen_changed,
+           "fullscreen event has the correct kind");
+    backend.shutdown();
+    expect(backend.submit_frame(frame).code == HostCode::shutting_down,
+           "shutdown closes all submission paths");
+}
+
+void test_viewports() {
+    for (const AspectPolicy policy : {
+             AspectPolicy::preserve_4x3,
+             AspectPolicy::preserve_16x9,
+             AspectPolicy::preserve_21x9,
+             AspectPolicy::preserve_32x9}) {
+        ViewportRequest request{3840U, 2160U, 320U, 240U, policy, {},
+                                ScaleMode::fractional};
+        Viewport viewport{};
+        expect(clean_aot::host::calculate_viewport(request, viewport).success(),
+               "wide viewport policy is valid");
+        expect(viewport.width > 0U && viewport.height > 0U,
+               "wide viewport remains visible");
+        expect(viewport.x >= 0 && viewport.y >= 0,
+               "wide viewport is centered without negative coordinates");
+        expect(viewport.x + static_cast<std::int32_t>(viewport.width) <= 3840,
+               "viewport fits horizontally");
+        expect(viewport.y + static_cast<std::int32_t>(viewport.height) <= 2160,
+               "viewport fits vertically");
+    }
+
+    ViewportRequest integer_request{1920U, 1080U, 320U, 240U,
+                                    AspectPolicy::preserve_4x3, {},
+                                    ScaleMode::integer};
+    Viewport integer_viewport{};
+    expect(clean_aot::host::calculate_viewport(integer_request,
+                                               integer_viewport).success(),
+           "integer viewport is valid");
+    expect(integer_viewport.width == 1280U && integer_viewport.height == 960U,
+           "integer scaling chooses the largest exact 4:3 multiple");
+    expect(integer_viewport.x == 320 && integer_viewport.y == 60,
+           "integer viewport is centered");
+
+    ViewportRequest impossible_request{
+        std::numeric_limits<std::uint32_t>::max(),
+        std::numeric_limits<std::uint32_t>::max(),
+        std::numeric_limits<std::uint32_t>::max(),
+        std::numeric_limits<std::uint32_t>::max(),
+        AspectPolicy::custom,
+        {std::numeric_limits<std::uint32_t>::max(), 1U},
+        ScaleMode::fractional};
+    Viewport impossible_viewport{};
+    expect(!clean_aot::host::calculate_viewport(
+                 impossible_request, impossible_viewport)
+                 .success(),
+           "viewport dimensions that cannot fit the contract fail closed");
+}
+
+} // namespace
+
+int main() {
+    test_pacing();
+    test_headless_frame_schedules();
+    test_bounded_queue_and_audio();
+    test_viewports();
+    if (failures != 0) {
+        std::cerr << failures << " host tests failed\n";
+        return 1;
+    }
+    std::cout << "clean_aot_host_tests: all checks passed\n";
+    return 0;
+}

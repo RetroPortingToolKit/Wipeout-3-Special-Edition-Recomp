@@ -35,6 +35,11 @@ void load_block(Device& device) {
     put(device, Device::Control,
         static_cast<std::uint16_t>(Device::ControlEnable |
                                    Device::ControlMute | 0x0020u));
+    std::array<StereoSample, 1u> apply_mode{};
+    if (!device.render(apply_mode).ok()) {
+        std::cerr << "benchmark setup mode-apply failure\n";
+        std::terminate();
+    }
     const auto result = device.dma_write(words);
     if (!result.ok()) {
         std::cerr << "benchmark setup DMA failure\n";

@@ -1,0 +1,27 @@
+{
+  "format": "psxrecomp-input-route-v1",
+  "description": "GooseStation PALx2 oracle route from the running attract race to FEISAR / Porto Kora / Vector",
+  "precondition": "Attract race is visibly running; no memory-card save is loaded",
+  "steps": [
+    {"pad_word": "0xFFF7", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 180},
+    {"pad_word": "0xFFF7", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 180},
+    {"pad_word": "0xFFBF", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 30},
+    {"pad_word": "0xBFFF", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 300},
+    {"pad_word": "0xBFFF", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 300},
+    {"pad_word": "0xBFFF", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 300},
+    {"pad_word": "0xBFFF", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 300},
+    {"pad_word": "0xBFFF", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 300},
+    {"pad_word": "0xBFFF", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 300},
+    {"pad_word": "0xBFFF", "frames": 3},
+    {"pad_word": "0xFFFF", "frames": 1000}
+  ]
+}

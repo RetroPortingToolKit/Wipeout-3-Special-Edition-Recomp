@@ -7,6 +7,17 @@ caller-owned bounded stereo span and advances exactly one 44,100 Hz sample per
 output entry, so the machine timing component can supply its exact 25/50/100 Hz
 sample budgets without a second clock.
 
+Clock-domain contract
+
+- The SPU output clock is always `44,100 Hz`. PAL x2 changes the machine update
+  cadence to `100 Hz`; it does not overclock the SPU.
+- `Device::render_100hz_update` accepts a fixed-extent span of exactly `441`
+  stereo samples. The 25 Hz and 50 Hz budgets are `1,764` and `882` samples.
+- CPU retirement multiplication belongs to the CPU/machine scheduler. No CPU
+  frequency, cycle count, or retirement multiplier enters this API, so it
+  cannot alter SPU sample count, ADPCM pitch, noise frequency, ADSR rate, or
+  capture cadence.
+
 Implemented surface
 
 - 24 voices with key-on/key-off, start/repeat/current positions, pitch,
@@ -22,7 +33,8 @@ Implemented surface
   no host-math dependency.
 - Main, reverb, CD, and external volume controls, SPU enable/mute, CD/external
   enable and reverb routing, capture buffers, capture-half status, and IRQ
-  callback signaling.
+  callback signaling. CD and voice capture writes run every sample; transfer
+  control bits gate capture IRQs/status, not the writes themselves.
 - 512 KiB sound RAM, a 32-halfword transfer FIFO, manual transfer writes,
   typed bounded DMA spans/callbacks, transfer modes 0/1/2/3, transfer
   replication modes, transfer status, a stable programmed transfer-address
@@ -36,15 +48,24 @@ Implemented surface
   CD-ROM component and are not hidden in this boundary.
 - A fixed-point, register-driven reverb path with same-side reflection,
   cross-side reflection, four comb stages, two all-pass stages, wet output,
-  intermediate saturation, and a 22,050 Hz work-area cadence. The silicon FIR
-  work-area resampler and every device-specific read/write timing detail are
-  not claimed; callers requiring those details must keep this tranche behind an
-  explicit audio policy decision.
+  intermediate saturation, and the documented alternate left/right 22,050 Hz
+  work-area cadence. The documented 39-tap input and output FIRs are modeled
+  with their 19-sample causal delays, giving the documented 38-sample combined
+  delay at the 44,100 Hz output. Reverb writes are saturated at the documented
+  datapath boundaries, including the documented `vIIR=-8000h` behavior.
+  The public measurements still leave exact silicon evaluation order and the
+  output FIR polyphase convention underdetermined; this implementation uses a
+  centered zero-stuffed polyphase reconstruction and does not claim bit-exact
+  wet audio.
 - Canonical little-endian snapshots containing all device state and sound RAM,
   payload validation, FNV-1a replay digests, and callback-independent restore.
+  Callbacks are synchronous/non-owning, may not re-enter the device, and remain
+  attached to the destination object rather than becoming snapshot data.
 - Relative MMIO offsets accept only legal aligned 16-bit operations. Malformed
   widths, unaligned offsets, unmapped offsets, read-only/write-only accesses,
-  value overflow, and transfer FIFO boundaries return explicit results.
+  value overflow, and transfer FIFO boundaries return explicit results. The
+  documented unknown R/W scratch ranges retain deterministic 16-bit values;
+  the genuinely undefined read-only status returns a stable zero.
 
 The device path uses only fixed-width integer arithmetic. Signed shifts are
 implemented by explicit floor arithmetic, intermediate products use bounded
@@ -62,12 +83,15 @@ build-clean-spu-gcc/clean_aot_spu_benchmark
 ```
 
 The independent test executable covers ADPCM predictor vectors, loop and IRQ
-edges, all envelope phases and representative rates, sweep volumes, noise and
-modulation ordering, saturation, masks and malformed MMIO, transfer FIFO and
-DMA boundaries, capture, CD/XA/external underflow and overflow, chunking,
-snapshot replay, and long deterministic generation. The benchmark runs a
-representative 24-voice/reverb workload and reports measured samples per
-second; its timing is evidence only and is not a correctness gate.
+edges, exact Gaussian phase anchors, all envelope phases and rate freezes,
+the inverted all-ones sweep, continuously clocked noise, modulation ordering,
+saturation, masks and malformed MMIO, transfer FIFO/DMA modes,
+always-on capture and IRQ gates, CD/XA/external routing, chunking, adversarial
+snapshot validation, 39-tap reverb FIR phase and combined-delay behavior, long
+deterministic generation, and a fixed 441-sample 100 Hz boundary under varying
+simulated CPU retirement multipliers. The benchmark runs a representative
+24-voice/reverb workload and reports measured samples per second; its timing is
+evidence only and is not a correctness gate.
 
 Sanitized validation uses the same source tree:
 
@@ -77,7 +101,15 @@ cmake --build build-clean-spu-clang-asan --config RelWithDebInfo
 ctest --test-dir build-clean-spu-clang-asan --build-config RelWithDebInfo --output-on-failure
 ```
 
-Integration risks remaining for a later tranche are exact hardware ADSR corner
-cases outside the covered rate vectors, device-specific reverb read/write
-timing, raw XA sector decode, external-port production wiring, and the system
-interrupt-controller adapter.
+The implementation provenance and exact pinned behavioral references are in
+[`provenance.md`](provenance.md).
+
+Integration risks remaining for a later tranche are sub-sample MMIO and
+key-on/key-off timing beyond the native 44,100 Hz sample boundary, exact
+silicon reverb evaluation/polyphase rounding, the unknown third per-voice RAM
+read and complete bus-slot IRQ ordering, physical transfer FIFO/DMA request
+timing and DMA arbitration, raw XA sector decode/resampling, external-port
+production wiring, and the system interrupt-controller adapter. The known
+delayed SPUCNT low bits, DMA-read request warm-up, inactive-voice header/data
+reads, and synchronous FIFO behavior are implemented and tested; the
+unresolved items remain explicit acceptance gates.
