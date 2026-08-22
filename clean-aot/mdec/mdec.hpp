@@ -150,6 +150,7 @@ private:
         bool output_dma_enabled = false;
         bool macroblock_started = false;
         bool input_last_word_received = false;
+        bool output_dma_reordered = false;
         std::uint64_t cycles = 0;
     };
 
@@ -171,6 +172,7 @@ private:
     bool append_output_bytes(const std::uint8_t* bytes,
                              std::size_t size,
                              std::uint8_t block) noexcept;
+    bool reorder_color_output_for_dma() noexcept;
     void finish_command() noexcept;
     [[nodiscard]] bool snapshot_valid(const State& candidate) const noexcept;
     [[nodiscard]] std::uint8_t current_block() const noexcept;

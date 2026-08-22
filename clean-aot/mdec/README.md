@@ -46,9 +46,11 @@ pixels use PS1 RGB555 bit placement with the
 command-controlled bit 15. These choices are deterministic implementation
 behavior, not a claim that every undocumented revision has identical rounding.
 
-A color macroblock is decoded in input order `Cr, Cb, Y1, Y2, Y3, Y4` and the
-output FIFO exposes the reconstructed pixels as one contiguous row-major
-16x16 raster macroblock. The current-block status field carries `Cr=4`,
+A color macroblock is decoded in input order `Cr, Cb, Y1, Y2, Y3, Y4`.
+CPU reads from MDEC0 expose the documented four consecutive 8x8 output blocks
+`Y1, Y2, Y3, Y4`; DMA1 reads apply the hardware path's block-to-raster
+reordering and therefore place one contiguous row-major 16x16 macroblock in
+RAM. The current-block status field carries `Cr=4`,
 `Cb=5`, `Y1..Y4=0..3`, and `Y=4` in monochrome mode.
 
 Build and test in isolation:

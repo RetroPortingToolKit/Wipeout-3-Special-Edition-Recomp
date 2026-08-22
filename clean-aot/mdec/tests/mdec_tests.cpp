@@ -417,27 +417,55 @@ void test_color_macroblock_raster_order()
     send_direct(device, command(1U, OutputDepth::TwentyFourBit, false, false,
                                 static_cast<std::uint16_t>(stream.size())), stream);
     const auto words = drain(device);
-    require_equal(words.size(), 192U, "asymmetric 24-bit output size");
+    require_equal(words.size(), 192U, "asymmetric 24-bit raw output size");
     std::array<std::uint8_t, 768> bytes{};
     for (std::size_t index = 0U; index < words.size(); ++index) {
         for (unsigned lane = 0U; lane < 4U; ++lane) {
             bytes[index * 4U + lane] = static_cast<std::uint8_t>(words[index] >> (lane * 8U));
         }
     }
-    const auto red = [&bytes](std::size_t x, std::size_t y) {
-        return bytes[(y * 16U + x) * 3U];
+    const auto raw_red = [&bytes](std::size_t block, std::size_t x, std::size_t y) {
+        return bytes[(block * 64U + y * 8U + x) * 3U];
     };
-    require(red(0U, 0U) == red(7U, 0U), "top-left luma block continuity");
-    require(red(8U, 0U) == red(15U, 0U), "top-right luma block continuity");
-    require(red(0U, 0U) != red(8U, 0U), "top row crosses Y1 to Y2 at x=8");
-    require(red(0U, 8U) != red(8U, 8U), "bottom row crosses Y3 to Y4 at x=8");
-    require(red(0U, 0U) != red(0U, 8U), "left column crosses Y1 to Y3 at y=8");
+    require(raw_red(0U, 0U, 0U) == raw_red(0U, 7U, 7U), "raw Y1 block continuity");
+    require(raw_red(0U, 0U, 0U) != raw_red(1U, 0U, 0U),
+            "MDEC0 exposes Y1 then Y2 rather than raster scanlines");
+
+    Device via_dma;
+    require(via_dma.write_control_word(0x20000000U).complete, "enable output DMA");
+    send_direct(via_dma, command(1U, OutputDepth::TwentyFourBit, false, false,
+                                static_cast<std::uint16_t>(stream.size())), stream);
+    std::vector<std::uint32_t> dma_words(192U);
+    require(via_dma.dma_read_words(dma_words).complete, "DMA reads complete color macroblock");
+    std::array<std::uint8_t, 768> dma_bytes{};
+    for (std::size_t index = 0U; index < dma_words.size(); ++index) {
+        for (unsigned lane = 0U; lane < 4U; ++lane) {
+            dma_bytes[index * 4U + lane] =
+                static_cast<std::uint8_t>(dma_words[index] >> (lane * 8U));
+        }
+    }
+    const auto dma_red = [&dma_bytes](std::size_t x, std::size_t y) {
+        return dma_bytes[(y * 16U + x) * 3U];
+    };
+    require(dma_red(0U, 0U) != dma_red(8U, 0U), "DMA raster crosses Y1/Y2 at x=8");
+    require(dma_red(0U, 0U) != dma_red(0U, 8U), "DMA raster crosses Y1/Y3 at y=8");
 
     Device replay;
+    require(replay.write_control_word(0x20000000U).complete, "replay DMA enable");
     send_direct(replay, command(1U, OutputDepth::TwentyFourBit, false, false,
                                 static_cast<std::uint16_t>(stream.size())), stream);
-    require_equal(drain(replay), words, "asymmetric raster replay determinism");
-    require_equal(replay.cycles(), device.cycles(), "raster layout preserves exact cycles");
+    std::array<std::uint32_t, 17> prefix{};
+    require(replay.dma_read_words(prefix).complete, "DMA prefix");
+    Snapshot snapshot{};
+    require(replay.save_snapshot(snapshot), "DMA-reordered snapshot");
+    Device restored;
+    require(restored.load_snapshot(snapshot), "restore DMA-reordered snapshot");
+    std::vector<std::uint32_t> replay_tail(192U - prefix.size());
+    std::vector<std::uint32_t> restored_tail(replay_tail.size());
+    require(replay.dma_read_words(replay_tail).complete, "original DMA tail");
+    require(restored.dma_read_words(restored_tail).complete, "restored DMA tail");
+    require_equal(restored_tail, replay_tail, "mid-DMA snapshot preserves reorder epoch");
+    require_equal(restored.digest(), replay.digest(), "mid-DMA replay digest");
 }
 
 void test_rle_saturation_and_boundaries()

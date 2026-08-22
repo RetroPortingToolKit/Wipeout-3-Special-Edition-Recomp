@@ -12,7 +12,7 @@ namespace clean_aot::mdec {
 namespace {
 
 constexpr std::uint32_t kStateMagic = 0x4D444543U; // "MDEC"
-constexpr std::uint32_t kStateVersion = 2U;
+constexpr std::uint32_t kStateVersion = 3U;
 constexpr std::size_t kInputBytes = Device::kInputCapacityWords * 4U;
 constexpr std::size_t kMaxPumpSteps = 8192U;
 constexpr std::uint16_t kEndCode = 0xFE00U;
@@ -894,7 +894,7 @@ bool Device::emit_monochrome() noexcept
 
 bool Device::emit_color() noexcept
 {
-    std::array<std::uint8_t, 768> packed{};
+    std::array<std::uint8_t, 768> raster{};
     std::size_t output_offset = 0U;
     for (std::size_t global_y = 0U; global_y < 16U; ++global_y) {
         for (std::size_t global_x = 0U; global_x < 16U; ++global_x) {
@@ -933,9 +933,9 @@ bool Device::emit_color() noexcept
                     // The GP0(A0h) packed-24 display stream is R, G, B in
                     // increasing VRAM byte order. MDEC output is DMA'd into
                     // that stream without a channel swizzle.
-                    packed[output_offset++] = as_byte(red);
-                    packed[output_offset++] = as_byte(green);
-                    packed[output_offset++] = as_byte(blue);
+                    raster[output_offset++] = as_byte(red);
+                    raster[output_offset++] = as_byte(green);
+                    raster[output_offset++] = as_byte(blue);
                 } else {
                     const std::uint32_t packed_pixel =
                         static_cast<std::uint32_t>(component5(red)) |
@@ -943,8 +943,8 @@ bool Device::emit_color() noexcept
                         (static_cast<std::uint32_t>(component5(blue)) << 10U) |
                         (state_.output_bit15 ? 0x8000U : 0U);
                     const std::uint16_t pixel = static_cast<std::uint16_t>(packed_pixel);
-                    packed[output_offset++] = static_cast<std::uint8_t>(pixel & 0xFFU);
-                    packed[output_offset++] = static_cast<std::uint8_t>(pixel >> 8U);
+                    raster[output_offset++] = static_cast<std::uint8_t>(pixel & 0xFFU);
+                    raster[output_offset++] = static_cast<std::uint8_t>(pixel >> 8U);
                 }
         }
     }
@@ -955,14 +955,69 @@ bool Device::emit_color() noexcept
     if (!add_cycles(kPixelCycleCost * 256U)) {
         return false;
     }
+    const std::size_t bytes_per_pixel = state_.depth == OutputDepth::TwentyFourBit ? 3U : 2U;
+    std::array<std::uint8_t, 768> blocked{};
+    std::size_t blocked_offset = 0U;
     for (std::uint8_t block = 0U; block < 4U; ++block) {
-        const std::size_t byte_offset = static_cast<std::size_t>(block) *
-                                        (output_bytes_for(state_.depth) / 4U);
-        const std::size_t byte_size = output_bytes_for(state_.depth) / 4U;
-        if (!append_output_bytes(packed.data() + byte_offset, byte_size, block)) {
+        const std::size_t origin_x = (block & 1U) != 0U ? 8U : 0U;
+        const std::size_t origin_y = (block & 2U) != 0U ? 8U : 0U;
+        for (std::size_t y = 0U; y < 8U; ++y) {
+            const std::size_t source = ((origin_y + y) * 16U + origin_x) * bytes_per_pixel;
+            const std::size_t row_bytes = 8U * bytes_per_pixel;
+            std::copy_n(raster.data() + source, row_bytes, blocked.data() + blocked_offset);
+            blocked_offset += row_bytes;
+        }
+        const std::size_t block_bytes = 64U * bytes_per_pixel;
+        if (!append_output_bytes(blocked.data() + blocked_offset - block_bytes,
+                                 block_bytes, block)) {
             return false;
         }
     }
+    state_.output_dma_reordered = false;
+    return true;
+}
+
+bool Device::reorder_color_output_for_dma() noexcept
+{
+    if (state_.output_dma_reordered ||
+        (state_.depth != OutputDepth::TwentyFourBit &&
+         state_.depth != OutputDepth::FifteenBit)) {
+        return true;
+    }
+    const std::size_t total_words = output_bytes_for(state_.depth) / 4U;
+    if (state_.output_count < total_words) {
+        return false;
+    }
+    const std::size_t bytes_per_pixel = state_.depth == OutputDepth::TwentyFourBit ? 3U : 2U;
+    std::array<std::uint8_t, 768> blocked{};
+    std::array<std::uint8_t, 768> raster{};
+    for (std::size_t index = 0U; index < total_words; ++index) {
+        const std::uint32_t word = state_.output[(state_.output_head + index) % kOutputCapacityWords];
+        for (unsigned lane = 0U; lane < 4U; ++lane) {
+            blocked[index * 4U + lane] = static_cast<std::uint8_t>(word >> (lane * 8U));
+        }
+    }
+    const std::size_t block_bytes = 64U * bytes_per_pixel;
+    for (std::size_t block = 0U; block < 4U; ++block) {
+        const std::size_t origin_x = (block & 1U) != 0U ? 8U : 0U;
+        const std::size_t origin_y = (block & 2U) != 0U ? 8U : 0U;
+        for (std::size_t y = 0U; y < 8U; ++y) {
+            const std::size_t source = block * block_bytes + y * 8U * bytes_per_pixel;
+            const std::size_t destination = ((origin_y + y) * 16U + origin_x) * bytes_per_pixel;
+            std::copy_n(blocked.data() + source, 8U * bytes_per_pixel,
+                        raster.data() + destination);
+        }
+    }
+    for (std::size_t index = 0U; index < total_words; ++index) {
+        std::uint32_t word = 0U;
+        for (unsigned lane = 0U; lane < 4U; ++lane) {
+            word |= static_cast<std::uint32_t>(raster[index * 4U + lane]) << (lane * 8U);
+        }
+        state_.output[(state_.output_head + index) % kOutputCapacityWords] = word;
+        state_.output_block[(state_.output_head + index) % kOutputCapacityWords] =
+            static_cast<std::uint8_t>(index / (total_words / 4U));
+    }
+    state_.output_dma_reordered = true;
     return true;
 }
 
@@ -1039,6 +1094,9 @@ TransferResult Device::read_data_word(std::uint32_t& word) noexcept
     state_.output_head = static_cast<std::uint16_t>(
         (static_cast<std::size_t>(state_.output_head) + 1U) % kOutputCapacityWords);
     --state_.output_count;
+    if (state_.output_count == 0U) {
+        state_.output_dma_reordered = false;
+    }
     (void)add_cycles(kRegisterCycleCost);
     pump();
     result.words = 1U;
@@ -1092,6 +1150,10 @@ TransferResult Device::dma_read_words(std::span<std::uint32_t> words) noexcept
     }
     if (!state_.output_dma_enabled) {
         result.fault = Fault::DmaNotRequested;
+        return result;
+    }
+    if (!reorder_color_output_for_dma()) {
+        result.fault = Fault::OutputFifoEmpty;
         return result;
     }
     for (std::uint32_t& word : words) {
@@ -1417,6 +1479,12 @@ bool Device::snapshot_valid(const State& candidate) const noexcept
             return false;
         }
     }
+    if (candidate.output_dma_reordered &&
+        (candidate.output_count == 0U ||
+         (candidate.depth != OutputDepth::TwentyFourBit &&
+          candidate.depth != OutputDepth::FifteenBit))) {
+        return false;
+    }
     return true;
 }
 
@@ -1478,6 +1546,7 @@ bool Device::save_snapshot(Snapshot& snapshot) const noexcept
     (void)writer.write_u8(state_.output_dma_enabled ? 1U : 0U);
     (void)writer.write_u8(state_.macroblock_started ? 1U : 0U);
     (void)writer.write_u8(state_.input_last_word_received ? 1U : 0U);
+    (void)writer.write_u8(state_.output_dma_reordered ? 1U : 0U);
     (void)writer.write_u64(state_.cycles);
     return writer.valid();
 }
@@ -1539,7 +1608,7 @@ bool Device::load_snapshot(const Snapshot& snapshot) noexcept
     (void)reader.read_u8(candidate.q_scale);
     (void)reader.read_u8(candidate.table_index);
 
-    std::array<std::uint8_t, 7> flags{};
+    std::array<std::uint8_t, 8> flags{};
     for (std::uint8_t& value : flags) {
         (void)reader.read_u8(value);
     }
@@ -1561,6 +1630,7 @@ bool Device::load_snapshot(const Snapshot& snapshot) noexcept
     candidate.output_dma_enabled = flags[4] != 0U;
     candidate.macroblock_started = flags[5] != 0U;
     candidate.input_last_word_received = flags[6] != 0U;
+    candidate.output_dma_reordered = flags[7] != 0U;
     if (!snapshot_valid(candidate)) {
         return false;
     }

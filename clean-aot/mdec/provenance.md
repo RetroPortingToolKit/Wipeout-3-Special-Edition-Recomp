@@ -15,6 +15,11 @@ inverse-zig-zag and `q_scale=0` natural-order paths, macroblock block order, the
 published scale matrix, the 0x20-word MDEC DMA boundary, and the known hardware
 uncertainty around exact IDCT/YUV rounding and decompression latency.
 
+The same pinned MDEC register description explicitly distinguishes colored
+MDEC0 reads (four sequential 8x8 bitmaps requiring software reordering) from
+DMA1 output (the DMA path performs that reordering). This is the basis for the
+separate CPU-read and DMA-read layouts; no observed emulator output was used.
+
 No emulator, recompiler, GooseStation, DuckStation, title source, generated
 code, media, BIOS, or external implementation file was inspected or copied.
 The pinned PSX-SPX repository records that its documentation is not itself a
