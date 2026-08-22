@@ -1,5 +1,21 @@
 # Handoff
 
+## DMA6 CHCR deadline catch-up (2026-08-22)
+
+- Cause `0x1C` at authenticated EPC `0x8005027C` was an artificial data-bus
+  exception: opcode `0x8D8D0000` is the lawful aligned word read
+  `lw $t5,0($t4)` with `$t4=0x1F8010E8`, DMA6 OTC CHCR.
+- A 16-instruction generated corridor crossed an internal DMA deadline. The
+  CPU MMIO callback converted `MissedDeadline` into a failed memory access and
+  therefore `BusErrorData`. CPU access synchronization now services each real
+  intervening device deadline in order. The external pacer API remains strict.
+- The real probe completes OTC, observes CHCR `0x01000002`, and advances through
+  exact bindings 423-431 to UnknownCode `0x800502D8`: 19,280,879 instructions,
+  1,790,583 dispatches, and zero CD reads/writes/sectors. Evidence is
+  `clean-aot/runtime/evidence/dma6-chcr-deadline-catchup-v1.json`.
+- Next action: continue exact authorization at `0x800502D8`; do not revisit the
+  old fatal A0 SCC or raise the dispatch bound.
+
 ## Native SPU DMA4 request coupling (2026-08-22)
 
 - Whole-machine DMA channel 4 now follows the SPU's delayed SPUSTAT DMA

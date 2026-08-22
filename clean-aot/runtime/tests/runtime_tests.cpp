@@ -829,6 +829,43 @@ void test_device_deadlines(Runner& runner) {
                .ok());
 }
 
+void test_mmio_access_services_intervening_dma_deadlines(Runner& runner) {
+    using clean_aot::runtime::AccessContext;
+    using clean_aot::runtime::DeadlineSource;
+    using clean_aot::runtime::Status;
+
+    auto runtime = make_runtime(1U, 1U);
+    const AccessContext at_zero{0U, 0x8005'0264U, false};
+    /* Enable DMA6, configure a three-word OTC transfer, and start it exactly
+       as the authenticated shell does before polling CHCR. */
+    EXPECT(runner, runtime->write32(at_zero, 0x1f80'10f0U,
+                                    0x0800'0000U).ok());
+    EXPECT(runner, runtime->write32(at_zero, 0x1f80'10e0U, 0x0000'0200U).ok());
+    EXPECT(runner, runtime->write32(at_zero, 0x1f80'10e4U, 3U).ok());
+    EXPECT(runner, runtime->write32(at_zero, 0x1f80'10e8U,
+                                    0x1100'0002U).ok());
+    /* The first elapsed native cycle starts DMA and transfers one word. */
+    EXPECT(runner, runtime->advance_to_retirement_cycle(1U).ok());
+    const auto deadline = runtime->next_device_deadline();
+    EXPECT(runner, deadline.ok() && deadline.pending);
+    EXPECT(runner, deadline.source == DeadlineSource::Dma);
+
+    /* The external pacer contract remains strict. */
+    EXPECT(runner, runtime->advance_to_retirement_cycle(4U).status ==
+                       Status::MissedDeadline);
+    EXPECT(runner, runtime->current_retirement_cycle() == 1U);
+
+    /* A lawful later CPU MMIO poll catches the devices up through every
+       intervening deadline and reads CHCR; it must not become BusErrorData. */
+    const auto chcr = runtime->read32(
+        AccessContext{4U, 0x8005'027cU, false}, 0x1f80'10e8U);
+    EXPECT(runner, chcr.ok());
+    EXPECT(runner, (chcr.value & (1U << 24U)) == 0U);
+    EXPECT(runner, runtime->current_retirement_cycle() == 4U);
+    EXPECT(runner, runtime->read32({}, 0x0000'0200U).value == 0x0000'01fcU);
+    EXPECT(runner, runtime->read32({}, 0x0000'01f8U).value == 0x00ff'ffffU);
+}
+
 void test_reset(Runner& runner) {
     auto runtime = make_runtime();
     const clean_aot::runtime::AccessContext context{90U, 0U, false};
@@ -1145,6 +1182,7 @@ int main() {
     test_issue_cycle_and_mmio(runner);
     test_interrupt_latch(runner);
     test_device_deadlines(runner);
+    test_mmio_access_services_intervening_dma_deadlines(runner);
     test_reset(runner);
     test_exact_audio_clock(runner);
     test_pal_crtc_root_counter_clocking(runner);

@@ -1297,6 +1297,29 @@ struct Runtime::Impl final {
         if (!is_device_access(address, width)) {
             return true;
         }
+        /* Generated regions may contain several ordinary CPU instructions
+           between MMIO accesses.  Service every intervening hardware deadline
+           in order before issuing the access; MissedDeadline remains a strict
+           error for the public pacer API, but is not a PS1 data-bus fault. */
+        while (true) {
+            const DeviceDeadline deadline = next_deadline();
+            if (!deadline.ok()) {
+                fault = map_status(deadline.status);
+                return false;
+            }
+            if (!deadline.pending ||
+                deadline.raw_cpu_cycle >= context.raw_cpu_cycle) {
+                break;
+            }
+            const std::uint64_t before = clock.retirement_total();
+            const ClockAdvance serviced =
+                advance_to(deadline.raw_cpu_cycle);
+            if (!serviced.ok() || serviced.retirement_total <= before) {
+                fault = map_status(serviced.ok() ? Status::DeviceRejected
+                                                 : serviced.status);
+                return false;
+            }
+        }
         const ClockAdvance advance = advance_to(context.raw_cpu_cycle);
         fault = map_status(advance.status);
         return advance.ok();
