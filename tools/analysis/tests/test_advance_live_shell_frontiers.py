@@ -5,7 +5,8 @@ from pathlib import Path
 from tools.analysis.advance_live_shell_frontiers import (
     TERMINAL, instruction_span, synchronize_probe_capacity)
 from tools.analysis.live_shell_frontier_batch import (
-    BatchError, audit_exact_receipt, authenticated_straight_line_span)
+    BatchError, audit_exact_receipt, authenticated_mandatory_ranges,
+    authenticated_straight_line_span, receipt_relink_projection)
 
 
 class LiveShellFrontierTests(unittest.TestCase):
@@ -64,6 +65,34 @@ class LiveShellFrontierTests(unittest.TestCase):
             root / "clean-aot/catalog/evidence/bios-shell-live-frontiers-8005161c.json")
         self.assertEqual(result["binding_count"], 103)
         self.assertEqual(result["instruction_count"], 116)
+
+    def test_mandatory_closure_follows_only_plain_jump(self):
+        base = 0x80000000
+        jump = (0x08000004).to_bytes(4, "little")
+        normal = (0x24020001).to_bytes(4, "little")
+        image = jump + normal + normal * 2 + normal * 2
+        self.assertEqual(authenticated_mandatory_ranges(image, base, base, 8),
+                         [(base, base + 8), (base + 16, base + 24)])
+
+    def test_mandatory_closure_does_not_authorize_conditional_target(self):
+        base = 0x80000000
+        branch = (0x10000002).to_bytes(4, "little")
+        normal = (0x24020001).to_bytes(4, "little")
+        self.assertEqual(authenticated_mandatory_ranges(
+            branch + normal * 4, base, base, 16), [(base, base + 8)])
+
+    def test_mandatory_closure_does_not_authorize_jal_or_return(self):
+        base = 0x80000000
+        jal = (0x0c000004).to_bytes(4, "little")
+        normal = (0x24020001).to_bytes(4, "little")
+        self.assertEqual(authenticated_mandatory_ranges(
+            jal + normal * 4, base, base, 16), [(base, base + 8)])
+
+    def test_existing_receipt_projects_fewer_exact_relinks(self):
+        root = Path(__file__).resolve().parents[3]
+        result = receipt_relink_projection(
+            root / "clean-aot/catalog/evidence/bios-shell-live-frontiers-8005161c.json")
+        self.assertLess(result["bundle_count"], result["binding_count"])
 
 
 if __name__ == "__main__":

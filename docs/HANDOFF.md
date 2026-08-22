@@ -1106,6 +1106,13 @@ instruction and fails closed on every unknown PC or executable identity.
   reduces aggregate CMake relinks on linear corridors while leaving compiler
   CFI rejection authoritative. The committed shard-371 receipt audits as 103
   unique exact bindings covering 116 instructions.
+- A second opt-in mode, `--max-direct-closure-instructions N`, emits one
+  authenticated multi-range binding across mandatory plain-`J` corridors.
+  It never follows conditional branches, JAL/JALR, JR, exceptions, or an
+  out-of-image target, and always retains the control-transfer delay slot.
+  Calls/returns therefore remain live-evidence and live-RA qualified instead
+  of gaining dormant authorization. Historical exact-contiguous projection on
+  the shard-371 receipt reduces 103 relink points to 29 (3.5517x frequency).
 # 2026-08-22 accelerated shell frontier checkpoint
 
 - Adopted the compiler acceleration from `02b712c` with

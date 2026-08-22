@@ -11,7 +11,8 @@ import re
 import subprocess
 from pathlib import Path
 
-from tools.analysis.live_shell_frontier_batch import authenticated_straight_line_span
+from tools.analysis.live_shell_frontier_batch import (
+    authenticated_mandatory_ranges, authenticated_straight_line_span)
 
 
 TERMINAL = re.compile(r"^(\d+) (\d+) (\d+) (\d+) (?:\d+ ){8}(\d+) (\d+) ", re.M)
@@ -80,6 +81,8 @@ def main() -> int:
     parser.add_argument("--first-index", type=int, default=269)
     parser.add_argument("--max-batch-instructions", type=int, default=1,
                         help="batch authenticated straight-line instructions before one rebuild")
+    parser.add_argument("--max-direct-closure-instructions", type=int, default=0,
+                        help="also follow authenticated mandatory plain-J corridors")
     parser.add_argument("--normalize-receipt", action="store_true")
     args = parser.parse_args()
     root = args.root.resolve()
@@ -108,13 +111,16 @@ def main() -> int:
             if index_match is None:
                 continue
             index = int(index_match.group(1))
-            fields = dict(line.split("=", 1) for line in path.read_text(encoding="utf-8").splitlines())
+            manifest_lines = [line.split("=", 1) for line in path.read_text(encoding="utf-8").splitlines()]
+            fields = dict(manifest_lines)
+            codes = [value for key, value in manifest_lines if key == "code"]
             bindings.append({"index": index, "source_sha256": source_hashes[index],
                              "variant_sha256": fields["variant_sha256"],
                              "image_sha256": fields["image_sha256"],
                              "load_start": fields["load_start"],
                              "load_end_exclusive": fields["load_end_exclusive"],
-                             "manifest_sha256": sha(path.read_bytes())})
+                             "manifest_sha256": sha(path.read_bytes()),
+                             "code_ranges": codes})
         document = {"schema": "clean-aot-live-shell-frontiers-v1",
                     "route_manifest_commit": "46da91b", "dispatch_bound": 3000000,
                     "frontier_count": max(0, len(rows) - 1), "frontiers": rows,
@@ -166,24 +172,36 @@ def main() -> int:
             print("MATERIAL_BLOCKER repeated-exact-frontier", flush=True)
             break
         seen.add(key)
-        span = authenticated_straight_line_span(source, offset, args.max_batch_instructions)
-        payload = source[offset:offset + span]
-        end = pc + span
-        identity = sha(f"{source_hash}:{pc:08x}:{end:08x}".encode("ascii"))
+        if args.max_direct_closure_instructions:
+            ranges = authenticated_mandatory_ranges(
+                source, source_start, pc, args.max_direct_closure_instructions)
+        else:
+            span = authenticated_straight_line_span(source, offset, args.max_batch_instructions)
+            ranges = [(pc, pc + span)]
+        payload_start, payload_end = ranges[0][0], ranges[-1][1]
+        payload_offset = payload_start - source_start
+        payload = source[payload_offset:payload_offset + payload_end - payload_start]
+        range_contract = ",".join(f"{start:08x}-{end:08x}" for start, end in ranges)
+        identity_input = (f"{source_hash}:{ranges[0][0]:08x}:{ranges[0][1]:08x}"
+                          if len(ranges) == 1 else f"{source_hash}:ranges:{range_contract}")
+        identity = sha(identity_input.encode("ascii"))
         image_hash = sha(payload)
         index = args.first_index + ordinal
         stem = f"build-shell-exact-live-{index:03d}"
         image_path = root / f"{stem}.bin"
         manifest_path = root / f"{stem}.manifest"
-        output_path = root / f"{stem}-{span}"
+        instruction_count = sum((end - start) // 4 for start, end in ranges)
+        output_suffix = f"{instruction_count}i" if args.max_direct_closure_instructions else str(span)
+        output_path = root / f"{stem}-{output_suffix}"
         image_path.write_bytes(payload)
         manifest_path.write_text(
             "schema=clean-aot-compiler-manifest-v1\n"
             "image_kind=raw-payload\n"
             "symbol_namespace=variant\n"
             f"variant_sha256={identity}\nimage_sha256={image_hash}\n"
-            f"load_start=0x{pc:08x}\nload_end_exclusive=0x{end:08x}\n"
-            f"entry=0x{pc:08x}\ncode=0x{pc:08x}-0x{end:08x}\n",
+            f"load_start=0x{payload_start:08x}\nload_end_exclusive=0x{payload_end:08x}\n"
+            + "".join(f"entry=0x{start:08x}\n" for start, _end in ranges)
+            + "".join(f"code=0x{start:08x}-0x{end:08x}\n" for start, end in ranges),
             encoding="utf-8", newline="\n")
         compiled = run([str(compiler), "--image", str(image_path), "--manifest",
                         str(manifest_path), "--output", str(output_path)], root)
