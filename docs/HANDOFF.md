@@ -190,6 +190,14 @@
    link graph, then rerun the static boundary gate.
 4. Validate ultrawide/content coverage and perform a long deterministic soak.
 
+- An isolated Debug build is now reproducibly instrumented with the user-supplied
+  BIOS and disc passed explicitly at launch. The first durable paired
+  `frame_fingerprint` probe completed, but the comparator failed at the short
+  boot prefix: normal retained 34 entries while accelerated retained 32. This
+  is diagnostic evidence only; it is not yet a causal guest-state divergence
+  because the route ended before the menu/load boundary. Extend the same probe
+  through card and race loading and identify the first common-frame mismatch.
+
 ## Ruled out
 
 - Reusing the existing NTSC-120 package as a PAL-100 patch: PAL sites do not
