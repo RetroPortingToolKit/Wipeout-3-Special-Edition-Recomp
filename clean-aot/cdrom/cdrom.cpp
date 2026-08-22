@@ -13,6 +13,7 @@ constexpr std::uint8_t ModeXaAdpcm = 0x40U;
 constexpr std::uint8_t ModeWholeSector = 0x20U;
 constexpr std::uint8_t ModeIgnoreSectorSize = 0x10U;
 constexpr std::uint8_t ModeXaFilter = 0x08U;
+constexpr std::uint8_t ModeReport = 0x04U;
 constexpr std::uint8_t ModeAutoPause = 0x02U;
 constexpr std::uint8_t ModeReadCdda = 0x01U;
 constexpr std::uint8_t SyncFirst = 0x00U;
@@ -1643,6 +1644,48 @@ void Cdrom::process_cdda_sector() noexcept {
         queue_command_error(ErrorCode::SourceReadFailure,
                             CommandError::CannotRespond);
         return;
+    }
+    if ((mode_ & ModeReport) != 0U && interrupt_reason_ == Interrupt::None) {
+        const Msf absolute = lba_to_msf(delivered_lba);
+        if (absolute.frame % 10U == 0U) {
+            const bool in_pregap = delivered_lba < track->start_lba;
+            const Lba relative_frames = in_pregap
+                                            ? track->start_lba - delivered_lba
+                                            : delivered_lba - track->start_lba;
+            const Msf relative = frames_to_msf(relative_frames);
+            std::int32_t peak = 0;
+            for (std::size_t index = 0U; index < CddaSamplesPerSector; ++index) {
+                const std::size_t byte_offset = index * 4U;
+                const std::uint16_t word =
+                    static_cast<std::uint16_t>(raw.bytes[byte_offset]) |
+                    static_cast<std::uint16_t>(
+                        static_cast<std::uint16_t>(raw.bytes[byte_offset + 1U])
+                        << 8U);
+                std::int32_t sample = signed_sample(word);
+                if (sample < 0) {
+                    sample = -sample;
+                }
+                peak = std::max(peak, sample);
+            }
+            peak = std::min<std::int32_t>(peak, 0x7fff);
+            std::array<std::uint8_t, 8U> report{
+                status_value(), to_bcd(track->number),
+                to_bcd(in_pregap ? 0U : 1U), 0U, 0U, 0U,
+                static_cast<std::uint8_t>(peak),
+                static_cast<std::uint8_t>(static_cast<std::uint32_t>(peak) >> 8U)};
+            if ((absolute.frame / 10U) % 2U == 0U) {
+                report[3U] = to_bcd(absolute.minute);
+                report[4U] = to_bcd(absolute.second);
+                report[5U] = to_bcd(absolute.frame);
+            } else {
+                report[3U] = to_bcd(relative.minute);
+                report[4U] = static_cast<std::uint8_t>(
+                    to_bcd(relative.second) | 0x80U);
+                report[5U] = to_bcd(relative.frame);
+            }
+            (void)queue_interrupt(Interrupt::DataReady,
+                                  std::span<const std::uint8_t>(report));
+        }
     }
     std::array<StereoSample, CddaSamplesPerSector> samples{};
     if (track->kind == TrackKind::Audio && !muted_) {

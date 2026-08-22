@@ -189,6 +189,19 @@ public:
     }
 };
 
+class RepeatingCddaSource final : public RawSectorSource {
+public:
+    std::size_t read_count = 0U;
+
+    bool read_raw_sector(Lba,
+                         RawSector& destination) noexcept override {
+        destination = cdda_sector(std::numeric_limits<std::int16_t>::min(),
+                                  1234);
+        ++read_count;
+        return true;
+    }
+};
+
 class SchedulerLog final : public MachineScheduler {
 public:
     struct Receipt final {
@@ -253,6 +266,32 @@ public:
             }
             ++sample_count;
         }
+    }
+};
+
+class AudioDigestLog final : public CddaSink {
+public:
+    std::uint64_t digest = 1469598103934665603ULL;
+    std::size_t sector_count = 0U;
+
+    void receive_cdda_samples(Lba lba,
+                              std::span<const StereoSample> received) noexcept override {
+        const auto mix = [this](std::uint8_t byte) noexcept {
+            digest ^= byte;
+            digest *= 1099511628211ULL;
+        };
+        for (unsigned byte = 0U; byte < 4U; ++byte) {
+            mix(static_cast<std::uint8_t>(lba >> (byte * 8U)));
+        }
+        for (const StereoSample sample : received) {
+            const std::uint16_t left = static_cast<std::uint16_t>(sample.left);
+            const std::uint16_t right = static_cast<std::uint16_t>(sample.right);
+            mix(static_cast<std::uint8_t>(left));
+            mix(static_cast<std::uint8_t>(left >> 8U));
+            mix(static_cast<std::uint8_t>(right));
+            mix(static_cast<std::uint8_t>(right >> 8U));
+        }
+        ++sector_count;
     }
 };
 
@@ -1003,6 +1042,53 @@ void test_cdda_tracks_autopause_matrix_mute_and_100hz_relation() {
             "successive CDDA sectors remain exactly 75 Hz in data double-speed mode");
 }
 
+void test_wipeout_cdda_report_irq_and_exact_cadence() {
+    RepeatingCddaSource source;
+    AudioDigestLog audio;
+    Cdrom device(&source, wipeout_special_edition_layout());
+    device.attach_cdda_sink(&audio);
+    issue(device, Command::Setmode, {0x04U});
+    acknowledge_one_byte(device, 0U);
+    issue(device, Command::Play, {0x02U});
+    (void)device.pop_response();
+    acknowledge(device);
+
+    device.advance_to(device.current_cycle() + CyclesPer100HzUpdate * 4U);
+    require(audio.sector_count == 3U && source.read_count == 3U &&
+                device.interrupt_flags() == 0U,
+            "three 75-Hz sectors precede the first report in four 100-Hz updates");
+    device.advance_to(device.current_cycle() + SingleSpeedSectorCycles);
+    require(audio.sector_count == 4U && source.read_count == 4U,
+            "fourth sector lands at the next exact 75-Hz deadline");
+    require_reason(device, Interrupt::DataReady,
+                   "track-02 relative CDDA report uses INT1");
+    const std::array<std::uint8_t, 8U> relative_report{
+        0x82U, 0x02U, 0x01U, 0x00U, 0x80U, 0x03U, 0xffU, 0x7fU};
+    for (const std::uint8_t expected : relative_report) {
+        require(device.pop_response() == expected,
+                "relative CDDA report byte and pre-mute peak");
+    }
+    acknowledge(device);
+
+    device.advance_to(device.current_cycle() + SingleSpeedSectorCycles * 10U);
+    require_reason(device, Interrupt::DataReady,
+                   "alternating absolute CDDA report uses INT1");
+    require(device.response_count() == 8U,
+            "one absolute report packet is visible");
+    device.advance_to(device.current_cycle() + SingleSpeedSectorCycles * 10U);
+    require(device.response_count() == 8U && audio.sector_count == 24U,
+            "report collision is dropped without stalling deterministic audio");
+    require(audio.digest == 15774102990737321859ULL,
+            "verified-layout CDDA report-path audio digest");
+    const std::array<std::uint8_t, 8U> absolute_report{
+        0x82U, 0x02U, 0x01U, 0x09U, 0x00U, 0x60U, 0xffU, 0x7fU};
+    for (const std::uint8_t expected : absolute_report) {
+        require(device.pop_response() == expected,
+                "absolute CDDA report remains stable across dropped collision");
+    }
+    acknowledge(device);
+}
+
 void test_xa_routing_filter_and_explicit_decode_boundary() {
     auto source = std::make_unique<MemorySource>();
     source->sectors[3U] = xa_audio_sector();
@@ -1339,6 +1425,7 @@ int main() {
     test_dma_is_request_gated_and_cadence_is_exact();
     test_delayed_100hz_service_preserves_sector_irq_dma_order();
     test_cdda_tracks_autopause_matrix_mute_and_100hz_relation();
+    test_wipeout_cdda_report_irq_and_exact_cadence();
     test_xa_routing_filter_and_explicit_decode_boundary();
     test_remaining_command_families_reset_controls_and_stream_end();
     test_overflow_time_reset_scheduler_and_deterministic_chunking();

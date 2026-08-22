@@ -59,7 +59,10 @@ use index 1, while lookup and `GetlocP` attribute pregap sectors to index 0 of
 the following track.
 CDDA playback uses track type, emits silence on data tracks, applies the active
 four-coefficient matrix, preserves muted timing, stops at lead-out, and honors
-track-boundary autopause. XA audio/realtime Form 2 sectors can be filtered and
+track-boundary autopause. Report mode emits the alternating absolute/relative
+INT1 position and pre-mute peak packet at each tenth absolute frame; reports
+are dropped while another controller interrupt is unacknowledged. XA
+audio/realtime Form 2 sectors can be filtered and
 routed as 2,304 compressed bytes to `XaSectorSink`; this component does not
 decode or resample XA ADPCM.
 
