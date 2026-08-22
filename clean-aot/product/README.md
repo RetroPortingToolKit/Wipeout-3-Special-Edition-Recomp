@@ -299,6 +299,24 @@ python tools/product/build_product.py graphics-matrix `
   --receipt clean-aot/product/evidence/graphics-matrix.json
 ```
 
+Content readiness is split into three independently measured contracts. The
+content ledger binds every cataloged data payload and all 14 tracks to the
+verified external multi-file CUE/BIN manifest without copying source media,
+binds both authenticated executable identities to the complete 135,829 static
+instruction set, and separately requires installed-product execution evidence
+for every declared mode, track, team, ship, menu, FMV, CDDA, XA, and SPU route:
+
+```powershell
+python tools/product/build_product.py content-coverage `
+  --content clean-aot/catalog/evidence/content-static-coverage.json `
+  --shards clean-aot/catalog/evidence/generated-game-shards.json `
+  --media-manifest assets/manifests/wipeout3se-media.json `
+  --policy clean-aot/product/content-coverage-policy.json `
+  --receipt clean-aot/product/evidence/content-coverage-ledger.json
+```
+
 The current receipt is intentionally `not-ready`: direct game instructions and
-authenticated media reads have not occurred, and the content-coverage receipt
-still contains unresolved gates. Graphics and current-package soak gates pass.
+authenticated media reads have not occurred. External payload availability and
+static executable coverage pass independently, while all routes without clean
+installed-product execution evidence remain explicitly unexecuted. Graphics
+and current-package soak gates pass.

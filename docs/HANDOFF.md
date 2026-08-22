@@ -1,5 +1,20 @@
 # Handoff
 
+## Split content coverage gate (2026-08-21)
+
+- Product content readiness now has three independently hash-bound contracts:
+  verified external-media availability, static executable/overlay generation,
+  and clean installed-product behavioral execution. The first two pass for
+  5,179 data payloads, 14 disc tracks, two authenticated executable identities,
+  and 135,829 generated instructions with zero unresolved CFI.
+- Behavioral evidence remains fail closed: all 64 policy routes are currently
+  unexecuted (6 modes, 16 tracks, 8 teams, 8 ships, 8 menus, 3 FMV routes, and
+  15 audio routes). Quarantined or non-product evidence is ineligible.
+- `validate-release` is deterministic at 11 pass / 3 fail. Remaining failures
+  are direct BIOS-to-game execution, behavioral-route execution, and
+  authenticated media execution. Do not promote game readiness until those
+  real installed-product paths execute.
+
 ## Same-epoch overlap registry and live shell loop (2026-08-21)
 
 - Copied-RAM registries now retain independent exact range/hash/stamp contracts

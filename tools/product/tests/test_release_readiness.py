@@ -30,7 +30,9 @@ class ReleaseReadinessTests(unittest.TestCase):
             self.assertFalse(first["game_ready"])
             failed = {item["name"] for item in first["gates"] if item["status"] == "fail"}
             self.assertIn("direct-bios-to-game-execution", failed)
-            self.assertIn("complete-content-coverage", failed)
+            self.assertIn("external-media-payload-availability", failed)
+            self.assertIn("static-executable-overlay-coverage", failed)
+            self.assertIn("complete-behavioral-route-coverage", failed)
             self.assertIn("authenticated-media-execution", failed)
             self.assertIn("graphics-feature-matrix", failed)
             self.assertIn("current-product-performance-soak", failed)

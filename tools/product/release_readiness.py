@@ -52,13 +52,18 @@ def audit_release_readiness(package: Path, evidence_root: Path,
     package, evidence_root = package.resolve(), evidence_root.resolve()
     product = evidence_root / "product" / "evidence"
     catalog = evidence_root / "catalog" / "evidence"
+    repository = evidence_root.parent
     gates: list[dict[str, Any]] = []
 
     def label(path: Path) -> str:
+        resolved = path.resolve()
         try:
-            return path.resolve().relative_to(evidence_root).as_posix()
+            return resolved.relative_to(evidence_root).as_posix()
         except ValueError:
-            return "package/" + path.resolve().relative_to(package).as_posix()
+            try:
+                return "package/" + resolved.relative_to(package).as_posix()
+            except ValueError:
+                return "repository/" + resolved.relative_to(repository).as_posix()
 
     def gate(name: str, passed: bool, evidence: list[Path], detail: str) -> None:
         gates.append({"name": name, "status": "pass" if passed else "fail",
@@ -98,14 +103,44 @@ def audit_release_readiness(package: Path, evidence_root: Path,
          "complete authenticated shard closure is absent or inconsistent")
 
     content_path = catalog / "content-static-coverage.json"
-    content = _load(content_path) or {}
-    content_gates = content.get("coverage_gates", {})
-    content_ok = (bool(content_gates) and
-                  content_gates.get("content_static_coverage_complete") is True and
-                  all(value is True for value in content_gates.values()))
-    gate("complete-content-coverage", content_ok, [content_path],
-         "all static, media, callback, edge, epoch, and unknown-code coverage gates pass"
-         if content_ok else "content coverage receipt still records unresolved coverage gates")
+    ledger_path = product / "content-coverage-ledger.json"
+    ledger = _load(ledger_path) or {}
+    media_manifest_path = repository / "assets" / "manifests" / "wipeout3se-media.json"
+    content_policy_path = evidence_root / "product" / "content-coverage-policy.json"
+    inputs = ledger.get("inputs", {})
+    ledger_current = (
+        ledger.get("schema") == "wipeout3se.clean-aot.content-coverage-ledger.v1" and
+        inputs.get("content_sha256") == _sha(content_path) and
+        inputs.get("game_shards_sha256") == _sha(shards_path) and
+        inputs.get("media_manifest_sha256") == _sha(media_manifest_path) and
+        inputs.get("policy_sha256") == _sha(content_policy_path))
+    media_coverage = ledger.get("media_availability", {})
+    media_available = (ledger_current and media_coverage.get("status") == "pass" and
+                       media_coverage.get("redistributed") is False and
+                       media_coverage.get("disc_tracks") == 14 and
+                       media_coverage.get("data_payloads") == 5179 and
+                       media_coverage.get("cdda_tracks") == 13)
+    gate("external-media-payload-availability", media_available, [ledger_path, content_path,
+         media_manifest_path], "all 5179 data payloads and 14 tracks remain externally available"
+         if media_available else "external-media inventory binding is stale or incomplete")
+    static_coverage = ledger.get("static_executable_coverage", {})
+    static_complete = (ledger_current and static_coverage.get("status") == "pass" and
+                       static_coverage.get("authenticated_images") ==
+                       ["main-exe", "nfe-entry5-route-variant"] and
+                       static_coverage.get("compiled_instructions") == 135829 and
+                       static_coverage.get("unresolved_cfi_sites") == 0)
+    gate("static-executable-overlay-coverage", static_complete, [ledger_path, shards_path],
+         "every authenticated executable/overlay is generated with zero unresolved CFI"
+         if static_complete else "authenticated executable/overlay generation is incomplete")
+    behavioral = ledger.get("behavioral_execution", {})
+    behavioral_complete = (ledger_current and behavioral.get("status") == "pass" and
+                           behavioral.get("required", 0) > 0 and
+                           behavioral.get("executed") == behavioral.get("required") and
+                           behavioral.get("unexecuted") == 0)
+    gate("complete-behavioral-route-coverage", behavioral_complete, [ledger_path],
+         "every mode/track/team/ship/menu/FMV/audio route has clean-product execution evidence"
+         if behavioral_complete else
+         f"{behavioral.get('unexecuted', 'unknown')} required behavioral routes remain unexecuted")
 
     verification_path = catalog / "verification.json"
     verification = _load(verification_path) or {}

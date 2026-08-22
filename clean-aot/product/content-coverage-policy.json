@@ -1,0 +1,18 @@
+{
+  "schema": "wipeout3se.content-coverage-policy.v1",
+  "game_id": "SCES-02845",
+  "media": {
+    "source": "verified-external-multi-file-cue-bin",
+    "redistribute_source_media": false,
+    "runtime_access": "cue-track-sector-and-cdda-routing"
+  },
+  "behavioral_routes": {
+    "modes": ["challenge", "eliminator", "prototype", "single-race", "time-trial", "tournament"],
+    "tracks": ["altima-vii", "arridos-iv", "gare-europa", "hi-fumii", "manor-top", "mega-mall", "odessa-keys", "p-mar-project", "phenitia-park", "porto-kora", "sagarmatha", "sampa-run", "stanza-inter", "talons-reach", "terminal", "terramax"],
+    "teams": ["ag-s", "assegai", "auricom", "feisar", "goteki-45", "icaras", "pirhana", "qirex"],
+    "ships": ["ag-s", "assegai", "auricom", "feisar", "goteki-45", "icaras", "pirhana", "qirex"],
+    "menus": ["title-language", "main", "mode-select", "class-select", "team-ship-select", "track-select", "pause", "results-records"],
+    "fmvs": ["intro", "attract", "ending-credits"],
+    "audio_routes": ["cdda-track-02", "cdda-track-03", "cdda-track-04", "cdda-track-05", "cdda-track-06", "cdda-track-07", "cdda-track-08", "cdda-track-09", "cdda-track-10", "cdda-track-11", "cdda-track-12", "cdda-track-13", "cdda-track-14", "xa-adpcm", "spu-effects"]
+  }
+}

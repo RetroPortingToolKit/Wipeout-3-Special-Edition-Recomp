@@ -30,6 +30,7 @@ if __package__ in {None, ""}:
                                 validate_installer)  # type: ignore[import-not-found]
     from release_readiness import (audit_release_readiness,
                                    write_readiness_receipt)  # type: ignore[import-not-found]
+    from content_coverage import build_content_coverage_ledger  # type: ignore[import-not-found]
 else:
     from .pipeline import (
         DEFAULT_MEDIA_MANIFEST,
@@ -48,6 +49,7 @@ else:
     from .windows_audit import audit_windows_package, smoke_windows_product
     from .installer_lane import audit_installed_runtime, create_installer, validate_installer
     from .release_readiness import audit_release_readiness, write_readiness_receipt
+    from .content_coverage import build_content_coverage_ledger
 
 
 def _common_media(parser: argparse.ArgumentParser) -> None:
@@ -187,6 +189,14 @@ def _build_parser() -> argparse.ArgumentParser:
     graphics_matrix.add_argument("--package", type=Path, required=True)
     graphics_matrix.add_argument("--soak", action="append", type=Path, required=True)
     graphics_matrix.add_argument("--receipt", type=Path, required=True)
+    content_coverage = subparsers.add_parser(
+        "content-coverage", help="split lawful media, static code, and behavioral coverage")
+    content_coverage.add_argument("--content", type=Path, required=True)
+    content_coverage.add_argument("--shards", type=Path, required=True)
+    content_coverage.add_argument("--media-manifest", type=Path, required=True)
+    content_coverage.add_argument("--policy", type=Path, required=True)
+    content_coverage.add_argument("--behavioral-evidence", action="append", type=Path, default=[])
+    content_coverage.add_argument("--receipt", type=Path, required=True)
     installer = subparsers.add_parser("package-installer", help="create the two-stage offline installer")
     installer.add_argument("--setup-exe", type=Path, required=True)
     installer.add_argument("--runtime-payload", type=Path, required=True)
@@ -319,6 +329,11 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "graphics-matrix":
             document = generate_graphics_matrix_receipt(
                 args.package, args.soak, receipt_path=args.receipt)
+        elif args.command == "content-coverage":
+            document = build_content_coverage_ledger(
+                content_path=args.content, shards_path=args.shards,
+                media_manifest_path=args.media_manifest, policy_path=args.policy,
+                behavioral_evidence=args.behavioral_evidence, receipt_path=args.receipt)
         elif args.command == "package-installer":
             document = create_installer(setup_exe=args.setup_exe,
                 runtime_payload=args.runtime_payload, setup_payload=_artifacts(args.setup_payload),
