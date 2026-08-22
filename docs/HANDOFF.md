@@ -393,6 +393,11 @@ instruction and fails closed on every unknown PC or executable identity.
   MFC0, and RFE now operate on explicit COP0 status/cause/EPC/bad-address state.
   The real BIOS reaches `0x80000080` and fails closed because the RAM exception
   vector's copied-content epoch is not yet authorized.
+- ADDI overflow semantics and successful same-PC generated dispatch advance the
+  next deterministic frontier to 1,509 instructions across 67 dispatches in
+  `clean-aot/catalog/evidence/bios-frontier-00001509.json`. The stop remains the
+  exact fail-closed RAM exception vector `0x80000080`; no RAM content epoch or
+  indirect target was inferred from the address alone.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control

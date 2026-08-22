@@ -562,15 +562,16 @@ void test_emitter_contains_compilable_graph_shape() {
 }
 
 void test_emitter_contains_cop0_semantics() {
-    std::vector<std::uint8_t> text(16U, 0U);
+    std::vector<std::uint8_t> text(20U, 0U);
     write_le32(text, 0x00U, 0x408c6000U); // mtc0 t4,status
     write_le32(text, 0x04U, 0x400d7000U); // mfc0 t5,epc
     write_le32(text, 0x08U, 0x42000010U); // rfe
+    write_le32(text, 0x0cU, 0x214a0080U); // addi t2,t2,128
     const PsxExeImage image = make_image(0x00004000U, 0x00004000U, std::move(text));
     RegionBuildOptions options;
     options.entry_points = {0x00004000U};
     options.start_inclusive = 0x00004000U;
-    options.end_exclusive = 0x0000400cU;
+    options.end_exclusive = 0x00004010U;
     const std::string source = clean_aot::compiler::CppEmitter::emit(
         RegionBuilder::build(image, std::move(options)));
     require(source.find("cpu_ops::mtc0(state,12,12)") != std::string::npos,
@@ -579,6 +580,8 @@ void test_emitter_contains_cop0_semantics() {
             "emitter must lower MFC0 with load-delay semantics");
     require(source.find("cpu_ops::rfe(state)") != std::string::npos,
             "emitter must lower RFE status-stack restoration");
+    require(source.find("cpu_ops::add(state,10,state.gpr[10],0x80u)") != std::string::npos,
+            "emitter must lower ADDI with overflow semantics");
 }
 
 } // namespace

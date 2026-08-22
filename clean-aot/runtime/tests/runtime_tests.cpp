@@ -61,6 +61,11 @@ bool unresolved_generated_step(clean_aot::runtime::GeneratedCpuState&) noexcept 
     return false;
 }
 
+bool generated_self_loop(clean_aot::runtime::GeneratedCpuState& state) noexcept {
+    state.gpr[8] += 1U;
+    return true;
+}
+
 bool generated_bios_reset_step(clean_aot::runtime::GeneratedCpuState& state) noexcept {
     state.gpr[29] = 0x801f'fff0U;
     state.pc = 0xbfc0'0010U;
@@ -116,8 +121,10 @@ void test_authenticated_generated_dispatch(Runner& runner) {
         GeneratedRegionEntry{0x00001000U, generated_step_a},
         GeneratedRegionEntry{0x00001010U, generated_step_b},
         GeneratedRegionEntry{0x00001020U, unresolved_generated_step},
+        GeneratedRegionEntry{0x00001040U, generated_self_loop, 1U},
     };
-    const std::array<std::uint32_t, 2U> roots{0x00001000U, 0x00001010U};
+    const std::array<std::uint32_t, 3U> roots{
+        0x00001000U, 0x00001010U, 0x00001040U};
     const GeneratedExecutableBinding binding{identity, identity, 0x00001000U,
                                               0x00001100U, roots, entries};
     GeneratedDispatcher dispatcher;
@@ -135,6 +142,12 @@ void test_authenticated_generated_dispatch(Runner& runner) {
     cpu.pc = 0x00001020U;
     EXPECT(runner, dispatcher.dispatch(cpu) == DispatchStatus::UnknownCode);
     EXPECT(runner, cpu.pc == 0x00001020U);
+
+    cpu.pc = 0x00001040U;
+    EXPECT(runner, dispatcher.dispatch(cpu) == DispatchStatus::Executed);
+    EXPECT(runner, cpu.pc == 0x00001040U);
+    EXPECT(runner, cpu.gpr[8] == 1U);
+    EXPECT(runner, dispatcher.last_instruction_count() == 1U);
 
     GeneratedDispatcher mismatch;
     EXPECT(runner, mismatch.bind(

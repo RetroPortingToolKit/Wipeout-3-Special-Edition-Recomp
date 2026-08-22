@@ -78,15 +78,10 @@ DispatchStatus GeneratedDispatcher::dispatch(GeneratedCpuState& state) const noe
         return DispatchStatus::UnknownCode;
     }
     const GeneratedCpuState original_state = state;
-    const std::uint32_t original_pc = pc;
     if (!found->function(state)) {
         const bool faulted = state.fault != CpuFault::None;
         state = original_state;
         return faulted ? DispatchStatus::CpuFault : DispatchStatus::UnknownCode;
-    }
-    if (pc == original_pc) {
-        state = original_state;
-        return DispatchStatus::UnknownCode;
     }
     if (state.fault != CpuFault::None) {
         state = original_state;
