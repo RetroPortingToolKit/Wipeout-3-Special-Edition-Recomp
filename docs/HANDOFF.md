@@ -1,5 +1,15 @@
 # Handoff
 
+## Native SPU DMA4 request coupling (2026-08-22)
+
+- Whole-machine DMA channel 4 now follows the SPU's delayed SPUSTAT DMA
+  read/write request instead of retaining the DMA controller's reset-high
+  request. Request-mode transfers wait through SPUCNT application and DMA-read
+  warm-up, then run at native device time.
+- Boundary, transfer, deassertion, paired SoC/SPU snapshot replay, and GCC plus
+  Clang ASan/UBSan proof are recorded in
+  `clean-aot/runtime/evidence/spu-dma4-native-request-v1.json`.
+
 ## Native XA zigzag resampling (2026-08-22)
 
 - XA 37.8/18.9 kHz audio now uses the documented seven-phase, 29-tap CD-ROM

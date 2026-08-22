@@ -1975,6 +1975,12 @@ void Device::acknowledge_irq() noexcept {
     irq_pending_ = false;
 }
 
+bool Device::dma_request() const noexcept {
+    const TransferMode mode = transfer_mode(effective_control_);
+    return mode == TransferMode::DmaWrite ||
+           (mode == TransferMode::DmaRead && dma_read_request_ready_);
+}
+
 void Device::set_audio_source(AudioSource source) noexcept {
     audio_source_ = source;
 }

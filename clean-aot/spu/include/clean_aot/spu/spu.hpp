@@ -266,6 +266,7 @@ public:
     void set_irq_callback(IrqCallback callback, void* user) noexcept;
     [[nodiscard]] bool irq_pending() const noexcept;
     void acknowledge_irq() noexcept;
+    [[nodiscard]] bool dma_request() const noexcept;
 
     void set_audio_source(AudioSource source) noexcept;
     [[nodiscard]] AudioSource audio_source() const noexcept;

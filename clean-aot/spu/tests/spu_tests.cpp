@@ -510,8 +510,12 @@ void test_irq_and_mmio_boundaries() {
     require(dma_ram[524280u] == 0x34u && dma_ram[524281u] == 0x12u &&
                 dma_ram[524282u] == 0x78u && dma_ram[524283u] == 0x56u,
             "DMA write uses sound-RAM wrap semantics");
+    require(dma.dma_request(),
+            "DMA-write mode asserts the live channel request");
     put(dma, Device::Control, kLive);
     render_count(dma, 1u, "apply delayed DMA stop mode");
+    require(!dma.dma_request(),
+            "DMA stop deasserts the live channel request at the boundary");
     put(dma, Device::TransferAddress, 0xFFFFu);
     put(dma, Device::Control, static_cast<std::uint16_t>(kLive | kDmaRead));
     const auto dma_read_before_tick = dma.read_mmio(Device::Status, kWord);
@@ -524,6 +528,8 @@ void test_irq_and_mmio_boundaries() {
                 (dma_read_after_tick.value & Device::StatusDmaReadRequest) == 0u,
             "DMA-read request remains in its FIFO warm-up interval");
     render_count(dma, 1u, "finish delayed DMA-read FIFO warm-up");
+    require(dma.dma_request(),
+            "DMA-read request asserts only after native warm-up");
     const auto dma_read_ready = dma.read_mmio(Device::Status, kWord);
     require(dma_read_ready.ok() &&
                 (dma_read_ready.value & Device::StatusDmaReadRequest) != 0u,

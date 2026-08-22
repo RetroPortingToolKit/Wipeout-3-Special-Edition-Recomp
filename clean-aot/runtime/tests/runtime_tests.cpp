@@ -4,6 +4,7 @@
 #include "r3000a/reference.hpp"
 #include "gte.hpp"
 #include "clean_aot/gpu/gpu.hpp"
+#include "clean_aot/spu/spu.hpp"
 
 #include "clean_aot_soc.hpp"
 
@@ -1069,6 +1070,57 @@ void test_spu_irq_sample_deadline(Runner& runner) {
     EXPECT(runner, runtime->produced_audio_samples() == 1U);
 }
 
+void test_spu_dma4_native_request_coupling(Runner& runner) {
+    using clean_aot::runtime::AccessContext;
+    auto runtime = make_runtime(1U, 1U);
+    const AccessContext at_zero{};
+    constexpr std::uint32_t source = 0x0000'1000U;
+    EXPECT(runner, runtime->write32(at_zero, source, 0x2222'1111U).ok());
+    EXPECT(runner, runtime->write16(at_zero, 0x1f80'1da6U, 0U).ok());
+    EXPECT(runner, runtime->write16(at_zero, 0x1f80'1dacU, 0x0004U).ok());
+
+    auto& dma = runtime->soc().dma();
+    EXPECT(runner, !dma.channel_status(4U).request_asserted);
+    dma.write_priority_control(0x0008'0000U);
+    EXPECT(runner, dma.write_base_address(4U, source) ==
+                       clean_aot::soc::SocStatus::ok);
+    EXPECT(runner, dma.write_block_control(4U, 0x0001'0001U) ==
+                       clean_aot::soc::SocStatus::ok);
+    EXPECT(runner, dma.write_channel_control(
+                       4U, 1U | (1U << 9U) | (1U << 24U)) ==
+                       clean_aot::soc::SocStatus::ok);
+    EXPECT(runner, !dma.channel_status(4U).request_asserted);
+
+    EXPECT(runner, runtime->write16(at_zero, 0x1f80'1daaU, 0x0020U).ok());
+    EXPECT(runner, !runtime->spu().dma_request());
+    EXPECT(runner, runtime->advance_to_retirement_cycle(767U).ok());
+    EXPECT(runner, !dma.channel_status(4U).request_asserted &&
+                       dma.channel_status(4U).words_transferred == 0U);
+    EXPECT(runner, runtime->advance_to_retirement_cycle(768U).ok());
+    EXPECT(runner, runtime->spu().dma_request() &&
+                       dma.channel_status(4U).request_asserted &&
+                       dma.channel_status(4U).words_transferred == 0U);
+
+    const auto dma_boundary = runtime->soc().snapshot();
+    static std::array<std::byte, clean_aot::spu::Device::SnapshotBytes>
+        spu_boundary{};
+    EXPECT(runner, runtime->spu().save_snapshot(spu_boundary).ok());
+    EXPECT(runner, runtime->advance_to_retirement_cycle(769U).ok());
+    EXPECT(runner, dma.channel_status(4U).completed &&
+                       dma.channel_status(4U).words_transferred == 1U);
+    const auto ram = runtime->spu().sound_ram();
+    EXPECT(runner, ram[0U] == 0x11U && ram[1U] == 0x11U &&
+                       ram[2U] == 0x22U && ram[3U] == 0x22U);
+
+    EXPECT(runner, runtime->soc().restore(dma_boundary) ==
+                       clean_aot::soc::SocStatus::ok);
+    EXPECT(runner, runtime->spu().restore_snapshot(spu_boundary).ok());
+    const auto replay = runtime->soc().dma().run({1U, 1U});
+    EXPECT(runner, replay.status == clean_aot::soc::SocStatus::ok &&
+                       replay.words_transferred == 1U &&
+                       runtime->soc().dma().channel_status(4U).completed);
+}
+
 } // namespace
 
 int main() {
@@ -1100,5 +1152,6 @@ int main() {
     test_crtc_edge_ordering(runner);
     test_interlaced_half_fields_and_console_oscillators(runner);
     test_spu_irq_sample_deadline(runner);
+    test_spu_dma4_native_request_coupling(runner);
     return runner.result();
 }

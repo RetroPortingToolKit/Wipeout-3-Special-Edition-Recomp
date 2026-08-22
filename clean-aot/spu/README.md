@@ -40,7 +40,8 @@ Implemented surface
   typed bounded DMA spans/callbacks, transfer modes 0/1/2/3, transfer
   replication modes, transfer status, a stable programmed transfer-address
   register with a separate advancing internal pointer, and IRQ checks on RAM
-  transactions.
+  transactions. The delayed SPUSTAT DMA read/write request is exposed as the
+  live whole-machine DMA4 DRQ level; stop mode and read warm-up deassert it.
 - Separate bounded CDDA, resampled-XA, and external stereo FIFOs sized to hold
   the legal worst-case 9,408-frame mono/half-rate XA sector burst. Pushing past
   capacity drops the newest samples and records overflow; consuming an empty
@@ -114,7 +115,7 @@ Integration risks remaining for a later tranche are sub-sample MMIO and
 key-on/key-off timing beyond the native 44,100 Hz sample boundary, exact
 silicon reverb evaluation/polyphase rounding, the unknown third per-voice RAM
 read and complete bus-slot IRQ ordering, physical transfer FIFO/DMA request
-  timing and DMA arbitration, residual XA zigzag silicon rounding, external-port
+  physical transfer bus-slot timing and arbitration, residual XA zigzag silicon rounding, external-port
 production wiring, and the system interrupt-controller adapter. The known
 delayed SPUCNT low bits, DMA-read request warm-up, inactive-voice header/data
 reads, and synchronous FIFO behavior are implemented and tested; the

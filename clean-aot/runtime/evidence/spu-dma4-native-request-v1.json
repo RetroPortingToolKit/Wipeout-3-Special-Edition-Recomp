@@ -1,0 +1,38 @@
+{
+  "schema": "clean-aot.runtime.spu-dma4-native-request.v1",
+  "clock_domain": "native device time",
+  "spu_sample_period_cycles": 768,
+  "channel": 4,
+  "request_semantics": {
+    "stop": false,
+    "dma_write_after_mode_boundary": true,
+    "dma_read_before_warmup": false,
+    "dma_read_after_warmup": true
+  },
+  "integration_boundary": {
+    "cycle_767_words": 0,
+    "cycle_768_request": true,
+    "cycle_768_words": 0,
+    "next_native_service_words": 1,
+    "transferred_halfwords": [4369, 8738]
+  },
+  "snapshot": {
+    "paired_soc_spu_boundary": "request asserted before transfer",
+    "replay_words": 1,
+    "replay_complete": true
+  },
+  "verification": {
+    "gcc_16_1_0_full_runtime": "23/23 pass",
+    "gcc_15_2_0_linux_asan_ubsan": "2/2 pass",
+    "clang_22_1_8_asan_ubsan": "2/2 pass"
+  },
+  "scope": {
+    "cmake_files_modified": false,
+    "boot_frontier_files_modified": false,
+    "product_package_files_modified": false
+  },
+  "remaining_unwaived": [
+    "physical SPU RAM bus-slot timing",
+    "global DMA arbitration latency"
+  ]
+}

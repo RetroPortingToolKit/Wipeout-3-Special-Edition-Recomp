@@ -1013,6 +1013,8 @@ struct Runtime::Impl final {
     void sample_device_irqs() noexcept {
         /* Channel 3 DRQ is the live CD data-FIFO level, not a latched event. */
         (void)soc.dma().set_request(3U, cdrom.data_count() >= 4U);
+        /* Channel 4 follows the delayed SPUSTAT DMA request level. */
+        (void)soc.dma().set_request(4U, spu.dma_request());
         if (soc.dma().irq_line()) {
             soc.interrupts().raise(soc::InterruptSource::dma);
         }
