@@ -52,6 +52,10 @@
 - A link-time-optimization experiment was ruled out by the bundled compiler:
   its `cc1` has no LTO support. The Release build was restored to its original
   `-O3 -DNDEBUG` flags; no product behavior depends on the failed experiment.
+- A disposable `-march=native` Release comparison was also ruled out: it
+  measured only about 71–74 Hz in the PAL FMV workload versus roughly 75–79 Hz
+  with generic `-O3`, so the bottleneck is structural runtime/generated work,
+  not generic ISA selection. The build was restored to `-O3 -DNDEBUG`.
 - FMV handling was corrected separately from gameplay cadence. Depth-24/MDEC
   presents now use a 50-Hz host period while PAL x2 gameplay remains 100 Hz,
   and the OpenGL FMV path receives the measured valid RGB width instead of
