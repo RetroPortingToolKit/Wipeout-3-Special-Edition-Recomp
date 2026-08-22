@@ -1813,11 +1813,32 @@ DispatchStatus Runtime::bind_authenticated_copied_epoch(
         const std::uint64_t existing_end=static_cast<std::uint64_t>(existing.stamp.virtual_start)+existing.stamp.byte_count;
         const bool overlaps=binding.generated.load_start<existing_end&&existing.stamp.virtual_start<candidate_end;
         if(!overlaps)continue;
-        if(impl_->bus.validate_code_region(existing.stamp,existing.variant)==memory::CodeRegionValidity::Current){
-            if(binding.generated.load_start==existing.stamp.virtual_start&&candidate_end==existing_end)return DispatchStatus::InvalidBinding;
-        }else{
-            existing.bound=false;
+        if(impl_->bus.validate_code_region(existing.stamp,existing.variant)!=memory::CodeRegionValidity::Current){
+            std::string current_hash;
+            try{
+                if(!hash_bus_range(impl_->bus,existing.stamp.virtual_start,
+                                   existing.stamp.byte_count,current_hash)){
+                    existing.bound=false;
+                    continue;
+                }
+            }catch(...){
+                existing.bound=false;
+                continue;
+            }
+            if(current_hash!=existing.destination_sha256){
+                existing.bound=false;
+                continue;
+            }
+            const auto refreshed=impl_->bus.capture_code_region(
+                existing.stamp.virtual_start,existing.stamp.byte_count,
+                existing.variant);
+            if(!refreshed.ok()){
+                existing.bound=false;
+                continue;
+            }
+            existing.stamp=refreshed.stamp;
         }
+        if(binding.generated.load_start==existing.stamp.virtual_start&&candidate_end==existing_end)return DispatchStatus::InvalidBinding;
     }
     if(target_index==Impl::kMaximumCopiedEpochs)return DispatchStatus::LoadRejected;
     auto& epoch=impl_->copied_epochs[target_index];

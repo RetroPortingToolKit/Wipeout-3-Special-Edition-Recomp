@@ -154,6 +154,43 @@ void test_generated_cache_isolation(Runner& runner) {
 
 void test_authenticated_copied_epoch(Runner&runner){using namespace clean_aot::runtime;constexpr std::string_view identity="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";constexpr std::string_view bios_sha="07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541";constexpr std::string_view payload_sha="66840dda154e8a113c31dd0ad32f7f3a366a80e8136979d8f5a101d3d29d6f72";const std::array<std::uint32_t,1>bios_roots{0xBFC00000U};const std::array bios_entries{GeneratedRegionEntry{0xBFC00000U,generated_to_copied_epoch,1U}};const GeneratedExecutableBinding bios_binding{identity,bios_sha,0xBFC00000U,0xBFC80000ULL,bios_roots,bios_entries};auto runtime=make_runtime();EXPECT(runner,runtime->bind_authenticated_bios(identity,bios_binding)==DispatchStatus::Bound);for(std::uint32_t i=0;i<8U;++i){EXPECT(runner,runtime->write8({},0x1000U+i,static_cast<std::uint8_t>(i+1U)).ok());EXPECT(runner,runtime->write8({},0x2000U+i,static_cast<std::uint8_t>(i+1U)).ok());EXPECT(runner,runtime->write8({},0xA0000080U+i,static_cast<std::uint8_t>(i+1U)).ok());EXPECT(runner,runtime->write8({},0x000000C0U+i,static_cast<std::uint8_t>(i+1U)).ok());}EXPECT(runner,runtime->dispatch_bios()==DispatchStatus::Executed);const std::array<std::uint32_t,2>roots{0xA0000080U,0xA0000084U};const std::array entries{GeneratedRegionEntry{0xA0000080U,generated_copied_step,1U},GeneratedRegionEntry{0xA0000084U,generated_copied_alias_jump,1U}};const GeneratedExecutableBinding generated{identity,payload_sha,0xA0000080U,0xA0000088ULL,roots,entries};const Runtime::AuthenticatedCopiedEpochBinding epoch{identity,0x1000U,8U,payload_sha,payload_sha,generated};EXPECT(runner,runtime->bind_authenticated_copied_epoch(epoch)==DispatchStatus::Bound);const std::array<std::uint32_t,1>alias_roots{0x000000C0U};const std::array alias_entries{GeneratedRegionEntry{0x000000C0U,generated_copied_alias_step,1U}};const GeneratedExecutableBinding alias_generated{identity,payload_sha,0x000000C0U,0x000000C8ULL,alias_roots,alias_entries};const Runtime::AuthenticatedCopiedEpochBinding alias_epoch{identity,0x2000U,8U,payload_sha,payload_sha,alias_generated};EXPECT(runner,runtime->bind_authenticated_copied_epoch(alias_epoch)==DispatchStatus::Bound);EXPECT(runner,runtime->bind_authenticated_copied_epoch(alias_epoch)==DispatchStatus::InvalidBinding);EXPECT(runner,runtime->dispatch_bios()==DispatchStatus::Executed);EXPECT(runner,runtime->bios_pc()==0xA0000084U);EXPECT(runner,runtime->dispatch_bios()==DispatchStatus::Executed);EXPECT(runner,runtime->bios_pc()==0x000000C0U);EXPECT(runner,runtime->dispatch_bios()==DispatchStatus::Executed);EXPECT(runner,runtime->bios_pc()==0x000000C4U);EXPECT(runner,runtime->write8({},0xC0U,0xFFU).ok());EXPECT(runner,runtime->dispatch_bios()==DispatchStatus::EpochMismatch);auto wrong=epoch;wrong.source_sha256="ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";EXPECT(runner,runtime->bind_authenticated_copied_epoch(wrong)==DispatchStatus::ExecutableHashMismatch);}
 
+void test_overlap_binding_refreshes_unchanged_exact_epoch(Runner& runner) {
+    using namespace clean_aot::runtime;
+    constexpr std::string_view identity =
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    constexpr std::string_view bios_sha =
+        "07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541";
+    constexpr std::string_view payload_sha =
+        "66840dda154e8a113c31dd0ad32f7f3a366a80e8136979d8f5a101d3d29d6f72";
+    const std::array<std::uint32_t, 1U> bios_roots{0xBFC00000U};
+    const std::array bios_entries{GeneratedRegionEntry{
+        0xBFC00000U, generated_to_copied_epoch, 1U}};
+    const GeneratedExecutableBinding bios_binding{
+        identity, bios_sha, 0xBFC00000U, 0xBFC80000ULL, bios_roots,
+        bios_entries};
+    auto runtime = make_runtime();
+    EXPECT(runner, runtime->bind_authenticated_bios(identity, bios_binding) ==
+                       DispatchStatus::Bound);
+    for (std::uint32_t index = 0U; index < 8U; ++index) {
+        EXPECT(runner, runtime->write8({}, 0x2000U + index,
+                                      static_cast<std::uint8_t>(index + 1U)).ok());
+        EXPECT(runner, runtime->write8({}, 0xC0U + index,
+                                      static_cast<std::uint8_t>(index + 1U)).ok());
+    }
+    const std::array<std::uint32_t, 1U> roots{0xC0U};
+    const std::array entries{
+        GeneratedRegionEntry{0xC0U, generated_copied_alias_step, 1U}};
+    const GeneratedExecutableBinding generated{
+        identity, payload_sha, 0xC0U, 0xC8ULL, roots, entries};
+    const Runtime::AuthenticatedCopiedEpochBinding epoch{
+        identity, 0x2000U, 8U, payload_sha, payload_sha, generated};
+    EXPECT(runner, runtime->bind_authenticated_copied_epoch(epoch) ==
+                       DispatchStatus::Bound);
+    EXPECT(runner, runtime->write8({}, 0xC8U, 0x5aU).ok());
+    EXPECT(runner, runtime->bind_authenticated_copied_epoch(epoch) ==
+                       DispatchStatus::InvalidBinding);
+}
+
 void test_authenticated_generated_dispatch(Runner& runner) {
     using clean_aot::runtime::DispatchStatus;
     using clean_aot::runtime::GeneratedDispatcher;
@@ -536,6 +573,7 @@ int main() {
     test_authenticated_bios_reset_contract(runner);
     test_generated_cache_isolation(runner);
     test_authenticated_copied_epoch(runner);
+    test_overlap_binding_refreshes_unchanged_exact_epoch(runner);
     test_generated_integer_differential(runner);
     test_generated_unaligned_memory_differential(runner);
     test_generated_cop2_binding_and_latency(runner);

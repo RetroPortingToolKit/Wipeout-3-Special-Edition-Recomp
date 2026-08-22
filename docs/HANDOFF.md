@@ -476,6 +476,19 @@ instruction and fails closed on every unknown PC or executable identity.
   fail-closed at the next unbound copied-RAM PC `0x000027C0`. Receipt
   `bios-frontier-00080867.json` supersedes the hardware-invalid 80,802 receipt
   and records the new RAM epoch SHA-256 `c0020392...0cd3`.
+- The `0x27C0` epoch executes 26 instructions before its own code writes change
+  the whole-RAM identity to `39498839...036a5`; dispatch stops with
+  `EpochMismatch` at `0x2150`, then resumes only after that new identity is
+  compiled. Overlap reconciliation now rehashes exact prior ranges before
+  disabling them, so unrelated same-page writes no longer discard the
+  byte-identical A0/B0 trampoline; changed instruction bytes still invalidate.
+- The refreshed epoch advances through copied-RAM initialization, immutable
+  BIOS `0xBFC086B0`, B0 dispatch, and A0 service 0x2A. A subsequent RAM mutation
+  stops before dispatch at `0x00003C90`. Two repeated runs reach 84,520
+  instructions and 14,791 dispatches with 9,375 reads, 17,089 writes, 2,480
+  isolated-cache writes, one device read, and 44 device writes. Receipt
+  `bios-frontier-00084520.json` records fail-closed status `EpochMismatch` and
+  next RAM epoch SHA-256 `6f30b27d...cc50b`.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control
