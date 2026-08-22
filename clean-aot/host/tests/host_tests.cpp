@@ -1,11 +1,14 @@
 #include "clean_aot/host/headless.hpp"
 #include "clean_aot/host/pacing.hpp"
 #include "clean_aot/host/viewport.hpp"
+#include "clean_aot/host/render_interfaces.hpp"
 
 #include <array>
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <variant>
+#include <vector>
 
 namespace {
 
@@ -346,6 +349,151 @@ void test_viewports() {
     }
 }
 
+void test_precise_geometry_bridge_visual_digest() {
+    psx::render::EmittedTriangle triangle{};
+    for (std::size_t index = 0U; index < triangle.vertices.size(); ++index) {
+        auto& vertex = triangle.vertices[index];
+        vertex.native = psx::render::NativePosition{
+            static_cast<std::int16_t>(10 + index),
+            static_cast<std::int16_t>(20 + index)};
+        vertex.precise = psx::render::PreciseCoordinate{
+            static_cast<double>(index + 1U), static_cast<double>(index + 2U),
+            0.5, 2.0};
+        vertex.uv = psx::render::NativeUv{static_cast<std::uint8_t>(index * 127U),
+                                          static_cast<std::uint8_t>(255U - index * 127U), 0U};
+        vertex.color = psx::render::Rgba8{10U, 20U, 30U, 255U};
+        vertex.identity = psx::render::PreciseVertexIdentity{
+            {{psx::render::ProvenanceSourceKind::MemoryWord,
+              static_cast<std::uint32_t>(0x100U + index * 4U)}, index + 10U},
+            {{psx::render::ProvenanceSourceKind::GteRegister,
+              static_cast<std::uint32_t>(index)}, index + 20U}};
+    }
+    psx::render::AssembledPolygon polygon{};
+    polygon.triangles.push_back(triangle);
+    const auto projection = psx::render::ProjectionPolicyPlanner::plan(
+        {psx::render::ProjectionPolicy::ExpandHorizontal,
+         psx::render::CullingPolicy::MatchExpandedProjection, 32U, 9U});
+    expect(projection.accepted, "ultrawide projection plan is valid");
+    std::array<clean_aot::host::RenderVertex, 3> vertices{};
+    std::array<std::uint16_t, 3> indices{};
+    const auto result = clean_aot::host::build_render_geometry(
+        polygon, projection.plan, vertices, indices);
+    expect(result.status.success() && result.geometry.vertex_count == 3U &&
+               result.geometry.index_count == 3U,
+           "precise triangle crosses the host geometry bridge");
+    expect(vertices[0].x == 0.375F && vertices[0].y == 2.0F &&
+               vertices[0].w == 2.0F && vertices[0].storage_generation == 10U &&
+               vertices[0].origin_generation == 20U,
+           "projection and provenance survive the host bridge");
+    expect(result.culling == psx::render::CullingPolicy::MatchExpandedProjection,
+           "expanded culling policy survives the host bridge");
+    expect(result.visual_digest == 0x032a082a4e99fe27ULL,
+           "precise geometry visual digest changed");
+
+    auto fallback_polygon = polygon;
+    fallback_polygon.triangles[0].fallback_reason =
+        psx::render::FallbackReason::MissingProvenance;
+    const auto rejected = clean_aot::host::build_render_geometry(
+        fallback_polygon, projection.plan, vertices, indices);
+    expect(rejected.status.code == HostCode::unsupported,
+           "ultrawide geometry did not fail closed on native fallback");
+}
+
+void test_gte_memory_gpu_host_provenance_chain() {
+    clean_aot::gpu::FrontEnd gpu;
+    const std::array<std::uint32_t, 4> words{
+        0x200a141eU,
+        (20U << 16U) | 10U,
+        (25U << 16U) | 30U,
+        (40U << 16U) | 15U,
+    };
+    for (const std::uint32_t word : words) {
+        expect(gpu.write_gp0(word).accepted, "GPU accepts precise-chain packet word");
+    }
+    auto event = gpu.pop_event();
+    expect(event.has_value() &&
+               std::holds_alternative<clean_aot::gpu::PolygonEvent>(*event),
+           "GPU emits polygon for precise-chain packet");
+    if (!event.has_value() ||
+        !std::holds_alternative<clean_aot::gpu::PolygonEvent>(*event)) {
+        return;
+    }
+
+    psx::render::ProvenanceState provenance;
+    const std::array native{
+        psx::render::NativePosition{10, 20},
+        psx::render::NativePosition{30, 25},
+        psx::render::NativePosition{15, 40},
+    };
+    std::array<psx::render::VertexCandidate, 3> candidates{};
+    for (std::size_t index = 0U; index < native.size(); ++index) {
+        const auto gte = provenance.write_gte(
+            static_cast<psx::render::GteRegister>(index), native[index],
+            psx::render::PreciseCoordinate{
+                static_cast<double>(native[index].x) + 0.25,
+                static_cast<double>(native[index].y) + 0.5,
+                3.0 + static_cast<double>(index), 2.0});
+        const std::uint32_t raw =
+            static_cast<std::uint16_t>(native[index].x) |
+            (static_cast<std::uint32_t>(static_cast<std::uint16_t>(native[index].y)) << 16U);
+        expect(provenance.store_memory(
+                   static_cast<std::uint32_t>(0x100U + index * 4U), raw,
+                   gte.candidate().enhancement)
+                   .carried_precise(),
+               "GTE precision survives RAM store");
+        candidates[index] = provenance.load_memory(
+            static_cast<std::uint32_t>(0x100U + index * 4U))->candidate();
+    }
+
+    const auto baseline = psx::render::ProjectionPolicyPlanner::plan({});
+    std::array<clean_aot::host::RenderVertex, 3> vertices{};
+    std::array<std::uint16_t, 3> indices{};
+    const auto built = clean_aot::host::build_gpu_polygon_geometry(
+        std::get<clean_aot::gpu::PolygonEvent>(*event), candidates, &provenance,
+        baseline.plan, vertices, indices);
+    expect(built.status.success() && vertices[0].x == 10.25F &&
+               vertices[0].y == 20.5F && vertices[0].storage_generation != 0U &&
+               vertices[0].origin_generation != 0U,
+           "GTE/RAM/GPU packet provenance reaches host geometry");
+    expect(built.visual_digest == 0x49cebe6818887fe1ULL,
+           "GTE/RAM/GPU/host visual digest changed");
+}
+
+void test_4k_scanout_frame_binding() {
+    clean_aot::gpu::DisplayTiming display{};
+    display.display_enabled = true;
+    display.display_start_x = 0U;
+    display.display_start_y = 0U;
+    display.horizontal_start = 0x200U;
+    display.horizontal_end = 0xc00U;
+    display.vertical_start = 0x10U;
+    display.vertical_end = 0x100U;
+    display.horizontal_resolution = 1U;
+    const auto plan = clean_aot::raster::ScanoutMapper::plan({
+        display, clean_aot::raster::ScanoutField::Progressive,
+        3840U, 2160U, clean_aot::raster::PresentationMode::Identity4x3, 4U, 3U});
+    expect(plan.accepted && plan.plan.presentation.destination_x == 480U &&
+               plan.plan.presentation.destination_width == 2880U &&
+               plan.plan.presentation.destination_height == 2160U,
+           "4K scanout preserves exact centered 4:3 presentation");
+    std::vector<clean_aot::raster::VramWord> vram(
+        clean_aot::raster::kVramWordCount, 0U);
+    vram[0] = 0x001fU;
+    std::vector<std::uint8_t> rgb(plan.plan.required_rgb_bytes, 0U);
+    expect(clean_aot::raster::ScanoutMapper::decode_rgb888(plan.plan, vram, rgb)
+               .accepted(),
+           "scanout decoder emits the host RGB frame");
+    FrameSubmission submission{};
+    expect(clean_aot::host::bind_scanout_frame(
+               plan.plan, rgb, 1U, 1U, submission).success(),
+           "scanout output binds to a host frame submission");
+    expect(submission.surface.format == PixelFormat::rgb8_unorm &&
+               submission.surface.pitch == 960U &&
+               submission.surface.byte_size == 320U * 240U * 3U &&
+               submission.surface.pixels[0] == 255U,
+           "host frame retains scanout format, bounds, and first pixel");
+}
+
 } // namespace
 
 int main() {
@@ -353,6 +501,9 @@ int main() {
     test_headless_frame_schedules();
     test_bounded_queue_and_audio();
     test_viewports();
+    test_precise_geometry_bridge_visual_digest();
+    test_gte_memory_gpu_host_provenance_chain();
+    test_4k_scanout_frame_binding();
     if (failures != 0) {
         std::cerr << failures << " host tests failed\n";
         return 1;

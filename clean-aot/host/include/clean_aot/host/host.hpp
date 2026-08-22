@@ -36,6 +36,7 @@ struct HostStatus final {
 enum class PixelFormat : std::uint8_t {
     rgba8_unorm,
     bgra8_unorm,
+    rgb8_unorm,
     rgb565,
     indexed8,
 };
@@ -46,6 +47,8 @@ enum class PixelFormat : std::uint8_t {
     case PixelFormat::rgba8_unorm:
     case PixelFormat::bgra8_unorm:
         return 4U;
+    case PixelFormat::rgb8_unorm:
+        return 3U;
     case PixelFormat::rgb565:
         return 2U;
     case PixelFormat::indexed8:

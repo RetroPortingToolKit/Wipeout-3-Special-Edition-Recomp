@@ -220,6 +220,7 @@ public:
                                    std::uint32_t y) const noexcept;
   [[nodiscard]] std::span<const VramWord> vram_words() const noexcept;
   [[nodiscard]] std::uint64_t digest() const noexcept;
+  [[nodiscard]] std::uint64_t vram_generation() const noexcept;
   [[nodiscard]] const RasterLimits &limits() const noexcept;
 
   [[nodiscard]] NativeBackendV1 native_backend() noexcept;

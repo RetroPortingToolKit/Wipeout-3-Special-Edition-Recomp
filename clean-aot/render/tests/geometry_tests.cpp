@@ -3,6 +3,7 @@
 #include "psx_render/interpolation.h"
 #include "psx_render/provenance.h"
 #include "psx_render/projection_policy.h"
+#include "psx_render/replacement_manifest.h"
 
 #include <array>
 #include <cmath>
@@ -52,6 +53,42 @@ void projection_and_culling_policy_is_explicit() {
                 ProjectionRequest{ProjectionPolicy::ExpandHorizontal,
                                   CullingPolicy::NativeHardware, 3u, 4u})
                 .accepted);
+}
+
+void replacement_manifest_is_generation_safe() {
+    const auto texture_key = parse_replacement_key("d281cf44-2a49f962");
+    const auto font_key = parse_replacement_key("00000001-00000002");
+    EXPECT(texture_key.has_value());
+    EXPECT(font_key.has_value());
+    EXPECT(!parse_replacement_key("D281CF44-2a49f962").has_value());
+    const std::array entries{
+        ReplacementManifestEntry{ReplacementAssetKind::Texture, *texture_key,
+                                 "textures/ship.png", std::string(64u, 'a'),
+                                 4096u, 4096u},
+        ReplacementManifestEntry{ReplacementAssetKind::Font, *font_key,
+                                 "fonts/menu.png", std::string(64u, 'b'),
+                                 2048u, 1024u},
+    };
+    const auto manifest = ReplacementManifest::create(entries, 7u);
+    EXPECT(manifest.has_value());
+    EXPECT(manifest->size() == 2u);
+    const auto texture = manifest->resolve(ReplacementAssetKind::Texture,
+                                           *texture_key, 11u);
+    EXPECT(texture.has_value());
+    EXPECT(manifest->is_current(*texture, 11u));
+    EXPECT(!manifest->is_current(*texture, 12u));
+    EXPECT(!manifest->resolve(ReplacementAssetKind::Texture, *texture_key, 0u)
+                .has_value());
+    EXPECT(!manifest->resolve(ReplacementAssetKind::Font, *texture_key, 11u)
+                .has_value());
+
+    auto duplicate = entries;
+    duplicate[1].kind = ReplacementAssetKind::Texture;
+    duplicate[1].key = *texture_key;
+    EXPECT(!ReplacementManifest::create(duplicate, 7u).has_value());
+    auto unsafe = entries;
+    unsafe[0].logical_path = "../escape.png";
+    EXPECT(!ReplacementManifest::create(unsafe, 7u).has_value());
 }
 
 void expect_near(double actual, double expected, double tolerance, std::string_view expression, int line) {
@@ -828,6 +865,7 @@ void perspective_attributes_are_all_or_nothing() {
 
 int main() {
     projection_and_culling_policy_is_explicit();
+    replacement_manifest_is_generation_safe();
     parser_decodes_flat_triangle();
     parser_decodes_textured_gouraud_quad();
     parser_rejects_invalid_or_truncated_packets();

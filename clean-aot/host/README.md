@@ -1,8 +1,8 @@
 # Clean native host foundation
 
 This directory is a platform-neutral host boundary for the clean static-AOT
-lane. It contains no guest CPU, GPU emulation, PGXP implementation, texture
-replacement lookup, game fix, or legacy runner dependency.
+lane. It contains no guest CPU, game fix, title-specific graphics policy, or
+legacy runner dependency.
 
 The contract has three independent clocks:
 
@@ -26,10 +26,15 @@ on different threads.
 exact reduced-rational fractional or largest-fitting-integer scaling. It produces integer pixel
 rectangles and has no connection to `MonotonicPacer` or the game clock.
 
-`render_interfaces.hpp` is deliberately only a seam for the later GPU,
-PGXP, and replacement-texture implementations. Those systems own their
-guest-derived data and can provide an `IFrameEncoder` to the Windows
-presentation shell.
+`render_interfaces.hpp` now connects the generic production graphics
+contracts. A GPU polygon's immutable raw packet is reparsed, matched against
+generation-checked GTE/RAM candidates, assembled all-or-nothing, and emitted as
+clip-space host vertices with storage/origin generations. Horizontal expansion
+fails closed if any triangle falls back to native coordinates. RGB888 scanout
+is bound without copying into `FrameSubmission`, while the 4K viewport remains
+an independent presentation policy. Replacement lookup receives the opaque
+two-word key and source generation; asset loading and title policy stay above
+the host.
 
 ## Optional Windows presentation shell
 

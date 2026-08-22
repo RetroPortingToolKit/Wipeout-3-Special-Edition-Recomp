@@ -1214,6 +1214,20 @@ void test_golden_digest() {
 }
 
 void test_scanout_boundaries() {
+  ReferenceRasterizer generation_raster;
+  const std::uint64_t initial_generation = generation_raster.vram_generation();
+  clean_aot::gpu::CacheFlushEvent marker{};
+  consume_ok(generation_raster, Event{marker});
+  require(generation_raster.vram_generation() == initial_generation,
+          "read-only marker changed texture source generation");
+  VramFillEvent generation_write{};
+  generation_write.origin = VramPoint{0u, 0u};
+  generation_write.extent = VramExtent{16u, 1u};
+  generation_write.color = color(255u, 0u, 0u);
+  consume_ok(generation_raster, Event{generation_write});
+  require(generation_raster.vram_generation() == initial_generation + 1u,
+          "VRAM write did not advance texture source generation");
+
   DisplayTiming display{};
   display.display_enabled = true;
   display.display_start_x = 0u;

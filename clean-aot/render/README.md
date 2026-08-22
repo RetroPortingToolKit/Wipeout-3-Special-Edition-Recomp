@@ -28,6 +28,14 @@ an explicit choice between native culling and a matching expanded frustum;
 the planner supplies only a generic clip-space scale and contains no title
 addresses, track constants, or object exceptions.
 
+`ReplacementManifest` indexes textures and fonts by the external pack's opaque
+two-word key without assigning unverified semantic names to either word. Every
+resolved identity binds the exact asset SHA-256, manifest generation, and
+current raster-source generation. Reloading a manifest or modifying VRAM makes
+cached replacement handles stale deterministically. Paths, dimensions, hashes,
+duplicate keys, and malformed key encodings fail closed during bounded startup
+construction; image decoding and title policy remain outside this component.
+
 The interpolation functions implement the renderer-independent perspective
 formula using clip-space `w`. Scaling all `w` values by a common finite factor
 does not change the result while the scaled inputs remain finite and non-zero.

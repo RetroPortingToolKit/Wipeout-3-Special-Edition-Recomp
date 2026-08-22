@@ -15,6 +15,7 @@ add_library(psx_render_geometry STATIC
     src/assembly.cpp
     src/interpolation.cpp
     src/projection_policy.cpp
+    src/replacement_manifest.cpp
 )
 
 target_include_directories(psx_render_geometry

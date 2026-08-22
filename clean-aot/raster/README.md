@@ -80,6 +80,12 @@ The digest is FNV-1a over VRAM halfwords in little-endian byte order. This is
 an intentionally simple deterministic golden-test contract, not a claim about
 GPU bus timing.
 
+`vram_generation()` is the monotonic source identity used by replacement-
+texture caches. Reset and each accepted VRAM-writing event advance it;
+downloads, state markers, and rejected or ignored draws do not. The generation
+is deliberately global and conservative: a native backend may add finer page
+tracking, but may never reuse a replacement after this identity changes.
+
 ## Deliberate boundary and integration requirements
 
 This is a functional VRAM reference, not a complete CRTC or timed GPU. It does

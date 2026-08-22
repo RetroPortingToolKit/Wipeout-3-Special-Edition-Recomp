@@ -24,17 +24,34 @@ option(CLEAN_AOT_HOST_REBUILD_SHADERS
        "Compile the presentation shaders with the pinned DXC release"
        OFF)
 
+if(NOT TARGET psx_render_geometry)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../render"
+                     "${CMAKE_CURRENT_BINARY_DIR}/render")
+endif()
+if(NOT TARGET clean_aot_gpu)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../gpu"
+                     "${CMAKE_CURRENT_BINARY_DIR}/gpu")
+endif()
+if(NOT TARGET clean_aot_raster)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../raster"
+                     "${CMAKE_CURRENT_BINARY_DIR}/raster")
+endif()
+
 add_library(clean_aot_host STATIC
     src/headless.cpp
     src/pacing.cpp
     src/viewport.cpp
+    src/render_interfaces.cpp
 )
 
 target_compile_features(clean_aot_host PUBLIC cxx_std_20)
 target_include_directories(clean_aot_host
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../gpu/include
 )
+target_link_libraries(clean_aot_host PUBLIC psx_render_geometry clean_aot_gpu clean_aot_raster)
 
 if(MSVC)
     target_compile_options(clean_aot_host PRIVATE /W4 /permissive-)

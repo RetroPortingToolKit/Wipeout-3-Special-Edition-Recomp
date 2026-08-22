@@ -428,6 +428,7 @@ struct ReferenceRasterizer::Impl {
 
   std::array<VramWord, kVramWordCount> vram{};
   RasterLimits limits{};
+  std::uint64_t vram_generation = 0u;
 
   [[nodiscard]] EventResult reject(RasterError error) const noexcept {
     return EventResult{EventStatus::Rejected, error, 0, {}};
@@ -1120,37 +1121,35 @@ struct ReferenceRasterizer::Impl {
 
   [[nodiscard]] EventResult consume(const gpu::Event &event,
                                     WorkBudget &budget) noexcept {
-    if (const auto *value = std::get_if<gpu::PolygonEvent>(&event)) {
-      return consume_polygon(*value, budget);
+    EventResult result{};
+    if (const auto *polygon = std::get_if<gpu::PolygonEvent>(&event)) {
+      result = consume_polygon(*polygon, budget);
+    } else if (const auto *line = std::get_if<gpu::LineEvent>(&event)) {
+      result = consume_line(*line, budget);
+    } else if (const auto *rectangle = std::get_if<gpu::RectangleEvent>(&event)) {
+      result = consume_rectangle(*rectangle, budget);
+    } else if (const auto *fill = std::get_if<gpu::VramFillEvent>(&event)) {
+      result = consume_fill(*fill, budget);
+    } else if (const auto *copy = std::get_if<gpu::VramCopyEvent>(&event)) {
+      result = consume_copy(*copy, budget);
+    } else if (const auto *upload = std::get_if<gpu::VramUploadEvent>(&event)) {
+      result = consume_upload(*upload, budget);
+    } else if (const auto *download = std::get_if<gpu::VramDownloadEvent>(&event)) {
+      return consume_download(*download, budget);
+    } else if (const auto *environment = std::get_if<gpu::EnvironmentEvent>(&event)) {
+      return consume_environment(*environment, budget);
+    } else if (const auto *flush = std::get_if<gpu::CacheFlushEvent>(&event)) {
+      return consume_marker(*flush, budget);
+    } else if (const auto *interrupt = std::get_if<gpu::InterruptRequestEvent>(&event)) {
+      return consume_marker(*interrupt, budget);
+    } else {
+      return reject(RasterError::MalformedEvent);
     }
-    if (const auto *value = std::get_if<gpu::LineEvent>(&event)) {
-      return consume_line(*value, budget);
+    if (result.status == EventStatus::Applied &&
+        vram_generation != std::numeric_limits<std::uint64_t>::max()) {
+      ++vram_generation;
     }
-    if (const auto *value = std::get_if<gpu::RectangleEvent>(&event)) {
-      return consume_rectangle(*value, budget);
-    }
-    if (const auto *value = std::get_if<gpu::VramFillEvent>(&event)) {
-      return consume_fill(*value, budget);
-    }
-    if (const auto *value = std::get_if<gpu::VramCopyEvent>(&event)) {
-      return consume_copy(*value, budget);
-    }
-    if (const auto *value = std::get_if<gpu::VramUploadEvent>(&event)) {
-      return consume_upload(*value, budget);
-    }
-    if (const auto *value = std::get_if<gpu::VramDownloadEvent>(&event)) {
-      return consume_download(*value, budget);
-    }
-    if (const auto *value = std::get_if<gpu::EnvironmentEvent>(&event)) {
-      return consume_environment(*value, budget);
-    }
-    if (const auto *value = std::get_if<gpu::CacheFlushEvent>(&event)) {
-      return consume_marker(*value, budget);
-    }
-    if (const auto *value = std::get_if<gpu::InterruptRequestEvent>(&event)) {
-      return consume_marker(*value, budget);
-    }
-    return reject(RasterError::MalformedEvent);
+    return result;
   }
 };
 
@@ -1408,6 +1407,9 @@ ReferenceRasterizer::~ReferenceRasterizer() noexcept = default;
 
 void ReferenceRasterizer::reset(VramWord value) noexcept {
   impl_->vram.fill(value);
+  if (impl_->vram_generation != std::numeric_limits<std::uint64_t>::max()) {
+    ++impl_->vram_generation;
+  }
 }
 
 EventResult ReferenceRasterizer::consume(const gpu::Event &event) noexcept {
@@ -1458,6 +1460,10 @@ std::uint64_t ReferenceRasterizer::digest() const noexcept {
     hash = mix_byte(hash, static_cast<std::uint8_t>(word >> 8u));
   }
   return hash;
+}
+
+std::uint64_t ReferenceRasterizer::vram_generation() const noexcept {
+  return impl_->vram_generation;
 }
 
 const RasterLimits &ReferenceRasterizer::limits() const noexcept {
