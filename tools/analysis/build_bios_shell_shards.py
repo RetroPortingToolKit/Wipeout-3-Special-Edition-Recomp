@@ -103,9 +103,10 @@ def manifest(receipt):
 def epoch_variants(items):
  out={}
  for manifest_path,blob_path in items:
-  data=parse_manifest(manifest_path); blob=blob_path.read_bytes(); start=int(data["load_start"][0],0); end=int(data["load_end_exclusive"][0],0); identity=data["image_sha256"][0]
-  if len(blob)!=end-start or sha(blob)!=identity: raise ShellShardError(f"epoch slice identity mismatch: {manifest_path}")
-  key=(identity,start,end); row=out.setdefault(key,{"identity_sha256":identity,"load_start":start,"load_end_exclusive":end,"roots":set(),"ranges":set(),"source_manifests":set(),"unknown_pc_action":"reject","unknown_identity_action":"reject"})
+  data=parse_manifest(manifest_path); blob=blob_path.read_bytes(); start=int(data["load_start"][0],0); end=int(data["load_end_exclusive"][0],0); image_identity=data["image_sha256"][0]; variant_identity=data["variant_sha256"][0]
+  if len(blob)!=end-start or sha(blob)!=image_identity: raise ShellShardError(f"epoch slice identity mismatch: {manifest_path}")
+  key=(variant_identity,start,end); row=out.setdefault(key,{"identity_sha256":variant_identity,"image_sha256":image_identity,"load_start":start,"load_end_exclusive":end,"roots":set(),"ranges":set(),"source_manifests":set(),"unknown_pc_action":"reject","unknown_identity_action":"reject"})
+  if row["image_sha256"]!=image_identity: raise ShellShardError("one epoch variant has conflicting payload identities")
   row["roots"].update(int(x,0) for x in data.get("entry",[])); row["ranges"].update(tuple(int(x,0) for x in v.split("-",1)) for v in data.get("code",[])); row["source_manifests"].add(manifest_path.name)
  result=[]
  for row in out.values():
@@ -131,7 +132,7 @@ def incremental_variants(receipt,baseline,max_entries,label="frontier-increment"
 def variant_manifest(receipt,variant):
  view=dict(receipt); view["ranges"]=variant["ranges"]; return manifest(view)
 def epoch_manifest(variant):
- lines=[f"schema={MANIFEST_SCHEMA}","image_kind=raw-payload",f"variant_sha256={variant['identity_sha256']}",f"image_sha256={variant['identity_sha256']}",f"load_start=0x{variant['load_start']:08X}",f"load_end_exclusive=0x{variant['load_end_exclusive']:08X}"]
+ lines=[f"schema={MANIFEST_SCHEMA}","image_kind=raw-payload",f"variant_sha256={variant['identity_sha256']}",f"image_sha256={variant.get('image_sha256',variant['identity_sha256'])}",f"load_start=0x{variant['load_start']:08X}",f"load_end_exclusive=0x{variant['load_end_exclusive']:08X}"]
  lines += [f"entry=0x{x:08X}" for x in variant["roots"]]; lines += [f"code=0x{x['start']:08X}-0x{x['end_exclusive']:08X}" for x in variant["ranges"]]; return "\n".join(lines)+"\n"
 def main(argv=None):
  p=argparse.ArgumentParser(); p.add_argument("--image",type=Path,required=True); p.add_argument("--identity",required=True); p.add_argument("--load-start",type=lambda x:int(x,0),required=True); p.add_argument("--frontier-manifest",type=Path,action="append",required=True); p.add_argument("--epoch-frontier",action="append",default=[],metavar="MANIFEST=BIN"); p.add_argument("--frontier-trace",type=Path,action="append",default=[]); p.add_argument("--baseline-receipt",type=Path); p.add_argument("--incremental-manifest-dir",type=Path); p.add_argument("--increment-label",default="frontier-increment"); p.add_argument("--max-increment-entries",type=int,default=256); p.add_argument("--receipt",type=Path,required=True); p.add_argument("--manifest-out",type=Path,required=True); a=p.parse_args(argv)
@@ -142,7 +143,7 @@ def main(argv=None):
   parsed=[(x,parse_manifest(x)) for x in a.frontier_manifest]; result=build(image,a.load_start,parsed); result["exact_epoch_variants"]=epoch_variants([(Path(x.split("=",1)[0]),Path(x.split("=",1)[1])) for x in a.epoch_frontier]); result["frontier_traces"]=[]
   for path in a.frontier_trace:
    raw=path.read_bytes(); trace=json.loads(raw)
-   if trace.get("schema") not in {"clean-aot.real-bios-shell-frontier-capacity.v1","clean-aot.bios-shell-registry-frontier.v1"}: raise ShellShardError("unsupported shell frontier trace schema")
+   if trace.get("schema") not in {"clean-aot.real-bios-shell-frontier-capacity.v1","clean-aot.bios-shell-registry-frontier.v1","clean-aot.bios-shell-exact-frontiers.v1"}: raise ShellShardError("unsupported shell frontier trace schema")
    result["frontier_traces"].append({"path":path.name,"schema":trace["schema"],"sha256":sha(raw)})
   text=manifest(result); result["compiler_manifest_sha256"]=sha(text.encode())
   if a.baseline_receipt:
@@ -162,7 +163,7 @@ def main(argv=None):
     if epoch_bindings.intersection(bindings): raise ShellShardError("incremental epoch variants duplicate identity/PC bindings")
     epoch_bindings.update(bindings); name=f"bios-shell-{a.increment_label}-epoch-{variant['load_start']:08x}-{variant['identity_sha256'][:12]}"; path=a.incremental_manifest_dir/(name+".manifest"); payload=epoch_manifest(variant)
     if path.exists(): raise ShellShardError(f"refusing to overwrite {path}")
-    path.write_text(payload,encoding="utf-8",newline="\n"); result["incremental_epoch_variants"].append({"name":name,"identity_sha256":variant["identity_sha256"],"load_start":variant["load_start"],"load_end_exclusive":variant["load_end_exclusive"],"manifest":path.name,"manifest_sha256":sha(payload.encode())})
+    path.write_text(payload,encoding="utf-8",newline="\n"); result["incremental_epoch_variants"].append({"name":name,"identity_sha256":variant["identity_sha256"],"image_sha256":variant.get("image_sha256",variant["identity_sha256"]),"load_start":variant["load_start"],"load_end_exclusive":variant["load_end_exclusive"],"manifest":path.name,"manifest_sha256":sha(payload.encode())})
    result["incremental_registry_contract"]={"baseline_receipt_sha256":baseline.get("receipt_sha256"),"maximum_entries_per_manifest":a.max_increment_entries,"duplicate_pc_count":0,"selection_key":"authenticated-resident-identity-plus-exact-pc","unknown_pc_action":"reject"}
   result["receipt_sha256"]=sha(canonical(result))
   for path,payload in ((a.manifest_out,text),(a.receipt,json.dumps(result,sort_keys=True,separators=(",",":"))+"\n")):

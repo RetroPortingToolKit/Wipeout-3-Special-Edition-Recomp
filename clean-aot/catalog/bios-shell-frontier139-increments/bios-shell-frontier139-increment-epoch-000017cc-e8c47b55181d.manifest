@@ -1,0 +1,8 @@
+schema=clean-aot-compiler-manifest-v1
+image_kind=raw-payload
+variant_sha256=e8c47b55181d0a004a48589a1570701a27168ee96ab39502b363fc78a3cbdf45
+image_sha256=e8c47b55181d0a004a48589a1570701a27168ee96ab39502b363fc78a3cbdf45
+load_start=0x000017CC
+load_end_exclusive=0x000017D4
+entry=0x000017CC
+code=0x000017CC-0x000017D4
