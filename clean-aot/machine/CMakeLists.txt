@@ -56,3 +56,27 @@ enable_testing()
 add_test(NAME clean_aot_machine_tests COMMAND clean_aot_machine_tests)
 add_test(NAME clean_aot_machine_c_abi_test
          COMMAND clean_aot_machine_c_abi_test)
+
+if(NOT TARGET clean_aot_soc)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../soc"
+                     "${CMAKE_CURRENT_BINARY_DIR}/soc-integration")
+endif()
+
+add_executable(clean_aot_whole_machine_adversarial_tests
+    ../runtime/tests/whole_machine_adversarial_tests.cpp
+)
+target_link_libraries(clean_aot_whole_machine_adversarial_tests PRIVATE
+    clean_aot_machine
+    clean_aot_soc
+)
+if(MSVC)
+    target_compile_options(clean_aot_whole_machine_adversarial_tests PRIVATE
+        /W4 /WX /permissive-
+    )
+else()
+    target_compile_options(clean_aot_whole_machine_adversarial_tests PRIVATE
+        -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow -Werror
+    )
+endif()
+add_test(NAME clean_aot_whole_machine_adversarial_tests
+         COMMAND clean_aot_whole_machine_adversarial_tests)

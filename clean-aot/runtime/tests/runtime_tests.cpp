@@ -72,7 +72,9 @@ void test_authenticated_generated_dispatch(Runner& runner) {
         GeneratedRegionEntry{0x00001010U, generated_step_b},
         GeneratedRegionEntry{0x00001020U, unresolved_generated_step},
     };
-    const GeneratedExecutableBinding binding{identity, 0x00001000U, 0x00001100U, entries};
+    const std::array<std::uint32_t, 2U> roots{0x00001000U, 0x00001010U};
+    const GeneratedExecutableBinding binding{identity, identity, 0x00001000U,
+                                              0x00001100U, roots, entries};
     GeneratedDispatcher dispatcher;
     EXPECT(runner, dispatcher.bind(identity, binding) == DispatchStatus::Bound);
 
@@ -99,7 +101,8 @@ void test_authenticated_generated_dispatch(Runner& runner) {
         GeneratedRegionEntry{0x00001010U, generated_step_b},
         GeneratedRegionEntry{0x00001000U, generated_step_a},
     };
-    const GeneratedExecutableBinding bad{identity, 0x00001000U, 0x00001100U, unsorted};
+    const GeneratedExecutableBinding bad{identity, identity, 0x00001000U,
+                                          0x00001100U, roots, unsorted};
     EXPECT(runner, mismatch.bind(identity, bad) == DispatchStatus::InvalidBinding);
 }
 
