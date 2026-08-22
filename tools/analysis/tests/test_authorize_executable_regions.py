@@ -92,6 +92,19 @@ class FiniteIndirectTests(unittest.TestCase):
             hashlib.sha256(image[4:12]).hexdigest(),
         )
 
+    def test_literal_system_vector_is_finite_but_other_external_target_is_not(self) -> None:
+        image = bytearray(16)
+        write_word(image, BASE, 0x240800A0)      # addiu t0,zero,0xa0
+        write_word(image, BASE + 4, 0x0100F809)  # jalr t0
+        report = analyze(bytes(image), BASE, {BASE}, set(range(BASE, BASE + 16, 4)),
+                         "synthetic", {0xA0, 0xB0, 0xC0})
+        self.assertEqual(report["unresolved_indirects"], [])
+        self.assertEqual(report["indirect_targets"][0]["target"], 0xA0)
+        write_word(image, BASE, 0x24080100)
+        rejected = analyze(bytes(image), BASE, {BASE}, set(range(BASE, BASE + 16, 4)),
+                           "synthetic", {0xA0, 0xB0, 0xC0})
+        self.assertEqual(rejected["unresolved_indirects"][0]["pc"], BASE + 4)
+
     def test_authenticated_zero_trip_loop_proves_empty_target_set(self) -> None:
         image, pc = zero_trip_loop_image()
         self.assertEqual(

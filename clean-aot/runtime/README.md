@@ -31,3 +31,8 @@ This first integration slice owns:
 
 Host presentation, media-file parsing, scanout/raster draining, frame pacing,
 audio-device queues, and product policy are separate components.
+`GeneratedEpochDispatcher` selects one precompiled executable binding by the
+already-authenticated active-image SHA-256. Candidate identities must be sorted,
+unique, and match their binding identities. Unknown epochs, duplicate identity
+choices, and unknown PCs fail closed; the discriminator never decodes guest
+instructions.

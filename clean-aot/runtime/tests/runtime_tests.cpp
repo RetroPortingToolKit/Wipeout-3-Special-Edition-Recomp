@@ -246,6 +246,48 @@ void test_authenticated_generated_dispatch(Runner& runner) {
     EXPECT(runner, mismatch.bind(identity, bad) == DispatchStatus::InvalidBinding);
 }
 
+void test_authenticated_epoch_discriminator(Runner& runner) {
+    using namespace clean_aot::runtime;
+    constexpr std::string_view main_identity =
+        "1111111111111111111111111111111111111111111111111111111111111111";
+    constexpr std::string_view nfe_identity =
+        "2222222222222222222222222222222222222222222222222222222222222222";
+    constexpr std::string_view unknown_identity =
+        "3333333333333333333333333333333333333333333333333333333333333333";
+    const std::array<std::uint32_t, 1U> roots{0x800C05B0U};
+    const std::array main_entries{
+        GeneratedRegionEntry{0x800C05B0U, generated_step_a, 1U}};
+    const std::array nfe_entries{
+        GeneratedRegionEntry{0x800C05B0U, generated_step_b, 1U}};
+    const GeneratedExecutableBinding main_binding{
+        main_identity, main_identity, 0x800BF800U, 0x800E0F0CULL,
+        roots, main_entries};
+    const GeneratedExecutableBinding nfe_binding{
+        nfe_identity, nfe_identity, 0x800BF800U, 0x800E0F0CULL,
+        roots, nfe_entries};
+    const std::array candidates{
+        GeneratedEpochBinding{main_identity, &main_binding},
+        GeneratedEpochBinding{nfe_identity, &nfe_binding},
+    };
+    GeneratedEpochDispatcher dispatcher;
+    EXPECT(runner, dispatcher.select(nfe_identity, candidates) == DispatchStatus::Bound);
+    GeneratedCpuState state{};
+    state.pc = 0x800C05B0U;
+    EXPECT(runner, dispatcher.dispatch(state) == DispatchStatus::Executed);
+    EXPECT(runner, state.pc == 0x00001030U);
+
+    EXPECT(runner, dispatcher.select(unknown_identity, candidates) ==
+                       DispatchStatus::IdentityMismatch);
+    state.pc = 0x800C05B0U;
+    EXPECT(runner, dispatcher.dispatch(state) == DispatchStatus::UnknownCode);
+    const std::array ambiguous{
+        GeneratedEpochBinding{main_identity, &main_binding},
+        GeneratedEpochBinding{main_identity, &main_binding},
+    };
+    EXPECT(runner, dispatcher.select(main_identity, ambiguous) ==
+                       DispatchStatus::InvalidBinding);
+}
+
 void test_generated_integer_differential(Runner& runner) {
     using clean_aot::runtime::GeneratedCpuState; namespace ops=clean_aot::runtime::cpu_ops;
     r3000a::reference::Memory memory(0x1000U,0x100U);
@@ -625,6 +667,7 @@ void test_spu_irq_sample_deadline(Runner& runner) {
 int main() {
     Runner runner;
     test_authenticated_generated_dispatch(runner);
+    test_authenticated_epoch_discriminator(runner);
     test_authenticated_bios_reset_contract(runner);
     test_generated_cache_isolation(runner);
     test_authenticated_copied_epoch(runner);

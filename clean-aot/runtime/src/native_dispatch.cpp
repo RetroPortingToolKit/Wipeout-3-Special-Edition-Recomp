@@ -91,4 +91,34 @@ DispatchStatus GeneratedDispatcher::dispatch(GeneratedCpuState& state) const noe
     return DispatchStatus::Executed;
 }
 
+DispatchStatus GeneratedEpochDispatcher::select(
+    std::string_view authenticated_active_identity_sha256,
+    std::span<const GeneratedEpochBinding> candidates) noexcept {
+    selected_ = GeneratedDispatcher{};
+    if (!is_sha256(authenticated_active_identity_sha256) || candidates.empty()) {
+        return DispatchStatus::IdentityMismatch;
+    }
+    std::string_view previous{};
+    bool first = true;
+    for (const auto& candidate : candidates) {
+        if (!is_sha256(candidate.identity_sha256) || candidate.binding == nullptr ||
+            candidate.binding->variant_identity_sha256 != candidate.identity_sha256 ||
+            (!first && candidate.identity_sha256 <= previous)) {
+            return DispatchStatus::InvalidBinding;
+        }
+        previous = candidate.identity_sha256;
+        first = false;
+    }
+    const auto found = std::lower_bound(
+        candidates.begin(), candidates.end(), authenticated_active_identity_sha256,
+        [](const GeneratedEpochBinding& candidate, std::string_view identity) {
+            return candidate.identity_sha256 < identity;
+        });
+    if (found == candidates.end() ||
+        found->identity_sha256 != authenticated_active_identity_sha256) {
+        return DispatchStatus::IdentityMismatch;
+    }
+    return selected_.bind(authenticated_active_identity_sha256, *found->binding);
+}
+
 } // namespace clean_aot::runtime

@@ -94,5 +94,8 @@ tools.analysis.tests.test_build_game_region_shards`.
 `authorize_executable_regions.py` also closes exact direct-edge corridors rooted
 by authenticated main-image targets and NFE-to-main calls. Corridor decoding is
 bounded to the selected image identity, stops at every JR/JALR, hashes every
-recovered range, and excludes the overlapping NFE address epoch unless loader
-evidence selects it.
+recovered range, and excludes overlapping bytes from the wrong static image.
+The emitted `wo3se.overlapping-executable-epoch-dispatch.v1` contract records
+five capture-selected NFE sites and one load-base site that requires runtime
+selection by authenticated active-image SHA-256. Literal A0/B0/C0 constructions
+are finite external exits; every other unresolved indirect remains rejected.

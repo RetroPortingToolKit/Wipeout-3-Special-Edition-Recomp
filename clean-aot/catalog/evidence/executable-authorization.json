@@ -3,8 +3,8 @@
     "main-exe": {
       "authorized_instruction_delta": 3463,
       "proved_cross_image_direct_edges": 0,
-      "rejected_direct_edge_delta": -10,
-      "unresolved_indirect_delta": 17
+      "rejected_direct_edge_delta": -16,
+      "unresolved_indirect_delta": -29
     },
     "nfe-entry5-route-variant": {
       "authorized_instruction_delta": 0,
@@ -47629,7 +47629,7 @@
           "owner": 2149039048
         }
       ],
-      "direct_closure_complete": false,
+      "direct_closure_complete": true,
       "direct_corridor_evidence": {
         "proof": "authenticated-direct-edge-target plus bounded R3000A direct-flow semantics",
         "recovered_instruction_count": 1107,
@@ -47746,7 +47746,6 @@
           }
         ],
         "seeds": [
-          2148268036,
           2148458176,
           2148459916,
           2148461004,
@@ -543452,8 +543451,282 @@
         }
       ],
       "end_exclusive": 2149040128,
+      "epoch_discriminated_edges": [
+        {
+          "action": "dispatch-only-after-authenticated-epoch-selection",
+          "contract": "wo3se.overlapping-executable-epoch-dispatch.v1",
+          "reason": "missing_delay_slot_evidence",
+          "source": 2148268032,
+          "target": 2148268036
+        },
+        {
+          "action": "dispatch-only-after-authenticated-epoch-selection",
+          "contract": "wo3se.overlapping-executable-epoch-dispatch.v1",
+          "reason": "outside_cross_evidence",
+          "source": 2148271536,
+          "target": 2148271540
+        },
+        {
+          "action": "dispatch-only-after-authenticated-epoch-selection",
+          "contract": "wo3se.overlapping-executable-epoch-dispatch.v1",
+          "reason": "outside_cross_evidence",
+          "source": 2148385008,
+          "target": 2148385012
+        },
+        {
+          "action": "dispatch-only-after-authenticated-epoch-selection",
+          "contract": "wo3se.overlapping-executable-epoch-dispatch.v1",
+          "reason": "outside_cross_evidence",
+          "source": 2148398804,
+          "target": 2148398808
+        },
+        {
+          "action": "dispatch-only-after-authenticated-epoch-selection",
+          "contract": "wo3se.overlapping-executable-epoch-dispatch.v1",
+          "reason": "outside_cross_evidence",
+          "source": 2148399332,
+          "target": 2148399336
+        },
+        {
+          "action": "dispatch-only-after-authenticated-epoch-selection",
+          "contract": "wo3se.overlapping-executable-epoch-dispatch.v1",
+          "reason": "outside_cross_evidence",
+          "source": 2148401760,
+          "target": 2148401764
+        }
+      ],
       "finite_indirect_closure": false,
       "indirect_targets": [
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148912940,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148912956,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148912972,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148912988,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148913004,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148922776,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148922792,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148922808,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148922824,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148922840,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148922856,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148922872,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148922888,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148922904,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148922920,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148922936,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148923032,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148924800,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148924816,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148925048,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148925064,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148925144,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148925176,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148925192,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148926136,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148929148,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148934760,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148936664,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148936892,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148954004,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148954040,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148954540,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148954564,
+          "target": 192
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148955016,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148955044,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148955272,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148955420,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148955576,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148955592,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148961548,
+          "target": 176
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148961564,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148961580,
+          "target": 192
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148961596,
+          "target": 192
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148961612,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148967096,
+          "target": 160
+        },
+        {
+          "proof": "local_literal_register_construction:authenticated-system-vector",
+          "source": 2148975888,
+          "target": 176
+        },
         {
           "proof": "authenticated_masked_offset_construction",
           "source": 2148990068,
@@ -543496,50 +543769,10 @@
         }
       ],
       "name": "main-exe",
-      "rejected_direct_edges": [
-        {
-          "category": "delay_slot_evidence_gap",
-          "reason": "missing_delay_slot_evidence",
-          "source": 2148268032,
-          "target": 2148268036
-        },
-        {
-          "category": "overlapping_content_epoch_ambiguous",
-          "reason": "outside_cross_evidence",
-          "source": 2148271536,
-          "target": 2148271540
-        },
-        {
-          "category": "overlapping_content_epoch_ambiguous",
-          "reason": "outside_cross_evidence",
-          "source": 2148385008,
-          "target": 2148385012
-        },
-        {
-          "category": "overlapping_content_epoch_ambiguous",
-          "reason": "outside_cross_evidence",
-          "source": 2148398804,
-          "target": 2148398808
-        },
-        {
-          "category": "overlapping_content_epoch_ambiguous",
-          "reason": "outside_cross_evidence",
-          "source": 2148399332,
-          "target": 2148399336
-        },
-        {
-          "category": "overlapping_content_epoch_ambiguous",
-          "reason": "outside_cross_evidence",
-          "source": 2148401760,
-          "target": 2148401764
-        }
-      ],
-      "rejected_roots": [
-        2148268036
-      ],
+      "rejected_direct_edges": [],
+      "rejected_roots": [],
       "root_evidence": "authenticated PS-X EXE entry, authenticated cross-image direct targets, and exact bounded direct-edge corridors",
       "roots": [
-        2148268036,
         2148458176,
         2148459916,
         2148461004,
@@ -545022,31 +545255,6 @@
           "source_register": 2
         },
         {
-          "category": "unresolved_register_target",
-          "pc": 2148912940,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148912956,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148912972,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148912988,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148913004,
-          "source_register": 10
-        },
-        {
           "category": "return_value_target",
           "pc": 2148913332,
           "source_register": 2
@@ -545177,119 +545385,9 @@
           "source_register": 2
         },
         {
-          "category": "unresolved_register_target",
-          "pc": 2148922776,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148922792,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148922808,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148922824,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148922840,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148922856,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148922872,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148922888,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148922904,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148922920,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148922936,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148923032,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148924800,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148924816,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148925048,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148925064,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148925144,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148925176,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148925192,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148926136,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148929148,
-          "source_register": 10
-        },
-        {
           "category": "return_value_target",
           "pc": 2148931932,
           "source_register": 2
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148934760,
-          "source_register": 10
         },
         {
           "category": "return_value_target",
@@ -545315,16 +545413,6 @@
           "category": "return_value_target",
           "pc": 2148935272,
           "source_register": 2
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148936664,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148936892,
-          "source_register": 10
         },
         {
           "category": "return_value_target",
@@ -545362,56 +545450,6 @@
           "source_register": 2
         },
         {
-          "category": "unresolved_register_target",
-          "pc": 2148954004,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148954040,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148954540,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148954564,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148955016,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148955044,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148955272,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148955420,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148955576,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148955592,
-          "source_register": 10
-        },
-        {
           "category": "return_value_target",
           "pc": 2148956208,
           "source_register": 2
@@ -545447,31 +545485,6 @@
           "source_register": 2
         },
         {
-          "category": "unresolved_register_target",
-          "pc": 2148961548,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148961564,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148961580,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148961596,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148961612,
-          "source_register": 10
-        },
-        {
           "category": "return_value_target",
           "pc": 2148963312,
           "source_register": 2
@@ -545483,18 +545496,8 @@
         },
         {
           "category": "unresolved_register_target",
-          "pc": 2148967096,
-          "source_register": 10
-        },
-        {
-          "category": "unresolved_register_target",
           "pc": 2148975876,
           "source_register": 9
-        },
-        {
-          "category": "unresolved_register_target",
-          "pc": 2148975888,
-          "source_register": 10
         },
         {
           "category": "unresolved_register_target",
@@ -716777,6 +716780,7 @@
         }
       ],
       "end_exclusive": 2148404940,
+      "epoch_discriminated_edges": [],
       "finite_indirect_closure": false,
       "indirect_targets": [],
       "name": "nfe-entry5-route-variant",
@@ -746344,6 +746348,45 @@
       ]
     }
   ],
+  "overlapping_epoch_dispatch": {
+    "main_identity_sha256": "d483d38423965f7995e3d13fc919c887cf63c3f7f2b9d618859c80771488b0c3",
+    "nfe_identity_sha256": "b0a3843cd966319135271bb557d9b89871b5a71e69cc0a2b9f625947143c0988",
+    "schema": "wo3se.overlapping-executable-epoch-dispatch.v1",
+    "selection_key": "authenticated-active-image-sha256",
+    "sites": [
+      {
+        "observed_identity": null,
+        "pc": 2148268032,
+        "selection": "runtime-epoch-discriminator-required"
+      },
+      {
+        "observed_identity": "b0a3843cd966319135271bb557d9b89871b5a71e69cc0a2b9f625947143c0988",
+        "pc": 2148271536,
+        "selection": "authenticated-nfe-capture"
+      },
+      {
+        "observed_identity": "b0a3843cd966319135271bb557d9b89871b5a71e69cc0a2b9f625947143c0988",
+        "pc": 2148385008,
+        "selection": "authenticated-nfe-capture"
+      },
+      {
+        "observed_identity": "b0a3843cd966319135271bb557d9b89871b5a71e69cc0a2b9f625947143c0988",
+        "pc": 2148398804,
+        "selection": "authenticated-nfe-capture"
+      },
+      {
+        "observed_identity": "b0a3843cd966319135271bb557d9b89871b5a71e69cc0a2b9f625947143c0988",
+        "pc": 2148399332,
+        "selection": "authenticated-nfe-capture"
+      },
+      {
+        "observed_identity": "b0a3843cd966319135271bb557d9b89871b5a71e69cc0a2b9f625947143c0988",
+        "pc": 2148401760,
+        "selection": "authenticated-nfe-capture"
+      }
+    ],
+    "unknown_epoch_action": "reject"
+  },
   "policy": {
     "bytes_are_authoritative": true,
     "capture_is_discovery_only": true,

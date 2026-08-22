@@ -54,4 +54,22 @@ private:
     mutable std::uint32_t last_instruction_count_ = 0U;
 };
 
+struct GeneratedEpochBinding final {
+    std::string_view identity_sha256;
+    const GeneratedExecutableBinding* binding = nullptr;
+};
+
+class GeneratedEpochDispatcher final {
+public:
+    [[nodiscard]] DispatchStatus select(
+        std::string_view authenticated_active_identity_sha256,
+        std::span<const GeneratedEpochBinding> candidates) noexcept;
+    [[nodiscard]] DispatchStatus dispatch(GeneratedCpuState& state) const noexcept {
+        return selected_.dispatch(state);
+    }
+
+private:
+    GeneratedDispatcher selected_{};
+};
+
 } // namespace clean_aot::runtime

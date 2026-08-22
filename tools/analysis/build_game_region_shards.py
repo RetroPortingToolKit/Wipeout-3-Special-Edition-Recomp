@@ -67,7 +67,8 @@ def build(authority: dict[str, Any], finite: dict[str, Any]) -> dict[str, Any]:
     rejected: dict[str, set[int]] = {}
 
     for name, image in selected.items():
-        rejected[name] = {edge["source"] for edge in image["rejected_direct_edges"]}
+        rejected[name] = ({edge["source"] for edge in image["rejected_direct_edges"]} |
+                          {edge["source"] for edge in image.get("epoch_discriminated_edges", [])})
         unsafe_indirect = {item["pc"] for item in image["unresolved_indirects"]}
         if name == "main-exe":
             unsafe_indirect -= finite_sites.keys()

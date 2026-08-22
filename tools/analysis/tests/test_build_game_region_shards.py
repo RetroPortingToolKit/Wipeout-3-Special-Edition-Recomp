@@ -12,6 +12,7 @@ def image(name, base, *, rejected=(), unresolved=(), cross=()):
             {"source": base + 4, "target": base + 8, "kind": "linear"},
         ],
         "cross_image_direct_edges": list(cross),
+        "epoch_discriminated_edges": [],
         "rejected_direct_edges": list(rejected),
         "unresolved_indirects": list(unresolved),
         "delay_slot_owners": [],
@@ -49,6 +50,14 @@ class GameShardTests(unittest.TestCase):
         result = build(authority, self.finite())
         nfe = next(x for x in result["images"] if x["name"].startswith("nfe"))
         self.assertNotIn(0x2000, nfe["entries"])
+
+    def test_epoch_discriminated_source_is_not_compiled_in_wrong_identity(self):
+        authority = self.authority()
+        authority["images"][0]["epoch_discriminated_edges"] = [
+            {"source": 0x1008, "target": 0x100C}]
+        result = build(authority, self.finite())
+        main = next(x for x in result["images"] if x["name"] == "main-exe")
+        self.assertNotIn(0x1008, main["entries"])
 
     def test_identity_mismatch_and_zero_output_fail_closed(self):
         finite = self.finite()

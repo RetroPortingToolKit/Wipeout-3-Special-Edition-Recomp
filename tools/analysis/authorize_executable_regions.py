@@ -241,6 +241,7 @@ def analyze(
     roots: set[int],
     allowed: set[int],
     root_evidence: str,
+    external_targets: set[int] | None = None,
 ) -> dict[str, Any]:
     end = base + len(image)
     authorized: set[int] = set()
@@ -294,6 +295,12 @@ def analyze(
                     indirect_targets.add((pc, target, resolution[1]))
                     edges.add((pc, target, kind))
                     queue.append(target)
+            elif (resolution is not None and resolution[0] and
+                  external_targets is not None and
+                  all(target in external_targets for target in resolution[0])):
+                for target in resolution[0]:
+                    indirect_targets.add((
+                        pc, target, resolution[1] + ":authenticated-system-vector"))
             else:
                 unresolved_indirect.add((pc, source_register))
         if kind == "return":
@@ -441,10 +448,12 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         exe_report = analyze(
             exe, args.exe_base, exe_roots, exe_allowed,
             "authenticated PS-X EXE entry plus authenticated cross-image direct targets; closure constrained by Ghidra body bounds, which never create roots",
+            {0xA0, 0xB0, 0xC0},
         )
         nfe_report = analyze(
             bytes(nfe), args.nfe_base, nfe_roots, nfe_allowed,
             "route-observed authenticated PCs plus authenticated cross-image direct targets; Ghidra bodies constrain extension but never create roots",
+            {0xA0, 0xB0, 0xC0},
         )
         added_exe = {
             edge["target"] for edge in nfe_report["rejected_direct_edges"]
@@ -463,33 +472,40 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
 
     # Every seed below is already the exact target of an authenticated direct
     # instruction. Grow only direct/linear ISA flow inside the exact image and
-    # stop at all unresolved JR/JALR sites. Main addresses overlapping the NFE
-    # epoch remain excluded because an address alone cannot select an identity.
+    # stop at all unresolved JR/JALR sites. Overlapping addresses are admitted
+    # only into the main binding; the emitted epoch contract selects main bytes
+    # versus NFE bytes by authenticated active-image identity.
     main_seeds: set[int] = set()
+    ambiguous_sources = sorted(
+        edge["source"] for edge in exe_report["rejected_direct_edges"]
+        if args.nfe_base <= edge["target"] < nfe_end
+    )
     for edge in exe_report["rejected_direct_edges"]:
         target = edge["target"]
-        if (edge["reason"] == "missing_delay_slot_evidence" or
-                not args.nfe_base <= target < nfe_end):
-            if args.exe_base <= target < exe_end:
-                main_seeds.add(target)
+        if args.exe_base <= target < exe_end:
+            main_seeds.add(target)
     for edge in nfe_report["rejected_direct_edges"]:
         target = edge["target"]
         if not args.nfe_base <= target < nfe_end and args.exe_base <= target < exe_end:
             main_seeds.add(target)
     prior_exe_allowed = set(exe_allowed)
+    main_corridor_seeds = {pc for pc in main_seeds
+                           if not args.nfe_base <= pc < nfe_end}
     recovered = prove_direct_corridors(
-        exe, args.exe_base, main_seeds, (args.nfe_base, nfe_end))
+        exe, args.exe_base, main_corridor_seeds, (args.nfe_base, nfe_end))
     exe_allowed.update(recovered)
-    exe_roots.update(main_seeds)
+    exe_roots.update(main_corridor_seeds)
 
     for _ in range(8):
         exe_report = analyze(
             exe, args.exe_base, exe_roots, exe_allowed,
             "authenticated PS-X EXE entry, authenticated cross-image direct targets, and exact bounded direct-edge corridors",
+            {0xA0, 0xB0, 0xC0},
         )
         nfe_report = analyze(
             bytes(nfe), args.nfe_base, nfe_roots, nfe_allowed,
             "route-observed authenticated PCs plus authenticated cross-image direct targets; Ghidra bodies constrain extension but never create roots",
+            {0xA0, 0xB0, 0xC0},
         )
         added = {edge["target"] for edge in nfe_report["rejected_direct_edges"]
                  if not args.nfe_base <= edge["target"] < nfe_end and
@@ -509,9 +525,27 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         raise AuthorizationError("direct corridor recovery did not converge")
 
     exe_report["direct_corridor_evidence"] = corridor_evidence(
-        exe, args.exe_base, exe_allowed - prior_exe_allowed, main_seeds)
+        exe, args.exe_base, exe_allowed - prior_exe_allowed, main_corridor_seeds)
     nfe_report["direct_corridor_evidence"] = corridor_evidence(
         bytes(nfe), args.nfe_base, set(), set())
+
+    observed_nfe_sources = set(observed)
+    epoch_contract = {
+        "schema": "wo3se.overlapping-executable-epoch-dispatch.v1",
+        "main_identity_sha256": sha256(exe),
+        "nfe_identity_sha256": sha256(nfe),
+        "unknown_epoch_action": "reject",
+        "selection_key": "authenticated-active-image-sha256",
+        "sites": [
+            {
+                "pc": pc,
+                "observed_identity": (sha256(nfe) if pc in observed_nfe_sources else None),
+                "selection": ("authenticated-nfe-capture" if pc in observed_nfe_sources
+                              else "runtime-epoch-discriminator-required"),
+            }
+            for pc in ambiguous_sources
+        ],
+    }
 
     image_reports = (
         ("main-exe", exe_report, args.exe_base, exe_end),
@@ -523,6 +557,7 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
     }
     for name, report, _, _ in image_reports:
         cross_edges: list[dict[str, Any]] = []
+        epoch_edges: list[dict[str, Any]] = []
         remaining: list[dict[str, Any]] = []
         other_name = "main-exe"
         other_authorized = authorized_by_name[other_name]
@@ -534,6 +569,14 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
                 and edge["target"] in other_authorized
             ):
                 cross_edges.append({**edge, "target_image": other_name})
+            elif (name == "main-exe" and
+                  args.nfe_base <= edge["source"] < nfe_end and
+                  args.nfe_base <= edge["target"] < nfe_end):
+                epoch_edges.append({
+                    **edge,
+                    "contract": "wo3se.overlapping-executable-epoch-dispatch.v1",
+                    "action": "dispatch-only-after-authenticated-epoch-selection",
+                })
             else:
                 target = edge["target"]
                 if edge["reason"] != "outside_cross_evidence":
@@ -550,6 +593,7 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
                     category = "external_unmapped_target"
                 remaining.append({**edge, "category": category})
         report["cross_image_direct_edges"] = cross_edges
+        report["epoch_discriminated_edges"] = epoch_edges
         report["rejected_direct_edges"] = remaining
         report["direct_closure_complete"] = not remaining
         del report["_authorized"]
@@ -600,6 +644,7 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
             "unknown_pc_action": "reject",
             "unknown_executable_write_action": "reject",
         },
+        "overlapping_epoch_dispatch": epoch_contract,
         "evidence": {
             "bios_sha256": sha256(bios),
             "bios_execution_receipt_sha256": sha256(args.bios_execution_receipt.read_bytes()),
