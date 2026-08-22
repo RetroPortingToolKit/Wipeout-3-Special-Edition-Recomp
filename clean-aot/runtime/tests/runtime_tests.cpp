@@ -1,5 +1,7 @@
 #include "clean_aot/runtime/runtime.hpp"
 #include "clean_aot/runtime/native_dispatch.hpp"
+#include "clean_aot/runtime/generated_cpu.hpp"
+#include "r3000a/reference.hpp"
 
 #include "clean_aot_soc.hpp"
 
@@ -104,6 +106,22 @@ void test_authenticated_generated_dispatch(Runner& runner) {
     const GeneratedExecutableBinding bad{identity, identity, 0x00001000U,
                                           0x00001100U, roots, unsorted};
     EXPECT(runner, mismatch.bind(identity, bad) == DispatchStatus::InvalidBinding);
+}
+
+void test_generated_integer_differential(Runner& runner) {
+    using clean_aot::runtime::GeneratedCpuState; namespace ops=clean_aot::runtime::cpu_ops;
+    r3000a::reference::Memory memory(0x1000U,0x100U);
+    std::uint32_t random=0x6d2b79f5U; auto next=[&]{random^=random<<13U;random^=random>>17U;random^=random<<5U;return random;};
+    for(unsigned i=0;i<2000U;++i){
+        const auto a=next(),b=next(); GeneratedCpuState generated{}; generated.gpr[1]=a;generated.gpr[2]=b;
+        r3000a::reference::Machine oracle(memory,{0x1000U,0U,r3000a::reference::kGenericR3000AProcessorId}); oracle.cpu().gpr[1]=a;oracle.cpu().gpr[2]=b;
+        ops::addu(generated,3,1,2); (void)oracle.step_word((1U<<21U)|(2U<<16U)|(3U<<11U)|0x21U);
+        EXPECT(runner,generated.gpr[3]==oracle.cpu().gpr[3]);
+        ops::mult(generated,a,b,false); (void)oracle.step_word((1U<<21U)|(2U<<16U)|0x18U);
+        EXPECT(runner,generated.hi==oracle.cpu().hi); EXPECT(runner,generated.lo==oracle.cpu().lo);
+        ops::div(generated,a,b,false); (void)oracle.step_word((1U<<21U)|(2U<<16U)|0x1aU);
+        EXPECT(runner,generated.hi==oracle.cpu().hi); EXPECT(runner,generated.lo==oracle.cpu().lo);
+    }
 }
 
 void test_authenticated_load_and_first_dispatch(Runner& runner) {
@@ -376,6 +394,7 @@ void test_spu_irq_sample_deadline(Runner& runner) {
 int main() {
     Runner runner;
     test_authenticated_generated_dispatch(runner);
+    test_generated_integer_differential(runner);
     test_authenticated_load_and_first_dispatch(runner);
     test_retirement_clock(runner);
     test_configuration_and_plain_memory(runner);
