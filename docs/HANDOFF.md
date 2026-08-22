@@ -19,6 +19,18 @@
   `clean-aot/catalog/evidence/bios-shell-disc-route-frontier239.json` (SHA-256
   `d9b7d422...52c0`); analysis:
   `docs/SHELL_DISC_ROUTE_FRONTIER239.md`.
+- The route has now been compiled into 17 exact apertures (636 bytes, 38
+  roots, 49 entries, 18 shards). A whole-resident-image binding correctly
+  rejected because nine unrelated mutable data bytes differ; 15 exact
+  apertures bind and the two loop apertures reuse existing exact static shards.
+  Live execution at `0x80051018` proves the current invocation has `a0==0` and
+  takes `0x80050F94`, not the later route's `a0==1` edge. It therefore never
+  reaches the eight-way return at `0x800513C4`; no return target was guessed.
+  The exact continuation reaches continuously executable low-RAM interrupt
+  handler `0x000005C4` at the three-million-dispatch bound with zero CD MMIO.
+  Diagnose the pending interrupt/vector-table source before resuming the later
+  goal-route invocation. Receipt:
+  `clean-aot/catalog/evidence/bios-shell-disc-route-execution-000005c4.json`.
 
 ## Dual-card product evidence rebinding (2026-08-22)
 

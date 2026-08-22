@@ -1,0 +1,14 @@
+{
+  "schema": "clean-aot-shell-disc-route-execution-v1",
+  "route_evidence_commit": "90371e132f4ced2d8859d9b46772c2bf7da16133",
+  "starting_frontier": 239,
+  "starting_pc": "0x80050F8C",
+  "compiled": {"exact_apertures":17,"authorized_bytes":636,"roots":38,"entries":49,"shards":18},
+  "binding": {"accepted_exact_apertures":15,"existing_exact_loop_shards_reused":2,"whole_resident_image_rejected_due_to_mutable_data":true},
+  "live_predicate": {"pc":"0x80051018","a0_zero":true,"taken_target":"0x80050F94","static_goal_route_prerequisite_matched":false},
+  "eight_way_return": {"pc":"0x800513C4","reached":false,"selected_target":null,"guessed_target":false,"reason":"current authenticated a0-zero invocation entered the interrupt path before the later a0-one goal-route invocation"},
+  "terminal": {"dispatch_status":"Executed","pc":"0x000005C4","instructions":23515329,"dispatches":3000000,"ram_epoch_sha256":"46ae27250e3346ea55d722f00b6cc8a9226fd785a32a246583510363fe12d52f","memory_reads":4534106,"memory_writes":2992400,"device_reads":5010,"device_writes":56407,"spu_writes":54328},
+  "cd": {"mmio_reads":0,"mmio_writes":0,"raw_sectors":0,"get_id_commands":0,"read_commands":0},
+  "proof": {"repeated_probe_runs":2,"repeated_probe_match":true,"forced_boot":false,"fallback":false,"authorization_broadened":false},
+  "stop_reason": "material continuously executable low-RAM interrupt-handler path reached the unchanged three-million-dispatch diagnostic bound before the later goal-route invocation"
+}
