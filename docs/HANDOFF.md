@@ -19,6 +19,13 @@
   decode failures.
 - Normal CD timing probe recorded 3,840 exact data-sector deliveries, with no
   early/late/lost interrupts or response overwrites in the observed window.
+- Disposable PAL-100 package probe now selected `wipeout3.framerate.pal-x2`
+  against the authenticated patched media and logged PAL x2 / 100 Hz with a
+  10 ms pacer through the real SCPH1001 BIOS path. Debug telemetry recorded
+  3,841 exact data-sector deliveries (zero early, late, pended, or lost), 285
+  native XA audio sectors, 1,340,640 CD-input frames, 2,219,248 SPU frames at
+  44.1 kHz, and zero audio underruns. This is strong runtime timing evidence,
+  but does not yet prove exact game simulation-update count or stable racing.
 
 ## Open blockers
 
