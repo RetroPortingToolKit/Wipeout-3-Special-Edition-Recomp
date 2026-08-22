@@ -19,7 +19,7 @@ id = "framerate-pal100"
 name = "PAL x2 100 Hz (Experimental)"
 description = "Select only with an authenticated PAL 25/50/100 title build. Requires the title-side 100 Hz transformation and runtime timing verification."
 group = "Gameplay"
-default_enabled = false
+default_enabled = true
 
 [[plugin]]
 feature = "framerate-pal100"
