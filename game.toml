@@ -46,6 +46,9 @@ overlay_cache = false
 
 [video]
 renderer = "opengl"
+# Hueponik's MAX-detail path requires the GooseStation-equivalent 900% CPU
+# overclock; PAL x2 remains a separate CRTC/presentation setting.
+cpu_overclock = 900
 geometry_correction = true
 perspective_texturing = true
 pgxp_depth = true

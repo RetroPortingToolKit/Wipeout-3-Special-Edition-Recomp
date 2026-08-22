@@ -33,6 +33,7 @@ file(GLOB WIPEOUT3_MOD_PLUGIN_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mods/*.c")
 
 psxrecomp_add_game_runtime(psx-runtime
+    PGXP
     ENABLE_NETPLAY_IF_PRESENT
     NETPLAY_LOBBY_URL "ws://netplay.retcomm.net:8765"
     WINDOW_TITLE "Wipeout 3 Special Edition  Recompiled"
