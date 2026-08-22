@@ -832,3 +832,10 @@ instruction and fails closed on every unknown PC or executable identity.
   `bios-shell-registry-frontier-00001858.json` records 19,270,447 instructions,
   1,787,127 dispatches, zero CD MMIO, and fail-closed compiler rejection at
   `0x1858`: `control transfer has no bounded delay-slot instruction`.
+- Frontier `0x1858` was an exact truncation: `JR $ra` at `0x1C54` owns
+  `ADDIU $sp,$sp,64` at `0x1C58`. Manifest end moved by exactly one word to
+  `0x1C5C` (SHA-256 `5d370976...1e0bd`) with compiler atomicity unchanged.
+  A broad overlapping `0x17F4` recompilation was rejected; the accepted live
+  function is exactly `[0x17F4,0x1858)`. Fifty exact frontiers now reach
+  `0x2588`: 19,270,583 instructions, 1,787,197 dispatches, zero CD MMIO and
+  zero sectors. Receipt: `bios-shell-exact-frontiers-00000139.json`.
