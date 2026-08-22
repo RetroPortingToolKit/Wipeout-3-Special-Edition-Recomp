@@ -73,7 +73,9 @@ def decode(word: int, pc: int) -> tuple[str, list[int], bool, int | None]:
     return ("linear", [pc + 4], False, None)
 
 
-def resolve_indirect(image: bytes, base: int, pc: int, register: int) -> int | None:
+def resolve_indirect(
+    image: bytes, base: int, pc: int, register: int
+) -> tuple[list[int], str] | None:
     """Resolve only local, literal register constructions; reject all inference."""
     if register <= 0 or pc - 4 < base:
         return None
@@ -87,13 +89,50 @@ def resolve_indirect(image: bytes, base: int, pc: int, register: int) -> int | N
     rt = (previous >> 16) & 31
     immediate = previous & 0xFFFF
     if opcode == 9 and rt == register and rs == 0:
-        return immediate | (0xFFFF0000 if immediate & 0x8000 else 0)
+        return ([immediate | (0xFFFF0000 if immediate & 0x8000 else 0)],
+                "local_literal_register_construction")
     if opcode == 15 and rt == register:
-        return immediate << 16
+        return ([immediate << 16], "local_literal_register_construction")
     if opcode == 13 and rt == register and rs == register and pc - 8 >= base:
         earlier = read(pc - 8)
         if earlier >> 26 == 15 and ((earlier >> 16) & 31) == register:
-            return ((earlier & 0xFFFF) << 16) | immediate
+            return ([((earlier & 0xFFFF) << 16) | immediate],
+                    "local_literal_register_construction")
+
+    # Strict bounded computed-jump shape:
+    #   lui target, hi; ori target, target, lo
+    #   srl index, input, shift; andi index, index, mask
+    #   add target, target, index; jr target
+    # The AND mask makes the target set finite for every possible input value.
+    if pc - 20 >= base:
+        add = read(pc - 4)
+        andi = read(pc - 8)
+        shift = read(pc - 12)
+        ori = read(pc - 16)
+        lui = read(pc - 20)
+        add_rs, add_rt, add_rd = ((add >> 21) & 31, (add >> 16) & 31,
+                                  (add >> 11) & 31)
+        index = add_rt if add_rs == register else add_rs
+        if (add & 0xFC00003F) == 0x00000020 and add_rd == register and \
+                register in {add_rs, add_rt} and index != 0 and \
+                andi >> 26 == 12 and ((andi >> 21) & 31) == index and \
+                ((andi >> 16) & 31) == index and \
+                shift >> 26 == 0 and (shift & 0x3F) == 2 and \
+                ((shift >> 11) & 31) == index and \
+                ori >> 26 == 13 and ((ori >> 21) & 31) == register and \
+                ((ori >> 16) & 31) == register and \
+                lui >> 26 == 15 and ((lui >> 16) & 31) == register:
+            mask = andi & 0xFFFF
+            if mask != 0 and mask & 3 == 0 and mask.bit_count() <= 12:
+                literal = ((lui & 0xFFFF) << 16) | (ori & 0xFFFF)
+                bits = [1 << bit for bit in range(16) if mask & (1 << bit)]
+                offsets = [0]
+                for bit in bits:
+                    offsets += [value | bit for value in offsets]
+                targets = sorted(literal + offset for offset in offsets)
+                if all(target <= 0xFFFFFFFF and target % 4 == 0
+                       for target in targets):
+                    return (targets, "authenticated_masked_offset_construction")
     return None
 
 
@@ -127,7 +166,7 @@ def analyze(
     owners: dict[int, int] = {}
     edges: set[tuple[int, int, str]] = set()
     unresolved_indirect: set[tuple[int, int]] = set()
-    indirect_targets: set[tuple[int, int]] = set()
+    indirect_targets: set[tuple[int, int, str]] = set()
     rejected_edges: set[tuple[int, int, str]] = set()
     rejected_roots: set[int] = set()
     queue = deque(sorted(roots))
@@ -165,11 +204,15 @@ def analyze(
         authorized.add(pc)
         if kind.startswith("indirect"):
             source_register = register if register is not None else -1
-            target = resolve_indirect(image, base, pc, source_register)
-            if target is not None and target in allowed and base <= target < end:
-                indirect_targets.add((pc, target))
-                edges.add((pc, target, kind))
-                queue.append(target)
+            resolution = resolve_indirect(image, base, pc, source_register)
+            if resolution is not None and all(
+                target in allowed and base <= target < end
+                for target in resolution[0]
+            ):
+                for target in resolution[0]:
+                    indirect_targets.add((pc, target, resolution[1]))
+                    edges.add((pc, target, kind))
+                    queue.append(target)
             else:
                 unresolved_indirect.add((pc, source_register))
         if kind == "return":
@@ -198,8 +241,8 @@ def analyze(
             for source, target, reason in sorted(rejected_edges)
         ],
         "indirect_targets": [
-            {"source": source, "target": target, "proof": "local_literal_register_construction"}
-            for source, target in sorted(indirect_targets)
+            {"source": source, "target": target, "proof": proof}
+            for source, target, proof in sorted(indirect_targets)
         ],
         "unresolved_indirects": [
             {"pc": pc, "source_register": register,

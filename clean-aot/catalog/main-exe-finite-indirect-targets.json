@@ -1,0 +1,27 @@
+{
+  "image": {
+    "base": 2147549184,
+    "byte_count": 1490944,
+    "name": "main-exe",
+    "sha256": "d483d38423965f7995e3d13fc919c887cf63c3f7f2b9d618859c80771488b0c3"
+  },
+  "schema": "wo3se.finite-indirect-targets.v1",
+  "sites": [
+    {
+      "proof": "authenticated_masked_offset_construction",
+      "source": 2148990068,
+      "source_register": 2,
+      "targets": [
+        2148990076,
+        2148990092,
+        2148990108,
+        2148990124,
+        2148990140,
+        2148990156,
+        2148990172,
+        2148990188
+      ]
+    }
+  ],
+  "status": "authenticated-finite"
+}
