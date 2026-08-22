@@ -212,6 +212,8 @@ public:
         std::uint64_t device_reads = 0U;
         std::uint64_t device_writes = 0U;
         std::uint64_t spu_transfer_fifo_writes = 0U;
+        std::uint64_t cdrom_mmio_reads = 0U;
+        std::uint64_t cdrom_mmio_writes = 0U;
     };
     explicit Runtime(Configuration configuration);
     ~Runtime();
