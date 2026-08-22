@@ -178,6 +178,11 @@ void test_generated_integer_differential(Runner& runner) {
         EXPECT(runner,generated.gpr[3]==oracle.cpu().gpr[3]);
         ops::slt(generated,3,1,2,true); (void)oracle.step_word((1U<<21U)|(2U<<16U)|(3U<<11U)|0x2bU);
         EXPECT(runner,generated.gpr[3]==oracle.cpu().gpr[3]);
+        ops::bit_and(generated,3,1,0xffU); (void)oracle.step_word((0x0cU<<26U)|(1U<<21U)|(3U<<16U)|0xffU);
+        EXPECT(runner,generated.gpr[3]==oracle.cpu().gpr[3]);
+        ops::logic(generated,3,a,b,2U);(void)oracle.step_word((1U<<21U)|(2U<<16U)|(3U<<11U)|0x26U);EXPECT(runner,generated.gpr[3]==oracle.cpu().gpr[3]);
+        ops::shift(generated,3,b,a&31U,2U);(void)oracle.step_word((1U<<21U)|(2U<<16U)|(3U<<11U)|0x07U);EXPECT(runner,generated.gpr[3]==oracle.cpu().gpr[3]);
+        generated.fault=clean_aot::runtime::CpuFault::None;generated.exception_raised=false;ops::sub(generated,3,a,b);const auto subtraction=oracle.step_word((1U<<21U)|(2U<<16U)|(3U<<11U)|0x22U);EXPECT(runner,generated.exception_raised==subtraction.exception.has_value());if(!generated.exception_raised)EXPECT(runner,generated.gpr[3]==oracle.cpu().gpr[3]);
         ops::mult(generated,a,b,false); (void)oracle.step_word((1U<<21U)|(2U<<16U)|0x18U);
         EXPECT(runner,generated.hi==oracle.cpu().hi); EXPECT(runner,generated.lo==oracle.cpu().lo);
         ops::div(generated,a,b,false); (void)oracle.step_word((1U<<21U)|(2U<<16U)|0x1aU);

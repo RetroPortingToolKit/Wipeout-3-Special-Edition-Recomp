@@ -43,13 +43,27 @@ void write_semantic(std::ostringstream& out, const Instruction& instruction) {
     const auto raw=instruction.raw, op=raw>>26U, rs=(raw>>21U)&31U, rt=(raw>>16U)&31U,
                rd=(raw>>11U)&31U, fn=raw&63U; const auto imm=raw&0xffffU;
     if(raw==0U)return;
-    if(op==0U&&fn==0x21U)out<<"        cpu_ops::addu(state,"<<rd<<","<<rs<<","<<rt<<");\n";
+    if(op==0U&&(fn==0x00U||fn==0x02U||fn==0x03U))out<<"        cpu_ops::shift(state,"<<rd<<",state.gpr["<<rt<<"],"<<((raw>>6U)&31U)<<","<<(fn==0U?0U:fn==2U?1U:2U)<<");\n";
+    else if(op==0U&&(fn==0x04U||fn==0x06U||fn==0x07U))out<<"        cpu_ops::shift(state,"<<rd<<",state.gpr["<<rt<<"],state.gpr["<<rs<<"],"<<(fn==4U?0U:fn==6U?1U:2U)<<");\n";
+    else if(op==0U&&fn==0x10U)out<<"        state.write("<<rd<<",state.hi);\n";
+    else if(op==0U&&fn==0x11U)out<<"        state.hi=state.gpr["<<rs<<"];\n";
+    else if(op==0U&&fn==0x12U)out<<"        state.write("<<rd<<",state.lo);\n";
+    else if(op==0U&&fn==0x13U)out<<"        state.lo=state.gpr["<<rs<<"];\n";
+    else if(op==0U&&(fn==0x18U||fn==0x19U))out<<"        cpu_ops::mult(state,state.gpr["<<rs<<"],state.gpr["<<rt<<"],"<<(fn==0x19U?"true":"false")<<");\n";
+    else if(op==0U&&(fn==0x1aU||fn==0x1bU))out<<"        cpu_ops::div(state,state.gpr["<<rs<<"],state.gpr["<<rt<<"],"<<(fn==0x1bU?"true":"false")<<");\n";
+    else if(op==0U&&fn==0x20U)out<<"        cpu_ops::add(state,"<<rd<<",state.gpr["<<rs<<"],state.gpr["<<rt<<"]);\n";
+    else if(op==0U&&fn==0x21U)out<<"        cpu_ops::addu(state,"<<rd<<","<<rs<<","<<rt<<");\n";
+    else if(op==0U&&fn==0x22U)out<<"        cpu_ops::sub(state,"<<rd<<",state.gpr["<<rs<<"],state.gpr["<<rt<<"]);\n";
     else if(op==0U&&fn==0x23U)out<<"        cpu_ops::subu(state,"<<rd<<","<<rs<<","<<rt<<");\n";
-    else if(op==0U&&fn==0x25U)out<<"        cpu_ops::bit_or(state,"<<rd<<","<<rs<<","<<rt<<");\n";
+    else if(op==0U&&(fn>=0x24U&&fn<=0x27U))out<<"        cpu_ops::logic(state,"<<rd<<",state.gpr["<<rs<<"],state.gpr["<<rt<<"],"<<(fn-0x24U)<<");\n";
     else if(op==0U&&(fn==0x2aU||fn==0x2bU))out<<"        cpu_ops::slt(state,"<<rd<<","<<rs<<","<<rt<<","<<(fn==0x2bU?"true":"false")<<");\n";
+    else if(op==0U&&fn==0x0cU)out<<"        cpu_ops::syscall(state);\n";
+    else if(op==0U&&fn==0x0dU)out<<"        cpu_ops::breakpoint(state);\n";
     else if(op==0x08U)out<<"        cpu_ops::add(state,"<<rt<<",state.gpr["<<rs<<"],0x"<<std::hex<<static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<std::int16_t>(imm)))<<"u);\n"<<std::dec;
     else if(op==0x09U)out<<"        state.write("<<rt<<", state.gpr["<<rs<<"] + 0x"<<std::hex<<static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<std::int16_t>(imm)))<<"u);\n"<<std::dec;
+    else if(op==0x0cU)out<<"        cpu_ops::bit_and(state,"<<rt<<","<<rs<<",0x"<<std::hex<<imm<<"u);\n"<<std::dec;
     else if(op==0x0dU)out<<"        state.write("<<rt<<", state.gpr["<<rs<<"] | 0x"<<std::hex<<imm<<"u);\n"<<std::dec;
+    else if(op==0x0eU)out<<"        state.write("<<rt<<", state.gpr["<<rs<<"] ^ 0x"<<std::hex<<imm<<"u);\n"<<std::dec;
     else if(op==0x0fU)out<<"        state.write("<<rt<<", 0x"<<std::hex<<(imm<<16U)<<"u);\n"<<std::dec;
     else if(op==0x20U||op==0x24U)out<<"        cpu_ops::lb(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u),"<<(op==0x24U?"true":"false")<<");\n"<<std::dec;
     else if(op==0x21U||op==0x25U)out<<"        cpu_ops::lh(state,"<<rs<<","<<rt<<",static_cast<std::int16_t>(0x"<<std::hex<<imm<<"u),"<<(op==0x25U?"true":"false")<<");\n"<<std::dec;
@@ -168,6 +182,9 @@ std::string CppEmitter::emit(const Region& region) {
             else output << "0u";
             output << ");\n";
             if (!is_control_transfer(instruction.kind)) write_semantic(output, instruction);
+            else if(instruction.kind==InstructionKind::DirectCall||instruction.kind==InstructionKind::ConditionalCall){
+                output << "        state.write(31, "; write_address(output,instruction.address+8U); output << ");\n";
+            }
             output << "        cpu_ops::end(state);\n";
             output << "        if (state.fault != CpuFault::None) return false;\n";
             output << "        if (state.exception_raised) return true;\n";
@@ -194,6 +211,14 @@ std::string CppEmitter::emit(const Region& region) {
         }
 
         if (resolved != nullptr && resolved->target.has_value()) {
+            if (block->terminator_index.has_value() &&
+                block->instructions[*block->terminator_index].kind ==
+                    InstructionKind::DirectCall) {
+                output << "        state.write(31, ";
+                write_address(output,
+                    block->instructions[*block->terminator_index].address + 8U);
+                output << ");\n";
+            }
             output << "        state.pc = ";
             write_address(output, *resolved->target);
             output << ";\n        return true;\n";
@@ -225,6 +250,25 @@ std::string CppEmitter::emit(const Region& region) {
             output << " : ";
             write_address(output, *fallthrough->target);
             output << ";\n        return true;\n";
+        } else if (block->terminator_index.has_value() &&
+                   (block->instructions[*block->terminator_index].kind ==
+                        InstructionKind::IndirectJump ||
+                    block->instructions[*block->terminator_index].kind ==
+                        InstructionKind::IndirectCall ||
+                    block->instructions[*block->terminator_index].kind ==
+                        InstructionKind::Return)) {
+            const Instruction& transfer =
+                block->instructions[*block->terminator_index];
+            const std::uint32_t source = (transfer.raw >> 21U) & 31U;
+            if (transfer.kind == InstructionKind::IndirectCall) {
+                const std::uint32_t destination = (transfer.raw >> 11U) & 31U;
+                output << "        state.write(" << destination << ", ";
+                write_address(output, transfer.address + 8U);
+                output << ");\n";
+            }
+            output << "        state.pc = state.gpr[" << source << "];\n"
+                   << "        state.next_pc = state.pc + 4u;\n"
+                   << "        return true;\n";
         } else {
             output << "        return false;\n";
         }
