@@ -140,3 +140,12 @@ named-envelope families without assigning semantic roles from a cluster label.
 Named bodies are recursively hashed and checked for complete TIM/VAG children,
 embedded bounded PS-X EXE containers, and raw MIPS ABI candidates. A parser miss
 does not close executable risk.
+
+`evidence/generated-game-shards.json` is the first non-zero generated game-code
+coverage receipt. `tools/analysis/build_game_region_shards.py` derives it from
+the executable authorization and finite-target evidence as a greatest closed
+set. Sources of rejected or unresolved edges, their reverse direct closure, and
+non-atomic delay slots are excluded. The paired `*-closed-shards.manifest`
+files enumerate every admitted instruction as an explicit compiler entry;
+unknown identities and PCs remain runtime rejections. This receipt deliberately
+claims partial coverage, not whole-game closure.

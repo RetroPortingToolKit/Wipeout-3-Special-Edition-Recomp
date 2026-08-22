@@ -82,3 +82,11 @@ It verifies the parent audit's instance and unique-identity accounting before
 grouping by container extension, exact expanded size, four-byte magic,
 occurrence frequency, and structural classification. Cluster labels remain
 non-semantic and all unknown-role and executable-risk gates remain closed.
+
+`build_game_region_shards.py` partitions the authenticated main executable and
+NFE route-variant graphs into deterministic closed compiler ranges. It consumes
+only identity-bound authorization and finite-target receipts, propagates every
+unsafe edge backward to a fixed point, preserves delay-slot atomicity, and emits
+both compiler manifests and a fail-closed partial-coverage receipt. Its focused
+tests run with `python -m unittest
+tools.analysis.tests.test_build_game_region_shards`.

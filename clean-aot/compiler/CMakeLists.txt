@@ -106,4 +106,8 @@ if(BUILD_TESTING)
         COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/product/tests/test_clean_aot_image_adapter.py
             $<TARGET_FILE:clean_aot_compiler_cli>)
+    add_test(NAME clean_aot_compiler_cli_identity_tests
+        COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/compiler_cli_identity_tests.py
+            $<TARGET_FILE:clean_aot_compiler_cli>)
 endif()
