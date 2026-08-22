@@ -227,6 +227,21 @@
   lengths therefore do not prove equal event order; treat the card match and
   fingerprint prefix as the only valid evidence from that run.
 
+## Focused load gates
+
+Fast Loading is tested at two explicit result points, not as whole-run frame
+identity:
+
+1. `startup-card`: compare the memory-card load endpoint. The required command
+   is `tools/compare_guest_load_traces.py --gate startup-card --kind card`.
+2. `race-load`: compare the loaded-race endpoint and a short continuation for
+   deferred CD/IRQ/XA effects. Use `--gate race-load` with fingerprint and CD
+   artifacts.
+
+The comparator rejects a trace kind that belongs to the other gate. The current
+anchored startup-card comparison passes; the race-load artifacts still need an
+equal route length and overlapping endpoint window.
+
 ## Ruled out
 
 - Reusing the existing NTSC-120 package as a PAL-100 patch: PAL sites do not
