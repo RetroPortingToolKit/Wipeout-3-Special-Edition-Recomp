@@ -624,6 +624,52 @@ void test_emitter_contains_compilable_graph_shape() {
             "emitter must provide a stable, region-unique dispatch ABI");
 }
 
+void test_emitter_shards_preserve_blocks_and_reject_tamper() {
+    const Region region = make_trampoline_region();
+    require(region.blocks.size() >= 2U, "shard fixture needs multiple blocks");
+    std::vector<clean_aot::compiler::BlockId> first_ids;
+    std::vector<clean_aot::compiler::BlockId> second_ids;
+    for (std::size_t index = 0; index < region.blocks.size(); ++index) {
+        (index % 2U == 0U ? first_ids : second_ids).push_back(region.blocks[index].id);
+    }
+    const std::string full = clean_aot::compiler::CppEmitter::emit(region);
+    const std::string first = clean_aot::compiler::CppEmitter::emit_shard(
+        region, first_ids, 0x00002000U);
+    std::reverse(second_ids.begin(), second_ids.end());
+    const std::string second = clean_aot::compiler::CppEmitter::emit_shard(
+        region, second_ids, 0x00002004U);
+    for (const BasicBlock& block : region.blocks) {
+        std::ostringstream marker;
+        marker << "case 0x" << std::uppercase << std::hex << std::setw(8)
+               << std::setfill('0') << block.start << "u";
+        const auto count = [&](const std::string& source) {
+            std::size_t result = 0U;
+            std::size_t offset = 0U;
+            while ((offset = source.find(marker.str(), offset)) != std::string::npos) {
+                ++result;
+                offset += marker.str().size();
+            }
+            return result;
+        };
+        require(count(full) == 1U && count(first) + count(second) == 1U,
+                "every authenticated block PC must occur in exactly one shard");
+    }
+    require(first.find("0x00001010u") != std::string::npos ||
+                second.find("0x00001010u") != std::string::npos,
+            "cross-shard direct targets must retain exact guest PCs");
+    auto duplicate = first_ids;
+    duplicate.push_back(first_ids.front());
+    require_throws([&] {
+        (void)clean_aot::compiler::CppEmitter::emit_shard(
+            region, duplicate, 0x00002000U);
+    }, "duplicate shard blocks must fail closed");
+    const std::array<clean_aot::compiler::BlockId, 1U> unknown{0xffffffffU};
+    require_throws([&] {
+        (void)clean_aot::compiler::CppEmitter::emit_shard(
+            region, unknown, 0x00002000U);
+    }, "unknown shard blocks must fail closed");
+}
+
 void test_emitter_contains_cop0_semantics() {
     std::vector<std::uint8_t> text(24U, 0U);
     write_le32(text, 0x00U, 0x408c6000U); // mtc0 t4,status
@@ -702,6 +748,8 @@ int main(int argc, char** argv) {
          test_adversarial_instruction_streams_are_deterministic},
         {"backward_direct_edge_is_inside_the_region", test_backward_direct_edge_is_inside_the_region},
         {"emitter_contains_compilable_graph_shape", test_emitter_contains_compilable_graph_shape},
+        {"emitter_shards_preserve_blocks_and_reject_tamper",
+         test_emitter_shards_preserve_blocks_and_reject_tamper},
         {"emitter_contains_cop0_semantics", test_emitter_contains_cop0_semantics},
     };
 

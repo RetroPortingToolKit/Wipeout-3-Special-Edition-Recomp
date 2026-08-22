@@ -69,15 +69,34 @@ void write_semantic(std::ostringstream& out, const Instruction& instruction) {
 
 } // namespace
 
-std::string CppEmitter::emit(const Region& region) {
+namespace {
+
+std::string emit_selected(const Region& region,
+                          std::span<const BlockId> selected_ids,
+                          GuestAddress shard_identity) {
     region.validate();
+    if (selected_ids.empty() || (shard_identity % 4U) != 0U) {
+        throw IrError("emitter shard selection is empty or unaligned");
+    }
 
     std::vector<const BasicBlock*> ordered_blocks;
     std::map<BlockId, const BasicBlock*> blocks_by_id;
-    ordered_blocks.reserve(region.blocks.size());
     for (const BasicBlock& block : region.blocks) {
-        ordered_blocks.push_back(&block);
         blocks_by_id.emplace(block.id, &block);
+    }
+    std::vector<BlockId> canonical_ids(selected_ids.begin(), selected_ids.end());
+    std::sort(canonical_ids.begin(), canonical_ids.end());
+    if (std::adjacent_find(canonical_ids.begin(), canonical_ids.end()) !=
+        canonical_ids.end()) {
+        throw IrError("emitter shard contains duplicate basic blocks");
+    }
+    ordered_blocks.reserve(canonical_ids.size());
+    for (const BlockId id : canonical_ids) {
+        const auto found = blocks_by_id.find(id);
+        if (found == blocks_by_id.end()) {
+            throw IrError("emitter shard identifies an unknown basic block");
+        }
+        ordered_blocks.push_back(found->second);
     }
     std::sort(ordered_blocks.begin(), ordered_blocks.end(),
               [](const BasicBlock* left, const BasicBlock* right) {
@@ -90,7 +109,9 @@ std::string CppEmitter::emit(const Region& region) {
     std::vector<const Edge*> ordered_edges;
     ordered_edges.reserve(region.edges.size());
     for (const Edge& edge : region.edges) {
-        ordered_edges.push_back(&edge);
+        if (std::binary_search(canonical_ids.begin(), canonical_ids.end(), edge.source)) {
+            ordered_edges.push_back(&edge);
+        }
     }
     std::sort(ordered_edges.begin(), ordered_edges.end(),
               [&](const Edge* left, const Edge* right) {
@@ -109,8 +130,8 @@ std::string CppEmitter::emit(const Region& region) {
               });
 
     std::map<BlockId, std::vector<const Edge*>> outgoing;
-    for (const BasicBlock& block : region.blocks) {
-        outgoing.emplace(block.id, std::vector<const Edge*>{});
+    for (const BasicBlock* block : ordered_blocks) {
+        outgoing.emplace(block->id, std::vector<const Edge*>{});
     }
     for (const Edge* edge : ordered_edges) {
         outgoing.at(edge->source).push_back(edge);
@@ -123,7 +144,7 @@ std::string CppEmitter::emit(const Region& region) {
            << "// Returns true when a resolved edge advanced the guest PC.\n"
            << "// An unresolved indirect edge leaves the caller's PC untouched.\n"
            << "extern \"C\" bool clean_aot_region_"
-           << std::hex << std::setw(8) << std::setfill('0') << region.start
+           << std::hex << std::setw(8) << std::setfill('0') << shard_identity
            << std::dec << std::setfill(' ')
            << "(GeneratedCpuState& state) noexcept {\n"
            << "    switch (state.pc) {\n";
@@ -255,6 +276,22 @@ std::string CppEmitter::emit(const Region& region) {
            << "}\n\n"
            << "} // namespace clean_aot_generated\n";
     return output.str();
+}
+
+} // namespace
+
+std::string CppEmitter::emit(const Region& region) {
+    std::vector<BlockId> ids;
+    ids.reserve(region.blocks.size());
+    for (const BasicBlock& block : region.blocks) ids.push_back(block.id);
+    return emit_selected(region, ids, region.start);
+}
+
+std::string CppEmitter::emit_shard(
+    const Region& region,
+    std::span<const BlockId> block_ids,
+    GuestAddress shard_identity) {
+    return emit_selected(region, block_ids, shard_identity);
 }
 
 } // namespace clean_aot::compiler

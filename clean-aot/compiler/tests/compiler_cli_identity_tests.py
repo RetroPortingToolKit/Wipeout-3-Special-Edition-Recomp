@@ -46,6 +46,115 @@ class CompilerCliIdentityTests(unittest.TestCase):
             self.assertEqual(rejected.returncode, 2)
             self.assertIn("image SHA-256 mismatch", rejected.stderr)
 
+    def test_deterministic_basic_block_shards(self):
+        cli = Path(sys.argv[1])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            image = root / "image.bin"
+            manifest = root / "image.manifest"
+            output = root / "generated"
+
+            def jump(target):
+                return ((2 << 26) | ((target >> 2) & 0x03ffffff)).to_bytes(4, "little")
+
+            payload = b"".join((
+                jump(0x1008), b"\0\0\0\0",
+                jump(0x1010), b"\0\0\0\0",
+                jump(0x1018), b"\0\0\0\0",
+                jump(0x1000), b"\0\0\0\0",
+            ))
+            digest = hashlib.sha256(payload).hexdigest()
+            image.write_bytes(payload)
+            manifest.write_text("\n".join((
+                "schema=clean-aot-compiler-manifest-v1",
+                "image_kind=raw-payload",
+                f"variant_sha256={digest}",
+                f"image_sha256={digest}",
+                "load_start=0x1000",
+                "load_end_exclusive=0x1020",
+                "entry=0x1000",
+                "code=0x1000-0x1020",
+                "",
+            )))
+            command = (cli, "--image", image, "--manifest", manifest,
+                       "--output", output, "--max-shard-instructions", "2")
+            subprocess.run(command, check=True, capture_output=True)
+            sources = sorted(output.glob("clean_aot_region_*.cpp"))
+            self.assertEqual(len(sources), 4)
+            table = (output / "entry_table.cpp").read_text()
+            self.assertEqual(table.count('extern "C" bool clean_aot_region_'), 4)
+            receipt = (output / "shards.manifest").read_text()
+            self.assertIn("schema=clean-aot-generated-shards-v1", receipt)
+            self.assertIn("entry_count=4\nshard_count=4", receipt)
+
+            second = root / "generated-again"
+            second_command = list(command)
+            second_command[second_command.index(output)] = second
+            subprocess.run(second_command, check=True, capture_output=True)
+            self.assertEqual(receipt, (second / "shards.manifest").read_text())
+            self.assertEqual(
+                [(path.name, path.read_bytes()) for path in sources],
+                [(path.name, path.read_bytes())
+                 for path in sorted(second.glob("clean_aot_region_*.cpp"))])
+
+            unsharded = root / "generated-unsharded"
+            subprocess.run(
+                (cli, "--image", image, "--manifest", manifest,
+                 "--output", unsharded, "--max-shard-instructions", "65535"),
+                check=True, capture_output=True)
+
+            def compile_and_run(generated, name):
+                generated_sources = sorted(generated.glob("clean_aot_region_*.cpp"))
+                addresses = [path.stem.removeprefix("clean_aot_region_")
+                             for path in generated_sources]
+                declarations = "\n".join(
+                    f'extern "C" bool clean_aot_region_{address}(clean_aot::runtime::GeneratedCpuState&) noexcept;'
+                    for address in addresses)
+                selections = "\n".join(
+                    f'if(!ok)ok=clean_aot_region_{address}(state);'
+                    for address in addresses)
+                harness = root / f"{name}.cpp"
+                harness.write_text(
+                    '#include <clean_aot/runtime/generated_cpu.hpp>\n#include <iostream>\n' +
+                    declarations + '\nint main(){clean_aot::runtime::GeneratedCpuState state{};'
+                    'state.pc=0x1000U;for(int i=0;i<4;++i){bool ok=false;' +
+                    selections +
+                    'if(!ok)return 4;}std::cout<<std::hex<<state.pc<<":"'
+                    '<<state.gpr[31]<<"\\n";}\n')
+                executable = root / f"{name}.exe"
+                runtime_include = Path(__file__).parents[2] / "runtime" / "include"
+                subprocess.run(
+                    (Path(sys.argv[2]), "-std=c++20", "-O0", f"-I{runtime_include}",
+                     *generated_sources, harness, "-o", executable),
+                    check=True, capture_output=True)
+                return subprocess.run((executable,), check=True, capture_output=True,
+                                      text=True).stdout
+
+            self.assertEqual(compile_and_run(output, "sharded"),
+                             compile_and_run(unsharded, "unsharded"))
+
+            verifier = Path(__file__).parent.parent / "tools" / "verify_generated_shards.py"
+            subprocess.run((sys.executable, verifier, output), check=True,
+                           capture_output=True)
+            second_table = second / "entry_table.cpp"
+            second_table.write_bytes(second_table.read_bytes() + b"\n")
+            table_tampered = subprocess.run(
+                (sys.executable, verifier, second), capture_output=True, text=True)
+            self.assertEqual(table_tampered.returncode, 2)
+            self.assertIn("entry table source hash mismatch", table_tampered.stderr)
+            sources[0].write_bytes(sources[0].read_bytes() + b"\n")
+            tampered = subprocess.run(
+                (sys.executable, verifier, output), capture_output=True, text=True)
+            self.assertEqual(tampered.returncode, 2)
+            self.assertIn("source hash mismatch", tampered.stderr)
+
+            rejected = subprocess.run(
+                (cli, "--image", image, "--manifest", manifest,
+                 "--output", root / "rejected", "--max-shard-instructions", "0"),
+                capture_output=True, text=True)
+            self.assertEqual(rejected.returncode, 2)
+            self.assertIn("invalid maximum shard", rejected.stderr)
+
 
 if __name__ == "__main__":
     unittest.main(argv=sys.argv[:1])

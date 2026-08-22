@@ -2,6 +2,7 @@
 
 #include "clean_aot/compiler/ir.hpp"
 
+#include <span>
 #include <string>
 
 namespace clean_aot::compiler {
@@ -13,6 +14,14 @@ public:
     // wrapped fallthroughs. It reports genuinely dynamic indirect/return
     // control flow by returning false and never invents a target.
     [[nodiscard]] static std::string emit(const Region& region);
+
+    // Emits a function containing only the selected whole basic blocks. The
+    // complete region is validated before selection, so cross-shard edges keep
+    // their exact guest targets and delay slots cannot be split.
+    [[nodiscard]] static std::string emit_shard(
+        const Region& region,
+        std::span<const BlockId> block_ids,
+        GuestAddress shard_identity);
 };
 
 } // namespace clean_aot::compiler

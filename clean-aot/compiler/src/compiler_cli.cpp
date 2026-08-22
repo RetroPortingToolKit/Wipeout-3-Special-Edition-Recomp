@@ -50,6 +50,7 @@ void sha_block(std::array<std::uint32_t,8>& h,const std::uint8_t* p){std::array<
 
 int run(int argc, char** argv) {
     std::filesystem::path image, manifest, output; std::string kind;
+    std::uint64_t max_shard_instructions=2048U;
     for (int i=1;i<argc;i+=2) {
         if (i+1>=argc) throw std::runtime_error("option lacks value");
         const std::string_view option(argv[i]);
@@ -57,8 +58,10 @@ int run(int argc, char** argv) {
         else if (option=="--image-kind") kind=argv[i+1];
         else if (option=="--manifest") manifest=argv[i+1];
         else if (option=="--output") output=argv[i+1];
+        else if (option=="--max-shard-instructions") max_shard_instructions=number(argv[i+1]);
         else throw std::runtime_error("unknown option");
     }
+    if(max_shard_instructions==0U||max_shard_instructions>65535U) throw std::runtime_error("invalid maximum shard instruction count");
     if (image.empty() || manifest.empty() || output.empty()) throw std::runtime_error("missing required option");
     std::ifstream input(manifest); if (!input) throw std::runtime_error("unable to open manifest");
     std::map<std::string,std::vector<std::string>> fields; std::string line;
@@ -73,6 +76,8 @@ int run(int argc, char** argv) {
     if(roots.empty()||!std::is_sorted(roots.begin(),roots.end())||std::adjacent_find(roots.begin(),roots.end())!=roots.end()) throw std::runtime_error("entries must be sorted and unique");
     std::vector<Range> ranges; for(const auto& value:fields["code"]) { const auto dash=value.find('-'); if(dash==std::string::npos) throw std::runtime_error("malformed code range"); ranges.push_back({static_cast<GuestAddress>(number(value.substr(0,dash))),number(value.substr(dash+1))}); }
     if(ranges.empty()) throw std::runtime_error("manifest has no code ranges");
+    if(!std::is_sorted(ranges.begin(),ranges.end(),[](const Range& a,const Range& b){return a.start<b.start;})) throw std::runtime_error("code ranges must be sorted");
+    for(std::size_t i=0;i<ranges.size();++i)if(ranges[i].end<=ranges[i].start||(i!=0U&&ranges[i].start<ranges[i-1U].end))throw std::runtime_error("code ranges must be nonempty and nonoverlapping");
     const auto bytes=read_bytes(image); if(bytes.size()!=end-load) throw std::runtime_error("image size does not match load range");
     const std::string digest=one("image_sha256");
     if (digest.size()!=64U || sha256(bytes)!=digest) throw std::runtime_error("image SHA-256 mismatch");
@@ -80,13 +85,29 @@ int run(int argc, char** argv) {
     if(std::filesystem::exists(output)) throw std::runtime_error("output already exists");
     std::filesystem::create_directories(output);
     struct Entry { GuestAddress pc; GuestAddress region; std::uint32_t instruction_count; }; std::vector<Entry> entries;
+    struct Shard { GuestAddress region; GuestAddress identity; std::uint32_t block_count; std::uint32_t instruction_count; std::string source_sha256; }; std::vector<Shard> shards;
+    std::set<GuestAddress> shard_identities;
     for(const Range range:ranges) {
         std::vector<GuestAddress> region_roots; std::copy_if(roots.begin(),roots.end(),std::back_inserter(region_roots),[&](auto root){return root>=range.start&&root<range.end;});
         if(region_roots.empty()) throw std::runtime_error("each code range requires an explicit entry");
         clean_aot::compiler::RegionBuildOptions options{region_roots,range.start,range.end};
         const auto region=clean_aot::compiler::RegionBuilder::build(whole,std::move(options));
-        std::ofstream source(output/(symbol(range.start)+".cpp"),std::ios::binary); source<<clean_aot::compiler::CppEmitter::emit(region); if(!source) throw std::runtime_error("unable to write region source");
-        for(const auto& block:region.blocks) entries.push_back({block.start,range.start,static_cast<std::uint32_t>(block.instructions.size())});
+        std::vector<const clean_aot::compiler::BasicBlock*> blocks; for(const auto& block:region.blocks)blocks.push_back(&block);
+        std::sort(blocks.begin(),blocks.end(),[](const auto* a,const auto* b){return a->start<b->start||(a->start==b->start&&a->id<b->id);});
+        std::size_t begin=0;
+        while(begin<blocks.size()){
+            std::size_t finish=begin;std::uint64_t instructions=0;
+            while(finish<blocks.size()&&(finish==begin||instructions+blocks[finish]->instructions.size()<=max_shard_instructions)){instructions+=blocks[finish]->instructions.size();++finish;}
+            const GuestAddress shard_identity=blocks[begin]->start;
+            if(!shard_identities.insert(shard_identity).second)throw std::runtime_error("duplicate generated shard identity");
+            std::vector<clean_aot::compiler::BlockId> ids;ids.reserve(finish-begin);
+            for(std::size_t i=begin;i<finish;++i){ids.push_back(blocks[i]->id);entries.push_back({blocks[i]->start,shard_identity,static_cast<std::uint32_t>(blocks[i]->instructions.size())});}
+            const std::string generated=clean_aot::compiler::CppEmitter::emit_shard(region,ids,shard_identity);
+            std::ofstream source(output/(symbol(shard_identity)+".cpp"),std::ios::binary);source<<generated;if(!source)throw std::runtime_error("unable to write shard source");
+            const std::vector<std::uint8_t> generated_bytes(generated.begin(),generated.end());
+            shards.push_back({range.start,shard_identity,static_cast<std::uint32_t>(ids.size()),static_cast<std::uint32_t>(instructions),sha256(generated_bytes)});
+            begin=finish;
+        }
     }
     std::sort(entries.begin(),entries.end(),[](auto a,auto b){return a.pc<b.pc;});
     if(std::adjacent_find(entries.begin(),entries.end(),[](auto a,auto b){return a.pc==b.pc;})!=entries.end()) throw std::runtime_error("overlapping generated entries");
@@ -109,8 +130,13 @@ int run(int argc, char** argv) {
     binding<<"}};\nconstexpr std::array<clean_aot::runtime::GeneratedDispatchPage,"<<pages.size()<<"> pages{{";for(const auto [begin_index,end_index]:pages)binding<<"{"<<begin_index<<"U,"<<end_index<<"U},";
     binding<<"}};\nconst clean_aot::runtime::GeneratedExecutableBinding value{\""<<variant<<"\",\""<<digest<<"\",0x"<<std::hex<<load<<"U,0x"<<end<<"ULL,roots,{},regions,entries,pages};\n}\n";
     binding<<"extern \"C\" const clean_aot::runtime::GeneratedExecutableBinding* clean_aot_binding_"<<variant<<"() noexcept { return &value; }\n";
-    if(!binding) throw std::runtime_error("unable to write entry table");
-    std::cout<<"generated "<<entries.size()<<" authenticated entries\n"; return 0;
+    binding.close(); if(!binding) throw std::runtime_error("unable to write entry table");
+    const std::string entry_table_sha256=sha256(read_bytes(output/"entry_table.cpp"));
+    std::ofstream shard_manifest(output/"shards.manifest",std::ios::binary);
+    shard_manifest<<"schema=clean-aot-generated-shards-v1\nvariant_sha256="<<variant<<"\nimage_sha256="<<digest<<"\nentry_table_sha256="<<entry_table_sha256<<"\nmax_shard_instructions="<<max_shard_instructions<<"\nentry_count="<<entries.size()<<"\nshard_count="<<shards.size()<<"\n";
+    for(const auto& shard:shards)shard_manifest<<"shard=0x"<<std::hex<<shard.region<<",0x"<<shard.identity<<","<<std::dec<<shard.block_count<<","<<shard.instruction_count<<","<<shard.source_sha256<<"\n";
+    if(!shard_manifest)throw std::runtime_error("unable to write shard manifest");
+    std::cout<<"generated "<<entries.size()<<" authenticated entries in "<<shards.size()<<" shards\n"; return 0;
 }
 }
 int main(int argc,char** argv){try{return run(argc,argv);}catch(const std::exception& e){std::cerr<<"clean_aot_compiler_cli: "<<e.what()<<'\n';return 2;}}
