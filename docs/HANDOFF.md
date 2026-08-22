@@ -554,6 +554,15 @@ instruction and fails closed on every unknown PC or executable identity.
   instructions and 15,237 dispatches with 9,614 reads, 19,757 writes, 4,960
   isolated-cache writes, one device read, and 53 device writes. Receipt
   `bios-frontier-00088864.json` records fault-free `UnknownCode` at `0x6AB0`.
+- Epoch-`9898a802...6e6d` A0/0x97 stub `[0x6AB0,0x6ABC)` is authenticated
+  by exact SHA-256 `dd2df7ea...47d07`. Its sole live immutable wrapper is
+  `[0xBFC0C1FC,0xBFC0C220)`, which enters the already-authenticated service path;
+  adjacent A0 and BIOS wrappers remain rejected. The service performs another
+  1,240 isolated-cache writes, mutates RAM to `315de527...d56fa`, and stops at
+  the next unbound immutable BIOS target `0xBFC00DA0`. Two repeated probes reach
+  90,914 instructions and 15,420 dispatches with 9,710 reads, 21,094 writes,
+  6,200 isolated-cache writes, one device read, and 57 device writes. Receipt
+  `bios-frontier-00090914.json` records fault-free `UnknownCode` at that target.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control
