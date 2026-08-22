@@ -1,0 +1,8 @@
+schema=clean-aot-compiler-manifest-v1
+image_kind=raw-payload
+variant_sha256=e2cbddc8e96d9524ccfe597bfd6f7f43b78ee704f0d12f35e6f8e35094e3db32
+image_sha256=e2cbddc8e96d9524ccfe597bfd6f7f43b78ee704f0d12f35e6f8e35094e3db32
+load_start=0x00002c94
+load_end_exclusive=0x00002e00
+entry=0x00002c94
+code=0x00002c94-0x00002e00

@@ -1,0 +1,8 @@
+schema=clean-aot-compiler-manifest-v1
+image_kind=raw-payload
+variant_sha256=c200d86ada6f4f3bf8cdb56e8a795794f21537ea250a277a023a2aedf1d97878
+image_sha256=c200d86ada6f4f3bf8cdb56e8a795794f21537ea250a277a023a2aedf1d97878
+load_start=0x0000406c
+load_end_exclusive=0x00004134
+entry=0x0000406c
+code=0x0000406c-0x00004134

@@ -1,5 +1,23 @@
 # Handoff
 
+## Authenticated BIOS frontier checkpoint (2026-08-21)
+
+- The real SCPH1001 BIOS path advanced through five additional exact,
+  fail-closed frontiers from immutable BIOS PC `0xBFC00DA0`: copied-RAM
+  `[0x406C,0x4134)`, `[0x2C94,0x2E00)`, `[0x3E80,0x3F04)`, and, after a
+  measured RAM mutation, `[0x113C,0x1174)`.
+- The repeated probe is deterministic at 120,902 instructions / 22,208 native
+  dispatches, with 13,654 reads, 22,634 writes, 6,200 cache-isolated writes,
+  one device read, and 62 device writes. It stops honestly at UnknownCode
+  `0x00001174`; COP0 status/cause/EPC/bad-vaddr remain zero.
+- The final low-RAM epoch is
+  `6c6da3c3b6f7fcb315def23609b5118a25f94ee12e68ed75f0b9f34d43bd980a`.
+  Reauthenticate the bytes at `0x1174` from this epoch before continuing; do
+  not reuse the immediately preceding `34fa157f...` image.
+- Canonical evidence is
+  `clean-aot/catalog/evidence/bios-frontier-00120902.json`. No decoder,
+  interpreter, dormant edge, or unknown-PC fallback was added.
+
 ## Native production presentation checkpoint (2026-08-21)
 
 - The Windows SDL3/Vulkan presenter is now a complete live host backend rather
