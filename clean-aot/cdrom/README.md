@@ -57,6 +57,11 @@ transfer size.
 ownership boundaries, track type, and lead-out. `GetTD` and track-select Play
 use index 1, while lookup and `GetlocP` attribute pregap sectors to index 0 of
 the following track.
+Runtime lid state is independent of the mounted source/layout. Opening stops
+read, CDDA, and seek activity, cancels media phases, invalidates sector/DMA
+buffers, drops motor status, and exposes the ShellOpen bit. Disc-dependent
+commands fail while open; Getstat remains available, and closing never silently
+replaces caller-owned media.
 CDDA playback uses track type, emits silence on data tracks, applies the active
 four-coefficient matrix, preserves muted timing, stops at lead-out, and honors
 track-boundary autopause. Report mode emits the alternating absolute/relative
@@ -85,7 +90,7 @@ license identity in `GetID` come only from the supplied layout.
 
 This tranche intentionally does not claim full controller behavior. It does
 not parse BIN/CUE files, synthesize pregaps or index 0, parse subchannel Q,
-model multiple sessions beyond session 1, expose lid changes, perform SCEx
+model multiple sessions beyond session 1, perform SCEx
 authentication, descramble sectors, correct ECC, retry damaged reads, decode XA
 ADPCM, or implement sound-map playback. `GetQ`, CDDA report packets, most test
 subcommands, analog drive variation, and firmware quirks are unsupported.

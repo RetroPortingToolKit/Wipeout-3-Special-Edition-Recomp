@@ -1,5 +1,17 @@
 # Handoff
 
+## CD-ROM runtime lid accuracy (2026-08-22)
+
+- CD ShellOpen was defined but unreachable. `Cdrom::set_shell_open` now models
+  runtime lid state independently from mounted media identity. Opening stops
+  read/CDDA/seek work, cancels media phases, clears sector and DMA buffers,
+  drops motor state, and invalidates cached locations; Getstat exposes bit
+  `0x10`, while disc-dependent commands use their normal INT5 error path.
+- Closing the lid preserves the same caller-owned source/layout. An adversarial
+  active-ReadN transition test passes strict GCC 16.1 and Clang 22.1.8
+  ASan/UBSan. See `docs/CDROM_RUNTIME_LID_ACCURACY.md` and the deterministic
+  `clean-aot/cdrom/evidence/runtime-lid-accuracy-v1.json` receipt.
+
 ## A0 service 0x40 exact fatal-cycle analysis (2026-08-22)
 
 - Exact BIOS and RAM bytes prove service `0x40` is a non-returning fatal sink:

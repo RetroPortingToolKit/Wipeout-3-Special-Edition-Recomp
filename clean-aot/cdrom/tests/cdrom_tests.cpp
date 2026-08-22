@@ -1448,6 +1448,38 @@ void test_overflow_time_reset_scheduler_and_deterministic_chunking() {
     require(first_bytes == second_bytes, "advance chunking preserves transfer bytes");
 }
 
+void test_runtime_lid_transition_stops_media_and_blocks_disc_commands() {
+    auto source = std::make_unique<MemorySource>();
+    populate_mode_one(*source, 0U, 4U);
+    Cdrom device(source.get(), data_layout());
+
+    issue(device, Command::ReadN);
+    (void)device.pop_response();
+    acknowledge(device);
+    require(device.reading(), "read stream starts before lid transition");
+    device.set_shell_open(true);
+    require(device.shell_open() && !device.reading() && !device.playing() &&
+                device.data_count() == 0U,
+            "opening lid atomically stops streams and invalidates transfer data");
+
+    issue(device, Command::Nop);
+    require_reason(device, Interrupt::Acknowledge, "Getstat remains available with lid open");
+    require((device.pop_response() & status_bit(Status::ShellOpen)) != 0U,
+            "Getstat reports ShellOpen");
+    acknowledge(device);
+
+    issue(device, Command::ID);
+    require_reason(device, Interrupt::Error, "GetID rejects open-lid media");
+    require((device.pop_response() & status_bit(Status::ShellOpen)) != 0U,
+            "open-lid error retains ShellOpen status");
+    acknowledge(device);
+
+    device.set_shell_open(false);
+    require(!device.shell_open(), "closing lid clears ShellOpen");
+    issue(device, Command::ID);
+    require_reason(device, Interrupt::Acknowledge, "GetID resumes after lid closes");
+}
+
 } // namespace
 
 int main() {
@@ -1466,6 +1498,7 @@ int main() {
     test_xa_routing_filter_and_explicit_decode_boundary();
     test_remaining_command_families_reset_controls_and_stream_end();
     test_overflow_time_reset_scheduler_and_deterministic_chunking();
+    test_runtime_lid_transition_stops_media_and_blocks_disc_commands();
     std::cout << "clean_aot_cdrom_tests: ok\n";
     return EXIT_SUCCESS;
 }

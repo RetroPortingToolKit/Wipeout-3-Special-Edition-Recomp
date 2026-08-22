@@ -290,6 +290,7 @@ public:
     void attach_cdda_sink(CddaSink* sink) noexcept;
     void attach_xa_sink(XaSectorSink* sink) noexcept;
     bool set_disc_layout(const DiscLayout& layout) noexcept;
+    void set_shell_open(bool open) noexcept;
 
     void advance_to(Cycle cycle) noexcept;
     Cycle current_cycle() const noexcept;
@@ -323,6 +324,7 @@ public:
     bool reading() const noexcept;
     bool playing() const noexcept;
     bool muted() const noexcept;
+    bool shell_open() const noexcept;
     std::uint8_t mode() const noexcept;
     AudioMatrix audio_matrix() const noexcept;
     void set_audio_matrix(AudioMatrix matrix) noexcept;
@@ -424,6 +426,7 @@ private:
     bool seeking_ = false;
     bool paused_ = false;
     bool motor_on_ = false;
+    bool shell_open_ = false;
     PhaseAction phase_action_ = PhaseAction::None;
     std::uint8_t filter_file_ = 0U;
     std::uint8_t filter_channel_ = 0U;

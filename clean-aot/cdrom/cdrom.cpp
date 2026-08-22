@@ -291,6 +291,30 @@ bool Cdrom::set_disc_layout(const DiscLayout& layout) noexcept {
     return true;
 }
 
+void Cdrom::set_shell_open(bool open) noexcept {
+    if (shell_open_ == open) {
+        return;
+    }
+    shell_open_ = open;
+    if (!open) {
+        return;
+    }
+    stop_streams();
+    remove_events(ScheduledEvent::CommandPhase);
+    phase_action_ = PhaseAction::None;
+    seeking_ = false;
+    paused_ = false;
+    motor_on_ = false;
+    location_pending_ = false;
+    clear_transfer_buffers();
+    data_storage_ = {};
+    data_size_ = 0U;
+    data_cursor_ = 0U;
+    request_data_ = false;
+    last_position_valid_ = false;
+    last_location_valid_ = false;
+}
+
 void Cdrom::advance_to(Cycle cycle) noexcept {
     if (cycle < cycle_) {
         record_error(ErrorCode::TimeReversal);
@@ -570,6 +594,10 @@ bool Cdrom::playing() const noexcept {
 
 bool Cdrom::muted() const noexcept {
     return muted_;
+}
+
+bool Cdrom::shell_open() const noexcept {
+    return shell_open_;
 }
 
 std::uint8_t Cdrom::mode() const noexcept {
@@ -882,7 +910,7 @@ void Cdrom::begin_command(std::uint8_t command,
             queue_command_error(ErrorCode::InvalidMsf, CommandError::InvalidParameter);
             break;
         }
-        if (!layout_.valid() || lba >= layout_.lead_out_lba) {
+        if (shell_open_ || !layout_.valid() || lba >= layout_.lead_out_lba) {
             queue_command_error(ErrorCode::InvalidMsf, CommandError::InvalidParameter);
             break;
         }
@@ -897,7 +925,7 @@ void Cdrom::begin_command(std::uint8_t command,
             wrong_count();
             break;
         }
-        if (!layout_.valid() || source_ == nullptr) {
+        if (shell_open_ || !layout_.valid() || source_ == nullptr) {
             queue_command_error(ErrorCode::CannotRespond, CommandError::CannotRespond);
             break;
         }
@@ -935,7 +963,7 @@ void Cdrom::begin_command(std::uint8_t command,
             wrong_count();
             break;
         }
-        if (!layout_.valid() || source_ == nullptr) {
+        if (shell_open_ || !layout_.valid() || source_ == nullptr) {
             queue_command_error(ErrorCode::CannotRespond, CommandError::CannotRespond);
             break;
         }
@@ -1137,7 +1165,7 @@ void Cdrom::begin_command(std::uint8_t command,
             wrong_count();
             break;
         }
-        if (!layout_.valid()) {
+        if (shell_open_ || !layout_.valid()) {
             queue_command_error(ErrorCode::InvalidDisc, CommandError::CannotRespond);
             break;
         }
@@ -1175,7 +1203,7 @@ void Cdrom::begin_command(std::uint8_t command,
             wrong_count();
             break;
         }
-        if (parameters[0U] != 1U || !layout_.valid()) {
+        if (parameters[0U] != 1U || shell_open_ || !layout_.valid()) {
             queue_command_error(ErrorCode::InvalidTrack, CommandError::InvalidParameter);
             break;
         }
@@ -1195,7 +1223,7 @@ void Cdrom::begin_command(std::uint8_t command,
             wrong_count();
             break;
         }
-        if (!layout_.valid()) {
+        if (shell_open_ || !layout_.valid()) {
             queue_command_error(ErrorCode::InvalidDisc, CommandError::CannotRespond);
             break;
         }
@@ -1213,7 +1241,7 @@ void Cdrom::begin_command(std::uint8_t command,
             wrong_count();
             break;
         }
-        if (!layout_.valid()) {
+        if (shell_open_ || !layout_.valid()) {
             queue_command_error(ErrorCode::InvalidDisc, CommandError::CannotRespond);
             break;
         }
@@ -1245,7 +1273,8 @@ void Cdrom::begin_command(std::uint8_t command,
             wrong_count();
             break;
         }
-        if (!layout_.valid() || source_ == nullptr || target_lba_ >= layout_.lead_out_lba) {
+        if (shell_open_ || !layout_.valid() || source_ == nullptr ||
+            target_lba_ >= layout_.lead_out_lba) {
             queue_command_error(ErrorCode::CannotRespond, CommandError::CannotRespond);
             break;
         }
@@ -1289,7 +1318,7 @@ void Cdrom::begin_command(std::uint8_t command,
             wrong_count();
             break;
         }
-        if (!layout_.valid() || source_ == nullptr) {
+        if (shell_open_ || !layout_.valid() || source_ == nullptr) {
             queue_command_error(ErrorCode::CannotRespond, CommandError::CannotRespond);
             break;
         }
@@ -1321,7 +1350,7 @@ void Cdrom::begin_command(std::uint8_t command,
             wrong_count();
             break;
         }
-        if (!layout_.valid() || source_ == nullptr) {
+        if (shell_open_ || !layout_.valid() || source_ == nullptr) {
             queue_command_error(ErrorCode::CannotRespond, CommandError::CannotRespond);
             break;
         }
@@ -1514,7 +1543,7 @@ void Cdrom::schedule_next_cdda_sector(Cycle from) noexcept {
 }
 
 void Cdrom::process_data_sector() noexcept {
-    if (!layout_.valid() || source_ == nullptr) {
+    if (shell_open_ || !layout_.valid() || source_ == nullptr) {
         stop_streams();
         queue_command_error(ErrorCode::SourceReadFailure,
                             CommandError::CannotRespond);
@@ -1619,7 +1648,7 @@ void Cdrom::process_data_sector() noexcept {
 }
 
 void Cdrom::process_cdda_sector() noexcept {
-    if (!layout_.valid() || source_ == nullptr) {
+    if (shell_open_ || !layout_.valid() || source_ == nullptr) {
         stop_streams();
         queue_command_error(ErrorCode::SourceReadFailure,
                             CommandError::CannotRespond);
@@ -1828,6 +1857,9 @@ std::uint8_t Cdrom::status_value() const noexcept {
     }
     if (motor_on_) {
         value = static_cast<std::uint8_t>(value | status_bit(Status::MotorOn));
+    }
+    if (shell_open_) {
+        value = static_cast<std::uint8_t>(value | status_bit(Status::ShellOpen));
     }
     return value;
 }
