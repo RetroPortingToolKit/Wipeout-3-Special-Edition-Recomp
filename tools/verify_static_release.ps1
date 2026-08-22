@@ -12,6 +12,15 @@ if (-not (Test-Path -LiteralPath $cache)) { throw "Missing CMakeCache.txt: $buil
 if ($null -eq $exe) { throw "No executable staged in: $build" }
 
 $cacheText = Get-Content -Raw -LiteralPath $cache
+$config = Join-Path $build 'game.toml'
+if (-not (Test-Path -LiteralPath $config)) { throw "Missing staged game.toml: $build" }
+$configText = Get-Content -Raw -LiteralPath $config
+if ($configText -notmatch '(?m)^openbios\s*=\s*false\r?$') {
+    throw 'OpenBIOS is not explicitly disabled in the staged game config.'
+}
+if ($configText -notmatch '(?m)^bios_hle\s*=\s*false\r?$') {
+    throw 'BIOS HLE is not explicitly disabled in the staged game config.'
+}
 if ($cacheText -notmatch '(?m)^PSX_SETUP_WIZARD:BOOL=OFF\r?$') {
     throw 'Setup wizard is enabled or not explicitly disabled.'
 }
