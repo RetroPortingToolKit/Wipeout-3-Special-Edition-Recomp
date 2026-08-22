@@ -25,6 +25,7 @@ class InstallError(RuntimeError):
 
 ACTIVE_SCHEMA = "wipeout3se.clean-aot.active-setup.v1"
 BOOT_SCHEMA = "wipeout3se.clean-aot.boot-frontier.v1"
+CRASH_SCHEMA = "wipeout3se.clean-aot.launch-diagnostic.v1"
 
 
 def _hash(path: Path) -> str:
@@ -144,16 +145,29 @@ def launch_and_record(package: Path, user_data: Path, *, timeout_seconds: float 
         raise InstallError("active generated artifacts are stale")
     launch = list(command) if command is not None else [str(package / "bin" / "Wipeout3SE.exe"),
                                                         "--user-data", str(user_data)]
-    completed = subprocess.run(launch, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE, timeout=timeout_seconds, check=False)
+    try:
+        completed = subprocess.run(launch, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE, timeout=timeout_seconds, check=False)
+    except subprocess.TimeoutExpired as error:
+        diagnostic = {"schema": CRASH_SCHEMA, "status": "launch-timeout-not-game-ready",
+                      "reason": "bounded-launch-timeout",
+                      "timeout_milliseconds": max(1, int(timeout_seconds * 1000)),
+                      "package_manifest_sha256": package_receipt["manifest_sha256"],
+                      "active_setup_sha256": _hash(active_path), "game_ready": False}
+        _atomic(user_data / "receipts" / "launch-diagnostic.json", diagnostic)
+        raise InstallError("application launch timed out") from error
     try: frontier = json.loads(completed.stdout.decode("utf-8").strip().splitlines()[-1])
     except (UnicodeError, ValueError, IndexError) as error:
+        _record_launch_failure(user_data, package_receipt, active_path, completed,
+                               "missing-canonical-boot-frontier")
         raise InstallError("application emitted no canonical boot frontier") from error
     if (not isinstance(frontier, dict)
             or frontier.get("schema") != "clean-aot.bootstrap-receipt.v1"
             or not isinstance(frontier.get("stage"), str)
             or type(frontier.get("bios_instructions_executed")) is not int
             or frontier["bios_instructions_executed"] < 0):
+        _record_launch_failure(user_data, package_receipt, active_path, completed,
+                               "invalid-boot-frontier-schema")
         raise InstallError("application boot frontier schema is invalid")
     receipt = {"schema": BOOT_SCHEMA, "status": "frontier-recorded-not-game-ready",
                "exit_code": completed.returncode,
@@ -163,4 +177,37 @@ def launch_and_record(package: Path, user_data: Path, *, timeout_seconds: float 
                "stderr_sha256": hashlib.sha256(completed.stderr).hexdigest(),
                "game_ready": False}
     _atomic(user_data / "receipts" / "boot-frontier.json", receipt)
+    return receipt
+
+
+def _record_launch_failure(user_data: Path, package_receipt: dict[str, Any],
+                           active_path: Path, completed: subprocess.CompletedProcess[bytes],
+                           reason: str) -> None:
+    diagnostic = {"schema": CRASH_SCHEMA, "status": "launch-failed-not-game-ready",
+                  "reason": reason, "exit_code": completed.returncode,
+                  "package_manifest_sha256": package_receipt["manifest_sha256"],
+                  "active_setup_sha256": _hash(active_path),
+                  "stdout_sha256": hashlib.sha256(completed.stdout).hexdigest(),
+                  "stderr_sha256": hashlib.sha256(completed.stderr).hexdigest(),
+                  "game_ready": False}
+    _atomic(user_data / "receipts" / "launch-diagnostic.json", diagnostic)
+
+
+def migrate_upgrade(user_data: Path, new_active: dict[str, Any]) -> dict[str, Any]:
+    """Atomically switch setup versions while preserving global saves/configuration."""
+    active_path = user_data / "receipts" / "active-setup.json"
+    previous = load_json(active_path)
+    if previous.get("schema") != ACTIVE_SCHEMA or new_active.get("schema") != ACTIVE_SCHEMA:
+        raise InstallError("upgrade setup receipt is invalid")
+    if previous.get("version") == new_active.get("version"):
+        raise InstallError("upgrade must select a new setup version")
+    destination = user_data / str(new_active.get("setup_root", ""))
+    if not destination.is_dir(): raise InstallError("upgrade setup directory is missing")
+    receipt = {"schema": "wipeout3se.clean-aot.upgrade.v1", "status": "activated-not-game-ready",
+               "from_version": previous["version"], "to_version": new_active["version"],
+               "preserved": ["config.json", "saves/card1.mcd", "saves/card2.mcd"],
+               "game_ready": False}
+    history = user_data / "receipts" / "upgrades" / f"{previous['version']}-to-{new_active['version']}.json"
+    _atomic(history, receipt)
+    _atomic(active_path, new_active)
     return receipt

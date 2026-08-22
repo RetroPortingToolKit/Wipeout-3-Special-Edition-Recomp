@@ -205,6 +205,25 @@ python tools/product/build_product.py launch `
 Any cross-version finalize receipt, modified region, missing region, or stale
 active lock fails before launch. A recorded BIOS frontier remains explicitly
 `frontier-recorded-not-game-ready`; it is evidence, not a game-ready promotion.
+Failed processes and bounded launch timeouts write hash-only diagnostics to
+`receipts/launch-diagnostic.json`. Setup upgrades atomically switch the active
+version while preserving global configuration and both memory cards.
+
+The Windows package audit parses each PE import table directly, requires every
+non-system DLL to exist in the package, reruns the shipping link-map leakage
+gate, and binds its result to BIOS frontier evidence:
+
+```powershell
+python tools/product/build_product.py audit-windows `
+  --package D:/Games/Wipeout3SE --link-map build-release/Wipeout3SE.map `
+  --root . --frontier clean-aot/catalog/evidence/bios-frontier-00001509.json
+```
+
+`clean-aot/product/evidence/windows-installed-launch-audit.json` records the
+current honest boundary: the 1,509-instruction BIOS receipt and live Vulkan
+backend are real and freshly tested, but no `Wipeout3SE.exe` product target or
+package link map exists yet. Consequently installed-launch and dependency-
+closure success remain unclaimed.
 
 The deterministic soak command runs a headless validation executable multiple
 times with fixed locale/timezone/SDL drivers, requires identical output bytes,

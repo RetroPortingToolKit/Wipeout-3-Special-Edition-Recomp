@@ -21,7 +21,9 @@ if __package__ in {None, ""}:
     )
     from release_lane import (  # type: ignore[import-not-found]
         ReleaseError, create_release, initialize_install, run_soak, validate_release)
-    from install_lane import InstallError, launch_and_record, orchestrate_first_run  # type: ignore[import-not-found]
+    from install_lane import (InstallError, launch_and_record, migrate_upgrade,
+                              orchestrate_first_run)  # type: ignore[import-not-found]
+    from windows_audit import audit_windows_package  # type: ignore[import-not-found]
 else:
     from .pipeline import (
         DEFAULT_MEDIA_MANIFEST,
@@ -34,7 +36,9 @@ else:
     )
     from .release_lane import (ReleaseError, create_release, initialize_install,
                                run_soak, validate_release)
-    from .install_lane import InstallError, launch_and_record, orchestrate_first_run
+    from .install_lane import (InstallError, launch_and_record, migrate_upgrade,
+                               orchestrate_first_run)
+    from .windows_audit import audit_windows_package
 
 
 def _common_media(parser: argparse.ArgumentParser) -> None:
@@ -121,6 +125,18 @@ def _build_parser() -> argparse.ArgumentParser:
     launch.add_argument("--user-data", type=Path, required=True)
     launch.add_argument("--timeout-seconds", type=float, default=30.0)
     launch.add_argument("command_line", nargs=argparse.REMAINDER)
+
+    upgrade = subparsers.add_parser("upgrade", help="atomically activate a new setup version")
+    upgrade.add_argument("--user-data", type=Path, required=True)
+    upgrade.add_argument("--active-receipt", type=Path, required=True)
+
+    audit = subparsers.add_parser(
+        "audit-windows", help="verify PE dependency closure, link map, and BIOS frontier")
+    audit.add_argument("--package", type=Path, required=True)
+    audit.add_argument("--link-map", type=Path, required=True)
+    audit.add_argument("--root", type=Path, required=True)
+    audit.add_argument("--frontier", type=Path, required=True)
+    audit.add_argument("--allowlist", type=Path)
 
     soak = subparsers.add_parser(
         "soak", help="run a deterministic bounded performance/soak command")
@@ -211,6 +227,13 @@ def main(argv: list[str] | None = None) -> int:
             document = launch_and_record(args.package, args.user_data,
                                          timeout_seconds=args.timeout_seconds,
                                          command=command_line or None)
+        elif args.command == "audit-windows":
+            document = audit_windows_package(
+                args.package, link_map=args.link_map, root=args.root,
+                frontier_evidence=args.frontier, allowlist=args.allowlist)
+        elif args.command == "upgrade":
+            document = migrate_upgrade(args.user_data, json.loads(
+                args.active_receipt.read_text(encoding="utf-8")))
         elif args.command == "soak":
             command_line = args.command_line
             if command_line and command_line[0] == "--":

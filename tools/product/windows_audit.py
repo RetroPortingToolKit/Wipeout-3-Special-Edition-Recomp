@@ -1,0 +1,100 @@
+"""Windows installed-package dependency, link-map, and frontier audit."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import struct
+from pathlib import Path
+from typing import Any
+
+from tools.cleanroom.gate_common import GateError, scan_link_map
+if __package__ in {None, ""}:
+    from pipeline import canonical_json_bytes, load_json  # type: ignore[import-not-found]
+    from release_lane import ReleaseError, validate_release  # type: ignore[import-not-found]
+else:
+    from .pipeline import canonical_json_bytes, load_json
+    from .release_lane import ReleaseError, validate_release
+
+SYSTEM_DLLS = {name.casefold() for name in (
+    "kernel32.dll", "user32.dll", "advapi32.dll", "shell32.dll", "ole32.dll",
+    "oleaut32.dll", "gdi32.dll", "comdlg32.dll", "combase.dll", "ntdll.dll",
+    "secur32.dll", "setupapi.dll", "cfgmgr32.dll", "imm32.dll", "version.dll",
+    "winmm.dll", "ws2_32.dll", "bcrypt.dll", "crypt32.dll", "shlwapi.dll",
+    "windowscodecs.dll", "vulkan-1.dll", "dwmapi.dll", "uxtheme.dll")}
+
+
+def _hash(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def pe_imports(path: Path) -> list[str]:
+    data = path.read_bytes()
+    if len(data) < 256 or data[:2] != b"MZ": raise ReleaseError("payload is not a PE image")
+    pe = struct.unpack_from("<I", data, 0x3c)[0]
+    if pe + 24 > len(data) or data[pe:pe + 4] != b"PE\0\0":
+        raise ReleaseError("payload has an invalid PE signature")
+    sections, optional_size = struct.unpack_from("<H12xH", data, pe + 6)
+    optional = pe + 24
+    magic = struct.unpack_from("<H", data, optional)[0]
+    directory = optional + (112 if magic == 0x20b else 96 if magic == 0x10b else -1)
+    if directory < optional or directory + 16 > optional + optional_size:
+        raise ReleaseError("payload has an unsupported PE optional header")
+    import_rva, import_size = struct.unpack_from("<II", data, directory + 8)
+    section_table = optional + optional_size
+    table = []
+    for index in range(sections):
+        offset = section_table + index * 40
+        if offset + 40 > len(data): raise ReleaseError("payload has a truncated PE section table")
+        virtual_size, virtual_address, raw_size, raw_offset = struct.unpack_from("<IIII", data, offset + 8)
+        table.append((virtual_address, max(virtual_size, raw_size), raw_offset, raw_size))
+    def locate(rva: int) -> int:
+        for address, span, raw, raw_size in table:
+            if address <= rva < address + span and rva - address < raw_size:
+                result = raw + rva - address
+                if result < len(data): return result
+        raise ReleaseError("PE import RVA is outside file-backed sections")
+    if import_rva == 0 or import_size == 0: return []
+    cursor, end, result = locate(import_rva), locate(import_rva) + import_size, []
+    while cursor + 20 <= len(data) and cursor < end:
+        descriptor = struct.unpack_from("<IIIII", data, cursor)
+        if descriptor == (0, 0, 0, 0, 0): break
+        name = locate(descriptor[3]); terminator = data.find(b"\0", name, min(len(data), name + 260))
+        if terminator < 0: raise ReleaseError("PE import name is unterminated")
+        try: result.append(data[name:terminator].decode("ascii"))
+        except UnicodeError as error: raise ReleaseError("PE import name is not ASCII") from error
+        cursor += 20
+    return sorted(set(result), key=str.casefold)
+
+
+def audit_windows_package(package: Path, *, link_map: Path, root: Path,
+                          frontier_evidence: Path, allowlist: Path | None = None) -> dict[str, Any]:
+    package_receipt = validate_release(package)
+    try: link_receipt = scan_link_map(link_map, root=root.resolve(strict=True), allowlist_path=allowlist)
+    except GateError as error: raise ReleaseError(str(error)) from error
+    if link_receipt["status"] != "pass": raise ReleaseError("package link-map leakage detected")
+    frontier = load_json(frontier_evidence)
+    if (frontier.get("schema") != "clean-aot.real-bios-execution.v1"
+            or frontier.get("bios_instructions_executed", 0) < 1509):
+        raise ReleaseError("BIOS frontier evidence is stale")
+    binaries = [path for path in package.rglob("*")
+                if path.is_file() and path.suffix.casefold() in {".exe", ".dll"}]
+    packaged = {path.name.casefold() for path in binaries}
+    imports: dict[str, list[str]] = {}
+    missing: set[str] = set()
+    for binary in binaries:
+        names = pe_imports(binary)
+        imports[binary.relative_to(package).as_posix()] = names
+        for name in names:
+            folded = name.casefold()
+            if (folded.startswith("api-ms-win-") or folded.startswith("ext-ms-win-")
+                    or folded in SYSTEM_DLLS or folded in packaged): continue
+            missing.add(name)
+    if missing: raise ReleaseError(f"package dependency closure is incomplete: {sorted(missing)}")
+    return {"schema": "wipeout3se.clean-aot.windows-package-audit.v1",
+            "status": "validated-not-game-ready", "game_ready": False,
+            "package_manifest_sha256": package_receipt["manifest_sha256"],
+            "link_map_receipt_sha256": hashlib.sha256(canonical_json_bytes(link_receipt)).hexdigest(),
+            "frontier_evidence_sha256": _hash(frontier_evidence),
+            "bios_instructions_executed": frontier["bios_instructions_executed"],
+            "imports": imports}

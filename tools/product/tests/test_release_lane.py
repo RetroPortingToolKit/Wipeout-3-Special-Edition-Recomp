@@ -17,8 +17,9 @@ from tools.product.release_lane import (
     validate_release,
 )
 from tools.product.install_lane import (ACTIVE_SCHEMA, InstallError, generation_lock,
-                                        launch_and_record)
+                                        launch_and_record, migrate_upgrade)
 from tools.product.pipeline import canonical_json_bytes
+from tools.product.windows_audit import pe_imports
 
 
 class ReleaseLaneTests(unittest.TestCase):
@@ -204,6 +205,17 @@ class ReleaseLaneTests(unittest.TestCase):
         receipt = launch_and_record(relocated, user_data, command=command)
         self.assertEqual(receipt["frontier"]["bios_instructions_executed"], 30)
         self.assertFalse(receipt["game_ready"])
+        with self.assertRaisesRegex(InstallError, "no canonical boot frontier"):
+            launch_and_record(relocated, user_data,
+                              command=[sys.executable, "-c", "raise SystemExit(7)"])
+        diagnostic = json.loads((user_data / "receipts" / "launch-diagnostic.json").read_text())
+        self.assertEqual(diagnostic["exit_code"], 7)
+        self.assertFalse(diagnostic["game_ready"])
+        with self.assertRaisesRegex(InstallError, "timed out"):
+            launch_and_record(relocated, user_data, timeout_seconds=0.05,
+                              command=[sys.executable, "-c", "import time;time.sleep(1)"])
+        timeout = json.loads((user_data / "receipts" / "launch-diagnostic.json").read_text())
+        self.assertEqual(timeout["status"], "launch-timeout-not-game-ready")
         native.write_bytes(b"stale replacement")
         with self.assertRaisesRegex(InstallError, "stale"):
             launch_and_record(relocated, user_data, command=command)
@@ -228,6 +240,34 @@ class ReleaseLaneTests(unittest.TestCase):
         with self.assertRaisesRegex(InstallError, "stale for this setup"):
             generation_lock(root / "setup.json", root / "finalize.json",
                             root / "catalog.json", root)
+
+    def test_upgrade_migrates_active_version_without_touching_saves(self) -> None:
+        user_data = self.root / "upgrade-user"
+        (user_data / "receipts").mkdir(parents=True)
+        (user_data / "setups" / "v2").mkdir(parents=True)
+        (user_data / "saves").mkdir()
+        card = user_data / "saves" / "card1.mcd"
+        card.write_bytes(b"preserve-me")
+        previous = {"schema": ACTIVE_SCHEMA, "version": "v1", "setup_root": "setups/v1",
+                    "game_ready": False}
+        active_path = user_data / "receipts" / "active-setup.json"
+        active_path.write_bytes(canonical_json_bytes(previous) + b"\n")
+        upgraded = {"schema": ACTIVE_SCHEMA, "version": "v2", "setup_root": "setups/v2",
+                    "game_ready": False}
+        receipt = migrate_upgrade(user_data, upgraded)
+        self.assertEqual(receipt["from_version"], "v1")
+        self.assertEqual(card.read_bytes(), b"preserve-me")
+        self.assertEqual(json.loads(active_path.read_text())["version"], "v2")
+
+    @unittest.skipUnless(sys.platform == "win32", "PE dependency test is Windows-only")
+    def test_windows_pe_dependency_reader_is_deterministic(self) -> None:
+        first = pe_imports(Path(sys.executable))
+        self.assertEqual(first, pe_imports(Path(sys.executable)))
+        self.assertTrue(any(name.casefold().endswith(".dll") for name in first))
+        malformed = self.root / "bad.exe"
+        malformed.write_bytes(b"MZ" + bytes(300))
+        with self.assertRaisesRegex(ReleaseError, "PE signature"):
+            pe_imports(malformed)
 
 
 if __name__ == "__main__":
