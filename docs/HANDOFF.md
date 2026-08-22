@@ -375,5 +375,11 @@ instruction and fails closed on every unknown PC or executable identity.
 - Next: cross-evidence and authorize the corridor beginning at `0xBFC00150`,
   extend generated load/store/COP0 semantics as encountered, then continue the
   same receipt chain until the authenticated game transition is reached.
+
+- Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
+  executes another 59 instructions, including memory-control and cache-control
+  initialization, then rejects the unbound `MTC0` PC at `0xBFC0023C`. The
+  repeated deterministic receipt is
+  `clean-aot/catalog/evidence/bios-frontier-00000089.json`.
 - Do not commit disc images, retail BIOS data, patched executables, captures,
   generated C, screenshots, saves, or packaged binaries.

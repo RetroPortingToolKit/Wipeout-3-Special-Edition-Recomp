@@ -26,6 +26,7 @@ inline void queue_load(GeneratedCpuState& c,std::uint8_t r,std::uint32_t v) noex
 inline std::int32_t s(std::uint32_t v) noexcept { return static_cast<std::int32_t>(v); }
 inline void addu(GeneratedCpuState& c,std::uint8_t d,std::uint8_t a,std::uint8_t b) noexcept{c.write(d,c.gpr[a]+c.gpr[b]);}
 inline void subu(GeneratedCpuState& c,std::uint8_t d,std::uint8_t a,std::uint8_t b) noexcept{c.write(d,c.gpr[a]-c.gpr[b]);}
+inline void bit_or(GeneratedCpuState& c,std::uint8_t d,std::uint8_t a,std::uint8_t b) noexcept{c.write(d,c.gpr[a]|c.gpr[b]);}
 inline void logic(GeneratedCpuState& c,std::uint8_t d,std::uint32_t v) noexcept{c.write(d,v);}
 inline void slt(GeneratedCpuState& c,std::uint8_t d,std::uint8_t a,std::uint8_t b,bool uns) noexcept{c.write(d,uns?c.gpr[a]<c.gpr[b]:s(c.gpr[a])<s(c.gpr[b]));}
 inline bool add_checked(std::uint32_t a,std::uint32_t b,std::uint32_t& out) noexcept{out=a+b;return ((~(a^b)&(a^out))>>31U)==0U;}

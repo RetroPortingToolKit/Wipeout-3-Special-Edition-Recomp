@@ -463,7 +463,12 @@ struct Runtime::Impl final {
     static bool generated_write32(void* context, std::uint32_t address,
                                   std::uint32_t value) noexcept {
         auto* self = static_cast<Impl*>(context);
-        return self != nullptr && self->bus.write32(address, value).ok();
+        if (self == nullptr) return false;
+        if (address == kCacheControl) {
+            self->cache_control = value;
+            return true;
+        }
+        return self->bus.write32(address, value).ok();
     }
     static bool generated_read8(void* c,std::uint32_t a,std::uint8_t& v) noexcept{auto*s=static_cast<Impl*>(c);if(!s)return false;auto r=s->bus.read8(a);v=r.value;return r.ok();}
     static bool generated_read16(void* c,std::uint32_t a,std::uint16_t& v) noexcept{auto*s=static_cast<Impl*>(c);if(!s)return false;auto r=s->bus.read16(a);v=r.value;return r.ok();}
