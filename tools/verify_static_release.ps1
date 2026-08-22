@@ -21,10 +21,18 @@ if ($configText -notmatch '(?m)^openbios\s*=\s*false\r?$') {
 if ($configText -notmatch '(?m)^bios_hle\s*=\s*false\r?$') {
     throw 'BIOS HLE is not explicitly disabled in the staged game config.'
 }
+if ($configText -notmatch '(?m)^supersampling\s*=\s*4\r?$') {
+    throw 'The clean release does not carry the required 4x supersampling baseline.'
+}
 $skipManifest = Join-Path $build 'mods/packages/psx.enhancement.skip-fmv/1.0.0/manifest.toml'
 if (-not (Test-Path -LiteralPath $skipManifest)) { throw "Missing staged skip-opening manifest: $skipManifest" }
 if ((Get-Content -Raw -LiteralPath $skipManifest) -notmatch '(?m)^default_enabled\s*=\s*false\r?$') {
     throw 'Skip-opening-sequence is enabled by default; it must remain user-controlled.'
+}
+$pgxpManifest = Join-Path $build 'mods/packages/psx.enhancement.pgxp/1.0.0/manifest.toml'
+if (-not (Test-Path -LiteralPath $pgxpManifest)) { throw "Missing staged PGXP manifest: $pgxpManifest" }
+if ((Get-Content -Raw -LiteralPath $pgxpManifest) -notmatch '(?m)^default_enabled\s*=\s*true\r?$') {
+    throw 'PGXP precision is not enabled by default in the remaster build.'
 }
 $fr120 = Join-Path $build 'mods/packages/wipeout3.enhancement.framerate-120/1.0.0/manifest.toml'
 if (Test-Path -LiteralPath $fr120) {
