@@ -1075,6 +1075,11 @@ std::uint32_t Device::pitch_step(const Voice& voice,
 }
 
 std::int16_t Device::next_noise() noexcept {
+    /*
+     * A voice consumes the level held during this 44.1 kHz interval.  The
+     * divider and LFSR clock at the trailing edge for the next interval.
+     */
+    const std::int16_t output = noise_level_;
     const std::int32_t step = 4 + static_cast<std::int32_t>(
         (effective_control_ & ControlNoiseStepMask) >> 8u);
     noise_timer_ -= step;
@@ -1095,7 +1100,7 @@ std::int16_t Device::next_noise() noexcept {
             noise_timer_ += period;
         }
     }
-    return noise_level_;
+    return output;
 }
 
 void Device::release_adsr(Voice& voice) noexcept {

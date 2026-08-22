@@ -1137,6 +1137,61 @@ void test_adsr_sweep_noise_and_modulation() {
             "noise-routed voice still scans ADPCM loop flags");
 }
 
+void test_noise_native_edge_and_snapshot() {
+    const auto configure_noise = [](Device& target) {
+        target.reset();
+        load_block(target, make_constant_block(2, 0x03u));
+        put(target, Device::MainVolume, 0x3FFFu);
+        put(target, Device::MainVolume + 2u, 0x3FFFu);
+        configure_voice(target, 0u, 0x0000u, 0x7FFFu);
+        put(target, Device::NoiseEnable, 1u);
+        put(target, Device::KeyOn, 1u);
+        put(target, 12u, 0x7FFFu);
+        put(target, Device::Control,
+            static_cast<std::uint16_t>(
+                kLive | Device::ControlNoiseShiftMask |
+                Device::ControlNoiseStepMask));
+    };
+
+    static Device whole;
+    static Device split;
+    configure_noise(whole);
+    configure_noise(split);
+    std::array<StereoSample, 441u> whole_audio{};
+    std::array<StereoSample, 441u> split_audio{};
+    require(whole.render_100hz_update(whole_audio).ok(),
+            "render maximum-rate noise at exactly 100 Hz");
+    require(split.render(std::span<StereoSample>(split_audio).first(73u)).ok(),
+            "render noise through hostile pre-snapshot edge");
+
+    static std::array<std::byte, Device::SnapshotBytes> noise_snapshot{};
+    require(split.save_snapshot(noise_snapshot).ok(),
+            "snapshot maximum-rate noise divider and LFSR");
+    static Device replay;
+    replay.reset();
+    require(replay.restore_snapshot(noise_snapshot).ok(),
+            "restore maximum-rate noise divider and LFSR");
+
+    put(split, Device::Control,
+        static_cast<std::uint16_t>(kLive | 0x3800u));
+    put(replay, Device::Control,
+        static_cast<std::uint16_t>(kLive | 0x3800u));
+    std::array<StereoSample, 368u> replay_tail{};
+    require(split.render(std::span<StereoSample>(split_audio).subspan(73u)).ok() &&
+                replay.render(replay_tail).ok(),
+            "render noise across a native-boundary shift/step change");
+    require(std::equal(replay_tail.begin(), replay_tail.end(),
+                       split_audio.begin() + 73) &&
+                split.deterministic_digest() == replay.deterministic_digest(),
+            "noise rate change is snapshot-exact at the native edge");
+
+    const std::uint64_t whole_digest = audio_digest(whole_audio);
+    const std::uint64_t changed_digest = audio_digest(split_audio);
+    require(whole_digest == 3'278'948'218'615'534'505ull &&
+                changed_digest == 17'969'122'608'217'034'753ull,
+            "noise LFSR native-phase and rate-change audio digests");
+}
+
 void test_mix_capture_and_input_fifos() {
     static Device saturated;
     saturated.reset();
@@ -1825,6 +1880,7 @@ int main() {
     test_gaussian_fractional_phases();
     test_irq_and_mmio_boundaries();
     test_adsr_sweep_noise_and_modulation();
+    test_noise_native_edge_and_snapshot();
     test_mix_capture_and_input_fifos();
     test_snapshot_chunking_and_long_replay();
     test_fixed_100hz_integration_contract();

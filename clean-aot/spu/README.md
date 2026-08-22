@@ -100,6 +100,7 @@ the maximum-sustain attack boundary,
 fresh-divider sweep restarts, the inverted all-ones sweep,
 phase-invariant exponential decrease,
 continuously clocked noise, modulation ordering,
+trailing-edge noise LFSR/divider timing and rate-change replay,
 saturation, masks and malformed MMIO, transfer FIFO/DMA modes,
 always-on capture and IRQ gates, CD/XA/external routing, chunking, adversarial
 snapshot validation, 39-tap reverb FIR phase and combined-delay behavior, long
