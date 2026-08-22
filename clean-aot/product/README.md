@@ -239,6 +239,18 @@ user BIOS, then stops on the first unknown generated PC. The later authenticated
 receipt includes staged RAM epochs and is not represented as a directly
 reproduced installed boot.
 
+The installer acceptance command independently relocates both distribution
+stages under a Unicode path and remeasures the installed runtime, complete game
+shard authority, and authenticated frontier:
+
+```powershell
+python tools/product/build_product.py installer-acceptance `
+  --installer build-installer `
+  --runtime build-product-runtime `
+  --frontier build-product-runtime/artifacts/artifacts/regions/frontier-evidence.json `
+  --receipt clean-aot/product/evidence/two-stage-installer-acceptance.json
+```
+
 The deterministic soak command runs a headless validation executable multiple
 times with fixed locale/timezone/SDL drivers, requires identical output bytes,
 enforces bounded execution, and checks a declared p95 ceiling:

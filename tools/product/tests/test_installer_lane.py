@@ -7,7 +7,8 @@ import unittest
 from pathlib import Path
 
 from tools.product.installer_lane import (RUNTIME_AUDIT_SCHEMA, audit_installed_runtime,
-                                           create_installer, validate_installer)
+                                           create_installer, run_installer_acceptance,
+                                           validate_installer)
 from tools.product.release_lane import create_release
 from tools.product.setup_frontend import SetupCancelled, install_runtime, run_setup
 
@@ -80,6 +81,19 @@ class InstallerLaneTests(unittest.TestCase):
         self.assertFalse((installed / "setup-payload").exists())
         self.assertFalse((installed / "Wipeout3SE-Setup.exe").exists())
         self.assertEqual(audit_installed_runtime(installed)["status"], "pass")
+
+    def test_acceptance_binds_relocated_installer_to_exact_runtime(self):
+        package = self.root / "installer-acceptance"
+        create_installer(setup_exe=self.root / "setup.exe", runtime_payload=self.runtime,
+                         setup_payload=self.payload, output=package)
+        frontier = self.root / "frontier.json"
+        frontier.write_text(json.dumps({"schema":"clean-aot.real-bios-execution.v2",
+            "bios_instructions_executed":1509, "generated_dispatches":100,
+            "stop_pc":3217035264}), encoding="utf-8")
+        receipt = run_installer_acceptance(package, self.runtime, frontier)
+        self.assertTrue(receipt["installer"]["relocated_unicode_validation"])
+        self.assertEqual(receipt["runtime_isolation"]["status"], "passed")
+        self.assertEqual(receipt["game_shards"]["compiled_instruction_count"], 135829)
 
     def test_identity_mutation_is_rejected_even_if_outer_inventory_is_remeasured(self):
         mutated = []

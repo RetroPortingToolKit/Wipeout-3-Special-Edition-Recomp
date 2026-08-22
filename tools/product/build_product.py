@@ -27,6 +27,7 @@ if __package__ in {None, ""}:
                               orchestrate_first_run)  # type: ignore[import-not-found]
     from windows_audit import audit_windows_package, smoke_windows_product  # type: ignore[import-not-found]
     from installer_lane import (audit_installed_runtime, create_installer,
+                                run_installer_acceptance,
                                 validate_installer)  # type: ignore[import-not-found]
     from release_readiness import (audit_release_readiness,
                                    write_readiness_receipt)  # type: ignore[import-not-found]
@@ -51,7 +52,8 @@ else:
     from .install_lane import (InstallError, launch_and_record, migrate_upgrade, rollback_upgrade,
                                orchestrate_first_run)
     from .windows_audit import audit_windows_package, smoke_windows_product
-    from .installer_lane import audit_installed_runtime, create_installer, validate_installer
+    from .installer_lane import (audit_installed_runtime, create_installer,
+                                 run_installer_acceptance, validate_installer)
     from .release_readiness import audit_release_readiness, write_readiness_receipt
     from .content_coverage import build_content_coverage_ledger
     from .behavioral_runner import build_scenario_plan, run_behavioral_scenarios
@@ -164,6 +166,7 @@ def _build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--root", type=Path, required=True)
     audit.add_argument("--frontier", type=Path, required=True)
     audit.add_argument("--allowlist", type=Path)
+    audit.add_argument("--receipt", type=Path)
 
     smoke = subparsers.add_parser(
         "smoke-windows", help="run a relocated product against external BIOS and record frontier")
@@ -234,6 +237,12 @@ def _build_parser() -> argparse.ArgumentParser:
     installer.add_argument("--output", type=Path, required=True)
     validate_installer_parser = subparsers.add_parser("validate-installer")
     validate_installer_parser.add_argument("--package", type=Path, required=True)
+    installer_acceptance = subparsers.add_parser(
+        "installer-acceptance", help="relocate and remeasure installer/runtime acceptance")
+    installer_acceptance.add_argument("--installer", type=Path, required=True)
+    installer_acceptance.add_argument("--runtime", type=Path, required=True)
+    installer_acceptance.add_argument("--frontier", type=Path, required=True)
+    installer_acceptance.add_argument("--receipt", type=Path, required=True)
     runtime_audit = subparsers.add_parser("audit-installed-runtime")
     runtime_audit.add_argument("--runtime", type=Path, required=True)
     return parser
@@ -330,6 +339,8 @@ def main(argv: list[str] | None = None) -> int:
             document = audit_windows_package(
                 args.package, link_map=args.link_map, root=args.root,
                 frontier_evidence=args.frontier, allowlist=args.allowlist)
+            if args.receipt:
+                write_readiness_receipt(args.receipt, document)
         elif args.command == "upgrade":
             document = migrate_upgrade(args.user_data, json.loads(
                 args.active_receipt.read_text(encoding="utf-8")))
@@ -384,6 +395,9 @@ def main(argv: list[str] | None = None) -> int:
                 output=args.output)
         elif args.command == "validate-installer":
             document = validate_installer(args.package)
+        elif args.command == "installer-acceptance":
+            document = run_installer_acceptance(
+                args.installer, args.runtime, args.frontier, args.receipt)
         elif args.command == "audit-installed-runtime":
             document = audit_installed_runtime(args.runtime)
         else:  # pragma: no cover - argparse enforces the command set

@@ -1,5 +1,19 @@
 # Handoff
 
+## Dual-card product evidence rebinding (2026-08-22)
+
+- The genuine dual-card `Wipeout3SE.exe` is packaged at executable SHA-256
+  `2dfcca55...` and release-manifest SHA-256 `018f4712...`. Settings, persistence,
+  all four 4K/ultrawide soak profiles, graphics matrix, Windows dependency/link
+  audit, installer acceptance, and readiness receipts are bound to that identity.
+- Installer acceptance now relocates the complete installer under a Unicode path,
+  independently validates its 20-file inventory and nested compiler-free runtime,
+  and proves the two authenticated game variants retain 135,829 instructions,
+  290 regions, zero exclusions, and zero unresolved CFI sites.
+- All product-side readiness gates are restored: 12/15 pass. The only failures
+  remain direct game-instruction execution, 64-route behavioral execution, and
+  authenticated media execution. Game-ready remains false.
+
 ## Native runtime settings UX (2026-08-22)
 
 - `Wipeout3SE.exe` now opens a compiler-free Win32 settings window for missing

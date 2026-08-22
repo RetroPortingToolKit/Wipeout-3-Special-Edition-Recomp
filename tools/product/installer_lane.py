@@ -17,6 +17,7 @@ else:
 
 INSTALLER_SCHEMA = "wipeout3se.clean-aot.two-stage-installer.v1"
 RUNTIME_AUDIT_SCHEMA = "wipeout3se.clean-aot.installed-runtime-audit.v1"
+INSTALLER_ACCEPTANCE_SCHEMA = "wipeout3se.clean-aot.two-stage-installer-acceptance.v1"
 RUNTIME_FORBIDDEN = ("compiler", "patch", "xdelta", "oracle", "legacy", "setup", "python")
 RUNTIME_ROLES = {"application", "sdl-runtime", "generated-clean-artifact",
                  "configuration-defaults", "portable-launcher"}
@@ -198,3 +199,58 @@ def validate_installer(package: Path) -> dict[str, Any]:
     return {"schema": INSTALLER_SCHEMA, "status": "validated", "files": len(listed),
             "manifest_sha256": _hash(package / "installer-manifest.json"),
             "runtime_audit": audit, "game_shards": game_shards}
+
+
+def run_installer_acceptance(installer: Path, runtime: Path, frontier: Path,
+                             receipt_path: Path | None = None) -> dict[str, Any]:
+    """Relocate and independently remeasure setup, runtime, shards, and frontier."""
+    installer, runtime, frontier = installer.resolve(), runtime.resolve(), frontier.resolve()
+    direct = validate_installer(installer)
+    runtime_audit = audit_installed_runtime(runtime)
+    try:
+        frontier_document = json.loads(frontier.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise ReleaseError("authenticated frontier receipt is malformed") from error
+    if (frontier_document.get("schema") != "clean-aot.real-bios-execution.v2" or
+            not isinstance(frontier_document.get("bios_instructions_executed"), int) or
+            frontier_document["bios_instructions_executed"] <= 0):
+        raise ReleaseError("authenticated frontier receipt is not eligible")
+    with tempfile.TemporaryDirectory(prefix="wipeout3se-installer-acceptance-") as temporary:
+        relocated = Path(temporary) / "利用者" / "移動済みインストーラー"
+        shutil.copytree(installer, relocated)
+        relocated_result = validate_installer(relocated)
+        relocated_runtime = relocated / "runtime-payload"
+        relocated_audit = audit_installed_runtime(relocated_runtime)
+        if (relocated_result != direct or relocated_audit != runtime_audit):
+            raise ReleaseError("relocated installer or runtime measurement changed")
+    executable = runtime / "bin" / "Wipeout3SE.exe"
+    nested_executable = installer / "runtime-payload" / "bin" / "Wipeout3SE.exe"
+    if (_hash(executable) != _hash(nested_executable) or
+            runtime_audit["runtime_manifest_sha256"] !=
+            direct["runtime_audit"]["runtime_manifest_sha256"]):
+        raise ReleaseError("installer runtime payload is not the accepted product")
+    shards = direct["game_shards"]
+    document = {
+        "schema": INSTALLER_ACCEPTANCE_SCHEMA,
+        "status": "complete-shards-packaged-not-game-ready", "game_ready": False,
+        "installer": {"status": direct["status"], "files": direct["files"],
+                      "manifest_sha256": direct["manifest_sha256"],
+                      "relocated_unicode_validation": True},
+        "runtime_artifact": {"sha256": _hash(executable)},
+        "runtime_isolation": {"status": "passed", "compiler_linked": False,
+                              "forbidden_classes": runtime_audit["forbidden_classes"],
+                              "settings_schema": "wipeout3se.runtime-settings.v2",
+                              "runtime_manifest_sha256": runtime_audit["runtime_manifest_sha256"]},
+        "game_shards": shards,
+        "authenticated_frontier": {
+            "schema": frontier_document["schema"], "receipt_sha256": _hash(frontier),
+            "bios_instructions_executed": frontier_document["bios_instructions_executed"],
+            "generated_dispatches": frontier_document.get("generated_dispatches"),
+            "stop_pc": frontier_document.get("stop_pc")},
+    }
+    if receipt_path is not None:
+        receipt_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = receipt_path.with_name(receipt_path.name + ".new")
+        temporary.write_bytes(_canonical(document))
+        os.replace(temporary, receipt_path)
+    return document
