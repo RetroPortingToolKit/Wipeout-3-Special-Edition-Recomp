@@ -17,6 +17,7 @@ set(CLEAN_AOT_COMPONENTS
     cpu
     gte
     gpu
+    soc
     machine
     mdec
     media
@@ -24,10 +25,10 @@ set(CLEAN_AOT_COMPONENTS
     raster
     render
     sio
-    soc
     spu
     runtime
     host
+    app
 )
 
 foreach(component IN LISTS CLEAN_AOT_COMPONENTS)
