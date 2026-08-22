@@ -22,9 +22,11 @@ bool generated_target(GeneratedCpuState& state) noexcept {
 std::string replay() {
     RuntimeTargetTrace trace{kImages, 8U, 40U};
     const std::array<std::uint32_t, 1U> roots{0x1004U};
-    const std::array entries{GeneratedRegionEntry{0x1004U, generated_target, 1U}};
+    const std::array functions{GeneratedRegionFunction{generated_target}};
+    const std::array entries{GeneratedPackedRegionEntry{0x1004U, 0U, 1U}};
+    const std::array pages{GeneratedDispatchPage{0U, 1U}};
     const GeneratedExecutableBinding binding{kNfe, kNfe, 0x1000U, 0x1010ULL,
-                                               roots, entries};
+                                               roots, {}, functions, entries, pages};
     const std::array candidates{GeneratedEpochBinding{kNfe, &binding}};
     GeneratedEpochDispatcher epoch;
     epoch.set_trace(&trace);

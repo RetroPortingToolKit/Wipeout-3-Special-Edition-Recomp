@@ -2,7 +2,6 @@
 #include "clean_aot/compiler/mips_decoder.hpp"
 
 #include <algorithm>
-#include <array>
 #include <iomanip>
 #include <map>
 #include <sstream>
@@ -11,28 +10,6 @@
 
 namespace clean_aot::compiler {
 namespace {
-
-[[nodiscard]] const char* edge_kind_name(EdgeKind kind) {
-    switch (kind) {
-    case EdgeKind::Fallthrough:
-        return "Fallthrough";
-    case EdgeKind::DirectJump:
-        return "DirectJump";
-    case EdgeKind::DirectCall:
-        return "DirectCall";
-    case EdgeKind::BranchTaken:
-        return "BranchTaken";
-    case EdgeKind::BranchFallthrough:
-        return "BranchFallthrough";
-    case EdgeKind::IndirectJump:
-        return "IndirectJump";
-    case EdgeKind::IndirectCall:
-        return "IndirectCall";
-    case EdgeKind::Return:
-        return "Return";
-    }
-    throw IrError("emitter encountered an unknown edge kind");
-}
 
 void write_address(std::ostringstream& output, GuestAddress address) {
     output << "0x" << std::uppercase << std::hex << std::setw(8) << std::setfill('0')
@@ -140,34 +117,9 @@ std::string CppEmitter::emit(const Region& region) {
     }
 
     std::ostringstream output;
-    output << "#include <array>\n"
-           << "#include <cstdint>\n"
-           << "#include <optional>\n#include <clean_aot/runtime/generated_cpu.hpp>\n\n"
+    output << "#include <cstdint>\n"
+           << "#include <clean_aot/runtime/generated_cpu.hpp>\n\n"
            << "namespace clean_aot_generated {\nusing namespace clean_aot::runtime;\n\n"
-           << "enum class EdgeKind : std::uint8_t {\n"
-           << "    Fallthrough, DirectJump, DirectCall, BranchTaken,\n"
-           << "    BranchFallthrough, IndirectJump, IndirectCall, Return\n"
-           << "};\n\n"
-           << "struct Edge final {\n"
-           << "    std::uint32_t source;\n"
-           << "    std::optional<std::uint32_t> target;\n"
-           << "    EdgeKind kind;\n"
-           << "};\n\n"
-           << "inline constexpr std::array<Edge, " << region.edges.size() << "> kEdges = {{\n";
-
-    for (const Edge* edge : ordered_edges) {
-        output << "    {";
-        const BasicBlock* source = blocks_by_id.at(edge->source);
-        write_address(output, source->start);
-        output << ", ";
-        if (edge->target.has_value()) {
-            write_address(output, *edge->target);
-        } else {
-            output << "std::nullopt";
-        }
-        output << ", EdgeKind::" << edge_kind_name(edge->kind) << "},\n";
-    }
-    output << "}};\n\n"
            << "// Returns true when a resolved edge advanced the guest PC.\n"
            << "// An unresolved indirect edge leaves the caller's PC untouched.\n"
            << "extern \"C\" bool clean_aot_region_"

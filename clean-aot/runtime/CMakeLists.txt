@@ -74,6 +74,16 @@ if(BUILD_TESTING)
     target_compile_features(clean_aot_runtime_target_trace_tests PRIVATE cxx_std_20)
     add_test(NAME clean_aot_runtime_target_trace_tests
              COMMAND clean_aot_runtime_target_trace_tests)
+    add_executable(clean_aot_runtime_packed_dispatch_tests
+        tests/packed_dispatch_tests.cpp)
+    target_link_libraries(clean_aot_runtime_packed_dispatch_tests PRIVATE clean_aot_runtime)
+    target_compile_features(clean_aot_runtime_packed_dispatch_tests PRIVATE cxx_std_20)
+    add_test(NAME clean_aot_runtime_packed_dispatch_tests
+             COMMAND clean_aot_runtime_packed_dispatch_tests)
+    add_executable(clean_aot_runtime_dispatch_benchmark
+        tests/dispatch_benchmark.cpp)
+    target_link_libraries(clean_aot_runtime_dispatch_benchmark PRIVATE clean_aot_runtime)
+    target_compile_features(clean_aot_runtime_dispatch_benchmark PRIVATE cxx_std_20)
     add_executable(clean_aot_cdrom_bios_sequence_tests
         tests/cdrom_bios_sequence_tests.cpp)
     target_link_libraries(clean_aot_cdrom_bios_sequence_tests PRIVATE

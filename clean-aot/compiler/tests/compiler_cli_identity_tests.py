@@ -34,6 +34,9 @@ class CompilerCliIdentityTests(unittest.TestCase):
             self.assertIn(digest, table)
             self.assertIn("{0x1000U,", table)
             self.assertNotIn("{0x1004U,", table)
+            self.assertIn("GeneratedPackedRegionEntry", table)
+            self.assertIn("GeneratedDispatchPage", table)
+            self.assertEqual(table.count('extern "C" bool clean_aot_region_'), 1)
 
             changed = root / "changed.bin"
             changed.write_bytes(payload[:-1] + b"\x01")

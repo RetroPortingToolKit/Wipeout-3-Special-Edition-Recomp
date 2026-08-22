@@ -609,8 +609,9 @@ void test_backward_direct_edge_is_inside_the_region() {
 void test_emitter_contains_compilable_graph_shape() {
     const Region region = make_trampoline_region();
     const std::string source = clean_aot::compiler::CppEmitter::emit(region);
-    require(source.find("#include <optional>") != std::string::npos,
-            "emitter must include the type used for unresolved edges");
+    require(source.find("kEdges") == std::string::npos &&
+                source.find("#include <optional>") == std::string::npos,
+            "emitter must not duplicate compile-time graph metadata in native objects");
     require(source.find("0x00001010u") != std::string::npos,
             "emitter must preserve the trampoline target");
     require(source.find("0x00001020u") != std::string::npos,
