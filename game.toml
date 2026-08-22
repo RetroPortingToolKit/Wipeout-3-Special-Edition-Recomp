@@ -47,6 +47,8 @@ overlay_cache = false
 [video]
 renderer = "opengl"
 geometry_correction = true
+perspective_texturing = true
+pgxp_depth = true
 supersampling = 4
 hd_textures = true
 bezel = "random"
