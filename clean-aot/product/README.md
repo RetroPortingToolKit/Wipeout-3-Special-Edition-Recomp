@@ -243,6 +243,24 @@ python tools/product/build_product.py soak --iterations 1000 `
   -- build-release/product_soak.exe
 ```
 
+The installed-product lane exercises the genuine packaged executable after its
+authenticated BIOS frontier. Profiles `4k-headless`, `4k-hidden`,
+`5120x2160-headless`, and `5120x2160-hidden` drive real host frame and 44.1-kHz
+audio submission with exact deterministic 100-Hz deadlines. The harness rejects
+late pacing, hard GPU submission errors, audio underruns, nondeterministic output,
+timeouts, or a measured p95 above the supplied bound:
+
+```powershell
+python tools/product/build_product.py soak-windows `
+  --package D:/Games/Wipeout3SE --bios D:/UserMedia/SCPH1001.BIN `
+  --profile 5120x2160-hidden --updates 2 --iterations 100 `
+  --timeout-seconds 30 --max-p95-ms 5000 `
+  --receipt build-release/receipts/installed-ultrawide-hidden.json
+```
+
+Hidden-window swapchain deferrals are reported separately from hard GPU errors;
+they are bounded by the update count and never presented as completed frames.
+
 Passing these gates proves package isolation, relocation, deterministic harness
 output, and the measured performance threshold only. It does not prove BIOS or
 game boot, race completion, or release readiness.

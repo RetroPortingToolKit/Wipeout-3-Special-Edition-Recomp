@@ -371,3 +371,72 @@ def run_soak(command: Sequence[str], *, iterations: int, timeout_seconds: float,
     if receipt_path is not None:
         _atomic_write(receipt_path.resolve(strict=False), _canonical(receipt))
     return receipt
+
+
+def run_installed_product_soak(package: Path, *, bios: Path, profile: str,
+                               updates: int, iterations: int, timeout_seconds: float,
+                               max_p95_ms: float, receipt_path: Path | None = None) -> dict[str, Any]:
+    """Exercise the installed product's bounded 100-Hz host workload."""
+    if profile not in {"4k-headless", "4k-hidden", "5120x2160-headless",
+                       "5120x2160-hidden"}:
+        raise ReleaseError("unknown installed-product workload profile")
+    if not 1 <= updates <= 1000:
+        raise ReleaseError("installed-product workload update bound is invalid")
+    if not 2 <= iterations <= 1000 or timeout_seconds <= 0 or max_p95_ms <= 0:
+        raise ReleaseError("installed-product soak bound is invalid")
+    validate_release(package)
+    command = [str(package.resolve(strict=True) / "bin" / "Wipeout3SE.exe"),
+               "--bios", str(bios.resolve(strict=True)), "--smoke-hidden",
+               "--workload-profile", profile, "--workload-updates", str(updates)]
+    environment = {"PATH": os.environ.get("PATH", ""), "LANG": "C", "LC_ALL": "C",
+                   "TZ": "UTC", "PYTHONHASHSEED": "0"}
+    for name in ("SYSTEMROOT", "WINDIR", "TEMP", "TMP", "LOCALAPPDATA"):
+        if name in os.environ: environment[name] = os.environ[name]
+    elapsed: list[float] = []
+    outputs: list[bytes] = []
+    frontier: dict[str, Any] | None = None
+    for _ in range(iterations):
+        started = time.perf_counter_ns()
+        try:
+            completed = subprocess.run(command, cwd=package / "bin", env=environment,
+                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                timeout=timeout_seconds, check=False)
+        except subprocess.TimeoutExpired as error:
+            raise ReleaseError("installed-product soak timed out") from error
+        elapsed.append((time.perf_counter_ns() - started) / 1_000_000.0)
+        if completed.returncode != 0:
+            raise ReleaseError("installed-product workload failed closed")
+        outputs.append(completed.stdout + b"\0" + completed.stderr)
+        try: current = json.loads(completed.stdout.decode("utf-8").strip().splitlines()[-1])
+        except (UnicodeError, ValueError, IndexError) as error:
+            raise ReleaseError("installed-product workload emitted no metrics") from error
+        workload = current.get("workload", {})
+        if (current.get("stage") != "bios-slice-stopped" or
+                workload.get("profile") != profile or workload.get("rate_hz") != 100 or
+                workload.get("updates") != updates or
+                workload.get("frames_submitted") != updates or
+                workload.get("audio_batches_submitted") != updates or
+                workload.get("audio_sample_frames") != updates * 441 or
+                workload.get("pacing_span_ns") != updates * 10_000_000 or
+                workload.get("gpu_submission_failures") != 0 or
+                not 0 <= workload.get("gpu_deferred_updates", -1) <= updates or
+                workload.get("audio_underruns") != 0 or
+                workload.get("pacing_late_updates") != 0):
+            raise ReleaseError("installed-product workload metrics exceeded thresholds")
+        frontier = current
+    digests = {hashlib.sha256(output).hexdigest() for output in outputs}
+    if len(digests) != 1: raise ReleaseError("installed-product workload is nondeterministic")
+    ordered = sorted(elapsed)
+    p95 = ordered[max(0, (95 * len(ordered) + 99) // 100 - 1)]
+    if p95 > max_p95_ms: raise ReleaseError("installed-product workload p95 exceeded threshold")
+    receipt = {"schema": "wipeout3se.clean-aot.installed-soak.v1", "status": "passed-not-game-ready",
+        "game_ready": False, "profile": profile, "updates_per_iteration": updates,
+        "iterations": iterations, "metrics": frontier["workload"],
+        "cpu": {"bios_instructions_executed": frontier["bios_instructions_executed"],
+                "generated_dispatches": frontier["bios_generated_dispatches"],
+                "process_p95_ms": p95},
+        "output_sha256": next(iter(digests)),
+        "timing_ms": {"min": min(elapsed), "median": statistics.median(elapsed),
+                      "p95": p95, "max": max(elapsed), "limit_p95": max_p95_ms}}
+    if receipt_path is not None: _atomic_write(receipt_path.resolve(strict=False), _canonical(receipt))
+    return receipt

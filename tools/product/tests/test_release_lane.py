@@ -13,6 +13,7 @@ from tools.product.release_lane import (
     ReleaseError,
     create_release,
     initialize_install,
+    run_installed_product_soak,
     run_soak,
     validate_release,
 )
@@ -164,6 +165,12 @@ class ReleaseLaneTests(unittest.TestCase):
             run_soak(
                 [sys.executable, "-c", "import time; print(time.time_ns())"],
                 iterations=3, timeout_seconds=5.0, max_p95_ms=5000.0)
+        with self.assertRaisesRegex(ReleaseError, "unknown installed-product workload"):
+            run_installed_product_soak(self.root, bios=self.artifact, profile="8k-fantasy",
+                updates=2, iterations=3, timeout_seconds=1.0, max_p95_ms=1.0)
+        with self.assertRaisesRegex(ReleaseError, "update bound"):
+            run_installed_product_soak(self.root, bios=self.artifact, profile="4k-headless",
+                updates=0, iterations=3, timeout_seconds=1.0, max_p95_ms=1.0)
 
     def test_relocated_launch_records_frontier_and_rejects_stale_upgrade(self) -> None:
         package = self.root / "original-package"

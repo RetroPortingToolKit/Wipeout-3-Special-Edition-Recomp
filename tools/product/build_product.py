@@ -20,7 +20,8 @@ if __package__ in {None, ""}:
         setup_product,
     )
     from release_lane import (  # type: ignore[import-not-found]
-        ReleaseError, create_release, initialize_install, run_soak, validate_release)
+        ReleaseError, create_release, initialize_install, run_installed_product_soak,
+        run_soak, validate_release)
     from install_lane import (InstallError, launch_and_record, migrate_upgrade,
                               orchestrate_first_run)  # type: ignore[import-not-found]
     from windows_audit import audit_windows_package, smoke_windows_product  # type: ignore[import-not-found]
@@ -35,7 +36,7 @@ else:
         setup_product,
     )
     from .release_lane import (ReleaseError, create_release, initialize_install,
-                               run_soak, validate_release)
+                               run_installed_product_soak, run_soak, validate_release)
     from .install_lane import (InstallError, launch_and_record, migrate_upgrade,
                                orchestrate_first_run)
     from .windows_audit import audit_windows_package, smoke_windows_product
@@ -153,6 +154,16 @@ def _build_parser() -> argparse.ArgumentParser:
     soak.add_argument("--cwd", type=Path)
     soak.add_argument("--receipt", type=Path)
     soak.add_argument("command_line", nargs=argparse.REMAINDER)
+    installed_soak = subparsers.add_parser(
+        "soak-windows", help="exercise deterministic installed 4K/ultrawide product workloads")
+    installed_soak.add_argument("--package", type=Path, required=True)
+    installed_soak.add_argument("--bios", type=Path, required=True)
+    installed_soak.add_argument("--profile", required=True)
+    installed_soak.add_argument("--updates", type=int, default=10)
+    installed_soak.add_argument("--iterations", type=int, default=5)
+    installed_soak.add_argument("--timeout-seconds", type=float, default=30.0)
+    installed_soak.add_argument("--max-p95-ms", type=float, required=True)
+    installed_soak.add_argument("--receipt", type=Path)
     return parser
 
 
@@ -256,6 +267,11 @@ def main(argv: list[str] | None = None) -> int:
                 timeout_seconds=args.timeout_seconds,
                 max_p95_ms=args.max_p95_ms, cwd=args.cwd,
                 receipt_path=args.receipt)
+        elif args.command == "soak-windows":
+            document = run_installed_product_soak(
+                args.package, bios=args.bios, profile=args.profile, updates=args.updates,
+                iterations=args.iterations, timeout_seconds=args.timeout_seconds,
+                max_p95_ms=args.max_p95_ms, receipt_path=args.receipt)
         else:  # pragma: no cover - argparse enforces the command set
             raise ProductError("unknown product command")
         _print(document)
