@@ -439,6 +439,15 @@ instruction and fails closed on every unknown PC or executable identity.
   `clean-aot/catalog/evidence/bios-frontier-00079218.json` records the next RAM
   epoch SHA-256 `c1d13084...6b1744` and fail-closed PC `0x000000C0`, where the
   BIOS-installed low-RAM vector trampoline now begins.
+- Exact-range epoch binding advances through the physical `0xC0` trampoline,
+  dispatch table at `0x600`, selected handler at `0x540`, and exception-vector
+  installer at `0xEB0`. Writes elsewhere on the same RAM page force a byte-hash
+  recheck before refreshing the page stamp; any authenticated instruction-byte
+  change still fails closed. Two repeated runs reach 79,382 instructions and
+  13,864 dispatches with 9,253 reads, 15,013 writes, one device read, and 31
+  device writes. Receipt `bios-frontier-00079382.json` stops cleanly at the next
+  unbound physical RAM target `0x00006A70`; final 64-KiB RAM SHA-256 is
+  `f1f4eeac...766c8`.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control
