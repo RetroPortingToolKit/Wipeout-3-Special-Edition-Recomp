@@ -133,6 +133,12 @@
   spelling/control-flow and now passes. It proves the static policy boundary
   (mod-owned, host-pacing-only, bounded, and separate from XA/FMVs), but does
   not replace the missing paired runtime trace.
+- The first paired Fast Loading route exposed a real host-audio defect:
+  4x host pacing produced 155,084 bridge overflow drops while the guest was
+  accelerated. Fast Loading now automatically enables the existing
+  discard-only turbo audio sink for multipliers above 1 and resets it on
+  session reinitialization. The static guard and rebuild pass; a post-fix full
+  route comparison is still required before equivalence is declared.
 - Runtime still links generic overlay/autocompile/interpreter plumbing even
   though the release configuration disables its behavior; strict link-surface
   removal remains unfinished.
