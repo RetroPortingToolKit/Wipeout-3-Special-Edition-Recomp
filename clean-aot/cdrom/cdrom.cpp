@@ -966,10 +966,10 @@ void Cdrom::begin_command(std::uint8_t command,
         playing_ = true;
         play_origin_track_ = selected->number;
         Cycle next = 0U;
-        const Cycle period = (mode_ & ModeDoubleSpeed) != 0U
-                                 ? DoubleSpeedSectorCycles
-                                 : SingleSpeedSectorCycles;
-        if (!add_without_overflow(cycle_, period, next) ||
+        // Setmode bit 7 changes data-sector cadence only.  Red Book audio
+        // remains 75 sectors/second; applying the data multiplier here would
+        // double CDDA pitch and run report/autopause/lead-out early.
+        if (!add_without_overflow(cycle_, SingleSpeedSectorCycles, next) ||
             !schedule_event(next, ScheduledEvent::CddaSector)) {
             playing_ = false;
             queue_command_error(ErrorCode::SchedulerOverflow,
@@ -1489,10 +1489,7 @@ void Cdrom::schedule_next_data_sector(Cycle from) noexcept {
 
 void Cdrom::schedule_next_cdda_sector(Cycle from) noexcept {
     Cycle next = 0U;
-    const Cycle period = (mode_ & ModeDoubleSpeed) != 0U
-                             ? DoubleSpeedSectorCycles
-                             : SingleSpeedSectorCycles;
-    if (!add_without_overflow(from, period, next) ||
+    if (!add_without_overflow(from, SingleSpeedSectorCycles, next) ||
         !schedule_event(next, ScheduledEvent::CddaSector)) {
         stop_streams();
         queue_command_error(ErrorCode::SchedulerOverflow,

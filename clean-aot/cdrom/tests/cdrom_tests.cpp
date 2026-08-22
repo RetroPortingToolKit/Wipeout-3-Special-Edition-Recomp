@@ -868,6 +868,25 @@ void test_cdda_tracks_autopause_matrix_mute_and_100hz_relation() {
     require(!cadence.playing() &&
                 (cadence.status() & clean_aot::cdrom::status_bit(Status::MotorOn)) == 0U,
             "lead-out stops CDDA and motor");
+
+    AudioLog double_mode_audio;
+    Cdrom double_mode(source.get(), mixed_layout());
+    double_mode.attach_cdda_sink(&double_mode_audio);
+    issue(double_mode, Command::Setmode, {0x80U});
+    acknowledge_one_byte(double_mode, 0U);
+    issue(double_mode, Command::Play, {0x02U});
+    (void)double_mode.pop_response();
+    acknowledge(double_mode);
+    const clean_aot::cdrom::Cycle play_start = double_mode.current_cycle();
+    double_mode.advance_to(play_start + DoubleSpeedSectorCycles);
+    require(double_mode_audio.sector_count == 0U,
+            "data double-speed mode cannot accelerate the first CDDA sector");
+    double_mode.advance_to(play_start + SingleSpeedSectorCycles);
+    require(double_mode_audio.sector_count == 1U && double_mode_audio.lbas[0U] == 2U,
+            "CDDA first sector remains exactly 75 Hz in data double-speed mode");
+    double_mode.advance_to(play_start + SingleSpeedSectorCycles * 2U);
+    require(double_mode_audio.sector_count == 2U && double_mode_audio.lbas[1U] == 3U,
+            "successive CDDA sectors remain exactly 75 Hz in data double-speed mode");
 }
 
 void test_xa_routing_filter_and_explicit_decode_boundary() {
