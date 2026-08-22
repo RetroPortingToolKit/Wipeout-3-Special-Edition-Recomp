@@ -1,5 +1,23 @@
 # Handoff
 
+## Independent interrupt audit at PC 0x000005C4 (2026-08-22)
+
+- The committed route terminal was mislabeled as a low-RAM interrupt handler.
+  Exact verified BIOS and terminal RAM bytes prove the path is A0 service 0x40:
+  `0xBFC0D8E0 -> 0xA0 -> 0x5C4`, where the dispatcher reads table entry
+  `0x300 = 0xBFC0D8E0`. The actual general-exception path is independently
+  `0x80 -> 0xC80` and was not traversed by the terminal transition.
+- Exact CRTC VBlank is edge-latched in I_STAT; I_STAT is zero-to-clear; only
+  still-active DMA/CD/GPU/SIO/SPU levels are resampled; `(I_STAT & I_MASK)`
+  drives COP0 IP2. Generated exception entry disables current IE by pushing the
+  low Status mode stack, and RFE restores it. These semantics do not establish
+  a storm or missing return here.
+- The route receipt contains no I_STAT, I_MASK, COP0 Status/Cause/EPC, stack, or
+  vector-visit telemetry, so no source attribution is honest. No runtime/SoC
+  defect was independently proven and production/runtime was unchanged.
+  Canonical receipt: `bios-shell-interrupt-audit-000005c4.json` (SHA-256
+  `4780941e...1999`); full report: `docs/SHELL_INTERRUPT_AUDIT_000005C4.md`.
+
 ## Goal-directed shell disc route at frontier 239 (2026-08-22)
 
 - Authenticated resident bytes and the committed frontier-239 receipt now bind
