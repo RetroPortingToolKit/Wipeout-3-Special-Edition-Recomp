@@ -222,6 +222,10 @@
   normal and fast route lengths were different, so endpoint counts are not
   comparable; the frame-2,105 divergence is the current narrow correctness
   boundary requiring a longer equal-route capture and CD/XA event alignment.
+  The retained CD rings from that probe are also non-overlapping: normal
+  contains only frames 3,619–3,633 while fast contains 2,092–2,106. Equal ring
+  lengths therefore do not prove equal event order; treat the card match and
+  fingerprint prefix as the only valid evidence from that run.
 
 ## Ruled out
 
