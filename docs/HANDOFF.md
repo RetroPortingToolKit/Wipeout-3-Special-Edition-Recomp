@@ -817,3 +817,15 @@ instruction and fails closed on every unknown PC or executable identity.
   `clean-aot/catalog/evidence/bios-frontier-00000089.json`.
 - Do not commit disc images, retail BIOS data, patched executables, captures,
   generated C, screenshots, saves, or packaged binaries.
+
+- Registry capacity is no longer authorization: runtime construction now owns
+  a fixed manifest-sized registry (default 512, strict upper bound 4096),
+  allocation/configuration fails closed, invalidated slots are reused, and all
+  binding range/hash/stamp checks remain exact. More than 256 exact bindings
+  are covered by the runtime adversarial test.
+- Immutable BIOS shard `[0xBFC03FAC,0xBFC043AC)` (SHA-256 `a9a3f29f...50027`)
+  now has an exact ROM contract and advances through `0x18BC` and `0x19C8` to
+  copied-RAM `0x1858`. Receipt
+  `bios-shell-registry-frontier-00001858.json` records 19,270,447 instructions,
+  1,787,127 dispatches, zero CD MMIO, and fail-closed compiler rejection at
+  `0x1858`: `control transfer has no bounded delay-slot instruction`.

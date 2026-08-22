@@ -484,7 +484,7 @@ std::uint64_t RetirementClock::phase() const noexcept {
 }
 
 struct Runtime::Impl final {
-    static constexpr std::size_t kMaximumCopiedEpochs = 256U;
+    static constexpr std::size_t kMaximumCopiedEpochs = 4096U;
     struct CopiedEpoch final {
         GeneratedDispatcher dispatcher{};
         memory::CodeRegionStamp stamp{};
@@ -493,11 +493,13 @@ struct Runtime::Impl final {
         std::string source_sha256{};
         std::uint32_t source_start = 0U;
         std::uint32_t source_byte_count = 0U;
+        bool immutable_bios = false;
         bool bound = false;
     };
     GeneratedDispatcher generated_dispatcher{};
     GeneratedDispatcher bios_dispatcher{};
-    std::array<CopiedEpoch, kMaximumCopiedEpochs> copied_epochs{};
+    std::unique_ptr<CopiedEpoch[]> copied_epochs{};
+    std::size_t copied_epoch_capacity = 0U;
     GeneratedCpuState generated_cpu{};
     GeneratedCpuState bios_cpu{};
     std::string bios_sha256{};
@@ -730,7 +732,19 @@ struct Runtime::Impl final {
           cdda_bridge(this),
           router(this),
           bus(memory::BusConfig{configuration.bios, &router}) {
-        configured = multiplier_valid && clock.configured() && bus.configured();
+        const auto requested_capacity =
+            configuration.authenticated_region_capacity;
+        if (requested_capacity > 0U &&
+            requested_capacity <= kMaximumCopiedEpochs) {
+            copied_epochs.reset(
+                new (std::nothrow) CopiedEpoch[requested_capacity]);
+            if (copied_epochs != nullptr) {
+                copied_epoch_capacity = requested_capacity;
+            }
+        }
+        configured = multiplier_valid && clock.configured() && bus.configured() &&
+                     copied_epoch_capacity == requested_capacity &&
+                     requested_capacity > 0U;
         try {
             bios_sha256 = sha256_hex(configuration.bios);
         } catch (...) {
@@ -1879,7 +1893,8 @@ Status Runtime::reset() noexcept {
     impl_->bios_cpu.write32 = &Impl::generated_write32;
     Impl::bind_generated_cop2(*impl_,impl_->bios_cpu);
     impl_->bios_bound = false;
-    for (auto& epoch : impl_->copied_epochs) epoch = Impl::CopiedEpoch{};
+    for (std::size_t index = 0U; index < impl_->copied_epoch_capacity; ++index)
+        impl_->copied_epochs[index] = Impl::CopiedEpoch{};
     impl_->copied_epoch_count = 0U;
     impl_->generated_memory_reads = 0U;
     impl_->generated_memory_writes = 0U;
@@ -1947,7 +1962,8 @@ DispatchStatus Runtime::dispatch_bios() noexcept {
     for(std::size_t index=0U;index<impl_->copied_epoch_count;++index){
         auto& epoch=impl_->copied_epochs[index];
         if(!epoch.bound||!epoch.dispatcher.contains(impl_->bios_cpu.pc))continue;
-        if(impl_->bus.validate_code_region(epoch.stamp,epoch.variant)!=memory::CodeRegionValidity::Current){
+        if(!epoch.immutable_bios &&
+           impl_->bus.validate_code_region(epoch.stamp,epoch.variant)!=memory::CodeRegionValidity::Current){
             std::string current_hash;
             try{if(!hash_bus_range(impl_->bus,epoch.stamp.virtual_start,epoch.stamp.byte_count,current_hash))return DispatchStatus::EpochMismatch;}catch(...){return DispatchStatus::EpochMismatch;}
             if(current_hash!=epoch.destination_sha256)return DispatchStatus::EpochMismatch;
@@ -2003,7 +2019,8 @@ DispatchStatus Runtime::bind_authenticated_copied_epoch(
         const std::uint64_t existing_end=static_cast<std::uint64_t>(existing.stamp.virtual_start)+existing.stamp.byte_count;
         const bool overlaps=binding.generated.load_start<existing_end&&existing.stamp.virtual_start<candidate_end;
         if(!overlaps)continue;
-        if(impl_->bus.validate_code_region(existing.stamp,existing.variant)!=memory::CodeRegionValidity::Current){
+        if(!existing.immutable_bios &&
+           impl_->bus.validate_code_region(existing.stamp,existing.variant)!=memory::CodeRegionValidity::Current){
             std::string current_hash;
             try{
                 if(!hash_bus_range(impl_->bus,existing.stamp.virtual_start,
@@ -2053,17 +2070,27 @@ DispatchStatus Runtime::bind_authenticated_copied_epoch(
            binding.destination_sha256==existing.destination_sha256)
             return DispatchStatus::InvalidBinding;
     }
-    if(target_index==Impl::kMaximumCopiedEpochs)return DispatchStatus::LoadRejected;
+    if(target_index==impl_->copied_epoch_capacity)return DispatchStatus::LoadRejected;
+    const bool immutable_bios = binding.generated.load_start >= 0xBFC00000U &&
+        binding.generated.load_end_exclusive <= 0xBFC80000ULL;
+    const auto capture=impl_->bus.capture_code_region(
+        binding.generated.load_start,destination_bytes,variant);
+    if(!capture.ok() && !immutable_bios)return DispatchStatus::LoadRejected;
     auto& epoch=impl_->copied_epochs[target_index];
     epoch.dispatcher=std::move(candidate_dispatcher);
-    const auto capture=impl_->bus.capture_code_region(binding.generated.load_start,destination_bytes,variant);if(!capture.ok())return DispatchStatus::LoadRejected;
     try{
         epoch.destination_sha256.assign(binding.destination_sha256);
         epoch.source_sha256.assign(binding.source_sha256);
     }catch(...){return DispatchStatus::LoadRejected;}
     epoch.source_start=binding.source_start;
     epoch.source_byte_count=binding.source_byte_count;
-    epoch.stamp=capture.stamp;epoch.variant=variant;epoch.bound=true;if(target_index==impl_->copied_epoch_count)++impl_->copied_epoch_count;return DispatchStatus::Bound;
+    epoch.stamp=capture.stamp;
+    if (immutable_bios) {
+        epoch.stamp.virtual_start = binding.generated.load_start;
+        epoch.stamp.byte_count = destination_bytes;
+    }
+    epoch.variant=variant;
+    epoch.immutable_bios=immutable_bios;epoch.bound=true;if(target_index==impl_->copied_epoch_count)++impl_->copied_epoch_count;return DispatchStatus::Bound;
 }
 
 std::uint32_t Runtime::bios_pc() const noexcept {

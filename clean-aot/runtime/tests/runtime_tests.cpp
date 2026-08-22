@@ -39,13 +39,15 @@ private:
 
 std::unique_ptr<clean_aot::runtime::Runtime> make_runtime(
     std::uint64_t numerator = 9U,
-    std::uint64_t denominator = 1U) {
+    std::uint64_t denominator = 1U,
+    std::size_t authenticated_region_capacity = 512U) {
     static const std::vector<std::uint8_t> bios(
         clean_aot::memory::kBiosBytes, 0U);
     clean_aot::runtime::Configuration configuration{};
     configuration.bios = bios;
     configuration.cpu_multiplier_numerator = numerator;
     configuration.cpu_multiplier_denominator = denominator;
+    configuration.authenticated_region_capacity = authenticated_region_capacity;
     return std::make_unique<clean_aot::runtime::Runtime>(configuration);
 }
 
@@ -216,6 +218,55 @@ void test_generated_cdrom_mmio_receipt(Runner& runner) {
 }
 
 void test_authenticated_copied_epoch(Runner&runner){using namespace clean_aot::runtime;constexpr std::string_view identity="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";constexpr std::string_view bios_sha="07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541";constexpr std::string_view payload_sha="66840dda154e8a113c31dd0ad32f7f3a366a80e8136979d8f5a101d3d29d6f72";const std::array<std::uint32_t,1>bios_roots{0xBFC00000U};const std::array bios_entries{GeneratedRegionEntry{0xBFC00000U,generated_to_copied_epoch,1U}};const GeneratedExecutableBinding bios_binding{identity,bios_sha,0xBFC00000U,0xBFC80000ULL,bios_roots,bios_entries};auto runtime=make_runtime();EXPECT(runner,runtime->bind_authenticated_bios(identity,bios_binding)==DispatchStatus::Bound);for(std::uint32_t i=0;i<8U;++i){EXPECT(runner,runtime->write8({},0x1000U+i,static_cast<std::uint8_t>(i+1U)).ok());EXPECT(runner,runtime->write8({},0x2000U+i,static_cast<std::uint8_t>(i+1U)).ok());EXPECT(runner,runtime->write8({},0xA0000080U+i,static_cast<std::uint8_t>(i+1U)).ok());EXPECT(runner,runtime->write8({},0x000000C0U+i,static_cast<std::uint8_t>(i+1U)).ok());}EXPECT(runner,runtime->dispatch_bios()==DispatchStatus::Executed);const std::array<std::uint32_t,2>roots{0xA0000080U,0xA0000084U};const std::array entries{GeneratedRegionEntry{0xA0000080U,generated_copied_step,1U},GeneratedRegionEntry{0xA0000084U,generated_copied_alias_jump,1U}};const GeneratedExecutableBinding generated{identity,payload_sha,0xA0000080U,0xA0000088ULL,roots,entries};const Runtime::AuthenticatedCopiedEpochBinding epoch{identity,0x1000U,8U,payload_sha,payload_sha,generated};EXPECT(runner,runtime->bind_authenticated_copied_epoch(epoch)==DispatchStatus::Bound);const std::array<std::uint32_t,1>alias_roots{0x000000C0U};const std::array alias_entries{GeneratedRegionEntry{0x000000C0U,generated_copied_alias_step,1U}};const GeneratedExecutableBinding alias_generated{identity,payload_sha,0x000000C0U,0x000000C8ULL,alias_roots,alias_entries};const Runtime::AuthenticatedCopiedEpochBinding alias_epoch{identity,0x2000U,8U,payload_sha,payload_sha,alias_generated};EXPECT(runner,runtime->bind_authenticated_copied_epoch(alias_epoch)==DispatchStatus::Bound);EXPECT(runner,runtime->bind_authenticated_copied_epoch(alias_epoch)==DispatchStatus::InvalidBinding);EXPECT(runner,runtime->dispatch_bios()==DispatchStatus::Executed);EXPECT(runner,runtime->bios_pc()==0xA0000084U);EXPECT(runner,runtime->dispatch_bios()==DispatchStatus::Executed);EXPECT(runner,runtime->bios_pc()==0x000000C0U);EXPECT(runner,runtime->dispatch_bios()==DispatchStatus::Executed);EXPECT(runner,runtime->bios_pc()==0x000000C4U);EXPECT(runner,runtime->write8({},0xC0U,0xFFU).ok());EXPECT(runner,runtime->dispatch_bios()==DispatchStatus::EpochMismatch);auto wrong=epoch;wrong.source_sha256="ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";EXPECT(runner,runtime->bind_authenticated_copied_epoch(wrong)==DispatchStatus::ExecutableHashMismatch);}
+
+void test_manifest_sized_authenticated_registry(Runner& runner) {
+    using namespace clean_aot::runtime;
+    constexpr std::size_t binding_count = 300U;
+    constexpr std::string_view zero_word_sha =
+        "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119";
+    constexpr std::string_view bios_sha =
+        "07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541";
+    const std::array<std::uint32_t, 1U> bios_roots{0xBFC00000U};
+    const std::array bios_entries{GeneratedRegionEntry{
+        0xBFC00000U, generated_to_copied_epoch, 1U}};
+    const GeneratedExecutableBinding bios_binding{
+        zero_word_sha, bios_sha, 0xBFC00000U, 0xBFC80000ULL, bios_roots,
+        bios_entries};
+    auto runtime = make_runtime(9U, 1U, binding_count + 1U);
+    EXPECT(runner, runtime->bind_authenticated_bios(zero_word_sha, bios_binding) ==
+                       DispatchStatus::Bound);
+    const std::array<std::uint32_t, 1U> immutable_roots{0xBFC00004U};
+    const std::array immutable_entries{GeneratedRegionEntry{
+        0xBFC00004U, generated_copied_alias_step, 1U}};
+    const GeneratedExecutableBinding immutable_generated{
+        zero_word_sha, zero_word_sha, 0xBFC00004U, 0xBFC00008ULL,
+        immutable_roots, immutable_entries};
+    const Runtime::AuthenticatedCopiedEpochBinding immutable_binding{
+        zero_word_sha, 0xBFC00004U, 4U, zero_word_sha, zero_word_sha,
+        immutable_generated};
+    EXPECT(runner, runtime->bind_authenticated_copied_epoch(immutable_binding) ==
+                       DispatchStatus::Bound);
+    std::vector<std::array<std::uint32_t, 1U>> roots(binding_count + 1U);
+    std::vector<std::array<GeneratedRegionEntry, 1U>> entries(binding_count + 1U);
+    for (std::size_t index = 0U; index <= binding_count; ++index) {
+        const auto pc = 0x1000U + static_cast<std::uint32_t>(index * 4U);
+        roots[index][0] = pc;
+        entries[index][0] = GeneratedRegionEntry{
+            pc, generated_copied_alias_step, 1U};
+        const GeneratedExecutableBinding generated{
+            zero_word_sha, zero_word_sha, pc,
+            static_cast<std::uint64_t>(pc) + 4U, roots[index], entries[index]};
+        const Runtime::AuthenticatedCopiedEpochBinding binding{
+            zero_word_sha, 0x7000U, 4U, zero_word_sha, zero_word_sha,
+            generated};
+        const auto expected = index < binding_count ? DispatchStatus::Bound
+                                                    : DispatchStatus::LoadRejected;
+        EXPECT(runner, runtime->bind_authenticated_copied_epoch(binding) == expected);
+    }
+
+    EXPECT(runner, !make_runtime(9U, 1U, 0U)->configured());
+    EXPECT(runner, !make_runtime(9U, 1U, 4097U)->configured());
+}
 
 void test_overlap_binding_refreshes_unchanged_exact_epoch(Runner& runner) {
     using namespace clean_aot::runtime;
@@ -907,6 +958,7 @@ int main() {
     test_generated_spu_fifo_write_receipt(runner);
     test_generated_cdrom_mmio_receipt(runner);
     test_authenticated_copied_epoch(runner);
+    test_manifest_sized_authenticated_registry(runner);
     test_overlap_binding_refreshes_unchanged_exact_epoch(runner);
     test_same_epoch_overlap_dispatch_and_mutation(runner);
     test_generated_integer_differential(runner);

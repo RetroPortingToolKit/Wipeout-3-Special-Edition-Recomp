@@ -161,6 +161,8 @@ struct Configuration final {
     /* Optional caller-owned media endpoint. No media bytes are retained. */
     cdrom::RawSectorSource* disc_source = nullptr;
     const cdrom::DiscLayout* disc_layout = nullptr;
+    /* Fixed at construction from the authenticated manifest cardinality. */
+    std::size_t authenticated_region_capacity = 512U;
 };
 
 enum class DeadlineSource : std::uint8_t {
