@@ -21,6 +21,11 @@ if ($configText -notmatch '(?m)^openbios\s*=\s*false\r?$') {
 if ($configText -notmatch '(?m)^bios_hle\s*=\s*false\r?$') {
     throw 'BIOS HLE is not explicitly disabled in the staged game config.'
 }
+$skipManifest = Join-Path $build 'mods/packages/psx.enhancement.skip-fmv/1.0.0/manifest.toml'
+if (-not (Test-Path -LiteralPath $skipManifest)) { throw "Missing staged skip-opening manifest: $skipManifest" }
+if ((Get-Content -Raw -LiteralPath $skipManifest) -notmatch '(?m)^default_enabled\s*=\s*false\r?$') {
+    throw 'Skip-opening-sequence is enabled by default; it must remain user-controlled.'
+}
 if ($cacheText -notmatch '(?m)^PSX_SETUP_WIZARD:BOOL=OFF\r?$') {
     throw 'Setup wizard is enabled or not explicitly disabled.'
 }
