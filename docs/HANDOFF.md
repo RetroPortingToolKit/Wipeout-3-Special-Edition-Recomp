@@ -87,6 +87,13 @@
   skipped pacing as well as presentation and falsely reached ~200 Hz; that
   was corrected so skipped FMV frames still receive the 10 ms guest wait.
   Root CMake now keeps netplay/rewind opt-in for this single-player product.
+- With a temporary build-tree-only `auto_skip_fmv=true` probe, the title path
+  reached generated game dispatch after PAL x2 and held approximately 99.9–
+  105.4 Hz with approximately 44.1 kHz SPU production and zero underruns.
+  This validates the title/menu-side workload, but no automated controller
+  input has yet selected and completed a race, so race stability and full
+  content coverage remain open. The shipped config was restored to
+  `auto_skip_fmv=false`.
 
 - PAL100 title timing is now authenticated for the supplied PAL target: the
   title selector/state path at 0x8017BB8C–0x8017BBAC maps selector 2 to
