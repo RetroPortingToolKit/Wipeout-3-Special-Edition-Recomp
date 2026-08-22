@@ -72,6 +72,11 @@
 - Runtime still links generic overlay/autocompile/interpreter plumbing even
   though the release configuration disables its behavior; strict link-surface
   removal remains unfinished.
+- The current Release audit confirms the real `psx_interpreter.c` is not linked:
+  native builds select `stub_interpreter.c`, and the staged tree has no BIOS or
+  overlay/compiler cache artifacts. This is behavioral isolation, not yet the
+  stricter requirement of removing every generic autocompile/provider object
+  from the link graph.
 - Widescreen/ultrawide and complete race/content soak validation remain
   unproven.
 
