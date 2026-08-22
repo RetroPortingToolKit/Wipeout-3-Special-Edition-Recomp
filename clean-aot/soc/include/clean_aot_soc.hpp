@@ -155,6 +155,7 @@ struct CounterSnapshot {
     bool synchronization_released = false;
     bool irq_armed = true;
     bool irq_level = false;
+    std::uint8_t reset_hold_ticks = 0;
     std::uint64_t phase_numerator = 0;
     std::uint64_t phase_denominator = 1;
     std::uint64_t event_ordinal = 0;
@@ -208,6 +209,7 @@ private:
         bool irq_level = false;
         bool target_seen = false;
         bool overflow_seen = false;
+        std::uint8_t reset_hold_ticks = 0;
         std::uint64_t phase_numerator = 0;
         std::uint64_t phase_denominator = 1;
         std::uint64_t event_ordinal = 0;

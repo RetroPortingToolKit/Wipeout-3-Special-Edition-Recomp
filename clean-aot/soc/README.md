@@ -42,6 +42,9 @@ deterministic compressed transitions for pause during the gate, reset at the
 gate, reset and pause outside the gate, or pause until the first gate and then
 free-run. The reached-target and reached-overflow status bits are
 read-to-clear.
+Target-reset events hold zero for two source-clock ticks, while ordinary
+`FFFFh` overflow holds zero for one tick. The remaining dwell is snapshot state,
+and quiet bulk advances produce the same result as adversarial one-tick chunks.
 
 ## Integration and accuracy boundary
 
@@ -64,10 +67,9 @@ read-to-clear.
   translated guest work is retired inside a native interval, but must not make
   timer, DMA, SPU, CD, or other media deadlines run 9x faster; SPU/CD/media
   real-time pacing remains integration-owned and native.
-- Counter mode/current-write holds, target/overflow reset visibility delays,
-  and interrupt pulse width are not represented cycle-exactly. This slice uses
-  compressed event transitions; hardware-oracle validation and integration of
-  those delays remain release-blocking work.
+- Counter mode/current-write holds and interrupt pulse width are not represented
+  cycle-exactly. Target/overflow reset visibility delays are exact; the
+  remaining write/pulse delays still require hardware-oracle validation.
 - Callback bindings and external RAM/device state are not part of these
   snapshots. The integration that owns those objects must snapshot them in the
   same transaction.

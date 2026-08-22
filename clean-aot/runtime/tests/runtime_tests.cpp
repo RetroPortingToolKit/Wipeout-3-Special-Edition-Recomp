@@ -18,6 +18,13 @@
 
 namespace {
 
+constexpr std::uint16_t root_count_after_overflow_dwell(
+    const std::uint64_t ticks) noexcept {
+    constexpr std::uint64_t period = 0x1'0000ULL + 1U;
+    const std::uint64_t phase = ticks % period;
+    return phase == 0x1'0000ULL ? 0U : static_cast<std::uint16_t>(phase);
+}
+
 class Runner final {
 public:
     void expect(bool condition, std::string_view expression, int line) {
@@ -771,6 +778,9 @@ void test_interrupt_latch(Runner& runner) {
                .ok());
     timer_runtime->soc().dma().write_interrupt_control(0U);
 
+    EXPECT(runner, timer_runtime->soc().counters().advance_cpu(
+                       clean_aot::soc::CycleDelta::whole(2U)) ==
+                       clean_aot::soc::SocStatus::ok);
     const AccessContext second_target{2U, 0x8001'0108U, false};
     EXPECT(runner,
            timer_runtime->read32(second_target, 0x1f80'1070U).ok());
@@ -865,7 +875,7 @@ void test_pal_crtc_root_counter_clocking(Runner& runner) {
     EXPECT(runner, advanced.ok());
     EXPECT(runner, advanced.native_total == native_cycles);
     EXPECT(runner, runtime->soc().counters().read_count(0U) ==
-                       static_cast<std::uint16_t>(314U * 426U));
+                       root_count_after_overflow_dwell(314U * 426U));
     EXPECT(runner, runtime->soc().counters().read_count(1U) == 314U);
     EXPECT(runner, runtime->soc().interrupts().pending(
                        clean_aot::soc::InterruptSource::vblank));
@@ -937,10 +947,10 @@ void test_exact_100hz_native_crtc_long_run(Runner& runner) {
     constexpr std::uint64_t complete_lines = total_half_cycles / (3406U * 2U);
     constexpr std::uint64_t partial_half_line =
         total_half_cycles % (3406U * 2U);
-    constexpr std::uint16_t expected_timer0 = static_cast<std::uint16_t>(
+    constexpr std::uint16_t expected_timer0 = root_count_after_overflow_dwell(
         complete_lines * 426U + partial_half_line / 16U);
     constexpr std::uint16_t expected_timer1 =
-        static_cast<std::uint16_t>(complete_lines);
+        root_count_after_overflow_dwell(complete_lines);
     for (const auto* runtime : {accelerated.get(), stock.get(), replay.get()}) {
         EXPECT(runner, runtime->current_native_cycle() == total_native);
         EXPECT(runner, runtime->produced_audio_samples() == frames * 441U);

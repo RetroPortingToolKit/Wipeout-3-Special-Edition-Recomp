@@ -345,6 +345,7 @@ SocStatus RootCounters::write_count(const std::size_t index,
         return SocStatus::invalid_argument;
     }
     counter->count = value;
+    counter->reset_hold_ticks = 0U;
     counter->phase_numerator = 0U;
     counter->phase_denominator = 1U;
     return SocStatus::ok;
@@ -370,6 +371,7 @@ SocStatus RootCounters::write_mode(const std::size_t index,
     counter->irq_level = false;
     counter->target_seen = false;
     counter->overflow_seen = false;
+    counter->reset_hold_ticks = 0U;
     if ((config & kCounterSyncEnableBit) == 0U) {
         counter->running = true;
     } else {
@@ -466,13 +468,26 @@ SocStatus RootCounters::add_ticks(const std::size_t index, std::uint64_t ticks,
         return SocStatus::ok;
     }
 
+    const auto consume_hold = [&]() noexcept {
+        const std::uint64_t held =
+            std::min<std::uint64_t>(ticks, counter.reset_hold_ticks);
+        counter.reset_hold_ticks = static_cast<std::uint8_t>(
+            static_cast<std::uint64_t>(counter.reset_hold_ticks) - held);
+        ticks -= held;
+        report.ticks[index] += held;
+    };
+    consume_hold();
+    if (ticks == 0U) {
+        return SocStatus::ok;
+    }
+
     constexpr std::uint64_t modulus = 0x1'0000ULL;
     const bool target_reset = (counter.mode & kCounterResetTargetBit) != 0U;
     const bool irq_state_observable =
         counter.irq_armed &&
         (counter.mode & (kCounterIrqTargetBit | kCounterIrqOverflowBit)) != 0U;
 
-    if (callbacks_.on_event == nullptr && !irq_state_observable) {
+    if (callbacks_.on_event == nullptr && !irq_state_observable && !target_reset) {
         const std::uint64_t original_ticks = ticks;
         if (original_ticks >
             std::numeric_limits<std::uint64_t>::max() - report.ticks[index]) {
@@ -546,24 +561,50 @@ SocStatus RootCounters::add_ticks(const std::size_t index, std::uint64_t ticks,
             return SocStatus::ok;
         }
 
-        const std::uint64_t target_events =
-            original_ticks >= to_target
-                ? 1U + (original_ticks - to_target) / modulus
-                : 0U;
-        const std::uint64_t overflow_events =
-            original_ticks >= to_overflow
-                ? 1U + (original_ticks - to_overflow) / modulus
-                : 0U;
-        record_quiet_events(CounterEventKind::target, target_events);
-        record_quiet_events(CounterEventKind::overflow, overflow_events);
-        const std::uint64_t remainder = original_ticks % modulus;
-        counter.count =
-            static_cast<std::uint16_t>((current + remainder) % modulus);
+        if (original_ticks < to_overflow) {
+            if (original_ticks >= to_target) {
+                record_quiet_events(CounterEventKind::target, 1U);
+            }
+            counter.count = static_cast<std::uint16_t>(current + original_ticks);
+            report.ticks[index] += original_ticks;
+            return SocStatus::ok;
+        }
+        if (to_target <= to_overflow) {
+            record_quiet_events(CounterEventKind::target, 1U);
+        }
+        record_quiet_events(CounterEventKind::overflow, 1U);
+        std::uint64_t remaining = original_ticks - to_overflow;
+        counter.count = 0U;
+        counter.reset_hold_ticks = 1U;
+        if (remaining != 0U) {
+            --remaining;
+            counter.reset_hold_ticks = 0U;
+        }
+        const std::uint64_t period = modulus + 1U;
+        const std::uint64_t full_periods = remaining / period;
+        record_quiet_events(CounterEventKind::overflow, full_periods);
+        record_quiet_events(CounterEventKind::target, full_periods);
+        const std::uint64_t tail = remaining % period;
+        if (tail == modulus) {
+            record_quiet_events(CounterEventKind::overflow, 1U);
+            record_quiet_events(CounterEventKind::target, 1U);
+            counter.count = 0U;
+            counter.reset_hold_ticks = 1U;
+        } else {
+            counter.count = static_cast<std::uint16_t>(tail);
+            if (tail >= counter.target && counter.target != 0U) {
+                record_quiet_events(CounterEventKind::target, 1U);
+            }
+        }
         report.ticks[index] += original_ticks;
         return SocStatus::ok;
     }
 
     while (ticks != 0U) {
+        if (counter.reset_hold_ticks != 0U) {
+            consume_hold();
+            continue;
+        }
         const std::uint64_t current = counter.count;
         const std::uint64_t to_overflow = modulus - current;
         const std::uint64_t target = counter.target;
@@ -585,11 +626,15 @@ SocStatus RootCounters::add_ticks(const std::size_t index, std::uint64_t ticks,
             emit_event(index, CounterEventKind::target, report);
             if (target_reset) {
                 counter.count = 0U;
+                counter.reset_hold_ticks = 2U;
             }
         }
         if (reached_overflow) {
             emit_event(index, CounterEventKind::overflow, report);
             counter.count = 0U;
+            if (!target_reset) {
+                counter.reset_hold_ticks = 1U;
+            }
         }
     }
     return SocStatus::ok;
@@ -860,6 +905,7 @@ CounterSnapshot RootCounters::snapshot(const std::size_t index) const noexcept {
                            counter->synchronization_released,
                            counter->irq_armed,
                            counter->irq_level,
+                           counter->reset_hold_ticks,
                            counter->phase_numerator,
                            counter->phase_denominator,
                            counter->event_ordinal};
@@ -875,6 +921,7 @@ SocStatus RootCounters::validate_snapshot(
         (snapshot_state.mode & static_cast<std::uint16_t>(~0x1fffU)) != 0U ||
         ((snapshot_state.mode & kCounterIrqLevelBit) == 0U) !=
             snapshot_state.irq_level ||
+        snapshot_state.reset_hold_ticks > 2U ||
         counter_sync_mode(snapshot_state.mode) == CounterSyncMode::reserved) {
         return SocStatus::snapshot_mismatch;
     }
@@ -956,6 +1003,7 @@ SocStatus RootCounters::restore(
     counter->target_seen = (snapshot_state.mode & kCounterTargetSeenBit) != 0U;
     counter->overflow_seen =
         (snapshot_state.mode & kCounterOverflowSeenBit) != 0U;
+    counter->reset_hold_ticks = snapshot_state.reset_hold_ticks;
     counter->phase_numerator = snapshot_state.phase_numerator;
     counter->phase_denominator = snapshot_state.phase_denominator;
     counter->event_ordinal = snapshot_state.event_ordinal;

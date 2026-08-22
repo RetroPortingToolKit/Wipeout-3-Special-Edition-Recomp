@@ -260,6 +260,7 @@ bool equal_counter_snapshot(const CounterSnapshot& left,
            left.synchronization_released == right.synchronization_released &&
            left.irq_armed == right.irq_armed &&
            left.irq_level == right.irq_level &&
+           left.reset_hold_ticks == right.reset_hold_ticks &&
            left.phase_numerator == right.phase_numerator &&
            left.phase_denominator == right.phase_denominator &&
            left.event_ordinal == right.event_ordinal;
@@ -450,7 +451,7 @@ void test_counters(TestRunner& runner) {
     EXPECT(runner, equal_counter_snapshot(asserted_snapshot,
                                            chip.counters().snapshot(0U)));
     chip.interrupts().acknowledge(InterruptSource::counter0);
-    EXPECT(runner, chip.counters().advance_cpu(CycleDelta::whole(3U),
+    EXPECT(runner, chip.counters().advance_cpu(CycleDelta::whole(5U),
                                                &report) == SocStatus::ok);
     EXPECT(runner, !chip.counters().irq_level(0U));
     EXPECT(runner, !chip.interrupts().pending(InterruptSource::counter0));
@@ -593,9 +594,8 @@ void test_counters(TestRunner& runner) {
                CycleDelta::whole(std::numeric_limits<std::uint64_t>::max()),
                &huge_report) == SocStatus::ok);
     EXPECT(runner,
-           huge.read_count(0U) ==
-               static_cast<std::uint16_t>(
-                   std::numeric_limits<std::uint64_t>::max() % 0x1'0000ULL));
+           huge.read_count(0U) == 0U &&
+               huge.snapshot(0U).reset_hold_ticks == 0U);
     EXPECT(runner,
            huge_report.events == std::numeric_limits<std::uint32_t>::max());
 
@@ -710,7 +710,7 @@ void test_counter_adversarial_state(TestRunner& runner) {
     EXPECT(runner, toggle.write_target(0U, 1U) == SocStatus::ok);
     EXPECT(runner, toggle.write_mode(0U, 0x00d8U) == SocStatus::ok);
     EXPECT(runner,
-           toggle.advance_cpu(CycleDelta::whole(1U), nullptr) == SocStatus::ok);
+           toggle.advance_cpu(CycleDelta::whole(3U), nullptr) == SocStatus::ok);
     toggle_interrupts.acknowledge(InterruptSource::counter0);
     EXPECT(runner,
            toggle.advance_cpu(CycleDelta::whole(1U), nullptr) == SocStatus::ok);
@@ -763,6 +763,10 @@ void test_counter_adversarial_state(TestRunner& runner) {
            atomic.restore(0U, malformed) == SocStatus::snapshot_mismatch);
     EXPECT(runner,
            equal_counter_snapshot(before_malformed, atomic.snapshot(0U)));
+    malformed = before_malformed;
+    malformed.reset_hold_ticks = 3U;
+    EXPECT(runner,
+           atomic.restore(0U, malformed) == SocStatus::snapshot_mismatch);
     malformed = before_malformed;
     malformed.synchronization_released = true;
     EXPECT(runner,
@@ -1169,6 +1173,36 @@ void test_dma_reentrant_callbacks_fail_closed(TestRunner& runner) {
                    memory.nested_status == SocStatus::callback_rejected);
         }
     }
+}
+
+void test_counter_reset_event_dwell(TestRunner& runner) {
+    RootCounters target;
+    EXPECT(runner, target.write_target(0U, 1U) == SocStatus::ok);
+    EXPECT(runner, target.write_mode(0U, 0x0008U) == SocStatus::ok);
+    EXPECT(runner, target.advance_cpu(CycleDelta::whole(1U)) == SocStatus::ok);
+    EXPECT(runner, target.read_count(0U) == 0U &&
+                       target.snapshot(0U).reset_hold_ticks == 2U);
+    const CounterSnapshot held = target.snapshot(0U);
+    RootCounters replay;
+    EXPECT(runner, replay.restore(0U, held) == SocStatus::ok);
+    EXPECT(runner, target.advance_cpu(CycleDelta::whole(2U)) == SocStatus::ok);
+    EXPECT(runner, target.read_count(0U) == 0U &&
+                       target.snapshot(0U).reset_hold_ticks == 0U);
+    EXPECT(runner, target.advance_cpu(CycleDelta::whole(1U)) == SocStatus::ok);
+    EXPECT(runner, target.snapshot(0U).reset_hold_ticks == 2U);
+    EXPECT(runner, replay.advance_cpu(CycleDelta::whole(3U)) == SocStatus::ok &&
+                       equal_counter_snapshot(target.snapshot(0U), replay.snapshot(0U)));
+
+    RootCounters overflow;
+    EXPECT(runner, overflow.write_count(0U, 0xffffU) == SocStatus::ok);
+    EXPECT(runner, overflow.advance_cpu(CycleDelta::whole(1U)) == SocStatus::ok);
+    EXPECT(runner, overflow.read_count(0U) == 0U &&
+                       overflow.snapshot(0U).reset_hold_ticks == 1U);
+    EXPECT(runner, overflow.advance_cpu(CycleDelta::whole(1U)) == SocStatus::ok);
+    EXPECT(runner, overflow.read_count(0U) == 0U &&
+                       overflow.snapshot(0U).reset_hold_ticks == 0U);
+    EXPECT(runner, overflow.advance_cpu(CycleDelta::whole(1U)) == SocStatus::ok);
+    EXPECT(runner, overflow.read_count(0U) == 1U);
 }
 
 void test_dma_arbitration_and_edges(TestRunner& runner) {
@@ -1994,6 +2028,7 @@ int main() {
     test_interrupt_random_model(runner);
     test_counters(runner);
     test_counter_adversarial_state(runner);
+    test_counter_reset_event_dwell(runner);
     test_counter_random_differential(runner);
     test_native_timing_is_not_retirement_scaled(runner);
     test_dma_registers_and_linear(runner);

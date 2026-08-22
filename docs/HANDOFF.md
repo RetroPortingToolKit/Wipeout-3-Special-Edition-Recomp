@@ -1,5 +1,14 @@
 # Handoff
 
+## Root-counter target/overflow reset dwell (2026-08-22)
+
+- Target reset now holds zero for two selected-source ticks; ordinary `FFFFh`
+  overflow holds zero for one. Dwell is exact across bulk/chunked native time,
+  serialized and range-validated in snapshots, and never CPU-retirement scaled.
+- Strict/sanitizer verification and remaining unwaived write/pulse delays are
+  recorded in `clean-aot/soc/evidence/root-counter-reset-dwell-v1.json`; see
+  `docs/ROOT_COUNTER_RESET_DWELL.md`.
+
 ## Atomic installed-runtime acceptance (2026-08-22)
 
 - Installer acceptance now executes the same atomic install/rollback primitive
