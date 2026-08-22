@@ -32,10 +32,16 @@ records it as a behavioral reference only. The implementation, fixtures, and
 tests are new work under the repository clean-room policy.
 
 The fixed Q12 YUV coefficients, signed integer rounding rule, RGB byte order,
-bounded output FIFO size, fail-closed empty-read/malformed-input policy,
+bounded output FIFO size, deterministic empty-read and fail-closed malformed-input policy,
 level-triggered Data-Out request, reset table contents, and deterministic cycle
 costs are explicit clean-room contract choices where the reference leaves
 behavior unmeasured. They must remain subject to later native-console
 validation rather than being treated as title-specific truth. Snapshot wire
 encoding and validation are original host-runtime mechanics, not hardware
 claims.
+
+The register documentation says an empty MDEC0 read returns garbage rather
+than faulting. This model uses zero as a deterministic unspecified value; the
+completion itself is hardware behavior, while the chosen bits are explicitly
+not claimed as a measured open-bus value. DMA1 empty handling is separate and
+continues to obey its request line.

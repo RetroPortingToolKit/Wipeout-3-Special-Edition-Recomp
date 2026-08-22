@@ -198,6 +198,28 @@ void test_reset_and_status()
     require_equal(device.output_words_available(), 0U, "reset output FIFO");
     require(!device.command_busy(), "reset must be idle");
 
+    Snapshot empty_snapshot{};
+    require(device.save_snapshot(empty_snapshot), "empty FIFO snapshot");
+    std::uint32_t empty_word = 0xDEADBEEFU;
+    const auto empty_read = device.read_data_word(empty_word);
+    require(empty_read.complete && empty_read.words == 1U &&
+                empty_read.fault == Fault::None,
+            "empty MDEC0 read completes without a bus fault");
+    require_equal(empty_word, 0U, "deterministic empty-read garbage value");
+    require((device.status() & kStatusBit31) != 0U,
+            "empty read does not fabricate FIFO data");
+
+    Device empty_restored;
+    require(empty_restored.load_snapshot(empty_snapshot), "restore empty FIFO snapshot");
+    std::uint32_t restored_word = 0xFFFFFFFFU;
+    const auto restored_read = empty_restored.read_data_word(restored_word);
+    require(restored_read.complete && restored_read.words == 1U &&
+                restored_read.fault == Fault::None,
+            "restored empty read completes");
+    require_equal(restored_word, empty_word, "empty-read snapshot value equivalence");
+    require_equal(empty_restored.digest(), device.digest(),
+                  "empty-read snapshot state equivalence");
+
     const auto control = device.write_control_word(0x60000000U);
     require(control.complete, "control enable");
     require(device.dma_in_enabled() && device.dma_out_enabled(), "DMA enables");
@@ -646,6 +668,15 @@ void test_dma_widths_and_backpressure()
         return separate.dma_read_bytes(output_bytes, DmaWidth::Word);
     }();
     require(disabled_read.fault == Fault::DmaNotRequested, "DMA output request gate");
+
+    Device empty_dma;
+    require(empty_dma.write_control_word(0x20000000U).complete,
+            "empty DMA output enable");
+    std::array<std::uint32_t, 1> empty_dma_word{};
+    const auto empty_dma_read = empty_dma.dma_read_words(empty_dma_word);
+    require(empty_dma_read.words == 0U &&
+                empty_dma_read.fault == Fault::OutputFifoEmpty,
+            "DMA1 remains request-gated when output is empty");
 
     std::array<std::byte, 64> dma_output{};
     const auto output = device.dma_read_bytes(dma_output, DmaWidth::Word);

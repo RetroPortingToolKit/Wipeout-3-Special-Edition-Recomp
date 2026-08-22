@@ -1089,8 +1089,19 @@ TransferResult Device::read_data_word(std::uint32_t& word) noexcept
     }
     pump();
     if (state_.output_count == 0U) {
-        result.fault = state_.latched_fault == Fault::None ? Fault::OutputFifoEmpty
-                                                            : state_.latched_fault;
+        if (state_.latched_fault != Fault::None) {
+            result.fault = state_.latched_fault;
+            result.cycles = state_.cycles - before;
+            return result;
+        }
+        // MDEC0 is a readable register even when Data-Out FIFO Empty is set.
+        // Hardware documents the value as garbage; zero is this model's
+        // deterministic unspecified-data choice, not an invented bus fault.
+        word = 0U;
+        (void)add_cycles(kRegisterCycleCost);
+        result.words = 1U;
+        result.complete = state_.latched_fault == Fault::None;
+        result.fault = state_.latched_fault;
         result.cycles = state_.cycles - before;
         return result;
     }

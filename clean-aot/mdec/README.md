@@ -85,6 +85,7 @@ model for this component; it is not yet a measured console-cycle replacement
 for the unknown hardware decompression timing. The public documentation also
 states that Data-Out DREQ clears after an unknown number of words from a block;
 until native measurements establish that threshold, this model deliberately
-uses a level request while output data is available. An empty MDEC0 read is
-reported to the machine layer as `OutputFifoEmpty` instead of inventing a
-particular garbage/open-bus value.
+uses a level request while output data is available. An empty CPU read from
+MDEC0 still completes, as documented, and returns deterministic zero for the
+otherwise unspecified garbage value. DMA1 remains request-gated and reports
+`OutputFifoEmpty` without transferring a word.
