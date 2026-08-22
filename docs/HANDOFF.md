@@ -110,6 +110,12 @@
   `guest_clock_test`, and the authenticated PAL-title verifier. The build emits
   only existing third-party `stb_image` overflow warnings; no build or test
   failure occurred. PAL100 remains opt-in/default-off.
+- Focused FMV evidence is now available for both paths. Stock PAL remains
+  PAL x1 at a 20 ms wall-clock cadence; opt-in PAL x2 remains a 10 ms guest
+  cadence while the `gl_present_ring` shows movie swaps approximately every
+  20 ms (50 Hz). The FMV screenshot is 320x240 and contains no text outside
+  the movie bounds, confirming the corrected crop/clipping path. This is a
+  cadence/crop pass, not a full content soak.
 
 - PAL100 title timing is now authenticated for the supplied PAL target: the
   title selector/state path at 0x8017BB8C–0x8017BBAC maps selector 2 to
@@ -118,7 +124,11 @@
   local bytes and hashes. End-to-end PAL-x2 simulation, SPU/CDDA, timeout,
   media-load, and race traces remain open; keep the feature default-off.
 - Normal-vs-accelerated memory-card and race-load equivalence is not proven;
-  acceleration remains disabled by default.
+  the framework's Fast Loading host-pacing mod remains disabled by default.
+  The implementation is explicitly guest-observable-equivalent by design, but
+  a paired normal/accelerated trace (CD sector/IRQ order, card writes, state
+  fingerprint, and audio timing) is still required before treating that claim
+  as verified for WipEout.
 - Runtime still links generic overlay/autocompile/interpreter plumbing even
   though the release configuration disables its behavior; strict link-surface
   removal remains unfinished.
