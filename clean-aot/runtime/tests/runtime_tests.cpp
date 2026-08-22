@@ -3,6 +3,7 @@
 #include "clean_aot/runtime/generated_cpu.hpp"
 #include "r3000a/reference.hpp"
 #include "gte.hpp"
+#include "clean_aot/gpu/gpu.hpp"
 
 #include "clean_aot_soc.hpp"
 
@@ -789,6 +790,95 @@ void test_exact_audio_clock(Runner& runner) {
     }
 }
 
+void test_pal_crtc_root_counter_clocking(Runner& runner) {
+    using clean_aot::runtime::AccessContext;
+    auto runtime = make_runtime(9U, 1U);
+    const AccessContext at_zero{};
+    /* GP1(08): PAL, 320-dot, non-interlaced. */
+    EXPECT(runner,
+           runtime->write32(at_zero, 0x1f80'1814U, 0x0800'0009U).ok());
+    EXPECT(runner, runtime->write16(at_zero, 0x1f80'1104U, 0x0100U).ok());
+    EXPECT(runner, runtime->write16(at_zero, 0x1f80'1114U, 0x0100U).ok());
+
+    constexpr std::uint64_t pal_gpu_cycles = 314U * 3406U;
+    constexpr std::uint64_t native_cycles =
+        (pal_gpu_cycles * 7U + 10U) / 11U;
+    static_assert(native_cycles == 680'581U);
+    const auto advanced =
+        runtime->advance_to_retirement_cycle(native_cycles * 9U);
+    EXPECT(runner, advanced.ok());
+    EXPECT(runner, advanced.native_total == native_cycles);
+    EXPECT(runner, runtime->soc().counters().read_count(0U) ==
+                       static_cast<std::uint16_t>(314U * 426U));
+    EXPECT(runner, runtime->soc().counters().read_count(1U) == 314U);
+    EXPECT(runner, runtime->soc().interrupts().pending(
+                       clean_aot::soc::InterruptSource::vblank));
+    EXPECT(runner, runtime->gpu().control().display.in_vblank);
+    EXPECT(runner, !runtime->gpu().control().display.odd_field);
+    EXPECT(runner, runtime->produced_audio_samples() ==
+                       native_cycles / 768U);
+
+    auto out_of_range = make_runtime(1U, 1U);
+    EXPECT(runner, out_of_range->write32(
+                       at_zero, 0x1f80'1814U, 0x0800'0009U).ok());
+    /* GP1(07): visible line 16 through out-of-raster line 400. */
+    EXPECT(runner, out_of_range->write32(
+                       at_zero, 0x1f80'1814U, 0x0706'4010U).ok());
+    EXPECT(runner, out_of_range->advance_to_retirement_cycle(native_cycles)
+                       .ok());
+    EXPECT(runner, !out_of_range->soc().interrupts().pending(
+                       clean_aot::soc::InterruptSource::vblank));
+    EXPECT(runner, !out_of_range->gpu().control().display.in_vblank);
+}
+
+void test_exact_100hz_native_crtc_long_run(Runner& runner) {
+    constexpr std::uint64_t frames = 3'600U;
+    constexpr std::uint64_t native_per_update = 338'688U;
+    auto accelerated = make_runtime(9U, 1U);
+    auto stock = make_runtime(1U, 1U);
+    const auto configure = [&runner](clean_aot::runtime::Runtime& runtime) {
+        const clean_aot::runtime::AccessContext at_zero{};
+        EXPECT(runner,
+               runtime.write32(at_zero, 0x1f80'1814U, 0x0800'0009U).ok());
+        EXPECT(runner,
+               runtime.write16(at_zero, 0x1f80'1104U, 0x0100U).ok());
+        EXPECT(runner,
+               runtime.write16(at_zero, 0x1f80'1114U, 0x0100U).ok());
+    };
+    configure(*accelerated);
+    configure(*stock);
+    std::array<clean_aot::runtime::StereoSample, 441U> drain{};
+    for (std::uint64_t frame = 1U; frame <= frames; ++frame) {
+        EXPECT(runner, accelerated->advance_to_retirement_cycle(
+                           frame * native_per_update * 9U).ok());
+        EXPECT(runner, stock->advance_to_retirement_cycle(
+                           frame * native_per_update).ok());
+        EXPECT(runner, accelerated->drain_audio(drain) == drain.size());
+        EXPECT(runner, stock->drain_audio(drain) == drain.size());
+    }
+    constexpr std::uint64_t total_native = frames * native_per_update;
+    constexpr std::uint64_t total_gpu_cycles = total_native * 11U / 7U;
+    constexpr std::uint64_t complete_lines = total_gpu_cycles / 3406U;
+    constexpr std::uint64_t partial_line = total_gpu_cycles % 3406U;
+    constexpr std::uint16_t expected_timer0 = static_cast<std::uint16_t>(
+        complete_lines * 426U + partial_line / 8U);
+    constexpr std::uint16_t expected_timer1 =
+        static_cast<std::uint16_t>(complete_lines);
+    for (const auto* runtime : {accelerated.get(), stock.get()}) {
+        EXPECT(runner, runtime->current_native_cycle() == total_native);
+        EXPECT(runner, runtime->produced_audio_samples() == frames * 441U);
+        EXPECT(runner, runtime->soc().counters().read_count(0U) ==
+                           expected_timer0);
+        EXPECT(runner, runtime->soc().counters().read_count(1U) ==
+                           expected_timer1);
+    }
+    EXPECT(runner, accelerated->soc().counters().read_count(0U) ==
+                       stock->soc().counters().read_count(0U));
+    EXPECT(runner, accelerated->soc().counters().read_count(1U) ==
+                       stock->soc().counters().read_count(1U));
+    EXPECT(runner, accelerated->gpu().status() == stock->gpu().status());
+}
+
 void test_spu_irq_sample_deadline(Runner& runner) {
     auto runtime = make_runtime();
     const clean_aot::runtime::AccessContext context{};
@@ -831,6 +921,8 @@ int main() {
     test_device_deadlines(runner);
     test_reset(runner);
     test_exact_audio_clock(runner);
+    test_pal_crtc_root_counter_clocking(runner);
+    test_exact_100hz_native_crtc_long_run(runner);
     test_spu_irq_sample_deadline(runner);
     return runner.result();
 }

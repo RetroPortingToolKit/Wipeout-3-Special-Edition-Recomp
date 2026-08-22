@@ -786,6 +786,36 @@ SocStatus RootCounters::input_edge(
     return result.status;
 }
 
+SocStatus RootCounters::advance_external_clock(
+    const CounterClockSource requested_source, const std::uint64_t ticks,
+    CounterAdvanceReport* const report) noexcept {
+    CounterAdvanceReport local{};
+    CounterAdvanceReport& result = report == nullptr ? local : *report;
+    result = CounterAdvanceReport{};
+    result.cpu_denominator = 1U;
+    if ((requested_source != CounterClockSource::dot_clock &&
+         requested_source != CounterClockSource::hblank) || ticks == 0U) {
+        result.status = requested_source == CounterClockSource::dot_clock ||
+                                requested_source == CounterClockSource::hblank
+                            ? SocStatus::ok
+                            : SocStatus::invalid_argument;
+        return result.status;
+    }
+    for (std::size_t index = 0U; index < kCount; ++index) {
+        if (counter_clock_source(index, state_storage_[index].mode) !=
+            requested_source) {
+            continue;
+        }
+        const SocStatus status = add_ticks(index, ticks, result);
+        if (status != SocStatus::ok) {
+            result.status = status;
+            return status;
+        }
+    }
+    result.status = SocStatus::ok;
+    return result.status;
+}
+
 bool RootCounters::running(const std::size_t index) const noexcept {
     const CounterState* const counter = state(index);
     return counter != nullptr && counter->running;

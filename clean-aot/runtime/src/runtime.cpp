@@ -714,6 +714,12 @@ struct Runtime::Impl final {
     std::size_t audio_count = 0U;
     std::uint64_t produced_audio = 0U;
     bool spu_irq_enabled = false;
+    std::uint64_t crtc_gpu_phase = 0U;
+    std::uint32_t crtc_line_cycle = 0U;
+    std::uint16_t crtc_line = 0U;
+    bool crtc_odd_field = false;
+    bool crtc_hblank = true;
+    bool crtc_vblank = true;
 
     Impl(Configuration configuration,
          machine::Machine::CpuMultiplier canonical,
@@ -769,6 +775,139 @@ struct Runtime::Impl final {
         audio_count = 0U;
         produced_audio = 0U;
         spu_irq_enabled = false;
+        crtc_gpu_phase = 0U;
+        crtc_line_cycle = 0U;
+        crtc_line = 0U;
+        crtc_odd_field = false;
+        crtc_hblank = true;
+        crtc_vblank = true;
+        gpu.set_scanout_state(false, true);
+    }
+
+    [[nodiscard]] static std::uint32_t crtc_line_cycles(
+        const gpu::DisplayTiming& display) noexcept {
+        return display.video_standard == gpu::VideoStandard::Pal ? 3406U
+                                                                  : 3413U;
+    }
+
+    [[nodiscard]] static std::uint16_t crtc_lines(
+        const gpu::DisplayTiming& display) noexcept {
+        return display.video_standard == gpu::VideoStandard::Pal ? 314U
+                                                                  : 263U;
+    }
+
+    [[nodiscard]] static std::uint32_t crtc_dot_divider(
+        const gpu::DisplayTiming& display) noexcept {
+        if (display.resolution_368) {
+            return 7U;
+        }
+        constexpr std::array<std::uint32_t, 4U> divisors = {10U, 8U, 5U, 4U};
+        return divisors[display.horizontal_resolution & 3U];
+    }
+
+    [[nodiscard]] static std::uint32_t crtc_dots_per_line(
+        const gpu::DisplayTiming& display) noexcept {
+        const std::uint32_t quotient =
+            crtc_line_cycles(display) / crtc_dot_divider(display);
+        /* PAL 320-dot mode is the measured lone round-up case. */
+        return display.video_standard == gpu::VideoStandard::Pal &&
+                       !display.resolution_368 &&
+                       display.horizontal_resolution == 1U
+                   ? quotient + 1U
+                   : quotient;
+    }
+
+    [[nodiscard]] Status advance_crtc(const std::uint64_t native_delta) noexcept {
+        if (native_delta >
+            (std::numeric_limits<std::uint64_t>::max() - crtc_gpu_phase) / 11U) {
+            return Status::ArithmeticOverflow;
+        }
+        const std::uint64_t scaled = native_delta * 11U + crtc_gpu_phase;
+        std::uint64_t gpu_cycles = scaled / 7U;
+        crtc_gpu_phase = scaled % 7U;
+        while (gpu_cycles != 0U) {
+            const gpu::DisplayTiming display = gpu.control().display;
+            const std::uint32_t line_cycles = crtc_line_cycles(display);
+            if (crtc_line_cycle >= line_cycles) {
+                return Status::DeviceRejected;
+            }
+            const std::uint64_t step = std::min<std::uint64_t>(
+                gpu_cycles, line_cycles - crtc_line_cycle);
+            const std::uint32_t old_cycle = crtc_line_cycle;
+            crtc_line_cycle += static_cast<std::uint32_t>(step);
+            gpu_cycles -= step;
+
+            const std::uint32_t divider = crtc_dot_divider(display);
+            const std::uint64_t old_dots = old_cycle / divider;
+            const std::uint64_t new_dots =
+                crtc_line_cycle == line_cycles
+                    ? crtc_dots_per_line(display)
+                    : crtc_line_cycle / divider;
+            if (new_dots != old_dots &&
+                !soc::succeeded(soc.counters().advance_external_clock(
+                    soc::CounterClockSource::dot_clock,
+                    new_dots - old_dots, nullptr))) {
+                return Status::DeviceRejected;
+            }
+
+            const std::uint32_t horizontal_start =
+                std::min<std::uint32_t>(display.horizontal_start, line_cycles);
+            const std::uint32_t horizontal_end =
+                std::min<std::uint32_t>(display.horizontal_end, line_cycles);
+            if (horizontal_start < horizontal_end) {
+                if (crtc_hblank && old_cycle < horizontal_start &&
+                    crtc_line_cycle >= horizontal_start) {
+                    if (!soc::succeeded(soc.counters().input_edge(
+                            soc::CounterEdge::hblank_end, nullptr))) {
+                        return Status::DeviceRejected;
+                    }
+                    crtc_hblank = false;
+                }
+                if (!crtc_hblank && old_cycle < horizontal_end &&
+                    crtc_line_cycle >= horizontal_end) {
+                    if (!soc::succeeded(soc.counters().input_edge(
+                            soc::CounterEdge::hblank_begin, nullptr))) {
+                        return Status::DeviceRejected;
+                    }
+                    crtc_hblank = true;
+                }
+            }
+
+            if (crtc_line_cycle != line_cycles) {
+                continue;
+            }
+            crtc_line_cycle = 0U;
+            crtc_line = static_cast<std::uint16_t>(crtc_line + 1U);
+            const std::uint16_t line_count = crtc_lines(display);
+            if (crtc_line >= line_count) {
+                crtc_line = 0U;
+                if (display.interlaced) {
+                    crtc_odd_field = !crtc_odd_field;
+                } else {
+                    crtc_odd_field = false;
+                }
+            }
+            /* Out-of-raster GP1 ranges do not alias back into the field. */
+            const std::uint16_t vertical_start = display.vertical_start;
+            const std::uint16_t vertical_end = display.vertical_end;
+            if (crtc_vblank && crtc_line == vertical_start) {
+                if (!soc::succeeded(soc.counters().input_edge(
+                        soc::CounterEdge::vblank_end, nullptr))) {
+                    return Status::DeviceRejected;
+                }
+                crtc_vblank = false;
+            }
+            if (!crtc_vblank && crtc_line == vertical_end) {
+                if (!soc::succeeded(soc.counters().input_edge(
+                        soc::CounterEdge::vblank_begin, nullptr))) {
+                    return Status::DeviceRejected;
+                }
+                crtc_vblank = true;
+                soc.interrupts().raise(soc::InterruptSource::vblank);
+            }
+            gpu.set_scanout_state(crtc_odd_field, crtc_vblank);
+        }
+        return Status::Ok;
     }
 
     static void sio_irq_callback(void* context, bool level) noexcept {
@@ -838,6 +977,10 @@ struct Runtime::Impl final {
                     soc::CycleDelta::whole(advance.native_delta),
                     &counter_report))) {
                 return Status::DeviceRejected;
+            }
+            const Status crtc_status = advance_crtc(advance.native_delta);
+            if (!succeeded(crtc_status)) {
+                return crtc_status;
             }
             cdrom.advance_to(active_native_cycle);
             cd_scheduler.discard_through(active_native_cycle);

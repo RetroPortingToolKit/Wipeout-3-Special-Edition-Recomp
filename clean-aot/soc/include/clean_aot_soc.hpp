@@ -180,6 +180,9 @@ public:
     // retired during that time.
     SocStatus advance_cpu(const CycleDelta& delta,
                           CounterAdvanceReport* report = nullptr) noexcept;
+    SocStatus advance_external_clock(
+        CounterClockSource source, std::uint64_t ticks,
+        CounterAdvanceReport* report = nullptr) noexcept;
     SocStatus input_edge(CounterEdge edge,
                          CounterAdvanceReport* report = nullptr) noexcept;
     // Re-drive level-sensitive timer requests after the interrupt controller
