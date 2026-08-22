@@ -80,6 +80,13 @@
   roughly 33–35 kHz, but the full workload is still CPU-bound and audio
   underruns remain. The change is directionally correct but not a PAL-100 gate
   pass; further guest/render throughput work is required.
+- A standalone Release comparison disabled the root project's forced netplay
+  and rewind surfaces. With both optional systems off, the same PAL x2 FMV
+  window reaches 99.7–100.2 guest Hz, about 44.1 kHz SPU production, zero
+  underruns, and zero overflows. The alternate-present branch initially
+  skipped pacing as well as presentation and falsely reached ~200 Hz; that
+  was corrected so skipped FMV frames still receive the 10 ms guest wait.
+  Root CMake now keeps netplay/rewind opt-in for this single-player product.
 
 - PAL100 title timing is now authenticated for the supplied PAL target: the
   title selector/state path at 0x8017BB8C–0x8017BBAC maps selector 2 to
