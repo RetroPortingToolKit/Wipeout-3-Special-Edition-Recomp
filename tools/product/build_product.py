@@ -21,6 +21,7 @@ if __package__ in {None, ""}:
     )
     from release_lane import (  # type: ignore[import-not-found]
         ReleaseError, create_release, initialize_install, run_soak, validate_release)
+    from install_lane import InstallError, launch_and_record, orchestrate_first_run  # type: ignore[import-not-found]
 else:
     from .pipeline import (
         DEFAULT_MEDIA_MANIFEST,
@@ -33,6 +34,7 @@ else:
     )
     from .release_lane import (ReleaseError, create_release, initialize_install,
                                run_soak, validate_release)
+    from .install_lane import InstallError, launch_and_record, orchestrate_first_run
 
 
 def _common_media(parser: argparse.ArgumentParser) -> None:
@@ -103,6 +105,22 @@ def _build_parser() -> argparse.ArgumentParser:
         "install", help="initialize durable per-user state and first-run media UX")
     install.add_argument("--package", type=Path, required=True)
     install.add_argument("--user-data", type=Path, required=True)
+
+    first_run = subparsers.add_parser(
+        "first-run", help="verify media, generate/finalize regions, and atomically activate setup")
+    _common_media(first_run)
+    first_run.add_argument("--compiler", type=Path, required=True)
+    first_run.add_argument("--regions", type=Path, required=True)
+    first_run.add_argument("--artifacts", type=Path, required=True)
+    first_run.add_argument("--artifact-root", type=Path, required=True)
+    first_run.add_argument("--user-data", type=Path, required=True)
+
+    launch = subparsers.add_parser(
+        "launch", help="remeasure active generation, launch app, and persist boot frontier")
+    launch.add_argument("--package", type=Path, required=True)
+    launch.add_argument("--user-data", type=Path, required=True)
+    launch.add_argument("--timeout-seconds", type=float, default=30.0)
+    launch.add_argument("command_line", nargs=argparse.REMAINDER)
 
     soak = subparsers.add_parser(
         "soak", help="run a deterministic bounded performance/soak command")
@@ -181,6 +199,18 @@ def main(argv: list[str] | None = None) -> int:
             document = validate_release(args.package)
         elif args.command == "install":
             document = initialize_install(args.package, args.user_data)
+        elif args.command == "first-run":
+            document = orchestrate_first_run(
+                cue=args.cue, bios=args.bios, patch=args.patch, xdelta3=args.xdelta3,
+                compiler=args.compiler, regions=args.regions, artifacts=args.artifacts,
+                artifact_root=args.artifact_root, user_data=args.user_data,
+                profile=args.profile, media_manifest=args.media_manifest)
+        elif args.command == "launch":
+            command_line = args.command_line
+            if command_line and command_line[0] == "--": command_line = command_line[1:]
+            document = launch_and_record(args.package, args.user_data,
+                                         timeout_seconds=args.timeout_seconds,
+                                         command=command_line or None)
         elif args.command == "soak":
             command_line = args.command_line
             if command_line and command_line[0] == "--":
@@ -199,7 +229,7 @@ def main(argv: list[str] | None = None) -> int:
     except UnknownVariantError as error:
         sys.stderr.write(f"product setup rejected unknown variant: {error}\n")
         return 3
-    except (ProductError, ReleaseError, OSError, ValueError) as error:
+    except (ProductError, ReleaseError, InstallError, OSError, ValueError) as error:
         sys.stderr.write(f"product setup failed: {error}\n")
         return 2
 

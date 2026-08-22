@@ -175,6 +175,37 @@ write-through replacement. Its receipt remains
 the package from its own location and refuses to launch until the existing
 authenticated setup/finalization pipeline has published `finalize.json`.
 
+The complete first-run path invokes the existing hash-pinned media verifier,
+patcher, bounded clean compiler, and strict catalog finalizer in one staging
+directory. Only after every step passes does an atomic active-setup receipt
+select the version; upgrades never mutate the prior setup in place:
+
+```powershell
+python tools/product/build_product.py first-run `
+  --cue D:/Media/Wipeout3SE.cue --bios D:/Media/SCPH1001.bin `
+  --patch tools/patches/pal_track01.xdelta3 --xdelta3 tools/xdelta3.exe `
+  --compiler build-tools/clean-aot-compiler.exe `
+  --regions build-policy/product-regions.json `
+  --artifacts build-native/artifacts.json --artifact-root build-native `
+  --user-data "$env:LOCALAPPDATA/Wipeout3SE"
+```
+
+Disc, patch, compiler, and source BIOS bytes remain outside the portable
+package. Locally generated BIOS/game regions are copied into the versioned
+per-user setup and locked to exact setup, finalize, catalog, artifact hashes,
+and sizes. Launch remeasures that entire lock before starting the app and
+atomically records the canonical bootstrap frontier:
+
+```powershell
+python tools/product/build_product.py launch `
+  --package D:/Games/Wipeout3SE `
+  --user-data "$env:LOCALAPPDATA/Wipeout3SE"
+```
+
+Any cross-version finalize receipt, modified region, missing region, or stale
+active lock fails before launch. A recorded BIOS frontier remains explicitly
+`frontier-recorded-not-game-ready`; it is evidence, not a game-ready promotion.
+
 The deterministic soak command runs a headless validation executable multiple
 times with fixed locale/timezone/SDL drivers, requires identical output bytes,
 enforces bounded execution, and checks a declared p95 ceiling:

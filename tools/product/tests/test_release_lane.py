@@ -16,6 +16,9 @@ from tools.product.release_lane import (
     run_soak,
     validate_release,
 )
+from tools.product.install_lane import (ACTIVE_SCHEMA, InstallError, generation_lock,
+                                        launch_and_record)
+from tools.product.pipeline import canonical_json_bytes
 
 
 class ReleaseLaneTests(unittest.TestCase):
@@ -160,6 +163,68 @@ class ReleaseLaneTests(unittest.TestCase):
             run_soak(
                 [sys.executable, "-c", "import time; print(time.time_ns())"],
                 iterations=3, timeout_seconds=5.0, max_p95_ms=5000.0)
+
+    def test_relocated_launch_records_frontier_and_rejects_stale_upgrade(self) -> None:
+        package = self.root / "original-package"
+        self.package(package)
+        relocated = self.root / "moved" / "game"
+        relocated.parent.mkdir()
+        shutil.copytree(package, relocated)
+        user_data = self.root / "userdata"
+        setup_root = user_data / "setups" / "v1"
+        artifact_root = setup_root / "artifacts"
+        native = artifact_root / "regions" / "main.native"
+        native.parent.mkdir(parents=True)
+        native.write_bytes(b"local generated BIOS and game regions")
+        artifact_hash = hashlib.sha256(native.read_bytes()).hexdigest()
+        catalog_input_hash = "1" * 64
+        catalog = {"schema": "psxrecomp.clean-aot.catalog.v1", "variants": [{
+            "artifact": {"id": "bios-game", "path": "regions/main.native",
+                         "sha256": artifact_hash}}]}
+        catalog_hash = hashlib.sha256(canonical_json_bytes(catalog)).hexdigest()
+        setup = {"schema": "psxrecomp.clean-aot.product-receipt.v1",
+                 "status": "setup-complete", "catalog": {"input_sha256": catalog_input_hash}}
+        final = {"schema": "psxrecomp.clean-aot.product-finalize-receipt.v1",
+                 "status": "catalog-finalized", "catalog_input_sha256": catalog_input_hash,
+                 "catalog_sha256": catalog_hash}
+        for name, value in (("receipt.json", setup), ("finalize-receipt.json", final),
+                            ("catalog.json", catalog)):
+            (setup_root / name).write_bytes(canonical_json_bytes(value) + b"\n")
+        lock = generation_lock(setup_root / "receipt.json", setup_root / "finalize-receipt.json",
+                               setup_root / "catalog.json", artifact_root)
+        active = {"schema": ACTIVE_SCHEMA, "status": "active-not-game-ready",
+                  "version": "v1", "setup_root": "setups/v1",
+                  "generation_lock": lock, "game_ready": False}
+        active_path = user_data / "receipts" / "active-setup.json"
+        active_path.parent.mkdir(parents=True)
+        active_path.write_bytes(canonical_json_bytes(active) + b"\n")
+        frontier = {"schema": "clean-aot.bootstrap-receipt.v1", "stage": "bios-slice-stopped",
+                    "bios_instructions_executed": 30, "game_ready": False}
+        command = [sys.executable, "-c", f"import json;print(json.dumps({frontier!r}))"]
+        receipt = launch_and_record(relocated, user_data, command=command)
+        self.assertEqual(receipt["frontier"]["bios_instructions_executed"], 30)
+        self.assertFalse(receipt["game_ready"])
+        native.write_bytes(b"stale replacement")
+        with self.assertRaisesRegex(InstallError, "stale"):
+            launch_and_record(relocated, user_data, command=command)
+
+    def test_generation_lock_rejects_cross_setup_finalize_upgrade(self) -> None:
+        root = self.root / "upgrade"
+        root.mkdir()
+        artifact = root / "region.native"
+        artifact.write_bytes(b"region")
+        digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        catalog = {"variants": [{"artifact": {"path": "region.native", "sha256": digest}}]}
+        (root / "catalog.json").write_bytes(canonical_json_bytes(catalog) + b"\n")
+        catalog_hash = hashlib.sha256(canonical_json_bytes(catalog)).hexdigest()
+        (root / "setup.json").write_text(json.dumps(
+            {"status": "setup-complete", "catalog": {"input_sha256": "a" * 64}}))
+        (root / "finalize.json").write_text(json.dumps(
+            {"status": "catalog-finalized", "catalog_input_sha256": "b" * 64,
+             "catalog_sha256": catalog_hash}))
+        with self.assertRaisesRegex(InstallError, "stale for this setup"):
+            generation_lock(root / "setup.json", root / "finalize.json",
+                            root / "catalog.json", root)
 
 
 if __name__ == "__main__":
