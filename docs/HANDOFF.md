@@ -525,6 +525,16 @@ instruction and fails closed on every unknown PC or executable identity.
   9,422 reads, 18,369 writes, 3,720 isolated-cache writes, one device read, and
   48 device writes. Receipt `bios-frontier-00086291.json` records `UnknownCode`;
   RAM remains epoch `8af29f79...f1c9a` and COP0 remains fault-free.
+- Exact region `[0x3108,0x31E8)` explicitly roots `0x31A0`, which is both a
+  live branch target and another branch's architectural delay slot; no general
+  delay-slot relaxation was added. Its live path reaches only A0/0x17 stub
+  `[0x6B10,0x6B1C)`, then immutable BIOS comparison routine
+  `[0xBFC03288,0xBFC03310)`. The service returns to copied RAM `0x0000283C`
+  after mutating the whole-RAM epoch to `9548d3d4...4a35d`; stale authorization
+  is rejected there. Two repeated probes reach 86,834 instructions and 15,057
+  dispatches with 9,521 reads, 18,423 writes, 3,720 isolated-cache writes, one
+  device read, and 49 device writes. Receipt `bios-frontier-00086834.json`
+  records the new `UnknownCode` frontier with fault-free COP0 state.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control
