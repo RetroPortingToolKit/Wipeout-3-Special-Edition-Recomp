@@ -37,6 +37,24 @@ pixel-budget, missing-provenance, and disabled-mode paths preserve exact native
 scanout. The display-plane merge performs one validity test and at most one RGB
 write per native scanout pixel; the existing 4K resolve budget is unchanged.
 
+## GPU verification traces
+
+`GpuTraceRecorder` captures a bounded in-memory GP0 command stream together
+with identity-bound precise polygon vertices and the authoritative VRAM
+generation before and after each command. Capture canonicalizes every event to
+GP0 words and immediately re-decodes it with a fresh GPU front end; unsupported
+readback transactions, malformed packets, stale provenance, excess commands,
+and declared-count mismatches fail closed.
+
+`GpuTraceReplay` re-decodes the command stream independently for native and
+enhanced rasterizers. It requires the exact variant, executable, frame, initial
+VRAM generation, contiguous sequence, command digest, per-command generations,
+and complete polygon provenance. Its canonical receipt contains only identities,
+counts, command/VRAM digests, work units, primitive coverage, and precise-raster
+statistics. GP0 words, upload payloads, vertices, VRAM, and frame pixels are
+deliberately absent, so the receipt can be retained as verification evidence
+without bundling copyrighted frame or texture data.
+
 Replacement assets remain separated from title policy. A title-owned key
 policy may identify a texture or font while the generic runtime validates
 manifest/source generations, confines paths to the asset root, verifies

@@ -240,6 +240,89 @@ struct VisualReceipt final {
     [[nodiscard]] std::string canonical_json() const;
 };
 
+struct GpuTraceIdentity final {
+    std::string variant_sha256{};
+    std::string executable_sha256{};
+    std::uint64_t frame_index = 0U;
+    std::uint64_t initial_vram_generation = 1U;
+    friend bool operator==(const GpuTraceIdentity&,
+                           const GpuTraceIdentity&) = default;
+};
+
+struct GpuTraceCommand final {
+    std::uint64_t sequence = 0U;
+    std::uint64_t before_vram_generation = 0U;
+    std::uint64_t after_vram_generation = 0U;
+    std::vector<std::uint32_t> gp0_words{};
+    std::vector<raster::PreciseVertex> precise_vertices{};
+};
+
+struct GpuCommandTrace final {
+    GpuTraceIdentity identity{};
+    std::uint64_t declared_command_count = 0U;
+    std::uint64_t command_digest = 0U;
+    std::vector<GpuTraceCommand> commands{};
+};
+
+enum class GpuTraceCode : std::uint8_t {
+    Success,
+    InvalidIdentity,
+    IdentityMismatch,
+    DroppedCommand,
+    UnsupportedPrimitive,
+    StaleVramGeneration,
+    MalformedCommand,
+    WorkLimitExceeded,
+};
+
+struct GpuReplayReceipt final {
+    GpuTraceCode code = GpuTraceCode::MalformedCommand;
+    GpuTraceIdentity identity{};
+    std::uint64_t command_digest = 0U;
+    std::uint64_t commands_replayed = 0U;
+    std::uint64_t polygon_commands = 0U;
+    std::uint64_t native_only_commands = 0U;
+    std::uint64_t precise_commands = 0U;
+    std::uint64_t native_work_units = 0U;
+    std::uint64_t enhanced_work_units = 0U;
+    std::uint64_t native_vram_digest = 0U;
+    std::uint64_t enhanced_vram_digest = 0U;
+    raster::PreciseRasterStats precise_stats{};
+    [[nodiscard]] bool success() const noexcept {
+        return code == GpuTraceCode::Success;
+    }
+    [[nodiscard]] std::string canonical_json() const;
+};
+
+class GpuTraceRecorder final {
+public:
+    explicit GpuTraceRecorder(GpuTraceIdentity identity);
+    ~GpuTraceRecorder() noexcept;
+    GpuTraceRecorder(const GpuTraceRecorder&) = delete;
+    GpuTraceRecorder& operator=(const GpuTraceRecorder&) = delete;
+    [[nodiscard]] GpuTraceCode append(
+        const gpu::Event& event,
+        std::span<const raster::PreciseVertex> precise_vertices = {});
+    [[nodiscard]] std::optional<GpuCommandTrace> finish(
+        std::uint64_t declared_command_count);
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
+
+class GpuTraceReplay final {
+public:
+    [[nodiscard]] static GpuReplayReceipt replay(
+        const GpuCommandTrace& trace,
+        const GpuTraceIdentity& expected_identity,
+        raster::PreciseCullingPolicy culling =
+            raster::PreciseCullingPolicy::NativeHardware,
+        raster::TextureFilterMode filtering =
+            raster::TextureFilterMode::NearestNative,
+        raster::PreciseColorMode color_mode =
+            raster::PreciseColorMode::NativeRgb555) noexcept;
+};
+
 class RuntimeGraphics final {
 public:
     explicit RuntimeGraphics(GraphicsConfiguration configuration);

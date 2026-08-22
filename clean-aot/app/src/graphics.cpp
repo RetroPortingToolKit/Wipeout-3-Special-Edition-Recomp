@@ -5,11 +5,14 @@
 #include "sha256.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <fstream>
 #include <iterator>
 #include <limits>
 #include <optional>
+#include <string_view>
+#include <type_traits>
 #include <variant>
 
 #if defined(_WIN32)
@@ -23,6 +26,89 @@ namespace {
 constexpr std::uint64_t kFnvOffset = 14695981039346656037ULL;
 constexpr std::uint64_t kFnvPrime = 1099511628211ULL;
 constexpr std::size_t kMaximumPngBytes = 64U * 1024U * 1024U;
+constexpr std::size_t kMaximumTraceCommands = gpu::kEventQueueCapacity;
+
+void digest_bytes(std::uint64_t& digest,
+                  std::span<const std::uint8_t> bytes) noexcept;
+
+[[nodiscard]] bool trace_sha256(std::string_view value) noexcept {
+    return value.size() == 64U && std::all_of(
+        value.begin(), value.end(), [](char byte) noexcept {
+            return (byte >= '0' && byte <= '9') ||
+                   (byte >= 'a' && byte <= 'f');
+        });
+}
+
+[[nodiscard]] std::vector<std::uint32_t> trace_words(
+    const gpu::Event& event) {
+    return std::visit([](const auto& item) -> std::vector<std::uint32_t> {
+        using Item = std::decay_t<decltype(item)>;
+        if constexpr (std::is_same_v<Item, gpu::PolygonEvent> ||
+                      std::is_same_v<Item, gpu::RectangleEvent>) {
+            if (item.raw_word_count == 0U ||
+                item.raw_word_count > item.raw_words.size()) return {};
+            return {item.raw_words.begin(),
+                    item.raw_words.begin() + item.raw_word_count};
+        } else if constexpr (std::is_same_v<Item, gpu::LineEvent>) {
+            return item.raw_words;
+        } else if constexpr (std::is_same_v<Item, gpu::VramUploadEvent>) {
+            std::vector<std::uint32_t> words(
+                item.raw_words.begin(), item.raw_words.end());
+            words.insert(words.end(), item.data_words.begin(), item.data_words.end());
+            return words;
+        } else if constexpr (std::is_same_v<Item, gpu::VramDownloadEvent>) {
+            return {};
+        } else if constexpr (requires { item.raw_words; }) {
+            return {item.raw_words.begin(), item.raw_words.end()};
+        } else {
+            return {item.raw_word};
+        }
+    }, event);
+}
+
+void trace_mix_u64(std::uint64_t& digest, std::uint64_t value) noexcept {
+    const std::array<std::uint64_t, 1U> values{value};
+    digest_bytes(digest, std::span<const std::uint8_t>(
+        reinterpret_cast<const std::uint8_t*>(values.data()), sizeof(value)));
+}
+
+[[nodiscard]] std::uint64_t trace_digest(
+    const GpuCommandTrace& trace) noexcept {
+    std::uint64_t digest = kFnvOffset;
+    trace_mix_u64(digest, trace.declared_command_count);
+    for (const GpuTraceCommand& command : trace.commands) {
+        trace_mix_u64(digest, command.sequence);
+        trace_mix_u64(digest, command.before_vram_generation);
+        trace_mix_u64(digest, command.after_vram_generation);
+        trace_mix_u64(digest, command.gp0_words.size());
+        for (std::uint32_t word : command.gp0_words) trace_mix_u64(digest, word);
+        trace_mix_u64(digest, command.precise_vertices.size());
+        for (const raster::PreciseVertex& vertex : command.precise_vertices) {
+            trace_mix_u64(digest, std::bit_cast<std::uint64_t>(vertex.x));
+            trace_mix_u64(digest, std::bit_cast<std::uint64_t>(vertex.y));
+            trace_mix_u64(digest, std::bit_cast<std::uint64_t>(vertex.z));
+            trace_mix_u64(digest, std::bit_cast<std::uint64_t>(vertex.w));
+            trace_mix_u64(digest, std::bit_cast<std::uint64_t>(vertex.u));
+            trace_mix_u64(digest, std::bit_cast<std::uint64_t>(vertex.v));
+            trace_mix_u64(digest, vertex.color_rgba);
+            trace_mix_u64(digest, vertex.storage_generation);
+            trace_mix_u64(digest, vertex.origin_generation);
+        }
+    }
+    return digest;
+}
+
+[[nodiscard]] std::optional<gpu::Event> trace_decode(
+    gpu::FrontEnd& frontend, std::span<const std::uint32_t> words) noexcept {
+    if (words.empty() || frontend.event_count() != 0U) return std::nullopt;
+    for (std::uint32_t word : words) {
+        if (!frontend.write_gp0(word).accepted) return std::nullopt;
+    }
+    if (frontend.event_count() != 1U) return std::nullopt;
+    std::optional<gpu::Event> event = frontend.pop_event();
+    if (!event.has_value() || frontend.event_count() != 0U) return std::nullopt;
+    return event;
+}
 
 void digest_bytes(std::uint64_t& digest,
                   std::span<const std::uint8_t> bytes) noexcept {
@@ -1287,6 +1373,227 @@ std::string VisualReceipt::canonical_json() const {
         std::to_string(replacement_hits) + ",\"schema\":\"clean-aot.visual-receipt.v1\","
         "\"visual_digest\":" + std::to_string(visual_digest) +
         ",\"vram_generation\":" + std::to_string(vram_generation) + "}";
+}
+
+struct GpuTraceRecorder::Impl final {
+    explicit Impl(GpuTraceIdentity value) : trace{std::move(value)} {}
+    GpuCommandTrace trace{};
+    gpu::FrontEnd frontend{};
+    raster::ReferenceRasterizer raster{};
+    GpuTraceCode failure = GpuTraceCode::Success;
+    bool finished = false;
+};
+
+GpuTraceRecorder::GpuTraceRecorder(GpuTraceIdentity identity)
+    : impl_(std::make_unique<Impl>(std::move(identity))) {
+    if (!trace_sha256(impl_->trace.identity.variant_sha256) ||
+        !trace_sha256(impl_->trace.identity.executable_sha256) ||
+        impl_->trace.identity.initial_vram_generation !=
+            impl_->raster.vram_generation()) {
+        impl_->failure = GpuTraceCode::InvalidIdentity;
+    }
+}
+
+GpuTraceRecorder::~GpuTraceRecorder() noexcept = default;
+
+GpuTraceCode GpuTraceRecorder::append(
+    const gpu::Event& event,
+    std::span<const raster::PreciseVertex> precise_vertices) {
+    if (impl_->failure != GpuTraceCode::Success) return impl_->failure;
+    if (impl_->finished || impl_->trace.commands.size() >= kMaximumTraceCommands) {
+        return impl_->failure = GpuTraceCode::DroppedCommand;
+    }
+    try {
+        std::vector<std::uint32_t> words = trace_words(event);
+        if (words.empty()) {
+            return impl_->failure = GpuTraceCode::UnsupportedPrimitive;
+        }
+        std::optional<gpu::Event> decoded = trace_decode(impl_->frontend, words);
+        if (!decoded.has_value()) {
+            return impl_->failure = GpuTraceCode::MalformedCommand;
+        }
+        const bool polygon = std::holds_alternative<gpu::PolygonEvent>(*decoded);
+        const std::size_t expected_vertices = polygon
+            ? (std::get<gpu::PolygonEvent>(*decoded).quad ? 6U : 3U) : 0U;
+        if ((!polygon && !precise_vertices.empty()) ||
+            (polygon && !precise_vertices.empty() &&
+             precise_vertices.size() != expected_vertices)) {
+            return impl_->failure = GpuTraceCode::UnsupportedPrimitive;
+        }
+        for (const raster::PreciseVertex& vertex : precise_vertices) {
+            if (vertex.storage_generation == 0U ||
+                vertex.origin_generation == 0U) {
+                return impl_->failure = GpuTraceCode::StaleVramGeneration;
+            }
+        }
+        GpuTraceCommand command{};
+        command.sequence = impl_->trace.commands.size();
+        command.before_vram_generation = impl_->raster.vram_generation();
+        command.gp0_words = std::move(words);
+        command.precise_vertices.assign(
+            precise_vertices.begin(), precise_vertices.end());
+        const raster::EventResult consumed = impl_->raster.consume(*decoded);
+        if (!consumed.accepted()) {
+            return impl_->failure = consumed.error == raster::RasterError::WorkLimitExceeded
+                ? GpuTraceCode::WorkLimitExceeded
+                : GpuTraceCode::UnsupportedPrimitive;
+        }
+        command.after_vram_generation = impl_->raster.vram_generation();
+        impl_->trace.commands.push_back(std::move(command));
+        return GpuTraceCode::Success;
+    } catch (...) {
+        return impl_->failure = GpuTraceCode::MalformedCommand;
+    }
+}
+
+std::optional<GpuCommandTrace> GpuTraceRecorder::finish(
+    std::uint64_t declared_command_count) {
+    if (impl_->failure != GpuTraceCode::Success || impl_->finished ||
+        declared_command_count != impl_->trace.commands.size() ||
+        declared_command_count == 0U) {
+        impl_->failure = GpuTraceCode::DroppedCommand;
+        return std::nullopt;
+    }
+    impl_->finished = true;
+    impl_->trace.declared_command_count = declared_command_count;
+    impl_->trace.command_digest = trace_digest(impl_->trace);
+    return std::move(impl_->trace);
+}
+
+GpuReplayReceipt GpuTraceReplay::replay(
+    const GpuCommandTrace& trace,
+    const GpuTraceIdentity& expected_identity,
+    raster::PreciseCullingPolicy culling,
+    raster::TextureFilterMode filtering,
+    raster::PreciseColorMode color_mode) noexcept {
+    GpuReplayReceipt receipt{};
+    receipt.identity = trace.identity;
+    receipt.command_digest = trace.command_digest;
+    try {
+        if (!trace_sha256(trace.identity.variant_sha256) ||
+            !trace_sha256(trace.identity.executable_sha256)) {
+            receipt.code = GpuTraceCode::InvalidIdentity;
+            return receipt;
+        }
+        if (!(trace.identity == expected_identity)) {
+            receipt.code = GpuTraceCode::IdentityMismatch;
+            return receipt;
+        }
+        if (trace.declared_command_count == 0U ||
+            trace.declared_command_count != trace.commands.size() ||
+            trace.commands.size() > kMaximumTraceCommands ||
+            trace.command_digest != trace_digest(trace)) {
+            receipt.code = GpuTraceCode::DroppedCommand;
+            return receipt;
+        }
+        gpu::FrontEnd native_frontend{};
+        gpu::FrontEnd enhanced_frontend{};
+        raster::ReferenceRasterizer native{};
+        raster::ReferenceRasterizer enhanced{};
+        if (native.vram_generation() != trace.identity.initial_vram_generation ||
+            enhanced.vram_generation() != trace.identity.initial_vram_generation) {
+            receipt.code = GpuTraceCode::StaleVramGeneration;
+            return receipt;
+        }
+        for (std::size_t index = 0U; index < trace.commands.size(); ++index) {
+            const GpuTraceCommand& command = trace.commands[index];
+            if (command.sequence != index) {
+                receipt.code = GpuTraceCode::DroppedCommand;
+                return receipt;
+            }
+            if (native.vram_generation() != command.before_vram_generation ||
+                enhanced.vram_generation() != command.before_vram_generation) {
+                receipt.code = GpuTraceCode::StaleVramGeneration;
+                return receipt;
+            }
+            std::optional<gpu::Event> native_event =
+                trace_decode(native_frontend, command.gp0_words);
+            std::optional<gpu::Event> enhanced_event =
+                trace_decode(enhanced_frontend, command.gp0_words);
+            if (!native_event.has_value() || !enhanced_event.has_value()) {
+                receipt.code = GpuTraceCode::MalformedCommand;
+                return receipt;
+            }
+            const raster::EventResult native_result = native.consume(*native_event);
+            if (!native_result.accepted()) {
+                receipt.code = native_result.error == raster::RasterError::WorkLimitExceeded
+                    ? GpuTraceCode::WorkLimitExceeded
+                    : GpuTraceCode::UnsupportedPrimitive;
+                return receipt;
+            }
+            receipt.native_work_units += native_result.work_units;
+            raster::EventResult enhanced_result{};
+            if (const auto* polygon =
+                    std::get_if<gpu::PolygonEvent>(&*enhanced_event)) {
+                ++receipt.polygon_commands;
+                const std::size_t expected = polygon->quad ? 6U : 3U;
+                if (command.precise_vertices.size() != expected ||
+                    std::any_of(command.precise_vertices.begin(),
+                        command.precise_vertices.end(),
+                        [](const raster::PreciseVertex& vertex) noexcept {
+                            return vertex.storage_generation == 0U ||
+                                   vertex.origin_generation == 0U;
+                        })) {
+                    receipt.code = GpuTraceCode::UnsupportedPrimitive;
+                    return receipt;
+                }
+                enhanced_result = enhanced.consume_precise_polygon(
+                    *polygon, command.precise_vertices, nullptr, culling,
+                    filtering, color_mode);
+                ++receipt.precise_commands;
+            } else {
+                if (!command.precise_vertices.empty()) {
+                    receipt.code = GpuTraceCode::UnsupportedPrimitive;
+                    return receipt;
+                }
+                enhanced_result = enhanced.consume(*enhanced_event);
+                ++receipt.native_only_commands;
+            }
+            if (!enhanced_result.accepted()) {
+                receipt.code = enhanced_result.error ==
+                        raster::RasterError::WorkLimitExceeded
+                    ? GpuTraceCode::WorkLimitExceeded
+                    : GpuTraceCode::UnsupportedPrimitive;
+                return receipt;
+            }
+            receipt.enhanced_work_units += enhanced_result.work_units;
+            if (native.vram_generation() != command.after_vram_generation ||
+                enhanced.vram_generation() != command.after_vram_generation) {
+                receipt.code = GpuTraceCode::StaleVramGeneration;
+                return receipt;
+            }
+            ++receipt.commands_replayed;
+        }
+        receipt.native_vram_digest = native.digest();
+        receipt.enhanced_vram_digest = enhanced.digest();
+        receipt.precise_stats = enhanced.precise_stats();
+        receipt.code = GpuTraceCode::Success;
+        return receipt;
+    } catch (...) {
+        receipt.code = GpuTraceCode::MalformedCommand;
+        return receipt;
+    }
+}
+
+std::string GpuReplayReceipt::canonical_json() const {
+    return "{\"command_digest\":" + std::to_string(command_digest) +
+        ",\"commands_replayed\":" + std::to_string(commands_replayed) +
+        ",\"coverage\":{\"native_only\":" +
+        std::to_string(native_only_commands) + ",\"polygons\":" +
+        std::to_string(polygon_commands) + ",\"precise\":" +
+        std::to_string(precise_commands) + "},\"enhanced_vram_digest\":" +
+        std::to_string(enhanced_vram_digest) + ",\"identity\":{\"executable_sha256\":\"" +
+        identity.executable_sha256 + "\",\"frame_index\":" +
+        std::to_string(identity.frame_index) + ",\"initial_vram_generation\":" +
+        std::to_string(identity.initial_vram_generation) +
+        ",\"variant_sha256\":\"" + identity.variant_sha256 +
+        "\"},\"native_vram_digest\":" + std::to_string(native_vram_digest) +
+        ",\"performance\":{\"enhanced_work_units\":" +
+        std::to_string(enhanced_work_units) + ",\"native_work_units\":" +
+        std::to_string(native_work_units) + ",\"precise_fragments\":" +
+        std::to_string(precise_stats.precise_fragments) +
+        "},\"schema\":\"clean-aot.gpu-replay-receipt.v1\",\"status\":" +
+        std::to_string(static_cast<std::uint8_t>(code)) + "}";
 }
 
 } // namespace clean_aot::app

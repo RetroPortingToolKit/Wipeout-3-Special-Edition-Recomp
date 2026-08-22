@@ -356,6 +356,104 @@ void test_live_gp0_primitive_compatibility_matrix() {
               << graphics.visual_digest() << std::dec << '\n';
 }
 
+void test_identity_bound_gpu_trace_replay() {
+    using namespace clean_aot;
+    const app::GpuTraceIdentity identity{
+        std::string(64U, 'a'), std::string(64U, 'b'), 17U, 1U};
+    gpu::FrontEnd source{};
+    const auto event = [&](std::initializer_list<std::uint32_t> words) {
+        for (std::uint32_t word : words) {
+            expect(source.write_gp0(word).accepted,
+                   "synthetic trace GP0 command accepts");
+        }
+        expect(source.event_count() == 1U,
+               "synthetic trace command emits exactly one event");
+        return *source.pop_event();
+    };
+    const gpu::Event draw_area = event({
+        0xe4000000U | (239U << 10U) | 319U});
+    const gpu::Event fill = event({
+        0x02000040U, 0U, (240U << 16U) | 320U});
+    const gpu::Event polygon = event({
+        0x200000ffU, (20U << 16U) | 20U,
+        (20U << 16U) | 80U, (80U << 16U) | 20U});
+    const gpu::Event line = event({
+        0x4000ffffU, (100U << 16U) | 20U,
+        (100U << 16U) | 80U});
+    const auto precise = [](double x, double y) {
+        return raster::PreciseVertex{
+            x, y, 1.0, 1.0, 0.0, 0.0, 0xff0000ffU, 1U, 1U};
+    };
+    const std::array<raster::PreciseVertex, 3U> vertices{
+        precise(20.0, 20.0), precise(80.0, 20.0), precise(20.0, 80.0)};
+    app::GpuTraceRecorder recorder(identity);
+    expect(recorder.append(draw_area) == app::GpuTraceCode::Success &&
+           recorder.append(fill) == app::GpuTraceCode::Success &&
+           recorder.append(polygon, vertices) == app::GpuTraceCode::Success &&
+           recorder.append(line) == app::GpuTraceCode::Success,
+           "synthetic live trace records every command and provenance tuple");
+    auto trace = recorder.finish(4U);
+    expect(trace.has_value(), "complete trace seals with declared command count");
+    const app::GpuReplayReceipt replay = app::GpuTraceReplay::replay(
+        *trace, identity, raster::PreciseCullingPolicy::NativeHardware,
+        raster::TextureFilterMode::NearestNative,
+        raster::PreciseColorMode::TrueColorDisplay);
+    expect(replay.success() && replay.commands_replayed == 4U &&
+           replay.polygon_commands == 1U && replay.precise_commands == 1U &&
+           replay.native_only_commands == 3U &&
+           replay.native_vram_digest == replay.enhanced_vram_digest &&
+           replay.command_digest == 5872361417715498967ULL &&
+           replay.native_vram_digest == 12133522140254745647ULL &&
+           replay.native_work_units == 80462U &&
+           replay.enhanced_work_units == 80462U &&
+           replay.precise_stats.precise_fragments == 1830U,
+           "offline trace replay produces native/enhanced digest and coverage evidence");
+    const std::string receipt = replay.canonical_json();
+    expect(receipt == app::GpuTraceReplay::replay(
+               *trace, identity, raster::PreciseCullingPolicy::NativeHardware,
+               raster::TextureFilterMode::NearestNative,
+               raster::PreciseColorMode::TrueColorDisplay).canonical_json() &&
+           receipt.find("clean-aot.gpu-replay-receipt.v1") != std::string::npos &&
+           receipt.find("gp0_words") == std::string::npos &&
+           receipt.find("precise_vertices") == std::string::npos,
+           "trace receipt is deterministic and contains no command/frame payload");
+
+    auto wrong_identity = identity;
+    wrong_identity.frame_index = 18U;
+    expect(app::GpuTraceReplay::replay(*trace, wrong_identity).code ==
+               app::GpuTraceCode::IdentityMismatch,
+           "trace replay rejects a mismatched frame identity");
+    auto dropped = *trace;
+    dropped.commands.pop_back();
+    expect(app::GpuTraceReplay::replay(dropped, identity).code ==
+               app::GpuTraceCode::DroppedCommand,
+           "trace replay rejects a dropped command before rasterization");
+    auto stale = *trace;
+    stale.identity.initial_vram_generation = 2U;
+    auto stale_identity = identity;
+    stale_identity.initial_vram_generation = 2U;
+    expect(app::GpuTraceReplay::replay(stale, stale_identity).code ==
+               app::GpuTraceCode::StaleVramGeneration,
+           "trace replay rejects a stale initial VRAM generation");
+
+    app::GpuTraceRecorder unsupported(identity);
+    expect(unsupported.append(draw_area) == app::GpuTraceCode::Success &&
+           unsupported.append(polygon) == app::GpuTraceCode::Success,
+           "native-only polygon trace captures for explicit replay rejection");
+    auto unsupported_trace = unsupported.finish(2U);
+    expect(unsupported_trace.has_value() &&
+           app::GpuTraceReplay::replay(*unsupported_trace, identity).code ==
+               app::GpuTraceCode::UnsupportedPrimitive,
+           "enhanced replay rejects a polygon lacking provenance");
+    auto stale_vertices = vertices;
+    stale_vertices[0].storage_generation = 0U;
+    app::GpuTraceRecorder stale_provenance(identity);
+    expect(stale_provenance.append(polygon, stale_vertices) ==
+               app::GpuTraceCode::StaleVramGeneration,
+           "trace capture rejects stale provenance generations");
+    std::cout << "GPU replay receipt: " << receipt << '\n';
+}
+
 void test_precise_raster_perspective_interpolation() {
     using namespace clean_aot;
     raster::ReferenceRasterizer raster;
@@ -987,6 +1085,7 @@ void test_native_png_decode() {
 int main() {
     test_live_pgxp_projection_pipeline();
     test_live_gp0_primitive_compatibility_matrix();
+    test_identity_bound_gpu_trace_replay();
     test_precise_raster_perspective_interpolation();
     test_beetle_upload_key_derivation_and_sampling();
     test_live_replacement_pipeline();
