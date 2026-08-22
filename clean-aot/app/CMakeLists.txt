@@ -30,11 +30,17 @@ endif()
 add_library(clean_aot_app STATIC
     src/application.cpp
     src/authorization.cpp
+    src/bootstrap.cpp
+    src/disc_source.cpp
     src/json.cpp
     src/sha256.cpp
 )
 target_include_directories(clean_aot_app PUBLIC include)
-target_link_libraries(clean_aot_app PUBLIC clean_aot_runtime clean_aot_host)
+if(NOT TARGET clean_aot_media)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../media"
+                     "${CMAKE_CURRENT_BINARY_DIR}/media")
+endif()
+target_link_libraries(clean_aot_app PUBLIC clean_aot_runtime clean_aot_host clean_aot_media)
 target_compile_features(clean_aot_app PUBLIC cxx_std_20)
 
 function(clean_aot_app_warnings target)

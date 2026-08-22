@@ -161,7 +161,37 @@ Authorization authorize_launch(const LaunchInputs& inputs,
         if(binding.dispatch_roots.size()!=roots->array()->size())return rejected(AuthorizationCode::BindingMismatch,"compiled dispatch roots do not exactly match catalog");
         for(std::size_t index=0U;index<binding.dispatch_roots.size();++index)if(roots->array()->at(index).number()==nullptr||binding.dispatch_roots[index]!=*roots->array()->at(index).number())return rejected(AuthorizationCode::BindingMismatch,"compiled dispatch root order differs from catalog");
 
-        Authorization result{};result.code=AuthorizationCode::Authorized;result.detail="authenticated finalized catalog selection";result.variant_identity_sha256=*selected_identity;result.bios=std::move(bios);return result;
+        const Json* source_media=detail::member(*variant,"source_media");
+        const Json* source_files=source_media==nullptr?nullptr:detail::member(*source_media,"files");
+        if(source_files==nullptr||source_files->array()==nullptr||source_files->array()->empty())
+            return rejected(AuthorizationCode::InvalidDocument,"catalog source media is missing");
+        std::vector<SourceMeasurement> media_measurements;
+        std::filesystem::path cue_path;
+        for(const Json& source:*source_files->array()) {
+            const auto* role=text(source,{"role"});const auto* name=text(source,{"name"});
+            const auto* size=number(source,{"size"});const auto* source_hash=text(source,{"sha256"});
+            if(role==nullptr||name==nullptr||size==nullptr||source_hash==nullptr||!digest(*source_hash))
+                return rejected(AuthorizationCode::InvalidDocument,"catalog source-media entry is malformed");
+            media_measurements.push_back(SourceMeasurement{*role,*name,*size,*source_hash});
+            if(*role=="bios"||*role=="hueponik-patch"||*role=="payload-container")continue;
+            std::filesystem::path source_path;
+            if(!safe_artifact(inputs.media_root,*name,source_path))
+                return rejected(AuthorizationCode::UnsafePath,"catalog media path is unsafe");
+            std::vector<std::uint8_t> source_bytes;
+            if(*size>512U*1024U*1024U||!read_file(source_path,static_cast<std::size_t>(*size),source_bytes)||
+               source_bytes.size()!=*size||detail::sha256(source_bytes)!=*source_hash)
+                return rejected(AuthorizationCode::MeasurementMismatch,"disc media bytes do not match finalized catalog");
+            if(*role=="cue")cue_path=source_path;
+        }
+        if(cue_path.empty())return rejected(AuthorizationCode::InvalidDocument,"catalog has no authenticated cue file");
+
+        Authorization result{};result.code=AuthorizationCode::Authorized;result.detail="authenticated finalized catalog selection";
+        result.catalog_sha256=catalog_hash;result.variant_identity_sha256=*selected_identity;
+        result.executable_sha256=*executable_hash;result.artifact_sha256=*artifact_hash;
+        result.load_start=static_cast<std::uint32_t>(load_start);result.load_end_exclusive=load_end;
+        result.selected_entry_pc=binding.dispatch_roots.front();result.bios=std::move(bios);
+        result.executable=std::move(executable);result.cue_path=std::move(cue_path);
+        result.media=std::move(media_measurements);return result;
     } catch (...) { return rejected(AuthorizationCode::InvalidDocument,"authorization failed closed"); }
 }
 } // namespace clean_aot::app

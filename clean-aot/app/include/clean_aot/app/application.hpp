@@ -50,7 +50,6 @@ public:
 private:
     host::IHostBackend& host_;
     Authorization authorization_{};
-    runtime::GeneratedDispatcher dispatcher_{};
     std::unique_ptr<runtime::Runtime> runtime_{};
     bool initialized_ = false;
 };
