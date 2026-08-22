@@ -20,6 +20,7 @@ RUNTIME_AUDIT_SCHEMA = "wipeout3se.clean-aot.installed-runtime-audit.v1"
 RUNTIME_FORBIDDEN = ("compiler", "patch", "xdelta", "oracle", "legacy", "setup", "python")
 RUNTIME_ROLES = {"application", "sdl-runtime", "generated-clean-artifact",
                  "configuration-defaults", "portable-launcher"}
+GAME_SHARD_SCHEMA = "wo3se.generated-game-shards.v1"
 
 
 def _canonical(value: Any) -> bytes:
@@ -40,6 +41,45 @@ def _relative(value: str) -> Path:
     if not value or path.is_absolute() or path.drive or any(p in {"", ".", ".."} for p in path.parts):
         raise ReleaseError(f"unsafe installer-relative path: {value!r}")
     return path
+
+
+def _game_shard_acceptance(path: Path) -> dict[str, Any]:
+    """Reduce the packaged authority to the exact entries the compiler must emit."""
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise ReleaseError("missing or malformed packaged game-shard receipt") from error
+    images = document.get("images")
+    if (document.get("schema") != GAME_SHARD_SCHEMA or
+            document.get("status") != "partial-fail-closed" or
+            document.get("policy", {}).get("unknown_pc_action") != "reject" or
+            not isinstance(images, list) or not images):
+        raise ReleaseError("packaged game-shard receipt is not fail-closed")
+    entries = []
+    names = set()
+    for image in images:
+        name = image.get("name")
+        if not isinstance(name, str) or not name or name in names:
+            raise ReleaseError("packaged game-shard image names are invalid")
+        names.add(name)
+        entry = {key: image.get(key) for key in (
+            "name", "identity_sha256", "manifest", "manifest_sha256",
+            "compiled_instruction_count", "compiled_region_count")}
+        if (any(not isinstance(entry[key], str) or not entry[key] for key in
+                ("identity_sha256", "manifest", "manifest_sha256")) or
+                any(not isinstance(entry[key], int) or entry[key] <= 0 for key in
+                    ("compiled_instruction_count", "compiled_region_count"))):
+            raise ReleaseError(f"packaged game-shard entry is incomplete: {name}")
+        entries.append(entry)
+    entries.sort(key=lambda item: item["name"])
+    instruction_count = sum(entry["compiled_instruction_count"] for entry in entries)
+    region_count = sum(entry["compiled_region_count"] for entry in entries)
+    if (document.get("compiled_instruction_count") != instruction_count or
+            document.get("compiled_region_count") != region_count):
+        raise ReleaseError("packaged game-shard aggregate counts disagree with entries")
+    return {"receipt_sha256": _hash(path), "authority_sha256": document.get("authority_sha256"),
+            "compiled_instruction_count": instruction_count,
+            "compiled_region_count": region_count, "entries": entries}
 
 
 def audit_installed_runtime(runtime: Path) -> dict[str, Any]:
@@ -95,11 +135,13 @@ def create_installer(*, setup_exe: Path, runtime_payload: Path,
                     "media_manifest": "policy/media-manifest.json"}
         payload_root.mkdir(exist_ok=True)
         (payload_root / "setup-contract.json").write_bytes(_canonical(contract))
+        game_shards = _game_shard_acceptance(payload_root / contract["game_shards"])
         for path in sorted(p for p in temporary.rglob("*") if p.is_file()):
             relative = path.relative_to(temporary).as_posix()
             entries.append({"path": relative, "size": path.stat().st_size, "sha256": _hash(path)})
         manifest = {"schema": INSTALLER_SCHEMA, "status": "packaged-not-game-ready",
-                    "runtime_audit": runtime_audit, "files": entries}
+                    "runtime_audit": runtime_audit, "game_shards": game_shards,
+                    "files": entries}
         (temporary / "installer-manifest.json").write_bytes(_canonical(manifest))
         validate_installer(temporary)
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -133,6 +175,10 @@ def validate_installer(package: Path) -> dict[str, Any]:
     audit = audit_installed_runtime(package / "runtime-payload")
     if audit != manifest.get("runtime_audit"):
         raise ReleaseError("nested runtime audit changed")
+    contract = json.loads((package / "setup-payload" / "setup-contract.json").read_text(encoding="utf-8"))
+    game_shards = _game_shard_acceptance(package / "setup-payload" / _relative(contract.get("game_shards", "")))
+    if game_shards != manifest.get("game_shards"):
+        raise ReleaseError("packaged game-shard acceptance changed")
     return {"schema": INSTALLER_SCHEMA, "status": "validated", "files": len(listed),
             "manifest_sha256": _hash(package / "installer-manifest.json"),
-            "runtime_audit": audit}
+            "runtime_audit": audit, "game_shards": game_shards}

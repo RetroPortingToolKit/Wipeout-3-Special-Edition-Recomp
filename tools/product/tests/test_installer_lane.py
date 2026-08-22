@@ -37,7 +37,19 @@ class InstallerLaneTests(unittest.TestCase):
                          "policy/game-shards/nfe-entry5-route-variant-closed-shards.manifest",
                          "native/placeholder.dat"):
             path = self.root / ("input-" + str(len(self.payload)))
-            path.write_text("{}" if relative.endswith(".json") else "clean")
+            if relative == "policy/generated-game-shards.json":
+                path.write_text(json.dumps({"schema":"wo3se.generated-game-shards.v1",
+                    "status":"partial-fail-closed", "authority_sha256":"authority",
+                    "compiled_instruction_count":83244, "compiled_region_count":583,
+                    "policy":{"unknown_pc_action":"reject"}, "images":[
+                        {"name":"main-exe", "identity_sha256":"main", "manifest":"main.manifest",
+                         "manifest_sha256":"main-manifest", "compiled_instruction_count":75217,
+                         "compiled_region_count":450},
+                        {"name":"nfe-entry5-route-variant", "identity_sha256":"nfe",
+                         "manifest":"nfe.manifest", "manifest_sha256":"nfe-manifest",
+                         "compiled_instruction_count":8027, "compiled_region_count":133}]}))
+            else:
+                path.write_text("{}" if relative.endswith(".json") else "clean")
             self.payload.append((relative, path))
 
     def tearDown(self): self.temp.cleanup()
@@ -48,12 +60,27 @@ class InstallerLaneTests(unittest.TestCase):
                          setup_payload=self.payload, output=package)
         moved = self.root / "日本語" / "relocated"; moved.parent.mkdir(); shutil.copytree(package, moved)
         receipt = validate_installer(moved)
+        self.assertEqual(receipt["game_shards"]["compiled_instruction_count"], 83244)
+        self.assertEqual(receipt["game_shards"]["compiled_region_count"], 583)
+        self.assertEqual([entry["compiled_instruction_count"] for entry in receipt["game_shards"]["entries"]],
+                         [75217, 8027])
         self.assertEqual(receipt["runtime_audit"]["schema"], RUNTIME_AUDIT_SCHEMA)
         installed = self.root / "installed" / "Wipeout3SE"
         install_runtime(moved / "runtime-payload", installed)
         self.assertFalse((installed / "setup-payload").exists())
         self.assertFalse((installed / "Wipeout3SE-Setup.exe").exists())
         self.assertEqual(audit_installed_runtime(installed)["status"], "pass")
+
+    def test_identity_mutation_is_rejected_even_if_outer_inventory_is_remeasured(self):
+        mutated = []
+        for relative, source in self.payload:
+            if relative == "policy/generated-game-shards.json":
+                document = json.loads(source.read_text()); document["images"][0]["identity_sha256"] = ""
+                source = self.root / "mutated-game-shards.json"; source.write_text(json.dumps(document))
+            mutated.append((relative, source))
+        with self.assertRaisesRegex(Exception, "entry is incomplete"):
+            create_installer(setup_exe=self.root / "setup.exe", runtime_payload=self.runtime,
+                             setup_payload=mutated, output=self.root / "mutated-installer")
 
     def test_cancel_is_side_effect_free_and_unicode_paths_reach_orchestrator(self):
         with self.assertRaises(SetupCancelled):

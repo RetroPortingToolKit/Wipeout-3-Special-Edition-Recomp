@@ -70,6 +70,9 @@ def generate(evidence_dir: Path, generated_root: Path, output: Path,
         if game_document.get("compiled_region_count") != sum(
                 image.get("compiled_region_count", -1) for image in images):
             raise RegistryError("game shard region count is inconsistent")
+        if game_document.get("compiled_instruction_count") != sum(
+                image.get("compiled_instruction_count", -1) for image in images):
+            raise RegistryError("game shard instruction count is inconsistent")
         for image in images:
             identity = image.get("identity_sha256")
             if not isinstance(identity, str) or not re.fullmatch(HEX, identity):
@@ -103,7 +106,11 @@ def generate(evidence_dir: Path, generated_root: Path, output: Path,
         item = matches[0]
         if item["accessor"] != f"clean_aot_binding_{identity}" or item["executable_sha256"] != identity:
             raise RegistryError(f"game identity/accessor/executable mismatch: {identity}")
+        authority_image = next(image for image in game_document["images"] if image["identity_sha256"] == identity)
         game_entries.append({"identity_sha256": identity, "executable_sha256": identity,
+                             "name": authority_image["name"],
+                             "compiled_instruction_count": authority_image["compiled_instruction_count"],
+                             "compiled_region_count": authority_image["compiled_region_count"],
                              "accessor": item["accessor"], "directory": item["directory"].as_posix(),
                              "sources": [p.resolve().as_posix() for p in item["sources"]]})
     inventory = [{k: v for k, v in item.items() if k != "sources"} for item in entries]
@@ -112,7 +119,8 @@ def generate(evidence_dir: Path, generated_root: Path, output: Path,
                              "sha256": hashlib.sha256(latest_path.read_bytes()).hexdigest()},
                 "bios_identity_sha256": bios_identity, "bios_sha256": latest["bios_sha256"],
                 "entries": inventory,
-                "game_shards": {"compiled_region_count": 0 if game_document is None else game_document["compiled_region_count"],
+                "game_shards": {"compiled_instruction_count": 0 if game_document is None else game_document["compiled_instruction_count"],
+                    "compiled_region_count": 0 if game_document is None else game_document["compiled_region_count"],
                     "authority_sha256": "" if game_document is None else hashlib.sha256(game_shards.read_bytes()).hexdigest(),
                     "entries": [{k: v for k, v in item.items() if k != "sources"} for item in game_entries]}}
     document["registry_sha256"] = hashlib.sha256(_canonical(document)).hexdigest()

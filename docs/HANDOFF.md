@@ -54,10 +54,11 @@
   links their sources into `Wipeout3SE.exe`; the installed runtime remains
   compiler/setup-free. Resident game dispatch hashes the complete RAM image and
   rejects identity mutation or PCs outside closed shard coverage before dispatch.
-- The original 756-unit receipt was superseded by the tracked direct-corridor
-  authority at `c1f8228`: equivalent identity coverage is currently partitioned
-  into 727 closed units. Registry/setup validation follows the authenticated,
-  self-consistent receipt count rather than stale partition cardinality.
+- The stale 727-unit snapshot is superseded by the current authenticated
+  83,244-instruction/583-region receipt: main contributes 75,217 instructions
+  in 450 regions and route-mutated NFE contributes 8,027 in 133. Setup,
+  registry, and installer acceptance now re-derive these exact entry totals and
+  identities from the packaged receipt rather than trusting aggregate metadata.
 - Synthetic BIOS-to-game transition and identity-mutation tests pass. A genuine
   direct product launch still stops in the authenticated BIOS frontier; this is
   not evidence of real game execution and game-ready remains false.

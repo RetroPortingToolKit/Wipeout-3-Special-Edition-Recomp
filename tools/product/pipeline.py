@@ -2240,6 +2240,10 @@ def setup_product(
                         image.get("compiled_region_count", -1)
                         for image in game_shard_receipt.get("images", [])):
                     raise ProductError("game shard authority region count is inconsistent")
+                if game_shard_receipt.get("compiled_instruction_count") != sum(
+                        image.get("compiled_instruction_count", -1)
+                        for image in game_shard_receipt.get("images", [])):
+                    raise ProductError("game shard authority instruction count is inconsistent")
                 by_name = {"main-exe": media["main"], "nfe-entry5-route-variant": media["runtime"][0]}
                 for image in game_shard_receipt.get("images", []):
                     name = image.get("name")
@@ -2334,7 +2338,11 @@ def setup_product(
                     "manifests_directory": "compiler-manifests",
                     "variants": compiler_receipts,
                     "game_shards": None if game_shard_receipt is None else {
+                        "compiled_instruction_count": game_shard_receipt["compiled_instruction_count"],
                         "compiled_region_count": game_shard_receipt["compiled_region_count"],
+                        "entries": [{key: image[key] for key in ("name", "identity_sha256",
+                            "manifest_sha256", "compiled_instruction_count", "compiled_region_count")}
+                            for image in game_shard_receipt["images"]],
                         "authority_sha256": sha256_file(game_shards_path)[0],
                         "unknown_pc_action": "reject"},
                 },
