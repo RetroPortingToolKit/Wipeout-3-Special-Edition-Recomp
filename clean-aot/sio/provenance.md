@@ -21,7 +21,8 @@ documented `0x0A` control offset, 16/32-bit RX preview/removal rules,
 free-running half-bit baud timer, disabled-TX overwrite rule, single-shot
 address phase, delayed `/ACK` event, original-card late read ACK, PS1
 analog-pad type byte, command-48 response position, masked mode-lock key, and
-dynamic digital reply length implied by the six rumble-map bytes. All mapping
+native-byte command-44 mode/lock side effects, and the dynamic digital reply
+length implied by the six rumble-map bytes. All mapping
 values `00h..FEh` are legal protocol bytes; only the two documented motor
 values have effects in this model. The old one-motor command is evaluated from
 both documented control bytes rather than latching either byte independently.

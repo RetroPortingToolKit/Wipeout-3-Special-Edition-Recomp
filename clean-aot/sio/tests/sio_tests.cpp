@@ -858,6 +858,47 @@ void test_pad_watchdog_and_analog_button() {
     CHECK(!bus_pad.state().configuration_mode && bus_pad.state().mode_locked);
 }
 
+void test_command_44_native_side_effects() {
+    PadDevice pad;
+    const std::array<std::uint8_t, 5> enter_config = {
+        0x01U, 0x43U, 0x00U, 0x01U, 0x00U};
+    (void)exchange_pad_packet(pad, enter_config, 10U);
+    CHECK(pad.state().configuration_mode && !pad.state().analog_mode);
+
+    pad.on_select(30U);
+    CHECK(pad.exchange(0x01U, 30U).acknowledged);
+    CHECK(pad.exchange(0x44U, 31U).value == 0xF3U);
+    CHECK(pad.exchange(0x00U, 32U).value == 0x5AU);
+    CHECK(pad.exchange(0x01U, 33U).value == 0x00U);
+    CHECK(pad.state().analog_mode && pad.state().led_on &&
+          !pad.state().mode_locked);
+
+    const auto after_led = pad.snapshot();
+    CHECK(after_led.command_valid && after_led.command == 0x44U &&
+          after_led.phase == 3U && after_led.pending_mode == 1U);
+    PadDevice replay;
+    CHECK(replay.restore(after_led));
+    CHECK(pad.exchange(0x07U, 34U).value == 0x00U);
+    CHECK(replay.exchange(0x07U, 34U).value == 0x00U);
+    CHECK(pad.state().mode_locked && replay.state().mode_locked);
+
+    const auto after_key = pad.snapshot();
+    const auto replay_after_key = replay.snapshot();
+    CHECK(after_key.phase == 4U && after_key.pending_key == 0x07U &&
+          replay_after_key.phase == after_key.phase &&
+          replay_after_key.state.analog_mode == after_key.state.analog_mode &&
+          replay_after_key.state.mode_locked == after_key.state.mode_locked);
+    auto forged_lock = after_key;
+    forged_lock.state.mode_locked = false;
+    CHECK(!replay.restore(forged_lock));
+
+    pad.on_deselect(35U);
+    replay.on_deselect(35U);
+    CHECK(pad.state().analog_mode && pad.state().mode_locked &&
+          replay.state().analog_mode && replay.state().mode_locked);
+    CHECK(!pad.press_analog_button(36U));
+}
+
 void check_card_header(const std::array<std::uint8_t, MemoryCard::kImageSize>& image) {
     CHECK(image[0] == 0x4DU && image[1] == 0x43U);
     std::uint8_t checksum = 0;
@@ -1263,6 +1304,7 @@ int main() {
     test_rumble_and_analog_poll();
     test_pad_protocol_edges();
     test_pad_watchdog_and_analog_button();
+    test_command_44_native_side_effects();
     test_memory_card_protocol();
     test_invalid_card_and_snapshot_guards();
     test_snapshots_and_randomized_malformed_streams();

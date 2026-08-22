@@ -77,7 +77,9 @@ address is considered only after `/CS` is toggled.
 `PadDevice` supports the digital poll, analog poll, command-43 configuration
 entry/exit, LED/mode command 44, controller status queries, and command-4D
 rumble mapping used by DualShock-compatible PS1 controllers. All documented
-mapping bytes `00h..FEh` are retained; only `00h` and `01h` have motor effects
+command-44 LED/mode and lock fields take effect at their individual serial
+byte boundaries and survive an early `/CS` release. Rumble mapping bytes
+`00h..FEh` are retained; only `00h` and `01h` have motor effects
 in this two-motor model, while other legal values remain opaque protocol
 outputs. Input values, LED state, motor mapping, and motor values are plain
 data; no host API is called. Configuration-mode communication refreshes the

@@ -459,20 +459,16 @@ ByteTransfer PadDevice::exchange_configuration(std::uint8_t value,
     if (command_ == 0x44U) {
         if (phase_ == 2U) {
             pending_mode_ = value;
-        } else if (phase_ == 3U) {
-            pending_key_ = value;
-        }
-        if (phase_ == 7U) {
-            if (pending_mode_ == 0U) {
+            if (value == 0U) {
                 state_.analog_mode = false;
                 state_.led_on = false;
-            } else if (pending_mode_ == 1U) {
+            } else if (value == 1U) {
                 state_.analog_mode = true;
                 state_.led_on = true;
-            } else if (state_.error_count != std::numeric_limits<std::uint8_t>::max()) {
-                state_.error_count = static_cast<std::uint8_t>(state_.error_count + 1U);
             }
-            state_.mode_locked = (pending_key_ & 0x03U) == 0x03U;
+        } else if (phase_ == 3U) {
+            pending_key_ = value;
+            state_.mode_locked = (value & 0x03U) == 0x03U;
         }
         return response(phase_ == 1U ? response_id_high() : 0x00U, 7U);
     }
@@ -680,6 +676,20 @@ bool PadDevice::restore(const PadSnapshot& snapshot_value) noexcept {
         const std::uint8_t final_phase = static_cast<std::uint8_t>(
             (halfwords * 2U) + 1U);
         if (snapshot_value.phase > final_phase) {
+            return false;
+        }
+    }
+    if (snapshot_value.command_valid && snapshot_value.command == 0x44U) {
+        if ((snapshot_value.phase < 3U && snapshot_value.pending_mode != 0U) ||
+            (snapshot_value.phase < 4U && snapshot_value.pending_key != 0U) ||
+            (snapshot_value.phase >= 3U && snapshot_value.pending_mode <= 1U &&
+             (snapshot_value.state.analog_mode !=
+                  (snapshot_value.pending_mode == 1U) ||
+              snapshot_value.state.led_on !=
+                  (snapshot_value.pending_mode == 1U))) ||
+            (snapshot_value.phase >= 4U &&
+             snapshot_value.state.mode_locked !=
+                 ((snapshot_value.pending_key & 0x03U) == 0x03U))) {
             return false;
         }
     }
