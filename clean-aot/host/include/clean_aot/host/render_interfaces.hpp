@@ -45,6 +45,8 @@ public:
     [[nodiscard]] virtual HostStatus upload_replacement(
         const ReplacementImage& replacement,
         std::uint64_t& handle) noexcept = 0;
+    [[nodiscard]] virtual HostStatus release_replacement(
+        std::uint64_t handle) noexcept = 0;
 };
 
 struct GeometryBridgeResult final {

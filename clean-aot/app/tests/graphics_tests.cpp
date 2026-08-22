@@ -3,6 +3,7 @@
 #include "../src/sha256.hpp"
 
 #include <array>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -33,8 +34,25 @@ public:
         ++calls; last_rgba.assign(replacement.rgba8.begin(),replacement.rgba8.end());
         handle = 100U + calls; return {};
     }
+    clean_aot::host::HostStatus release_replacement(
+        std::uint64_t handle) noexcept override {
+        if (handle == 0U) return {clean_aot::host::HostCode::invalid_argument};
+        ++releases; last_released = handle; return {};
+    }
     std::uint64_t calls = 0U;
+    std::uint64_t releases = 0U;
+    std::uint64_t last_released = 0U;
     std::vector<std::uint8_t> last_rgba{};
+};
+class MissingPolicy final : public clean_aot::app::IReplacementKeyPolicy {
+public:
+    bool identify(const clean_aot::gpu::Event&, std::uint64_t,
+                  psx::render::ReplacementAssetKind& kind,
+                  psx::render::ReplacementKey& key) noexcept override {
+        kind = psx::render::ReplacementAssetKind::Texture;
+        key = {0xdeadbeefU, 0x12345678U};
+        return true;
+    }
 };
 void test_runtime_scanout() {
     std::vector<std::uint8_t> bios(512U * 1024U, 0U);
@@ -62,6 +80,14 @@ void test_runtime_scanout() {
               << graphics.visual_digest() << std::dec << '\n';
     expect(graphics.visual_digest() == 0xa0c4b5214903b3ddULL,
            "runtime visual digest remains deterministic");
+    const auto receipt = graphics.visual_receipt();
+    std::cout << "4K visual receipt: " << receipt.canonical_json() << '\n';
+    expect(receipt.output_width == 3840U && receipt.output_height == 2160U &&
+           receipt.content_x == 480U && receipt.content_width == 2880U &&
+           receipt.identity_4x3 &&
+           receipt.canonical_json().find("clean-aot.visual-receipt.v1") !=
+               std::string::npos,
+           "live 4K identity receipt records exact pillarboxed content");
 }
 void test_replacement_runtime() {
     const auto root = std::filesystem::temp_directory_path() /
@@ -88,6 +114,9 @@ void test_replacement_runtime() {
     expect(assets.resolve_and_upload(psx::render::ReplacementAssetKind::Texture,
         key, 12U, regenerated).success() && regenerated == 102U && decoder.calls == 2U,
         "generation change invalidates upload");
+    expect(uploader.releases == 1U && uploader.last_released == first &&
+           assets.stats().invalidated == 1U,
+           "generation change retires stale GPU handle");
     expect(uploader.last_rgba == std::vector<std::uint8_t>({1U, 2U, 3U, 4U}),
            "decoded RGBA crosses upload boundary exactly");
     auto disabled_manifest = psx::render::ReplacementManifest::create(entries, 8U);
@@ -99,6 +128,110 @@ void test_replacement_runtime() {
         key, 1U, font_handle).code == clean_aot::host::HostCode::unsupported,
         "font replacement remains an explicit title-policy seam");
     std::filesystem::remove_all(root);
+}
+void test_missing_asset_native_fallback() {
+    std::vector<std::uint8_t> bios(512U * 1024U, 0U);
+    clean_aot::runtime::Configuration config{}; config.bios = bios;
+    clean_aot::runtime::Runtime runtime(config); auto& gpu = runtime.gpu();
+    expect(gpu.write_gp1(0x03000000U).accepted &&
+           gpu.write_gp1(0x05000000U).accepted &&
+           gpu.write_gp1(0x06c00200U).accepted &&
+           gpu.write_gp1(0x07040010U).accepted &&
+           gpu.write_gp1(0x08000001U).accepted,
+           "fallback display configures");
+    expect(gpu.write_gp0(0x02ff00ffU).accepted && gpu.write_gp0(0U).accepted &&
+           gpu.write_gp0((240U << 16U) | 320U).accepted,
+           "fallback native fill packet queues");
+    const std::array entries{psx::render::ReplacementManifestEntry{
+        psx::render::ReplacementAssetKind::Texture, {1U, 2U}, "unused.png",
+        std::string(64U, '0'), 1U, 1U}};
+    auto manifest = psx::render::ReplacementManifest::create(entries, 1U);
+    FakePngDecoder decoder; FakeUploader uploader; MissingPolicy policy;
+    clean_aot::app::ReplacementAssetRuntime assets(
+        std::move(*manifest), std::filesystem::temp_directory_path(), decoder,
+        uploader);
+    clean_aot::host::HeadlessBackend host;
+    clean_aot::app::RuntimeGraphics graphics({true, 3840U, 2160U,
+        clean_aot::raster::PresentationMode::Identity4x3, 4U, 3U,
+        clean_aot::app::FontManifestPolicy::ManifestOnly, &assets, &policy});
+    expect(graphics.present(runtime, host, 0U).success() &&
+           graphics.visual_digest() == 0xa0c4b5214903b3ddULL &&
+           graphics.visual_receipt().native_fallbacks == 1U &&
+           uploader.calls == 0U,
+           "missing HD asset preserves byte-exact native 4:3 output");
+}
+void test_ultrawide_visual_receipt() {
+    std::vector<std::uint8_t> bios(512U * 1024U, 0U);
+    clean_aot::runtime::Configuration config{}; config.bios = bios;
+    clean_aot::runtime::Runtime runtime(config); auto& gpu = runtime.gpu();
+    expect(gpu.write_gp1(0x03000000U).accepted &&
+           gpu.write_gp1(0x05000000U).accepted &&
+           gpu.write_gp1(0x06c00200U).accepted &&
+           gpu.write_gp1(0x07040010U).accepted &&
+           gpu.write_gp1(0x08000001U).accepted &&
+           gpu.write_gp0(0x02ff00ffU).accepted && gpu.write_gp0(0U).accepted &&
+           gpu.write_gp0((240U << 16U) | 320U).accepted,
+           "ultrawide visual packet configures");
+    clean_aot::host::HeadlessBackend host;
+    clean_aot::app::RuntimeGraphics graphics({true, 5120U, 2160U,
+        clean_aot::raster::PresentationMode::Generic21x9, 21U, 9U,
+        clean_aot::app::FontManifestPolicy::ManifestOnly});
+    expect(graphics.present(runtime, host, 0U).success(),
+           "5120x2160 frame reaches live presentation boundary");
+    const auto receipt = graphics.visual_receipt();
+    std::cout << "ultrawide visual receipt: " << receipt.canonical_json() << '\n';
+    expect(receipt.output_width == 5120U && receipt.output_height == 2160U &&
+           receipt.content_x == 40U && receipt.content_y == 0U &&
+           receipt.content_width == 5040U && receipt.content_height == 2160U &&
+           !receipt.identity_4x3,
+           "21:9 receipt records deterministic 4K ultrawide viewport");
+}
+void test_title_manifest_and_receipts() {
+    const auto repository = std::filesystem::path(__FILE__).parent_path()
+        .parent_path().parent_path().parent_path();
+    std::string error;
+    auto loaded = clean_aot::app::load_wip3out_hd_manifest(
+        repository / "assets" / "manifests" / "wip3out-hd-textures.json",
+        1U, error);
+    if (!loaded.has_value()) {
+        expect(false, "permitted pack manifest loads for native decode");
+        return;
+    }
+    expect(loaded.has_value() && loaded->manifest.size() == 292U,
+           "permitted HD manifest maps every present asset");
+    const auto font = psx::render::parse_replacement_key("3dc173e1-3da5d410");
+    const auto banner = psx::render::parse_replacement_key("11b5d8d9-41d69974");
+    expect(font.has_value() && loaded.has_value() &&
+           loaded->classify(*font) == clean_aot::app::TitleAssetClass::Font,
+           "font manifest key maps through title policy");
+    expect(banner.has_value() && loaded.has_value() &&
+           loaded->classify(*banner) == clean_aot::app::TitleAssetClass::Banner,
+           "menu bar manifest key maps as banner");
+}
+void test_permitted_pack_when_available() {
+    const char* root_value = std::getenv("CLEAN_AOT_HD_ASSET_ROOT");
+    if (root_value == nullptr || *root_value == '\0') return;
+    const auto repository = std::filesystem::path(__FILE__).parent_path()
+        .parent_path().parent_path().parent_path();
+    std::string error;
+    auto loaded = clean_aot::app::load_wip3out_hd_manifest(
+        repository / "assets" / "manifests" / "wip3out-hd-textures.json",
+        1U, error);
+    if (!loaded.has_value()) {
+        expect(false, "permitted pack manifest loads for native decode");
+        return;
+    }
+    clean_aot::app::NativePngDecoder decoder;
+    clean_aot::host::HeadlessBackend uploader;
+    clean_aot::app::ReplacementAssetRuntime assets(
+        std::move(loaded->manifest), root_value, decoder, uploader);
+    const auto key = psx::render::parse_replacement_key("11b5d8d9-41d69974");
+    std::uint64_t handle = 0U;
+    expect(key.has_value() && assets.resolve_and_upload(
+        psx::render::ReplacementAssetKind::Texture, *key, 1U, handle).success() &&
+        handle != 0U && assets.stats().decoded == 1U &&
+        assets.stats().rgba_bytes == 256U * 112U * 4U,
+        "permitted pack PNG decodes and crosses the real upload boundary");
 }
 void test_native_png_decode() {
 #if defined(_WIN32)
@@ -122,6 +255,9 @@ void test_native_png_decode() {
 } // namespace
 int main() {
     test_runtime_scanout(); test_replacement_runtime(); test_native_png_decode();
+    test_title_manifest_and_receipts(); test_missing_asset_native_fallback();
+    test_ultrawide_visual_receipt();
+    test_permitted_pack_when_available();
     if (failures != 0) return 1;
     std::cout << "clean_aot_app_graphics_tests: all checks passed\n"; return 0;
 }

@@ -507,6 +507,8 @@ void test_headless_replacement_upload() {
            "headless replacement upload allocates deterministic handle");
     expect(backend.stats().replacements_uploaded == 1U,
            "headless replacement upload is counted");
+    expect(backend.stats().replacement_bytes_uploaded == 8U,
+           "headless replacement upload bytes are instrumented");
     std::cout << "replacement digest: 0x" << std::hex
               << backend.stats().replacement_digest << std::dec << '\n';
     expect(backend.stats().replacement_digest == 0xf2a57b68e1fd4d73ULL,
@@ -515,6 +517,11 @@ void test_headless_replacement_upload() {
     expect(backend.upload_replacement(image, handle).code == HostCode::invalid_argument &&
                handle == 0U,
            "headless replacement rejects malformed RGBA extent");
+    expect(backend.release_replacement(1U).success() &&
+           backend.stats().replacements_released == 1U,
+           "headless replacement handles retire exactly once");
+    expect(backend.release_replacement(1U).code == HostCode::invalid_argument,
+           "retired replacement handle cannot be reused");
 }
 
 } // namespace

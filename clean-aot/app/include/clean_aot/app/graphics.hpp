@@ -9,7 +9,9 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <span>
+#include <string>
 #include <vector>
 
 namespace clean_aot::app {
@@ -32,6 +34,31 @@ enum class FontManifestPolicy : std::uint8_t {
     Disabled,
     ManifestOnly,
 };
+
+enum class TitleAssetClass : std::uint8_t {
+    Texture,
+    Font,
+    Banner,
+};
+
+struct TitleAssetMapping final {
+    psx::render::ReplacementKey key{};
+    TitleAssetClass asset_class = TitleAssetClass::Texture;
+};
+
+struct LoadedTitleManifest final {
+    psx::render::ReplacementManifest manifest{};
+    std::vector<TitleAssetMapping> mappings{};
+    std::string source_commit{};
+
+    [[nodiscard]] std::optional<TitleAssetClass> classify(
+        psx::render::ReplacementKey key) const noexcept;
+};
+
+[[nodiscard]] std::optional<LoadedTitleManifest> load_wip3out_hd_manifest(
+    const std::filesystem::path& path,
+    std::uint64_t manifest_generation,
+    std::string& error) noexcept;
 
 struct GraphicsConfiguration final {
     bool runtime_scanout = false;
@@ -75,12 +102,26 @@ public:
                             host::IReplacementUploader& uploader,
                             FontManifestPolicy font_policy =
                                 FontManifestPolicy::ManifestOnly) noexcept;
+    ~ReplacementAssetRuntime();
 
     [[nodiscard]] host::HostStatus resolve_and_upload(
         psx::render::ReplacementAssetKind kind,
         psx::render::ReplacementKey key,
         std::uint64_t source_generation,
         std::uint64_t& handle) noexcept;
+
+    struct Stats final {
+        std::uint64_t queries = 0U;
+        std::uint64_t cache_hits = 0U;
+        std::uint64_t missing = 0U;
+        std::uint64_t decoded = 0U;
+        std::uint64_t uploaded = 0U;
+        std::uint64_t invalidated = 0U;
+        std::uint64_t png_bytes = 0U;
+        std::uint64_t rgba_bytes = 0U;
+    };
+    [[nodiscard]] const Stats& stats() const noexcept { return stats_; }
+    [[nodiscard]] host::HostStatus invalidate_all() noexcept;
 
 private:
     psx::render::ReplacementManifest manifest_;
@@ -93,6 +134,22 @@ private:
         std::uint64_t handle = 0U;
     };
     std::vector<CachedAsset> cache_{};
+    Stats stats_{};
+};
+
+struct VisualReceipt final {
+    std::uint32_t output_width = 0U;
+    std::uint32_t output_height = 0U;
+    std::uint32_t content_x = 0U;
+    std::uint32_t content_y = 0U;
+    std::uint32_t content_width = 0U;
+    std::uint32_t content_height = 0U;
+    bool identity_4x3 = true;
+    std::uint64_t visual_digest = 0U;
+    std::uint64_t vram_generation = 0U;
+    std::uint64_t replacement_hits = 0U;
+    std::uint64_t native_fallbacks = 0U;
+    [[nodiscard]] std::string canonical_json() const;
 };
 
 class RuntimeGraphics final {
@@ -104,6 +161,7 @@ public:
                                            std::uint64_t update_index) noexcept;
     [[nodiscard]] std::uint64_t visual_digest() const noexcept;
     [[nodiscard]] std::uint64_t vram_generation() const noexcept;
+    [[nodiscard]] VisualReceipt visual_receipt() const noexcept;
 
 private:
     GraphicsConfiguration configuration_{};
@@ -112,6 +170,9 @@ private:
     std::uint64_t sequence_ = 0U;
     std::uint64_t visual_digest_ = 0U;
     bool configured_ = false;
+    raster::ScanoutPlan last_plan_{};
+    std::uint64_t replacement_hits_ = 0U;
+    std::uint64_t native_fallbacks_ = 0U;
 };
 
 } // namespace clean_aot::app

@@ -1,5 +1,7 @@
 #include "clean_aot/host/sdl_vulkan.hpp"
 
+#include <algorithm>
+
 #if !defined(_WIN32)
 #error "The SDL3/Vulkan presentation backend is Windows-only"
 #endif
@@ -727,6 +729,27 @@ HostStatus SdlVulkanPresentation::upload_replacement(
         handle = 0U;
         return sdl_failure();
     }
+    return HostStatus{};
+}
+
+HostStatus SdlVulkanPresentation::release_replacement(
+    std::uint64_t handle) noexcept {
+    if (impl_ == nullptr || !impl_->initialized || impl_->shutting_down) {
+        return sdl_failure(HostCode::not_ready);
+    }
+    const auto found = std::find_if(impl_->replacements.begin(),
+        impl_->replacements.end(), [handle](const Impl::ReplacementTexture& item) {
+            return item.handle == handle;
+        });
+    if (handle == 0U || found == impl_->replacements.end()) {
+        return sdl_failure(HostCode::invalid_argument);
+    }
+    if (!SDL_WaitForGPUIdle(impl_->device)) {
+        mark_device_lost();
+        return sdl_failure(HostCode::device_lost);
+    }
+    SDL_ReleaseGPUTexture(impl_->device, found->texture);
+    impl_->replacements.erase(found);
     return HostStatus{};
 }
 

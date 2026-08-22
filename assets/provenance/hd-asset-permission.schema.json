@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wipeout3se-cleanroom.invalid/schemas/hd-asset-permission-v1.json",
+  "title": "HD asset permission and provenance receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "asset_manifest", "source", "permission"],
+  "properties": {
+    "schema": {"const": "clean-aot.hd-asset-permission.v1"},
+    "status": {"enum": ["pending-details", "verified"]},
+    "asset_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit", "hashes_ini_sha256", "readme_sha256"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "hashes_ini_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "readme_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "permission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["creator", "granted_at", "scope", "attribution", "evidence"],
+      "properties": {
+        "creator": {"type": ["string", "null"]},
+        "granted_at": {"type": ["string", "null"], "format": "date-time"},
+        "scope": {"type": ["string", "null"]},
+        "attribution": {"type": ["string", "null"]},
+        "evidence": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

@@ -1,10 +1,12 @@
 #include "clean_aot/app/graphics.hpp"
 
 #include "clean_aot/host/render_interfaces.hpp"
+#include "json.hpp"
 #include "sha256.hpp"
 
 #include <algorithm>
 #include <fstream>
+#include <iterator>
 #include <limits>
 #include <optional>
 #include <variant>
@@ -41,7 +43,134 @@ void digest_bytes(std::uint64_t& digest,
     return true;
 }
 
+[[nodiscard]] bool starts_with(std::string_view value,
+                               std::string_view prefix) noexcept {
+    return value.size() >= prefix.size() &&
+        value.substr(0U, prefix.size()) == prefix;
+}
+
+[[nodiscard]] TitleAssetClass classify_path(std::string_view path) noexcept {
+    if (starts_with(path, "Font/")) return TitleAssetClass::Font;
+    if (starts_with(path, "Main Menu/Title Screen/") ||
+        starts_with(path, "Main Menu/Screen Text/") ||
+        starts_with(path, "Main Menu/Bar/")) {
+        return TitleAssetClass::Banner;
+    }
+    return TitleAssetClass::Texture;
+}
+
+[[nodiscard]] std::optional<psx::render::ReplacementKey> parse_pack_key(
+    std::string_view value) noexcept {
+    const std::size_t dash = value.find('-');
+    if (dash == std::string_view::npos || dash == 0U || dash > 8U ||
+        value.size() <= dash + 1U || value.size() - dash - 1U > 8U) {
+        return std::nullopt;
+    }
+    const auto hexadecimal = [](char digit) noexcept {
+        return (digit >= '0' && digit <= '9') ||
+               (digit >= 'a' && digit <= 'f');
+    };
+    if (!std::all_of(value.begin(), value.begin() +
+                     static_cast<std::ptrdiff_t>(dash), hexadecimal) ||
+        !std::all_of(value.begin() + static_cast<std::ptrdiff_t>(dash + 1U),
+                     value.end(), hexadecimal)) {
+        return std::nullopt;
+    }
+    std::string canonical(8U - dash, '0');
+    canonical.append(value.substr(0U, dash));
+    canonical.push_back('-');
+    canonical.append(8U - (value.size() - dash - 1U), '0');
+    canonical.append(value.substr(dash + 1U));
+    return psx::render::parse_replacement_key(canonical);
+}
+
 } // namespace
+
+std::optional<TitleAssetClass> LoadedTitleManifest::classify(
+    psx::render::ReplacementKey key) const noexcept {
+    const auto found = std::lower_bound(mappings.begin(), mappings.end(), key,
+        [](const TitleAssetMapping& item, psx::render::ReplacementKey sought) {
+            return item.key < sought;
+        });
+    if (found == mappings.end() || found->key != key) return std::nullopt;
+    return found->asset_class;
+}
+
+std::optional<LoadedTitleManifest> load_wip3out_hd_manifest(
+    const std::filesystem::path& path, std::uint64_t manifest_generation,
+    std::string& error) noexcept {
+    error.clear();
+    try {
+        std::ifstream input(path, std::ios::binary);
+        if (!input) { error = "unable to open HD manifest"; return std::nullopt; }
+        const std::string text((std::istreambuf_iterator<char>(input)), {});
+        detail::Json root;
+        if (!detail::parse_json(text, root, error)) return std::nullopt;
+        const detail::Json* schema = detail::member(root, "schema");
+        const detail::Json* textures = detail::member(root, "textures");
+        const detail::Json* source = detail::member(root, "source");
+        if (schema == nullptr || schema->string() == nullptr ||
+            *schema->string() != "wo3se.external-texture-pack.v1" ||
+            textures == nullptr || textures->array() == nullptr ||
+            source == nullptr || source->object() == nullptr) {
+            error = "unsupported HD manifest schema"; return std::nullopt;
+        }
+        const detail::Json* commit = detail::member(*source, "commit");
+        if (commit == nullptr || commit->string() == nullptr ||
+            commit->string()->size() != 40U) {
+            error = "missing source commit"; return std::nullopt;
+        }
+        std::vector<psx::render::ReplacementManifestEntry> entries;
+        std::vector<TitleAssetMapping> mappings;
+        entries.reserve(textures->array()->size());
+        mappings.reserve(textures->array()->size());
+        for (const detail::Json& item : *textures->array()) {
+            const detail::Json* key_json = detail::member(item, "key");
+            const detail::Json* file_json = detail::member(item, "file");
+            const detail::Json* logical_json = detail::member(item, "logical_path");
+            const detail::Json* sha_json = detail::member(item, "sha256");
+            const detail::Json* png_json = detail::member(item, "png");
+            if (key_json == nullptr || key_json->string() == nullptr ||
+                file_json == nullptr || file_json->string() == nullptr ||
+                logical_json == nullptr || logical_json->string() == nullptr ||
+                sha_json == nullptr || sha_json->string() == nullptr ||
+                png_json == nullptr) {
+                error = "malformed HD texture entry"; return std::nullopt;
+            }
+            const detail::Json* width_json = detail::member(*png_json, "width");
+            const detail::Json* height_json = detail::member(*png_json, "height");
+            const auto key = parse_pack_key(*key_json->string());
+            if (!key.has_value() || width_json == nullptr ||
+                width_json->number() == nullptr || height_json == nullptr ||
+                height_json->number() == nullptr || *width_json->number() == 0U ||
+                *height_json->number() == 0U ||
+                *width_json->number() > UINT32_MAX ||
+                *height_json->number() > UINT32_MAX) {
+                error = "invalid HD texture identity"; return std::nullopt;
+            }
+            const TitleAssetClass asset_class = classify_path(*logical_json->string());
+            const auto kind = asset_class == TitleAssetClass::Font
+                ? psx::render::ReplacementAssetKind::Font
+                : psx::render::ReplacementAssetKind::Texture;
+            entries.push_back({kind, *key, *file_json->string(),
+                *sha_json->string(), static_cast<std::uint32_t>(*width_json->number()),
+                static_cast<std::uint32_t>(*height_json->number())});
+            mappings.push_back({*key, asset_class});
+        }
+        auto manifest = psx::render::ReplacementManifest::create(
+            entries, manifest_generation);
+        if (!manifest.has_value()) { error = "invalid HD manifest"; return std::nullopt; }
+        std::sort(mappings.begin(), mappings.end(),
+            [](const TitleAssetMapping& left, const TitleAssetMapping& right) {
+                return left.key < right.key;
+            });
+        return LoadedTitleManifest{std::move(*manifest), std::move(mappings),
+                                   *commit->string()};
+    } catch (...) {
+        error = "HD manifest allocation or I/O failure";
+        return std::nullopt;
+    }
+}
 
 bool NativePngDecoder::decode(std::span<const std::uint8_t> png,
                               std::uint32_t expected_width,
@@ -125,18 +254,31 @@ ReplacementAssetRuntime::ReplacementAssetRuntime(
     : manifest_(std::move(manifest)), root_(std::move(root)),
       decoder_(decoder), uploader_(uploader), font_policy_(font_policy) {}
 
+ReplacementAssetRuntime::~ReplacementAssetRuntime() { (void)invalidate_all(); }
+
+host::HostStatus ReplacementAssetRuntime::invalidate_all() noexcept {
+    for (const CachedAsset& item : cache_) {
+        const host::HostStatus released = uploader_.release_replacement(item.handle);
+        if (!released.success()) return released;
+        ++stats_.invalidated;
+    }
+    cache_.clear();
+    return {};
+}
+
 host::HostStatus ReplacementAssetRuntime::resolve_and_upload(
     psx::render::ReplacementAssetKind kind,
     psx::render::ReplacementKey key,
     std::uint64_t source_generation,
     std::uint64_t& handle) noexcept {
     handle = 0U;
+    ++stats_.queries;
     if (kind == psx::render::ReplacementAssetKind::Font &&
         font_policy_ == FontManifestPolicy::Disabled) {
         return {host::HostCode::unsupported};
     }
     const auto identity = manifest_.resolve(kind, key, source_generation);
-    if (!identity.has_value()) return {host::HostCode::not_ready};
+    if (!identity.has_value()) { ++stats_.missing; return {host::HostCode::not_ready}; }
     const auto cached = std::find_if(cache_.begin(), cache_.end(),
         [&](const CachedAsset& item) {
             return item.identity.kind == kind && item.identity.key == key;
@@ -144,6 +286,7 @@ host::HostStatus ReplacementAssetRuntime::resolve_and_upload(
     if (cached != cache_.end() &&
         manifest_.is_current(cached->identity, source_generation)) {
         handle = cached->handle;
+        ++stats_.cache_hits;
         return {};
     }
     const auto* entry = manifest_.entry(*identity, source_generation);
@@ -173,6 +316,9 @@ host::HostStatus ReplacementAssetRuntime::resolve_and_upload(
                 static_cast<std::size_t>(entry->width) * entry->height * 4U) {
             return {host::HostCode::invalid_argument};
         }
+        ++stats_.decoded;
+        stats_.png_bytes += png.size();
+        stats_.rgba_bytes += rgba8.size();
         const host::ReplacementImage decoded{
             *identity, entry->width, entry->height, rgba8};
         std::uint64_t uploaded = 0U;
@@ -180,8 +326,18 @@ host::HostStatus ReplacementAssetRuntime::resolve_and_upload(
             uploader_.upload_replacement(decoded, uploaded);
         if (!status.success() || uploaded == 0U) return status.success()
             ? host::HostStatus{host::HostCode::internal_error} : status;
+        if (cached != cache_.end()) {
+            const host::HostStatus released =
+                uploader_.release_replacement(cached->handle);
+            if (!released.success()) {
+                (void)uploader_.release_replacement(uploaded);
+                return released;
+            }
+            ++stats_.invalidated;
+        }
         if (cached == cache_.end()) cache_.push_back(CachedAsset{*identity, uploaded});
         else *cached = CachedAsset{*identity, uploaded};
+        ++stats_.uploaded;
         handle = uploaded;
         return {};
     } catch (...) {
@@ -225,6 +381,8 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                         replacement.code != host::HostCode::unsupported) {
                         return replacement;
                     }
+                    if (replacement.success()) ++replacement_hits_;
+                    else ++native_fallbacks_;
                 }
             }
             if (!raster_.consume(*event).accepted()) {
@@ -242,6 +400,7 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
             configuration_.custom_aspect_width,
             configuration_.custom_aspect_height});
         if (!planned.accepted) return {host::HostCode::invalid_argument};
+        last_plan_ = planned.plan;
         scanout_.assign(planned.plan.required_rgb_bytes, 0U);
         const raster::EventResult decoded = raster::ScanoutMapper::decode_rgb888(
             planned.plan, raster_.vram_words(), scanout_);
@@ -273,6 +432,30 @@ std::uint64_t RuntimeGraphics::visual_digest() const noexcept {
 
 std::uint64_t RuntimeGraphics::vram_generation() const noexcept {
     return raster_.vram_generation();
+}
+
+VisualReceipt RuntimeGraphics::visual_receipt() const noexcept {
+    return {configuration_.output_width, configuration_.output_height,
+        last_plan_.presentation.destination_x,
+        last_plan_.presentation.destination_y,
+        last_plan_.presentation.destination_width,
+        last_plan_.presentation.destination_height,
+        last_plan_.presentation.identity_4x3, visual_digest_,
+        raster_.vram_generation(), replacement_hits_, native_fallbacks_};
+}
+
+std::string VisualReceipt::canonical_json() const {
+    return "{\"content\":{\"height\":" + std::to_string(content_height) +
+        ",\"width\":" + std::to_string(content_width) +
+        ",\"x\":" + std::to_string(content_x) + ",\"y\":" +
+        std::to_string(content_y) + "},\"identity_4x3\":" +
+        (identity_4x3 ? "true" : "false") + ",\"native_fallbacks\":" +
+        std::to_string(native_fallbacks) + ",\"output\":{\"height\":" +
+        std::to_string(output_height) + ",\"width\":" +
+        std::to_string(output_width) + "},\"replacement_hits\":" +
+        std::to_string(replacement_hits) + ",\"schema\":\"clean-aot.visual-receipt.v1\","
+        "\"visual_digest\":" + std::to_string(visual_digest) +
+        ",\"vram_generation\":" + std::to_string(vram_generation) + "}";
 }
 
 } // namespace clean_aot::app

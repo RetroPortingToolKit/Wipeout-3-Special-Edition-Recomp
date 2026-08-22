@@ -1,5 +1,6 @@
 #include "clean_aot/host/headless.hpp"
 
+#include <algorithm>
 #include <limits>
 
 namespace clean_aot::host {
@@ -223,7 +224,26 @@ HostStatus HeadlessBackend::upload_replacement(
     stats_.replacement_digest = fnv1a(stats_.replacement_digest,
         replacement.rgba8.data(), replacement.rgba8.size());
     ++stats_.replacements_uploaded;
-    handle = stats_.replacements_uploaded;
+    stats_.replacement_bytes_uploaded += required;
+    handle = next_replacement_handle_++;
+    try {
+        replacement_handles_.push_back(handle);
+    } catch (...) {
+        handle = 0U;
+        return HostStatus{HostCode::internal_error};
+    }
+    return HostStatus{};
+}
+
+HostStatus HeadlessBackend::release_replacement(std::uint64_t handle) noexcept {
+    if (shutting_down_) return HostStatus{HostCode::shutting_down};
+    const auto found = std::find(replacement_handles_.begin(),
+                                 replacement_handles_.end(), handle);
+    if (handle == 0U || found == replacement_handles_.end()) {
+        return HostStatus{HostCode::invalid_argument};
+    }
+    replacement_handles_.erase(found);
+    ++stats_.replacements_released;
     return HostStatus{};
 }
 
@@ -236,6 +256,7 @@ void HeadlessBackend::shutdown() noexcept {
     audio_.clear();
     controllers_.clear();
     events_.clear();
+    replacement_handles_.clear();
 }
 
 } // namespace clean_aot::host

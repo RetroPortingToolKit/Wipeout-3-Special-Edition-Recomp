@@ -1,0 +1,35 @@
+{
+  "asset_verification": {
+    "decoded_upload_probe": {
+      "height": 112,
+      "key": "11b5d8d9-41d69974",
+      "rgba_bytes": 114688,
+      "status": "passed",
+      "width": 256
+    },
+    "files_hash_and_png_header_verified": 292,
+    "manifest_sha256": "6578cc4f9e35adccacb751abe3e29c1d640acc6b624b881e0556ab9485ad4c9d",
+    "status": "passed"
+  },
+  "receipts": [
+    {
+      "content": {"height": 2160, "width": 2880, "x": 480, "y": 0},
+      "identity_4x3": true,
+      "native_fallbacks": 0,
+      "output": {"height": 2160, "width": 3840},
+      "replacement_hits": 0,
+      "visual_digest": 11584583296067285981,
+      "vram_generation": 2
+    },
+    {
+      "content": {"height": 2160, "width": 5040, "x": 40, "y": 0},
+      "identity_4x3": false,
+      "native_fallbacks": 0,
+      "output": {"height": 2160, "width": 5120},
+      "replacement_hits": 0,
+      "visual_digest": 9352267889099696572,
+      "vram_generation": 2
+    }
+  ],
+  "schema": "clean-aot.hd-assets-visual-evidence.v1"
+}

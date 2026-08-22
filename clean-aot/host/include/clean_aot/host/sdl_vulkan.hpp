@@ -49,6 +49,8 @@ public:
     [[nodiscard]] HostStatus upload_replacement(
         const ReplacementImage& replacement,
         std::uint64_t& handle) noexcept override;
+    [[nodiscard]] HostStatus release_replacement(
+        std::uint64_t handle) noexcept override;
     void shutdown() noexcept override;
 
     [[nodiscard]] bool initialized() const noexcept;

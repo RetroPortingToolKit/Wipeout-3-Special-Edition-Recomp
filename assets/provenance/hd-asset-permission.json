@@ -1,0 +1,21 @@
+{
+  "asset_manifest": {
+    "path": "assets/manifests/wip3out-hd-textures.json",
+    "sha256": "6578cc4f9e35adccacb751abe3e29c1d640acc6b624b881e0556ab9485ad4c9d"
+  },
+  "permission": {
+    "attribution": null,
+    "creator": null,
+    "evidence": null,
+    "granted_at": null,
+    "scope": null
+  },
+  "schema": "clean-aot.hd-asset-permission.v1",
+  "source": {
+    "commit": "039a0690448047401cef251594327a25fcc73fad",
+    "hashes_ini_sha256": "9cfb23b92d72bc1233a76958621ddae7ab049493a7d2651fdd1a12e1455e5c71",
+    "readme_sha256": "4f45f9a19adc526780fdd45cb740218f1eb84bbf51d3e6430049328cf049bee5",
+    "repository": "princepeter64/Wip3out-HD-Texture-Pack"
+  },
+  "status": "pending-details"
+}

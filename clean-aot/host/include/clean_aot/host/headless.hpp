@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 #include "clean_aot/host/fixed_queue.hpp"
 #include "clean_aot/host/host.hpp"
@@ -25,6 +26,8 @@ struct HeadlessStats final {
     std::uint64_t audio_digest = 1469598103934665603ULL;
     std::uint64_t replacement_digest = 1469598103934665603ULL;
     std::uint64_t replacements_uploaded = 0U;
+    std::uint64_t replacements_released = 0U;
+    std::uint64_t replacement_bytes_uploaded = 0U;
     ControllerState controller{};
     WindowState window{640U, 480U, FullscreenMode::windowed};
 };
@@ -47,6 +50,8 @@ public:
     [[nodiscard]] HostStatus upload_replacement(
         const ReplacementImage& replacement,
         std::uint64_t& handle) noexcept override;
+    [[nodiscard]] HostStatus release_replacement(
+        std::uint64_t handle) noexcept override;
     void shutdown() noexcept override;
     [[nodiscard]] bool shutting_down() const noexcept override {
         return shutting_down_;
@@ -68,6 +73,8 @@ private:
     HeadlessStats stats_{};
     std::uint64_t next_frame_sequence_ = 0U;
     std::uint64_t next_audio_update_ = 0U;
+    std::uint64_t next_replacement_handle_ = 1U;
+    std::vector<std::uint64_t> replacement_handles_{};
     bool shutting_down_ = false;
 };
 

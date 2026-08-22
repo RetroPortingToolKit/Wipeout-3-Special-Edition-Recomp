@@ -251,6 +251,18 @@
 
 ## Next concrete step
 
+The live graphics boundary now loads the pinned Wip3out HD manifest, maps its
+292 present entries into texture/font/banner title classes, verifies and
+decodes PNGs, and explicitly retires stale Vulkan handles on source-generation
+changes. Missing entries preserve the exact native scanout digest. Deterministic
+3840x2160 4:3 and 5120x2160 21:9 receipts plus a real permitted-pack WIC/upload
+probe are recorded in `clean-aot/app/evidence/hd-assets-visual-receipt.json`.
+Permission metadata has a fail-visible `pending-details` receipt; creator,
+date, scope, attribution, and evidence remain null until supplied rather than
+being inferred. Next graphics work is the independently validated producer-side
+VRAM texture/palette key derivation and binding uploaded handles into primitive
+sampling; the current title key-policy seam deliberately does not guess it.
+
 Reconcile and commit the shared cleanroom integration as one reviewed product
 state. First close or explicitly defer the known SIO, host, CD-ROM, SoC and
 whole-machine acceptance findings; then rerun the aggregate GCC/Clang sanitizer

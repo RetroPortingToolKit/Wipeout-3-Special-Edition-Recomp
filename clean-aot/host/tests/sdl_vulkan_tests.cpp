@@ -31,6 +31,7 @@ int main() {
     ReplacementImage image{}; image.width=1U; image.height=1U; image.rgba8=replacement;
     std::uint64_t handle=0U;
     if (!backend.upload_replacement(image,handle).success() || handle==0U) return 6;
+    if (!backend.release_replacement(handle).success()) return 7;
     backend.shutdown();
     std::cout << "clean_aot_host_sdl_vulkan_tests: all checks passed\n";
     return 0;
