@@ -17,6 +17,7 @@
 namespace {
 
 using clean_aot::compiler::EdgeKind;
+using clean_aot::compiler::BasicBlock;
 using clean_aot::compiler::GuestAddress;
 using clean_aot::compiler::InstructionKind;
 using clean_aot::compiler::PsxExeImage;
@@ -445,11 +446,20 @@ void test_delay_slot_boundaries_fail_closed() {
         (void)RegionBuilder::build(image, std::move(options));
     }, "a region boundary must never split a branch from its delay slot");
 
-    require_throws([&] {
-        RegionBuildOptions options;
-        options.entry_points = {0x00003c00U, 0x00003c04U};
-        (void)RegionBuilder::build(image, std::move(options));
-    }, "an independently entered delay slot must fail closed in this IR tranche");
+    RegionBuildOptions entry_options;
+    entry_options.entry_points = {0x00003c00U, 0x00003c04U};
+    const Region independently_entered =
+        RegionBuilder::build(image, std::move(entry_options));
+    require(independently_entered.blocks.size() == 2U,
+            "an explicit delay-slot entry must have a standalone block");
+    const BasicBlock* transfer = independently_entered.block_at(0x00003c00U);
+    const BasicBlock* standalone = independently_entered.block_at(0x00003c04U);
+    require(transfer != nullptr && transfer->instructions.size() == 2U &&
+                transfer->instructions[1].address == 0x00003c04U,
+            "the transfer must retain its architectural delay-slot copy");
+    require(standalone != nullptr && standalone->instructions.size() == 1U &&
+                standalone->instructions[0].address == 0x00003c04U,
+            "the explicit entry must retain a standalone instruction copy");
 }
 
 void test_loop_and_emission_order_are_deterministic() {

@@ -75,7 +75,11 @@ void Region::validate() const {
 
     std::map<BlockId, const BasicBlock*> blocks_by_id;
     std::map<GuestAddress, const BasicBlock*> blocks_by_start;
-    std::set<GuestAddress> instruction_addresses;
+    struct InstructionOwnership final {
+        bool standalone = false;
+        bool delay_slot = false;
+    };
+    std::map<GuestAddress, InstructionOwnership> instruction_ownership;
     std::map<BlockId, std::vector<const Edge*>> outgoing;
     for (const BasicBlock& block : blocks) {
         if (!blocks_by_id.emplace(block.id, &block).second) {
@@ -133,9 +137,20 @@ void Region::validate() const {
                 expected + sizeof(std::uint32_t) > end_exclusive) {
                 throw IrError("basic block instruction lies outside the region");
             }
-            if (!instruction_addresses.insert(instruction.address).second) {
-                throw IrError("guest instructions cannot belong to multiple blocks");
+            const bool is_standalone = index == 0U;
+            const bool is_delay_slot =
+                block.terminator_index.has_value() &&
+                index == *block.terminator_index + 1U;
+            InstructionOwnership& ownership = instruction_ownership[instruction.address];
+            if ((ownership.standalone || ownership.delay_slot) &&
+                !((is_standalone && ownership.delay_slot && !ownership.standalone) ||
+                  (is_delay_slot && ownership.standalone && !ownership.delay_slot))) {
+                throw IrError(
+                    "guest instructions may only be shared by a delay slot and its "
+                    "explicit standalone entry");
             }
+            ownership.standalone = ownership.standalone || is_standalone;
+            ownership.delay_slot = ownership.delay_slot || is_delay_slot;
 
             const bool control_transfer = is_control_transfer(instruction.kind);
             if (control_transfer != instruction.has_delay_slot) {

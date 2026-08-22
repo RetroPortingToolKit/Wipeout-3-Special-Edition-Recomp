@@ -137,8 +137,10 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
         }
     }
 
+    const std::set<GuestAddress> explicit_entries(
+        options.entry_points.begin(), options.entry_points.end());
     for (const GuestAddress leader : leaders) {
-        if (delay_slots.contains(leader)) {
+        if (delay_slots.contains(leader) && !explicit_entries.contains(leader)) {
             std::ostringstream message;
             message << "region entry or direct edge 0x" << std::hex << leader
                     << " lands in a delay slot";
@@ -170,8 +172,12 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
         block.id = block_ids.at(block_start);
         block.start = block_start;
         GuestAddress pc = block_start;
+        const bool standalone_delay_entry =
+            delay_slots.contains(block_start) && explicit_entries.contains(block_start);
 
-        while (instructions.contains(pc) && !covered.contains(pc)) {
+        while (instructions.contains(pc) &&
+               (!covered.contains(pc) ||
+                (pc == block_start && standalone_delay_entry))) {
             if (pc != block_start && block_starts.contains(pc)) {
                 break;
             }
