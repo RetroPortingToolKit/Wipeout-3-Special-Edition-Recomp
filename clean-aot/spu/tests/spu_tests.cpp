@@ -1130,18 +1130,61 @@ void test_mix_capture_and_input_fifos() {
                 ram_word(external_reverb_only, 0x8000u) != 0u,
             "external dry and reverb route bits are independent");
 
+    const auto configure_disabled_tail = [&configure_reverb_route](
+                                             Device& target) {
+        target.reset();
+        configure_reverb_route(target);
+        put(target, Device::ReverbOutputVolume, 0x7FFFu);
+        put(target, Device::ReverbOutputVolume + 2u, 0x7FFFu);
+        put(target, Device::ReverbRegisterBase + 3u * 2u, 0x7FFFu);
+        put(target, Device::TransferControl, kNormalTransfer);
+        put(target, Device::TransferAddress, 0x1001u);
+        put(target, Device::Control,
+            static_cast<std::uint16_t>(kLive | kDmaWrite));
+        render_count(target, 1u, "apply disabled-tail DMA mode");
+        constexpr std::array<std::uint16_t, 1u> seed = {0x4000u};
+        require(target.dma_write(seed).ok(), "seed disabled reverb tail");
+        put(target, Device::IrqAddress, 0x1000u);
+        put(target, Device::Control,
+            static_cast<std::uint16_t>(kLive | Device::ControlIrqEnable));
+    };
     IrqCounter disabled_reverb_irq;
     static Device disabled_reverb;
-    disabled_reverb.reset();
+    static Device disabled_reverb_chunked;
+    configure_disabled_tail(disabled_reverb);
+    configure_disabled_tail(disabled_reverb_chunked);
     disabled_reverb.set_irq_callback(IrqCounter::signal,
                                      &disabled_reverb_irq);
-    configure_reverb_route(disabled_reverb);
-    put(disabled_reverb, Device::IrqAddress, 0x1000u);
-    put(disabled_reverb, Device::Control,
-        static_cast<std::uint16_t>(kLive | Device::ControlIrqEnable));
-    require(disabled_reverb.render(passive_output).ok() &&
-                disabled_reverb_irq.calls == 1u,
-            "disabled reverb substitutes destination reads for writes");
+    std::array<StereoSample, SamplesPer100HzUpdate> disabled_tail{};
+    std::array<StereoSample, SamplesPer100HzUpdate> disabled_tail_chunked{};
+    require(disabled_reverb.render_100hz_update(disabled_tail).ok(),
+            "render disabled reverb wet tail");
+    for (std::size_t offset = 0u; offset < disabled_tail_chunked.size();
+         offset += 63u) {
+        require(disabled_reverb_chunked.render(
+                    std::span<StereoSample>(disabled_tail_chunked)
+                        .subspan(offset, 63u))
+                    .ok(),
+                "render chunked disabled reverb wet tail");
+    }
+    const std::uint64_t disabled_tail_digest = audio_digest(disabled_tail);
+    require(disabled_reverb_irq.calls == 0u && !disabled_reverb.irq_pending(),
+            "disabled SAME/DIFF stages do not synthesize RAM IRQ reads");
+    require(disabled_tail == disabled_tail_chunked &&
+                disabled_reverb.deterministic_digest() ==
+                    disabled_reverb_chunked.deterministic_digest(),
+            "disabled reverb tail is render-chunk invariant");
+    require(disabled_tail_digest == 14732959653633772374ull,
+            "disabled reverb wet-tail audio digest");
+    IrqCounter retained_reverb_irq;
+    static Device retained_reverb_reads;
+    configure_disabled_tail(retained_reverb_reads);
+    retained_reverb_reads.set_irq_callback(IrqCounter::signal,
+                                           &retained_reverb_irq);
+    put(retained_reverb_reads, Device::IrqAddress, 0x1001u);
+    require(retained_reverb_reads.render(passive_output).ok() &&
+                retained_reverb_irq.calls == 1u,
+            "disabled reverb retains COMB/APF RAM reads and IRQs");
 }
 
 struct DmaCollector final {

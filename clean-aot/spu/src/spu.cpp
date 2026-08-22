@@ -1293,47 +1293,44 @@ StereoSample Device::process_reverb_side(bool right_channel,
     const std::size_t diff_delay_index = right_channel
                                               ? 24u /* dLDIFF */
                                               : 25u /* dRDIFF */;
-    const std::uint32_t same_address =
-        reverb_address(reverb_registers_[same_address_index]);
-    const std::uint32_t diff_address =
-        reverb_address(reverb_registers_[diff_address_index]);
-    const std::int16_t old_same = read_reverb_sample(
-        wrap_reverb(static_cast<std::int64_t>(same_address) - 2));
-    const std::int16_t old_diff = read_reverb_sample(
-        wrap_reverb(static_cast<std::int64_t>(diff_address) - 2));
-    const std::int16_t delayed_same = read_reverb_sample(
-        reverb_address(reverb_registers_[same_delay_index]));
-    const std::int16_t delayed_diff = read_reverb_sample(
-        reverb_address(reverb_registers_[diff_delay_index]));
-
-    const std::int16_t input_scaled = reverb_multiply(
-        input, volume(right_channel ? 31u : 30u));
-    const auto reflection = [this, v_wall, v_iir](std::int16_t reflected_input,
-                                                  std::int16_t delayed,
-                                                  std::int16_t old) noexcept {
-        const std::int16_t wall = reverb_multiply(delayed, v_wall);
-        const std::int16_t before = saturate_i16(
-            static_cast<std::int32_t>(reflected_input) +
-            static_cast<std::int32_t>(wall) - static_cast<std::int32_t>(old));
-        const std::int16_t filtered = reverb_multiply(before, v_iir);
-        const std::int16_t result = saturate_i16(
-            static_cast<std::int32_t>(filtered) + static_cast<std::int32_t>(old));
-        if (v_iir == static_cast<std::int16_t>(-0x8000)) {
-            /* Documented SCPH-1001 quirk: the stored result is negated. */
-            return saturate_i16(-static_cast<std::int32_t>(result));
-        }
-        return result;
-    };
-
     if (write_buffer) {
+        const std::uint32_t same_address =
+            reverb_address(reverb_registers_[same_address_index]);
+        const std::uint32_t diff_address =
+            reverb_address(reverb_registers_[diff_address_index]);
+        const std::int16_t old_same = read_reverb_sample(
+            wrap_reverb(static_cast<std::int64_t>(same_address) - 2));
+        const std::int16_t old_diff = read_reverb_sample(
+            wrap_reverb(static_cast<std::int64_t>(diff_address) - 2));
+        const std::int16_t delayed_same = read_reverb_sample(
+            reverb_address(reverb_registers_[same_delay_index]));
+        const std::int16_t delayed_diff = read_reverb_sample(
+            reverb_address(reverb_registers_[diff_delay_index]));
+        const std::int16_t input_scaled = reverb_multiply(
+            input, volume(right_channel ? 31u : 30u));
+        const auto reflection =
+            [this, v_wall, v_iir](std::int16_t reflected_input,
+                                  std::int16_t delayed,
+                                  std::int16_t old) noexcept {
+                const std::int16_t wall = reverb_multiply(delayed, v_wall);
+                const std::int16_t before = saturate_i16(
+                    static_cast<std::int32_t>(reflected_input) +
+                    static_cast<std::int32_t>(wall) -
+                    static_cast<std::int32_t>(old));
+                const std::int16_t filtered = reverb_multiply(before, v_iir);
+                const std::int16_t result = saturate_i16(
+                    static_cast<std::int32_t>(filtered) +
+                    static_cast<std::int32_t>(old));
+                if (v_iir == static_cast<std::int16_t>(-0x8000)) {
+                    /* Documented SCPH-1001 quirk: negate the stored result. */
+                    return saturate_i16(-static_cast<std::int32_t>(result));
+                }
+                return result;
+            };
         write_reverb_sample(same_address,
                             reflection(input_scaled, delayed_same, old_same));
         write_reverb_sample(diff_address,
                             reflection(input_scaled, delayed_diff, old_diff));
-    } else {
-        /* With reverb writes disabled, the same bus slots are reads. */
-        static_cast<void>(read_reverb_sample(same_address));
-        static_cast<void>(read_reverb_sample(diff_address));
     }
 
     const auto comb = [this, &volume](std::array<std::size_t, 4u> addresses,
