@@ -2,6 +2,19 @@
 
 ## Current position
 
+- Cross-evidenced executable authorization is now committed at `b6b0940` and
+  pushed. `clean-aot/catalog/evidence/executable-authorization.json` is a
+  deterministic, fail-closed receipt (SHA-256
+  `57511195433271ecbd3f3c76bc30f5aac1400964371113100a97a05cb1dc9fae`).
+  It authenticates the prepared main EXE and NFE entry 5, reconstructs the
+  four-word observed NFE runtime variant, pins the exact route/capture/hint
+  receipts, proves direct edges and delay-slot ownership within cross-evidence,
+  and rejects every uncertainty. It authorizes 98,831 main-image instructions
+  and 31,719 NFE instructions, but remains non-selectable: 137 indirect sites
+  and 1,236 rejected direct edges remain, with 1,095,620 main-image and 10,032
+  NFE bytes explicitly unknown. Exact ranges are in
+  `docs/EXECUTABLE_AUTHORIZATION.md` and the JSON receipt.
+
 - The original dirty checkout remains preserved at
   `C:\Users\Shokunin\Documents\ChatGPT\wipeout3se`.
 - The canonical cleanroom is
