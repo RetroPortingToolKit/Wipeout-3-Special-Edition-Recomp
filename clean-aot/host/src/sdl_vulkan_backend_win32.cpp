@@ -697,13 +697,16 @@ HostStatus SdlVulkanPresentation::service() noexcept {
         }
     }
 
-    if (!impl_->has_pending_frame &&
-        !impl_->frames.try_pop(impl_->pending_frame)) {
-        return sdl_failure(HostCode::not_ready);
+    if (!impl_->has_pending_frame) {
+        Impl::QueuedFrame queued{};
+        if (!impl_->frames.try_pop(queued)) return sdl_failure(HostCode::not_ready);
+        impl_->pending_frame = queued.frame;
+        impl_->pending_frame_accepted_ns = queued.accepted_ns;
     }
     impl_->has_pending_frame = true;
-    if (impl_->pending_frame.sequence != impl_->next_sequence) {
-        impl_->next_sequence = impl_->pending_frame.sequence + 1U;
+    if (impl_->pending_frame.sequence != impl_->next_sequence ||
+        impl_->pending_frame.update_index != impl_->next_update_index) {
+        ++impl_->metrics.sequence_errors;
         impl_->has_pending_frame = false;
         return sdl_failure(HostCode::sequence_error);
     }
@@ -729,8 +732,10 @@ HostStatus SdlVulkanPresentation::service() noexcept {
     }
     if (swapchain_texture == nullptr) {
         SDL_CancelGPUCommandBuffer(command_buffer);
+        ++impl_->metrics.acquire_not_ready;
         return sdl_failure(HostCode::not_ready);
     }
+    ++impl_->metrics.swapchain_images_acquired;
 
     Viewport viewport{};
     const ViewportRequest viewport_request{
@@ -773,6 +778,16 @@ HostStatus SdlVulkanPresentation::service() noexcept {
 
     impl_->has_pending_frame = false;
     ++impl_->next_sequence;
+    ++impl_->next_update_index;
+    ++impl_->metrics.gpu_present_submissions;
+    impl_->metrics.next_sequence = impl_->next_sequence;
+    impl_->metrics.next_update_index = impl_->next_update_index;
+    const std::uint64_t now = SDL_GetTicksNS();
+    const std::uint64_t latency = now >= impl_->pending_frame_accepted_ns
+        ? now - impl_->pending_frame_accepted_ns : 0U;
+    impl_->metrics.queue_latency_ns_total += latency;
+    impl_->metrics.queue_latency_ns_max =
+        std::max(impl_->metrics.queue_latency_ns_max, latency);
     return HostStatus{};
 }
 
@@ -957,6 +972,10 @@ bool SdlVulkanPresentation::shutting_down() const noexcept {
 
 WindowState SdlVulkanPresentation::window_state() const noexcept {
     return impl_ == nullptr ? WindowState{} : impl_->window_state;
+}
+
+SdlPresentationMetrics SdlVulkanPresentation::presentation_metrics() const noexcept {
+    return impl_ == nullptr ? SdlPresentationMetrics{} : impl_->metrics;
 }
 
 SdlAudioMetrics SdlVulkanPresentation::audio_metrics() const noexcept {

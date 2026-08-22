@@ -57,14 +57,20 @@ SDL3 3.4.10 source archive and build
 
 * loads `vulkan-1.dll` with the system-only `LoadLibraryExW` search policy and confirms
   `vkGetInstanceProcAddr` before asking SDL to use the Vulkan driver;
-* uses SDL3's Vulkan-backed GPU device and claimed window, with two frames in
-  flight and a fixed descriptor queue;
+* uses SDL3's Vulkan-backed GPU device and claimed window, with configurable
+  one-to-three frames in flight (one by default for latency) and explicit
+  vsync, immediate, mailbox, or low-latency 100 Hz present-mode policy;
 * handles bounded SDL event pumping without dropping consumed events,
   resize/fullscreen requests and transition events, clean device-loss
   signaling, and idle-before-reclaim swapchain recreation;
 * consumes the embedded SPIR-V sanity shaders at device initialization; and
-* clears a swapchain when no `IFrameEncoder` is installed. Actual game frame
-  upload and presentation belongs to the later renderer tranche.
+* reports display refresh as an exact rational when SDL supplies it, and keeps
+  accepted frames, acquired images, GPU present submissions, queue latency,
+  sequence faults, resize/reclaim, and device loss as separate counters; and
+* requires contiguous frame and update identities. SDL GPU exposes no
+  compositor/scanout completion feedback, so `display_presentations_confirmed`
+  deliberately remains zero and VRR remains unknown rather than being inferred
+  from a successful GPU submission.
 
 The Vulkan SDK is therefore not a runtime dependency. A Windows release still
 needs the SDL3 runtime DLL and a Vulkan-capable driver. The current shell does
