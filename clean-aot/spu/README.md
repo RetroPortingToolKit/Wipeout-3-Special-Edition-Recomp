@@ -95,6 +95,7 @@ build-clean-spu-gcc/clean_aot_spu_benchmark
 
 The independent test executable covers ADPCM predictor vectors, loop and IRQ
 edges, exact Gaussian phase anchors, all envelope phases and rate freezes,
+SPUCNT-only IRQ acknowledge/latch replay,
 the maximum-sustain attack boundary,
 fresh-divider sweep restarts, the inverted all-ones sweep,
 phase-invariant exponential decrease,

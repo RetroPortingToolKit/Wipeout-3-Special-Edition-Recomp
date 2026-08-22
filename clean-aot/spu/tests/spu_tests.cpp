@@ -666,8 +666,65 @@ void test_irq_and_mmio_boundaries() {
     require(irq_device.render(sample).ok() && irq_device.irq_pending() &&
                 counter.calls == 1u,
             "ADPCM block crossing signals IRQ once");
-    irq_device.acknowledge_irq();
-    require(!irq_device.irq_pending(), "IRQ acknowledge clears pending state");
+
+    static std::array<std::byte, Device::SnapshotBytes> irq_snapshot{};
+    require(irq_device.save_snapshot(irq_snapshot).ok(),
+            "snapshot asserted SPU IRQ latch");
+    IrqCounter replay_counter;
+    static Device irq_replay;
+    irq_replay.reset();
+    irq_replay.set_irq_callback(IrqCounter::signal, &replay_counter);
+    require(irq_replay.restore_snapshot(irq_snapshot).ok() &&
+                irq_replay.irq_pending() && replay_counter.calls == 0u,
+            "restore preserves IRQ latch without synthesizing an edge");
+
+    put(irq_device, Device::IrqAddress, 0x7FFFu);
+    put(irq_replay, Device::IrqAddress, 0x7FFFu);
+    put(irq_device, Device::Control,
+        static_cast<std::uint16_t>(kLive | Device::ControlIrqEnable));
+    put(irq_replay, Device::Control,
+        static_cast<std::uint16_t>(kLive | Device::ControlIrqEnable));
+    std::array<StereoSample, 1u> latched_audio{};
+    std::array<StereoSample, 1u> latched_replay_audio{};
+    require(irq_device.render(latched_audio).ok() &&
+                irq_replay.render(latched_replay_audio).ok() &&
+                irq_device.irq_pending() && irq_replay.irq_pending() &&
+                counter.calls == 1u && replay_counter.calls == 0u &&
+                latched_audio == latched_replay_audio &&
+                irq_device.deterministic_digest() ==
+                    irq_replay.deterministic_digest(),
+            "IRQ remains latched after its RAM address moves and SPUCNT stays armed");
+
+    put(irq_device, Device::Control, kLive);
+    put(irq_replay, Device::Control, kLive);
+    require(!irq_device.irq_pending() && !irq_replay.irq_pending() &&
+                (irq_device.read_mmio(Device::Status, kWord).value &
+                 Device::StatusIrq) == 0u &&
+                (irq_replay.read_mmio(Device::Status, kWord).value &
+                 Device::StatusIrq) == 0u,
+            "only SPUCNT IRQ disable acknowledges the internal latch");
+
+    put(irq_device, Device::IrqAddress, 0u);
+    put(irq_replay, Device::IrqAddress, 0u);
+    put(irq_device, Device::Control,
+        static_cast<std::uint16_t>(kLive | Device::ControlIrqEnable));
+    put(irq_replay, Device::Control,
+        static_cast<std::uint16_t>(kLive | Device::ControlIrqEnable));
+    std::array<StereoSample, 1u> retrigger_audio{};
+    std::array<StereoSample, 1u> retrigger_replay_audio{};
+    require(irq_device.render(retrigger_audio).ok() &&
+                irq_replay.render(retrigger_replay_audio).ok() &&
+                irq_device.irq_pending() && irq_replay.irq_pending() &&
+                counter.calls == 2u && replay_counter.calls == 1u &&
+                retrigger_audio == retrigger_replay_audio &&
+                irq_device.deterministic_digest() ==
+                    irq_replay.deterministic_digest(),
+            "SPUCNT acknowledge permits one exact native-edge retrigger");
+    const std::array<StereoSample, 2u> irq_audio = {
+        latched_audio[0], retrigger_audio[0]};
+    const std::uint64_t irq_audio_digest = audio_digest(irq_audio);
+    require(irq_audio_digest == 7'685'790'907'612'315'261ull,
+            "SPUCNT IRQ latch replay audio digest");
 
     IrqCounter scheduled_counter;
     static Device scheduled_irq;

@@ -1997,10 +1997,6 @@ bool Device::irq_pending() const noexcept {
     return irq_pending_;
 }
 
-void Device::acknowledge_irq() noexcept {
-    irq_pending_ = false;
-}
-
 bool Device::dma_request() const noexcept {
     const TransferMode mode = transfer_mode(effective_control_);
     return mode == TransferMode::DmaWrite ||
