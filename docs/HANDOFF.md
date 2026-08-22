@@ -242,6 +242,21 @@ The comparator rejects a trace kind that belongs to the other gate. The current
 anchored startup-card comparison passes; the race-load artifacts still need an
 equal route length and overlapping endpoint window.
 
+The runtime debug protocol now exposes `savestate_status`. Its monotonic
+`generation` changes only after `savestate_poll` has applied or rejected a save
+or load, and it reports `pending`, `last_ok`, `last_op`, and `last_slot`. A
+focused load-gate harness can restore a checkpoint and wait for completion
+before arming input, instead of relying on a sleep or an early staged-request
+acknowledgement.
+
+The save-state audit confirms this is the intended test shape: create one
+pre-load checkpoint, restore it into normal and Fast-Loading branches, then
+compare only the startup-card endpoint or race-load endpoint plus a short
+post-load continuation. The status receipt removes the previous staged-ack
+race; remaining harness work is calibrating committed pre-card/pre-race input
+routes and expanding endpoint capture to card buffers, sector/DMA history, and
+audio deltas.
+
 ## Ruled out
 
 - Reusing the existing NTSC-120 package as a PAL-100 patch: PAL sites do not
