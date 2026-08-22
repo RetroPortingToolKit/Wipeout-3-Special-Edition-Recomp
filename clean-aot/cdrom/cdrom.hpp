@@ -274,6 +274,7 @@ public:
     static constexpr std::size_t ResponseFifoCapacity = 16U;
     static constexpr std::size_t DataFifoCapacity = WholeSectorBytes;
     static constexpr std::size_t InterruptQueueCapacity = 8U;
+    static constexpr std::size_t SectorBufferCapacity = 8U;
     static constexpr std::size_t EventCapacity = 64U;
 
     explicit Cdrom(RawSectorSource* source = nullptr, DiscLayout layout = {}) noexcept;
@@ -392,6 +393,10 @@ private:
     std::array<std::uint8_t, DataFifoCapacity> transfer_storage_{};
     std::size_t transfer_size_ = 0U;
     bool transfer_valid_ = false;
+    std::array<std::array<std::uint8_t, DataFifoCapacity>,
+               SectorBufferCapacity - 1U> pending_transfer_storage_{};
+    std::array<std::size_t, SectorBufferCapacity - 1U> pending_transfer_sizes_{};
+    std::size_t pending_transfer_count_ = 0U;
     std::array<std::uint8_t, DataFifoCapacity> data_storage_{};
     std::size_t data_size_ = 0U;
     std::size_t data_cursor_ = 0U;
@@ -448,6 +453,7 @@ private:
     void stop_streams() noexcept;
     bool prepare_transfer(std::span<const std::uint8_t> bytes) noexcept;
     void latch_transfer() noexcept;
+    void clear_transfer_buffers() noexcept;
     void end_data_stream() noexcept;
     void end_cdda_stream() noexcept;
 

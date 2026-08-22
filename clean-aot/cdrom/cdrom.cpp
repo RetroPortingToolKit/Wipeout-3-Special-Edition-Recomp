@@ -169,9 +169,7 @@ void Cdrom::reset() noexcept {
     interrupt_reason_ = Interrupt::None;
     interrupt_queue_ = {};
     interrupt_queue_count_ = 0U;
-    transfer_storage_ = {};
-    transfer_size_ = 0U;
-    transfer_valid_ = false;
+    clear_transfer_buffers();
     data_storage_ = {};
     data_size_ = 0U;
     data_cursor_ = 0U;
@@ -220,8 +218,7 @@ void Cdrom::attach_source(RawSectorSource* source) noexcept {
     phase_action_ = PhaseAction::None;
     seeking_ = false;
     source_ = source;
-    transfer_valid_ = false;
-    transfer_size_ = 0U;
+    clear_transfer_buffers();
     data_size_ = 0U;
     data_cursor_ = 0U;
     last_position_valid_ = false;
@@ -277,7 +274,7 @@ bool Cdrom::set_disc_layout(const DiscLayout& layout) noexcept {
     current_lba_ = layout_.tracks[0U].start_lba;
     target_lba_ = current_lba_;
     location_pending_ = false;
-    transfer_valid_ = false;
+    clear_transfer_buffers();
     data_size_ = 0U;
     data_cursor_ = 0U;
     last_position_valid_ = false;
@@ -904,7 +901,7 @@ void Cdrom::begin_command(std::uint8_t command,
             break;
         }
         stop_streams();
-        transfer_valid_ = false;
+        clear_transfer_buffers();
         data_size_ = 0U;
         data_cursor_ = 0U;
         motor_on_ = true;
@@ -1302,7 +1299,7 @@ void Cdrom::begin_command(std::uint8_t command,
         xa_host_muted_ = false;
         motor_on_ = false;
         paused_ = false;
-        transfer_valid_ = false;
+        clear_transfer_buffers();
         data_size_ = 0U;
         data_cursor_ = 0U;
         (void)queue_status(Interrupt::Acknowledge);
@@ -1688,10 +1685,22 @@ bool Cdrom::prepare_transfer(std::span<const std::uint8_t> bytes) noexcept {
         record_error(ErrorCode::DataOverflow);
         return false;
     }
-    transfer_storage_ = {};
-    std::copy(bytes.begin(), bytes.end(), transfer_storage_.begin());
-    transfer_size_ = bytes.size();
-    transfer_valid_ = true;
+    if (!transfer_valid_) {
+        transfer_storage_ = {};
+        std::copy(bytes.begin(), bytes.end(), transfer_storage_.begin());
+        transfer_size_ = bytes.size();
+        transfer_valid_ = true;
+        return true;
+    }
+    if (pending_transfer_count_ == pending_transfer_storage_.size()) {
+        record_error(ErrorCode::DataOverflow);
+        return false;
+    }
+    auto& destination = pending_transfer_storage_[pending_transfer_count_];
+    destination = {};
+    std::copy(bytes.begin(), bytes.end(), destination.begin());
+    pending_transfer_sizes_[pending_transfer_count_] = bytes.size();
+    ++pending_transfer_count_;
     return true;
 }
 
@@ -1707,6 +1716,30 @@ void Cdrom::latch_transfer() noexcept {
             std::span<const std::uint8_t>(data_storage_.data(), data_size_));
         data_cursor_ = data_size_;
     }
+    if (pending_transfer_count_ == 0U) {
+        transfer_storage_ = {};
+        transfer_size_ = 0U;
+        transfer_valid_ = false;
+        return;
+    }
+    transfer_storage_ = pending_transfer_storage_[0U];
+    transfer_size_ = pending_transfer_sizes_[0U];
+    for (std::size_t index = 1U; index < pending_transfer_count_; ++index) {
+        pending_transfer_storage_[index - 1U] = pending_transfer_storage_[index];
+        pending_transfer_sizes_[index - 1U] = pending_transfer_sizes_[index];
+    }
+    --pending_transfer_count_;
+    pending_transfer_storage_[pending_transfer_count_] = {};
+    pending_transfer_sizes_[pending_transfer_count_] = 0U;
+}
+
+void Cdrom::clear_transfer_buffers() noexcept {
+    transfer_storage_ = {};
+    transfer_size_ = 0U;
+    transfer_valid_ = false;
+    pending_transfer_storage_ = {};
+    pending_transfer_sizes_ = {};
+    pending_transfer_count_ = 0U;
 }
 
 void Cdrom::end_data_stream() noexcept {

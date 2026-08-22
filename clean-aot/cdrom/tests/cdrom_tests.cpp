@@ -781,6 +781,39 @@ void test_dma_is_request_gated_and_cadence_is_exact() {
     require_reason(double_speed, Interrupt::DataReady, "double-speed exact boundary");
 }
 
+void test_delayed_100hz_service_preserves_sector_irq_dma_order() {
+    auto source = std::make_unique<MemorySource>();
+    populate_mode_one(*source, 0U, 8U);
+    DmaLog dma;
+    Cdrom device(source.get(), data_layout());
+    device.attach_dma(&dma);
+    device.set_dma_enabled(true);
+    issue(device, Command::ReadN);
+    (void)device.pop_response();
+    acknowledge(device);
+
+    /* Four 100 Hz updates span exactly three single-speed sector arrivals. */
+    device.advance_to(device.current_cycle() + CyclesPer100HzUpdate * 4U);
+    require(source->read_count == 3U &&
+                device.pending_interrupt_count() == 3U && dma.count == 0U,
+            "delayed four-frame service retains three INT1/data epochs");
+    for (std::size_t sector = 0U; sector < 3U; ++sector) {
+        require_reason(device, Interrupt::DataReady,
+                       "buffered sector keeps its matching INT1 visible");
+        (void)device.pop_response();
+        clear_data_request(device);
+        request_data(device);
+        require(dma.count == sector + 1U &&
+                    dma.lengths[sector] == DataOnlyBytes &&
+                    dma.bytes[sector * DataOnlyBytes] ==
+                        static_cast<std::uint8_t>(0x10U + sector),
+                "buffered DMA payloads retain sector order at 100 Hz");
+        acknowledge(device);
+    }
+    require(device.pending_interrupt_count() == 0U,
+            "all delayed sector IRQ epochs drain exactly once");
+}
+
 void test_cdda_tracks_autopause_matrix_mute_and_100hz_relation() {
     auto source = std::make_unique<MemorySource>();
     populate_mixed(*source);
@@ -1128,9 +1161,9 @@ void test_overflow_time_reset_scheduler_and_deterministic_chunking() {
     (void)overflow.pop_response();
     acknowledge(overflow);
     overflow.advance_to(overflow.current_cycle() + SingleSpeedSectorCycles * 10U);
-    require(!overflow.reading() && overflow.last_error() == ErrorCode::ResponseOverflow &&
-                overflow.pending_interrupt_count() == Cdrom::InterruptQueueCapacity + 1U,
-            "unserviced interrupt queue overflow stops streaming without overwrite");
+    require(!overflow.reading() && overflow.last_error() == ErrorCode::DataOverflow &&
+                overflow.pending_interrupt_count() == Cdrom::SectorBufferCapacity,
+            "unserviced eight-sector buffer stops streaming before payload overwrite");
 
     Cdrom time_guard;
     time_guard.advance_to(123456U);
@@ -1222,6 +1255,7 @@ int main() {
     test_seek_status_queries_and_identity_packets();
     test_data_request_widths_sector_sizes_and_location_header();
     test_dma_is_request_gated_and_cadence_is_exact();
+    test_delayed_100hz_service_preserves_sector_irq_dma_order();
     test_cdda_tracks_autopause_matrix_mute_and_100hz_relation();
     test_xa_routing_filter_and_explicit_decode_boundary();
     test_remaining_command_families_reset_controls_and_stream_end();

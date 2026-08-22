@@ -31,6 +31,10 @@ delivers 2,048 bytes. Whole-sector mode delivers 2,340 bytes beginning at the
 raw minute/second/frame/mode header. Overreads use the controller padding rule
 instead of inventing an underflow interrupt. The DMA adapter is a deterministic
 push boundary invoked only after a requested transfer has been latched.
+Up to eight arrived sector payloads are retained in FIFO order alongside their
+INT1 epochs. Delayed service therefore cannot pair an older interrupt with a
+newer overwritten payload; a ninth unconsumed payload stops the stream with an
+explicit data-overflow error before any buffered sector is mutated.
 
 ## Timing and media
 
