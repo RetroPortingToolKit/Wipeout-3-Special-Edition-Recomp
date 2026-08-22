@@ -1213,12 +1213,15 @@ void Device::advance_adsr(Voice& voice) noexcept {
     voice.current_adsr_register = bits_of_i16(voice.adsr_volume);
 
     if (voice.phase == AdsrPhase::Attack && voice.adsr_volume >= 0x7FFF) {
-        voice.phase = AdsrPhase::Decay;
+        const std::int32_t sustain_level = static_cast<std::int32_t>(
+            ((voice.adsr_low & 0xFu) + 1u) * 0x800u);
+        voice.phase = sustain_level > 0x7FFF
+                          ? AdsrPhase::Sustain
+                          : AdsrPhase::Decay;
         voice.adsr_counter = 0u;
     } else if (voice.phase == AdsrPhase::Decay) {
-        const std::int32_t sustain_level = std::min(
-            static_cast<std::int32_t>(((voice.adsr_low & 0xFu) + 1u) * 0x800u),
-            0x7FFF);
+        const std::int32_t sustain_level = static_cast<std::int32_t>(
+            ((voice.adsr_low & 0xFu) + 1u) * 0x800u);
         if (voice.adsr_volume <= sustain_level) {
             voice.phase = AdsrPhase::Sustain;
             voice.adsr_counter = 0u;

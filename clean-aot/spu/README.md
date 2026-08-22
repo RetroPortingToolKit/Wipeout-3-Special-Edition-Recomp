@@ -21,7 +21,8 @@ Clock-domain contract
 Implemented surface
 
 - 24 voices with key-on/key-off, start/repeat/current positions, pitch,
-  channel volume fixed and sweep modes, ADSR attack/decay/sustain/release,
+  channel volume fixed and sweep modes, ADSR attack/decay/sustain/release
+  including the maximum-sustain no-decay edge,
   threshold-consuming envelope counters, noise, pitch modulation, end flags,
   saturation, and stereo mixing. Key-off
   and end-mute silence the envelope while retaining the bounded RAM scan state
@@ -93,6 +94,7 @@ build-clean-spu-gcc/clean_aot_spu_benchmark
 
 The independent test executable covers ADPCM predictor vectors, loop and IRQ
 edges, exact Gaussian phase anchors, all envelope phases and rate freezes,
+the maximum-sustain attack boundary,
 fresh-divider sweep restarts, the inverted all-ones sweep,
 phase-invariant exponential decrease,
 continuously clocked noise, modulation ordering,

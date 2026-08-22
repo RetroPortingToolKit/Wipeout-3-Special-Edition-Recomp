@@ -745,6 +745,62 @@ void test_adsr_sweep_noise_and_modulation() {
     require(envelope_digest == 9'303'418'669'728'391'773ull,
             "ADSR one-sample edge audio digest");
 
+    const auto configure_max_sustain = [](Device& target) {
+        target.reset();
+        load_block(target, make_constant_block(7, 0x03u));
+        put(target, Device::MainVolume, 0x3FFFu);
+        put(target, Device::MainVolume + 2u, 0x3FFFu);
+        configure_voice(target, 0u, 0x1000u, 0x000Fu, 0x1FC0u);
+        put(target, Device::KeyOn, 1u);
+    };
+    static Device max_sustain_whole;
+    static Device max_sustain_split;
+    configure_max_sustain(max_sustain_whole);
+    configure_max_sustain(max_sustain_split);
+    std::array<StereoSample, SamplesPer100HzUpdate> max_sustain_audio{};
+    require(max_sustain_whole.render_100hz_update(max_sustain_audio).ok(),
+            "render maximum-sustain 100 Hz vector");
+    std::array<StereoSample, 3u> max_sustain_prefix{};
+    require(max_sustain_split.render(max_sustain_prefix).ok() &&
+                max_sustain_split.voice_state(0u).phase ==
+                    clean_aot::spu::AdsrPhase::Sustain &&
+                max_sustain_split.voice_state(0u).adsr_volume == 0x7FFF,
+            "maximum sustain bypasses impossible decay after attack edge");
+    static Device adjacent_sustain;
+    adjacent_sustain.reset();
+    load_block(adjacent_sustain, make_constant_block(7, 0x03u));
+    configure_voice(adjacent_sustain, 0u, 0x1000u, 0x000Eu, 0x1FC0u);
+    put(adjacent_sustain, Device::KeyOn, 1u);
+    render_count(adjacent_sustain, 3u,
+                 "render adjacent sustain-level attack boundary");
+    require(adjacent_sustain.voice_state(0u).phase ==
+                clean_aot::spu::AdsrPhase::Decay &&
+                adjacent_sustain.voice_state(0u).adsr_volume == 0x7FFF,
+            "sustain level E retains the documented decay phase");
+    static std::array<std::byte, Device::SnapshotBytes>
+        max_sustain_snapshot{};
+    require(max_sustain_split.save_snapshot(max_sustain_snapshot).ok(),
+            "snapshot maximum-sustain attack boundary");
+    static Device max_sustain_replay;
+    max_sustain_replay.reset();
+    require(max_sustain_replay.restore_snapshot(max_sustain_snapshot).ok(),
+            "restore maximum-sustain attack boundary");
+    std::array<StereoSample, 438u> max_sustain_tail{};
+    std::array<StereoSample, 438u> max_sustain_replay_tail{};
+    const std::uint64_t max_sustain_digest =
+        audio_digest(max_sustain_audio);
+    require(max_sustain_split.render(max_sustain_tail).ok() &&
+                max_sustain_replay.render(max_sustain_replay_tail).ok() &&
+                max_sustain_tail == max_sustain_replay_tail &&
+                std::equal(max_sustain_prefix.begin(), max_sustain_prefix.end(),
+                           max_sustain_audio.begin()) &&
+                std::equal(max_sustain_tail.begin(), max_sustain_tail.end(),
+                           max_sustain_audio.begin() + 3) &&
+                max_sustain_split.deterministic_digest() ==
+                    max_sustain_replay.deterministic_digest() &&
+                max_sustain_digest == 10'452'916'077'976'385'533ull,
+            "maximum-sustain edge is audio- and snapshot-exact for 441 samples");
+
     for (std::uint16_t shift = 0u; shift < 32u; ++shift) {
         static Device rate_device;
         rate_device.reset();
