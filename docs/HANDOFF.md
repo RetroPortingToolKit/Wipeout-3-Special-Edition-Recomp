@@ -69,6 +69,13 @@
   kHz, and zero underruns. The subsequent PAL/FM V transition still falls to
   about 50 Hz with severe audio underruns, so gameplay/audio behavior remains
   unverified and the feature must stay default-off.
+- FMV pacing was then corrected so PAL x2 no longer waits 20 ms on every guest
+  tick. Depth-24/MDEC presentation now skips alternate PAL x2 presents while
+  the guest remains on the 10 ms cadence. This raises the observed FMV-window
+  guest rate from about 50 Hz to roughly 74–79 Hz and raises SPU production to
+  roughly 33–35 kHz, but the full workload is still CPU-bound and audio
+  underruns remain. The change is directionally correct but not a PAL-100 gate
+  pass; further guest/render throughput work is required.
 
 - PAL100 title timing is now authenticated for the supplied PAL target: the
   title selector/state path at 0x8017BB8C–0x8017BBAC maps selector 2 to
