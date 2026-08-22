@@ -23,4 +23,12 @@ class Tests(unittest.TestCase):
    path,data=items[0]; blob=Path(td.name)/"slice.bin"; blob.write_bytes(image)
    out=m.epoch_variants([(path,blob),(path,blob)]); self.assertEqual(len(out),1); self.assertEqual(out[0]["unknown_identity_action"],"reject")
   finally: td.cleanup()
+ def test_incremental_variants_are_bounded_unique_and_identity_bound(self):
+  td,image,items=self.fixture()
+  try:
+   current=m.build(image,0x1000,items); baseline=dict(current); baseline["ranges"]=[{"start":0x1000,"end_exclusive":0x1008}]
+   variants=m.incremental_variants(current,baseline,2); pcs=[pc for v in variants for pc in v["entries"]]; self.assertEqual(len(pcs),len(set(pcs))); self.assertTrue(all(v["instruction_count"]<=2 for v in variants))
+   bad=dict(baseline); bad["resident_identity_sha256"]="0"*64
+   with self.assertRaises(m.ShellShardError): m.incremental_variants(current,bad,2)
+  finally: td.cleanup()
 if __name__=="__main__": unittest.main()
