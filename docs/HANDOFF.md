@@ -156,6 +156,13 @@
   probe confirmed the 21-step route was loaded, but it did not yet reach the
   race boundary before the probe was stopped. No aggregate audio result from
   that invalid/partial run is used as equivalence evidence.
+- The corrected route was then allowed to complete all 21 steps. It captured
+  32 sequential memory-card reads (sectors 0–31, all `data_idx=128`), guest
+  SPU/CDDA taps at 44.1 kHz, and CD/XA trace activity through frame ~8055.
+  This proves the accelerated path reaches the full menu/load/race route and
+  preserves guest-clocked audio production. The host bridge still reports
+  large aggregate underruns during the accelerated wall-time run, so host
+  presentation smoothness and a byte-for-byte paired normal trace remain open.
 - Runtime still links generic overlay/autocompile/interpreter plumbing even
   though the release configuration disables its behavior; strict link-surface
   removal remains unfinished.
