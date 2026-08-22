@@ -11,6 +11,23 @@ namespace clean_aot::app {
 
 struct GraphicsConfiguration;
 
+struct GraphicsFeatureReceipt final {
+    bool pgxp_vertex_projection_perspective = false;
+    bool widescreen_projection_culling = false;
+    bool true_color = false;
+    bool scaled_dither_resolve = false;
+    bool transparency_safe_filtering = false;
+    bool scanout_24bit_chroma = false;
+    bool hd_textures = false;
+    bool hd_fonts = false;
+    bool complete_gp0_fallback = false;
+    bool exact_native_fallback = false;
+    bool vulkan_4k_ultrawide = false;
+    bool physical_present_timing_verified = false;
+    bool physical_present_timing_available = false;
+    [[nodiscard]] std::string canonical_json() const;
+};
+
 struct RuntimeSettings final {
     std::uint32_t width = 3840U;
     std::uint32_t height = 2160U;
@@ -32,6 +49,10 @@ struct RuntimeSettings final {
 
     [[nodiscard]] clean_aot::host::SdlVulkanConfig host_config(bool hidden) const noexcept;
     void apply_graphics_settings(GraphicsConfiguration& graphics) const noexcept;
+    [[nodiscard]] GraphicsFeatureReceipt graphics_feature_receipt(
+        const GraphicsConfiguration& graphics,
+        const clean_aot::host::SdlPresentationMetrics* presentation = nullptr)
+        const noexcept;
 };
 
 enum class SettingsStatus : std::uint8_t { loaded, created, reset, upgraded, invalid, io_error };

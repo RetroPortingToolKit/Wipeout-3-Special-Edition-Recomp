@@ -33,6 +33,49 @@ int main(){
     expect(graphics.pgxp_enabled &&
            graphics.pgxp_near_plane == PgxpNearPlanePolicy::NativeFallback,
            "validated disabled near-plane setting reaches live graphics policy");
+    RuntimeSettings remaster{};
+    remaster.width = 5120U;
+    remaster.height = 2160U;
+    remaster.apply_graphics_settings(graphics);
+    clean_aot::host::SdlPresentationMetrics timing{};
+    timing.completion_source = clean_aot::host::PresentCompletionSource::present_wait;
+    timing.display_presentations_confirmed = 100U;
+    timing.completion_intervals_at_target = 99U;
+    const auto matrix = remaster.graphics_feature_receipt(graphics, &timing);
+    std::cout << matrix.canonical_json() << '\n';
+    expect(matrix.pgxp_vertex_projection_perspective &&
+           matrix.widescreen_projection_culling && matrix.true_color &&
+           matrix.scaled_dither_resolve && matrix.transparency_safe_filtering &&
+           matrix.scanout_24bit_chroma && matrix.hd_textures && matrix.hd_fonts &&
+           matrix.complete_gp0_fallback && matrix.exact_native_fallback &&
+           matrix.vulkan_4k_ultrawide && matrix.physical_present_timing_verified,
+           "remaster settings configure every live GooseStation-class feature");
+    expect(matrix.canonical_json().find(
+               "\"schema\":\"clean-aot.graphics-feature-matrix.v1\"") !=
+               std::string::npos &&
+           matrix.canonical_json().find("\"physical_present_timing\":\"verified\"") !=
+               std::string::npos,
+           "feature matrix emits deterministic verified timing receipt");
+    timing.completion_source = clean_aot::host::PresentCompletionSource::unavailable;
+    const auto unavailable = remaster.graphics_feature_receipt(graphics, &timing);
+    expect(!unavailable.physical_present_timing_verified &&
+           !unavailable.physical_present_timing_available &&
+           unavailable.canonical_json().find(
+               "\"physical_present_timing\":\"unavailable\"") != std::string::npos,
+           "feature receipt never claims physical completion when unavailable");
+
+    RuntimeSettings native{};
+    native.pgxp = false; native.true_color = false; native.hd_assets = false;
+    native.ultrawide = false;
+    native.apply_graphics_settings(graphics);
+    expect(graphics.presentation == clean_aot::raster::PresentationMode::Identity4x3 &&
+           graphics.projection == psx::render::ProjectionPolicy::PreserveNative4x3 &&
+           graphics.culling == psx::render::CullingPolicy::NativeHardware &&
+           graphics.texture_filter == clean_aot::raster::TextureFilterMode::NearestNative &&
+           graphics.precise_color == clean_aot::raster::PreciseColorMode::NativeRgb555 &&
+           graphics.presentation_resolve == clean_aot::raster::PresentationResolveMode::Native &&
+           graphics.display_postprocess == clean_aot::raster::DisplayPostprocessMode::None,
+           "disabled enhancements restore exact native graphics policy");
     auto legacy_json = runtime_settings_json(RuntimeSettings{});
     const auto near_field = legacy_json.find(",\"pgxp_verified_near_plane\":true");
     legacy_json.erase(near_field, std::string_view{",\"pgxp_verified_near_plane\":true"}.size());

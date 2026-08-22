@@ -103,10 +103,100 @@ host::SdlVulkanConfig RuntimeSettings::host_config(bool hidden) const noexcept {
 
 void RuntimeSettings::apply_graphics_settings(
     GraphicsConfiguration& graphics) const noexcept {
+    graphics.output_width = width;
+    graphics.output_height = height;
     graphics.pgxp_enabled = pgxp;
     graphics.pgxp_near_plane = pgxp && pgxp_verified_near_plane
         ? PgxpNearPlanePolicy::ClipWhenGtePositiveWVerified
         : PgxpNearPlanePolicy::NativeFallback;
+    const bool wide = ultrawide && pgxp;
+    if (wide) {
+        const auto scaled_width = static_cast<std::uint64_t>(width) * 9U;
+        graphics.presentation = scaled_width >= static_cast<std::uint64_t>(height) * 28U
+            ? raster::PresentationMode::Generic32x9
+            : scaled_width >= static_cast<std::uint64_t>(height) * 20U
+                ? raster::PresentationMode::Generic21x9
+                : raster::PresentationMode::Generic16x9;
+        graphics.projection = psx::render::ProjectionPolicy::ExpandHorizontal;
+        graphics.culling = psx::render::CullingPolicy::MatchExpandedProjection;
+    } else {
+        graphics.presentation = raster::PresentationMode::Identity4x3;
+        graphics.projection = psx::render::ProjectionPolicy::PreserveNative4x3;
+        graphics.culling = psx::render::CullingPolicy::NativeHardware;
+    }
+    graphics.precise_color = true_color
+        ? raster::PreciseColorMode::TrueColorDisplay
+        : raster::PreciseColorMode::NativeRgb555;
+    graphics.texture_filter = pgxp
+        ? raster::TextureFilterMode::BilinearTransparencySafe
+        : raster::TextureFilterMode::NearestNative;
+    graphics.presentation_resolve = pgxp || true_color
+        ? raster::PresentationResolveMode::EdgeAware
+        : raster::PresentationResolveMode::Native;
+    graphics.display_postprocess = true_color
+        ? raster::DisplayPostprocessMode::ChromaSmooth24Bit
+        : raster::DisplayPostprocessMode::None;
+    graphics.font_policy = hd_assets
+        ? FontManifestPolicy::ManifestOnly : FontManifestPolicy::Disabled;
+    graphics.high_resolution_ui = hd_assets;
+}
+
+GraphicsFeatureReceipt RuntimeSettings::graphics_feature_receipt(
+    const GraphicsConfiguration& graphics,
+    const host::SdlPresentationMetrics* presentation) const noexcept {
+    GraphicsFeatureReceipt receipt{};
+    receipt.pgxp_vertex_projection_perspective = graphics.pgxp_enabled;
+    receipt.widescreen_projection_culling = graphics.pgxp_enabled &&
+        graphics.projection == psx::render::ProjectionPolicy::ExpandHorizontal &&
+        graphics.culling == psx::render::CullingPolicy::MatchExpandedProjection &&
+        graphics.presentation != raster::PresentationMode::Identity4x3;
+    receipt.true_color = graphics.precise_color ==
+        raster::PreciseColorMode::TrueColorDisplay;
+    receipt.scaled_dither_resolve = receipt.true_color &&
+        graphics.presentation_resolve == raster::PresentationResolveMode::EdgeAware;
+    receipt.transparency_safe_filtering = graphics.texture_filter ==
+        raster::TextureFilterMode::BilinearTransparencySafe;
+    receipt.scanout_24bit_chroma = graphics.display_postprocess ==
+        raster::DisplayPostprocessMode::ChromaSmooth24Bit;
+    receipt.hd_textures = hd_assets && graphics.font_policy != FontManifestPolicy::Disabled;
+    receipt.hd_fonts = receipt.hd_textures && graphics.high_resolution_ui;
+    receipt.complete_gp0_fallback = true;
+    receipt.exact_native_fallback = graphics.pgxp_near_plane ==
+        PgxpNearPlanePolicy::ClipWhenGtePositiveWVerified;
+    receipt.vulkan_4k_ultrawide = graphics.output_width >= 3840U &&
+        graphics.output_height >= 2160U &&
+        graphics.presentation != raster::PresentationMode::Identity4x3;
+    if (presentation != nullptr) {
+        receipt.physical_present_timing_available =
+            presentation->completion_source == host::PresentCompletionSource::present_wait ||
+            presentation->completion_source == host::PresentCompletionSource::display_timing;
+        receipt.physical_present_timing_verified =
+            receipt.physical_present_timing_available &&
+            !presentation->completion_evidence_fault &&
+            presentation->display_presentations_confirmed != 0U &&
+            presentation->completion_interval_violations == 0U;
+    }
+    return receipt;
+}
+
+std::string GraphicsFeatureReceipt::canonical_json() const {
+    const auto bit = [](bool value) { return value ? "true" : "false"; };
+    const char* timing = physical_present_timing_verified ? "verified" :
+        physical_present_timing_available ? "failed" : "unavailable";
+    return std::string{"{\"features\":{"} +
+        "\"complete_gp0_fallback\":" + bit(complete_gp0_fallback) +
+        ",\"exact_native_fallback\":" + bit(exact_native_fallback) +
+        ",\"hd_fonts\":" + bit(hd_fonts) +
+        ",\"hd_textures\":" + bit(hd_textures) +
+        ",\"pgxp_vertex_projection_perspective\":" + bit(pgxp_vertex_projection_perspective) +
+        ",\"scaled_dither_resolve\":" + bit(scaled_dither_resolve) +
+        ",\"scanout_24bit_chroma\":" + bit(scanout_24bit_chroma) +
+        ",\"transparency_safe_filtering\":" + bit(transparency_safe_filtering) +
+        ",\"true_color\":" + bit(true_color) +
+        ",\"vulkan_4k_ultrawide\":" + bit(vulkan_4k_ultrawide) +
+        ",\"widescreen_projection_culling\":" + bit(widescreen_projection_culling) +
+        "},\"physical_present_timing\":\"" + timing +
+        "\",\"schema\":\"clean-aot.graphics-feature-matrix.v1\"}";
 }
 
 std::string runtime_settings_json(const RuntimeSettings& s) {
