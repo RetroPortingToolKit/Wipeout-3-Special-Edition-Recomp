@@ -37,6 +37,13 @@
   the host pacer was intentionally bypassed. It does not prove presentation.
   The windowed 100 Hz result must be re-run with the render workload measured;
   do not convert the headless surplus into a PAL-100 release claim.
+- The first host-policy correction is implemented in the runtime: an explicit
+  native guest rate now keeps swap interval 0 and the wall pacer even when the
+  panel nominally matches. This removes the observed PAL transition to driver
+  vsync. The next 38-second windowed run held about 100 Hz before PAL x2, but
+  settled around 60–70 Hz after PAL x2 with audio underruns; PAL-100 is still
+  not release-ready because the full workload needs CPU-side optimization or
+  a proven equivalent scheduling strategy.
 
 ## Open blockers
 
