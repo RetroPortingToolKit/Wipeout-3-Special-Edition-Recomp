@@ -11,6 +11,7 @@
 namespace {
 
 using clean_aot::spu::AdpcmSamplesPerBlock;
+using clean_aot::spu::AdsrPhase;
 using clean_aot::spu::AudioFifoCapacity;
 using clean_aot::spu::AudioSource;
 using clean_aot::spu::Device;
@@ -372,6 +373,35 @@ void test_irq_and_mmio_boundaries() {
     require(key_timing.render(timing_sample).ok() &&
                 key_timing.voice_state(0u).active,
             "key-on applies on the next native sample boundary");
+
+    static Device simultaneous_key;
+    simultaneous_key.reset();
+    std::array<std::int8_t, AdpcmSamplesPerBlock> key_nibbles{};
+    key_nibbles.fill(7);
+    prepare_device(simultaneous_key,
+                   make_block(0u, 0x03u, key_nibbles));
+    put(simultaneous_key, Device::KeyOff, 1u);
+    put(simultaneous_key, Device::KeyOn, 1u);
+    std::array<StereoSample, 441u> simultaneous_audio{};
+    require(simultaneous_key.render(
+                std::span<StereoSample>(simultaneous_audio).first(1u)).ok(),
+            "apply simultaneous KOFF/KON at the native sample boundary");
+    require(simultaneous_key.voice_state(0u).active &&
+                simultaneous_key.voice_state(0u).phase != AdsrPhase::Release,
+            "simultaneous KOFF/KON resolves to a freshly active voice");
+    require(simultaneous_key.render(
+                std::span<StereoSample>(simultaneous_audio).subspan(1u)).ok(),
+            "complete simultaneous KOFF/KON exact 100 Hz render");
+    const std::uint64_t simultaneous_digest =
+        audio_digest(simultaneous_audio);
+    constexpr std::uint64_t expected_simultaneous_digest =
+        0xF6CEDEDC10869B85ull;
+    if (simultaneous_digest != expected_simultaneous_digest) {
+        std::cerr << "simultaneous KOFF/KON digest: 0x" << std::hex
+                  << simultaneous_digest << std::dec << '\n';
+    }
+    require(simultaneous_digest == expected_simultaneous_digest,
+            "exact simultaneous KOFF/KON 100 Hz audio digest");
 
     put(device, Device::TransferControl, 0xFFFFu);
     const auto transfer_control = device.read_mmio(Device::TransferControl, kWord);
@@ -740,6 +770,7 @@ void test_adsr_sweep_noise_and_modulation() {
     load_block(release_device, block);
     configure_voice(release_device, 0u, 0x1000u, 0x7FFFu, 0u);
     put(release_device, Device::KeyOn, 1u);
+    render_count(release_device, 1u, "apply key-on before key-off");
     put(release_device, 12u, 0x4000u);
     put(release_device, Device::KeyOff, 1u);
     std::array<StereoSample, 1u> release_output{};
@@ -755,6 +786,7 @@ void test_adsr_sweep_noise_and_modulation() {
     load_block(frozen_release, block);
     configure_voice(frozen_release, 0u, 0x1000u, 0x7FFFu, 0x001Fu);
     put(frozen_release, Device::KeyOn, 1u);
+    render_count(frozen_release, 1u, "apply frozen-release key-on");
     put(frozen_release, 12u, 0x4000u);
     put(frozen_release, Device::KeyOff, 1u);
     render_count(frozen_release, 65'536u,

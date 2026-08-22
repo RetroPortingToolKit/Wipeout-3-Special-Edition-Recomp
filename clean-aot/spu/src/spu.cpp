@@ -505,14 +505,18 @@ void Device::apply_pending_events() noexcept {
         apply_volume(voice.right_volume);
     }
 
-    /* Key writes are sampled at the same native device boundary. */
-    if (pending_key_on_mask_ != 0u) {
-        key_on(pending_key_on_mask_);
-        pending_key_on_mask_ = 0u;
-    }
+    /*
+     * Key writes are sampled at the same native device boundary.  The SPU
+     * resolves KOFF before KON, so a voice selected by both masks is freshly
+     * keyed on rather than left in Release.
+     */
     if (pending_key_off_mask_ != 0u) {
         key_off(pending_key_off_mask_);
         pending_key_off_mask_ = 0u;
+    }
+    if (pending_key_on_mask_ != 0u) {
+        key_on(pending_key_on_mask_);
+        pending_key_on_mask_ = 0u;
     }
     for (Voice& voice : voices_) {
         if (voice.pending_current_adsr_valid) {
