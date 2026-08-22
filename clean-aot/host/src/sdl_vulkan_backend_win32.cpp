@@ -28,6 +28,37 @@ namespace {
 constexpr std::size_t kFrameQueueDepth = 4U;
 constexpr std::size_t kEventQueueDepth = 8U;
 constexpr std::size_t kMaxEventsPerService = 32U;
+constexpr std::uint64_t kFrameBudgetNs = 10'000'000U;
+constexpr char kExpectedVertexShaderSha256[] =
+    "91dfcf22be78cf7ab9da398082d3f8d00653076d7c17a4c4051652a53e2265bd";
+constexpr char kExpectedFragmentShaderSha256[] =
+    "e6a4bb31937db8d5d986f1f9981c3b5ab0f87326460cd9c55bf91636d15415c5";
+
+[[nodiscard]] bool shader_identity_valid() noexcept {
+    return std::strcmp(shaders::kPresentVertexSpirvSha256,
+                       kExpectedVertexShaderSha256) == 0 &&
+        std::strcmp(shaders::kPresentFragmentSpirvSha256,
+                    kExpectedFragmentShaderSha256) == 0;
+}
+
+[[nodiscard]] std::uint64_t pipeline_identity(
+    SDL_GPUTextureFormat format, PresentationFilter filter) noexcept {
+    std::uint64_t hash = 1469598103934665603ULL;
+    const auto append = [&hash](const void* data, std::size_t size) noexcept {
+        const auto* bytes = static_cast<const std::uint8_t*>(data);
+        for (std::size_t index = 0U; index < size; ++index) {
+            hash ^= bytes[index];
+            hash *= 1099511628211ULL;
+        }
+    };
+    append(kExpectedVertexShaderSha256, sizeof(kExpectedVertexShaderSha256) - 1U);
+    append(kExpectedFragmentShaderSha256, sizeof(kExpectedFragmentShaderSha256) - 1U);
+    append(&format, sizeof(format));
+    append(&filter, sizeof(filter));
+    constexpr std::uint32_t kPresentationAbi = 1U;
+    append(&kPresentationAbi, sizeof(kPresentationAbi));
+    return hash;
+}
 
 [[nodiscard]] bool valid_frame(const FrameSubmission& frame) noexcept {
     const std::uint32_t bytes = bytes_per_pixel(frame.surface.format);
@@ -146,6 +177,7 @@ struct SdlVulkanPresentation::Impl final {
     SdlPresentationMetrics metrics{};
     IPresentCompletionProbe* completion_probe = nullptr;
     std::uint64_t completion_cadence_tolerance_ns = 0U;
+    SDL_GPUTextureFormat pipeline_format = SDL_GPU_TEXTUREFORMAT_INVALID;
 };
 
 namespace {
@@ -322,6 +354,65 @@ template <typename ImplType>
     return true;
 }
 
+template <typename ImplType>
+[[nodiscard]] bool create_present_pipeline(
+    ImplType& impl, PresentationFilter filter) noexcept {
+    if (!shader_identity_valid()) return false;
+    const SDL_GPUTextureFormat format = SDL_GetGPUSwapchainTextureFormat(
+        impl.device, impl.window);
+    if (format == SDL_GPU_TEXTUREFORMAT_INVALID) return false;
+    const std::uint64_t identity = pipeline_identity(format, filter);
+    if (impl.present_pipeline != nullptr && impl.metrics.pipeline_identity == identity) {
+        ++impl.metrics.pipeline_cache_hits;
+        return true;
+    }
+
+    SDL_GPUShaderCreateInfo vertex_info{};
+    vertex_info.code_size = sizeof(shaders::kPresentVertexSpirv);
+    vertex_info.code = reinterpret_cast<const Uint8*>(shaders::kPresentVertexSpirv);
+    vertex_info.entrypoint = "VSMain";
+    vertex_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+    vertex_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
+    SDL_GPUShader* vertex = SDL_CreateGPUShader(impl.device, &vertex_info);
+    SDL_GPUShaderCreateInfo fragment_info{};
+    fragment_info.code_size = sizeof(shaders::kPresentFragmentSpirv);
+    fragment_info.code = reinterpret_cast<const Uint8*>(shaders::kPresentFragmentSpirv);
+    fragment_info.entrypoint = "PSMain";
+    fragment_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+    fragment_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
+    fragment_info.num_samplers = 1U;
+    fragment_info.num_uniform_buffers = 1U;
+    SDL_GPUShader* fragment = SDL_CreateGPUShader(impl.device, &fragment_info);
+    if (vertex == nullptr || fragment == nullptr) {
+        if (vertex != nullptr) SDL_ReleaseGPUShader(impl.device, vertex);
+        if (fragment != nullptr) SDL_ReleaseGPUShader(impl.device, fragment);
+        return false;
+    }
+    SDL_GPUColorTargetDescription target{};
+    target.format = format;
+    SDL_GPUGraphicsPipelineCreateInfo info{};
+    info.vertex_shader = vertex; info.fragment_shader = fragment;
+    info.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+    info.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
+    info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
+    info.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
+    info.target_info.color_target_descriptions = &target;
+    info.target_info.num_color_targets = 1U;
+    SDL_GPUGraphicsPipeline* replacement = SDL_CreateGPUGraphicsPipeline(impl.device, &info);
+    SDL_ReleaseGPUShader(impl.device, vertex);
+    SDL_ReleaseGPUShader(impl.device, fragment);
+    if (replacement == nullptr) return false;
+    if (impl.present_pipeline != nullptr) {
+        SDL_ReleaseGPUGraphicsPipeline(impl.device, impl.present_pipeline);
+    }
+    impl.present_pipeline = replacement;
+    impl.pipeline_format = format;
+    impl.metrics.pipeline_identity = identity;
+    ++impl.metrics.pipeline_cache_misses;
+    return true;
+}
+
 [[nodiscard]] bool copy_frame_rgba(const FrameView& frame,
                                    std::uint8_t* output) noexcept {
     for (std::uint32_t y = 0U; y < frame.height; ++y) {
@@ -441,6 +532,61 @@ template <typename ImplType>
     return true;
 }
 
+template <typename ImplType>
+[[nodiscard]] bool prewarm_present_pipeline(ImplType& impl,
+    const SdlVulkanConfig& config) noexcept {
+    if (!config.prewarm_pipeline) return true;
+    const std::uint64_t started = SDL_GetTicksNS();
+    if (!create_texture_upload_resources(impl, config.prewarm_source_width,
+                                         config.prewarm_source_height)) return false;
+    SDL_GPUCommandBuffer* command = SDL_AcquireGPUCommandBuffer(impl.device);
+    if (command == nullptr) return false;
+    SDL_GPUTexture* target = nullptr; Uint32 width = 0U; Uint32 height = 0U;
+    if (!SDL_WaitAndAcquireGPUSwapchainTexture(command, impl.window, &target,
+                                               &width, &height)) {
+        SDL_CancelGPUCommandBuffer(command); return false;
+    }
+    // Hidden/minimized windows have no presentable image. Resource allocation is
+    // still warmed; the first shown-frame compile remains explicitly unclaimed.
+    if (target == nullptr) {
+        SDL_CancelGPUCommandBuffer(command);
+        return true;
+    }
+    std::vector<std::uint8_t> pixels{};
+    try {
+        pixels.assign(static_cast<std::size_t>(config.prewarm_source_width) *
+            config.prewarm_source_height * 4U, 0U);
+    } catch (...) {
+        SDL_CancelGPUCommandBuffer(command);
+        return false;
+    }
+    FrameSubmission submission{};
+    submission.surface = FrameView{pixels.data(), static_cast<std::uint32_t>(pixels.size()),
+        config.prewarm_source_width, config.prewarm_source_height,
+        config.prewarm_source_width * 4U, PixelFormat::rgba8_unorm};
+    submission.presentation_width = width;
+    submission.presentation_height = height;
+    submission.presentation_effects = kPresentationEffectEdgeAware |
+        kPresentationEffectChromaSmooth;
+    const Viewport viewport{0, 0, width, height};
+    const std::uint64_t upload_bytes = impl.metrics.frame_upload_bytes;
+    const std::uint64_t effect_frames = impl.metrics.gpu_effect_frames;
+    const std::uint64_t effect_pixels = impl.metrics.gpu_effect_output_pixels;
+    if (!encode_default_frame(impl, command, target, submission, viewport)) {
+        SDL_CancelGPUCommandBuffer(command);
+        return false;
+    }
+    if (!SDL_SubmitGPUCommandBuffer(command) || !SDL_WaitForGPUIdle(impl.device)) {
+        return false;
+    }
+    impl.metrics.frame_upload_bytes = upload_bytes;
+    impl.metrics.gpu_effect_frames = effect_frames;
+    impl.metrics.gpu_effect_output_pixels = effect_pixels;
+    ++impl.metrics.pipeline_prewarms;
+    impl.metrics.prewarm_ns_total += SDL_GetTicksNS() - started;
+    return true;
+}
+
 } // namespace
 
 SdlVulkanPresentation::SdlVulkanPresentation(
@@ -454,7 +600,9 @@ SdlVulkanPresentation::~SdlVulkanPresentation() {
 HostStatus SdlVulkanPresentation::initialize() noexcept {
     if (impl_ != nullptr || config_.width == 0U || config_.height == 0U ||
         config_.target_refresh_hz == 0U || config_.allowed_frames_in_flight < 1U ||
-        config_.allowed_frames_in_flight > 3U) {
+        config_.allowed_frames_in_flight > 3U ||
+        (config_.prewarm_pipeline && (config_.prewarm_source_width == 0U ||
+                                      config_.prewarm_source_height == 0U))) {
         return sdl_failure(HostCode::invalid_argument);
     }
 
@@ -540,55 +688,6 @@ HostStatus SdlVulkanPresentation::initialize() noexcept {
         return sdl_failure(HostCode::unsupported);
     }
 
-    // Validate that the checked-in SPIR-V is consumable by the selected
-    // Vulkan device. The actual game presentation pipeline is deliberately
-    // supplied by IFrameEncoder in a later tranche.
-    SDL_GPUShaderCreateInfo vertex_info{};
-    vertex_info.code_size = sizeof(shaders::kPresentVertexSpirv);
-    vertex_info.code = reinterpret_cast<const Uint8*>(
-        shaders::kPresentVertexSpirv);
-    vertex_info.entrypoint = "VSMain";
-    vertex_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
-    vertex_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
-    SDL_GPUShader* vertex_shader =
-        SDL_CreateGPUShader(impl_->device, &vertex_info);
-
-    SDL_GPUShaderCreateInfo fragment_info{};
-    fragment_info.code_size = sizeof(shaders::kPresentFragmentSpirv);
-    fragment_info.code = reinterpret_cast<const Uint8*>(
-        shaders::kPresentFragmentSpirv);
-    fragment_info.entrypoint = "PSMain";
-    fragment_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
-    fragment_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
-    fragment_info.num_samplers = 1U;
-    fragment_info.num_uniform_buffers = 1U;
-    SDL_GPUShader* fragment_shader =
-        SDL_CreateGPUShader(impl_->device, &fragment_info);
-    if (vertex_shader == nullptr || fragment_shader == nullptr) {
-        if (vertex_shader != nullptr) SDL_ReleaseGPUShader(impl_->device, vertex_shader);
-        if (fragment_shader != nullptr) SDL_ReleaseGPUShader(impl_->device, fragment_shader);
-        shutdown();
-        return sdl_failure(HostCode::unsupported);
-    }
-
-    SDL_GPUColorTargetDescription color_target{};
-    color_target.format = SDL_GetGPUSwapchainTextureFormat(
-        impl_->device, impl_->window);
-    SDL_GPUGraphicsPipelineCreateInfo pipeline_info{};
-    pipeline_info.vertex_shader = vertex_shader;
-    pipeline_info.fragment_shader = fragment_shader;
-    pipeline_info.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
-    pipeline_info.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
-    pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
-    pipeline_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
-    pipeline_info.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
-    pipeline_info.target_info.color_target_descriptions = &color_target;
-    pipeline_info.target_info.num_color_targets = 1U;
-    impl_->present_pipeline = SDL_CreateGPUGraphicsPipeline(
-        impl_->device, &pipeline_info);
-    SDL_ReleaseGPUShader(impl_->device, vertex_shader);
-    SDL_ReleaseGPUShader(impl_->device, fragment_shader);
-
     SDL_GPUSamplerCreateInfo sampler_info{};
     const SDL_GPUFilter presentation_filter =
         config_.presentation_filter == PresentationFilter::Linear
@@ -600,7 +699,9 @@ HostStatus SdlVulkanPresentation::initialize() noexcept {
     sampler_info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
     sampler_info.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
     impl_->present_sampler = SDL_CreateGPUSampler(impl_->device, &sampler_info);
-    if (impl_->present_pipeline == nullptr || impl_->present_sampler == nullptr) {
+    if (!create_present_pipeline(*impl_, config_.presentation_filter) ||
+        impl_->present_sampler == nullptr ||
+        !prewarm_present_pipeline(*impl_, config_)) {
         shutdown();
         return sdl_failure(HostCode::unsupported);
     }
@@ -715,6 +816,7 @@ void SdlVulkanPresentation::mark_device_lost() noexcept {
         return;
     }
     impl_->device_lost = true;
+    impl_->metrics.pipeline_identity = 0U;
     ++impl_->metrics.device_losses;
     const HostEvent event{
         HostEventKind::device_lost,
@@ -742,6 +844,11 @@ HostStatus SdlVulkanPresentation::recreate_swapchain() noexcept {
     }
     impl_->window_claimed = true;
     if (!configure_presentation(*impl_, config_)) {
+        mark_device_lost();
+        return sdl_failure(HostCode::device_lost);
+    }
+    if (!create_present_pipeline(*impl_, config_.presentation_filter) ||
+        !prewarm_present_pipeline(*impl_, config_)) {
         mark_device_lost();
         return sdl_failure(HostCode::device_lost);
     }
@@ -872,6 +979,7 @@ HostStatus SdlVulkanPresentation::service() noexcept {
         return sdl_failure(HostCode::sequence_error);
     }
 
+    const std::uint64_t service_started_ns = SDL_GetTicksNS();
     SDL_GPUCommandBuffer* command_buffer =
         SDL_AcquireGPUCommandBuffer(impl_->device);
     if (command_buffer == nullptr) {
@@ -945,6 +1053,10 @@ HostStatus SdlVulkanPresentation::service() noexcept {
     ++impl_->next_sequence;
     ++impl_->next_update_index;
     ++impl_->metrics.gpu_present_submissions;
+    const std::uint64_t service_ns = SDL_GetTicksNS() - service_started_ns;
+    impl_->metrics.frame_service_ns_max = std::max(
+        impl_->metrics.frame_service_ns_max, service_ns);
+    if (service_ns > kFrameBudgetNs) ++impl_->metrics.frames_over_10ms;
     impl_->metrics.next_sequence = impl_->next_sequence;
     impl_->metrics.next_update_index = impl_->next_update_index;
     const std::uint64_t now = SDL_GetTicksNS();

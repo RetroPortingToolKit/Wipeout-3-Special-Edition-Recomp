@@ -51,6 +51,13 @@ struct SdlPresentationMetrics final {
     std::uint64_t sequence_errors = 0U;
     std::uint64_t swapchain_recreations = 0U;
     std::uint64_t device_losses = 0U;
+    std::uint64_t pipeline_identity = 0U;
+    std::uint64_t pipeline_prewarms = 0U;
+    std::uint64_t pipeline_cache_hits = 0U;
+    std::uint64_t pipeline_cache_misses = 0U;
+    std::uint64_t prewarm_ns_total = 0U;
+    std::uint64_t frame_service_ns_max = 0U;
+    std::uint64_t frames_over_10ms = 0U;
     std::uint64_t queue_latency_ns_total = 0U;
     std::uint64_t queue_latency_ns_max = 0U;
     std::uint64_t next_sequence = 0U;
@@ -89,6 +96,9 @@ struct SdlVulkanConfig final {
     SdlPresentPolicy present_policy = SdlPresentPolicy::low_latency_100hz;
     std::uint32_t target_refresh_hz = 100U;
     std::uint8_t allowed_frames_in_flight = 1U;
+    bool prewarm_pipeline = true;
+    std::uint32_t prewarm_source_width = 320U;
+    std::uint32_t prewarm_source_height = 240U;
     std::uint64_t completion_cadence_tolerance_ns = 1'000'000U;
     IPresentCompletionProbe* completion_probe = nullptr;
     std::uint32_t audio_target_buffer_frames = 882U;

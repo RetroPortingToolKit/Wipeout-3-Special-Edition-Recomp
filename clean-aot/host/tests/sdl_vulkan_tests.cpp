@@ -87,7 +87,16 @@ int main() {
     // Use a real shown swapchain for the GPU submission acceptance tranche.
     config.hidden = false;
     SdlVulkanPresentation backend(config);
+    const auto cold_begin = std::chrono::steady_clock::now();
     if (!backend.initialize().success()) return 5;
+    const auto cold_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now() - cold_begin).count();
+    const SdlPresentationMetrics cold_metrics = backend.presentation_metrics();
+    if (cold_metrics.pipeline_identity == 0U ||
+        cold_metrics.pipeline_cache_misses != 1U ||
+        cold_metrics.pipeline_prewarms != 1U || cold_metrics.prewarm_ns_total == 0U) return 34;
+    std::cout << "real Vulkan cold 4K initialize+prewarm_ns=" << cold_ns
+              << " pipeline_identity=" << cold_metrics.pipeline_identity << '\n';
     if (!backend.submit_frame({7U,0U,surface}).success()) return 3;
     if (backend.service().code != HostCode::sequence_error) return 4;
     const std::array<std::uint8_t, 4U> replacement{1U,2U,3U,255U};
@@ -121,7 +130,8 @@ int main() {
         metrics.frame_upload_bytes != 100U * 2U * 2U * 4U ||
         metrics.gpu_ui_draws != 100U ||
         metrics.gpu_ui_pixels != 100ULL * 256ULL * 64ULL ||
-        metrics.gpu_ui_stale_fallbacks != 0U) return 7;
+        metrics.gpu_ui_stale_fallbacks != 0U ||
+        metrics.frames_over_10ms != 0U || metrics.frame_service_ns_max > 10'000'000U) return 7;
     if (!backend.request_window({{5120U,2160U,FullscreenMode::windowed}}).success() ||
         !backend.recreate_swapchain().success()) return 8;
     const auto ultrawide_begin = std::chrono::steady_clock::now();
@@ -141,8 +151,14 @@ int main() {
     std::cout << "real Vulkan 5120x2160 UI submissions=100 elapsed_ns="
               << ultrawide_ns << '\n';
     metrics = backend.presentation_metrics();
+    std::cout << "real Vulkan warm max_frame_ns=" << metrics.frame_service_ns_max
+              << " over_10ms=" << metrics.frames_over_10ms
+              << " cache_hits=" << metrics.pipeline_cache_hits
+              << " prewarms=" << metrics.pipeline_prewarms << '\n';
     if (metrics.swapchain_recreations < 1U || metrics.gpu_present_submissions != 200U ||
-        metrics.gpu_effect_frames != 200U || metrics.gpu_ui_draws != 200U) return 10;
+        metrics.gpu_effect_frames != 200U || metrics.gpu_ui_draws != 200U ||
+        metrics.pipeline_cache_hits < 1U || metrics.pipeline_prewarms < 2U ||
+        metrics.frames_over_10ms != 0U) return 10;
 
     const std::array<std::int16_t, 882U> audio{};
     constexpr std::uint64_t kSoakUpdates = 200U;
@@ -165,7 +181,8 @@ int main() {
     if (!backend.release_replacement(handle).success()) return 15;
     backend.mark_device_lost();
     if (backend.service().code != HostCode::device_lost ||
-        backend.presentation_metrics().device_losses != 1U) return 16;
+        backend.presentation_metrics().device_losses != 1U ||
+        backend.presentation_metrics().pipeline_identity != 0U) return 16;
     backend.shutdown();
 
     MockPresentWaitProbe probe{};
