@@ -74,6 +74,10 @@ public:
     [[nodiscard]] bool resolve_entry(std::uint32_t pc,
                                      GeneratedRegionFunction& function,
                                      std::uint32_t& instruction_count) const noexcept;
+    [[nodiscard]] std::size_t entry_count() const noexcept {
+        return !packed_entries_.empty() ? packed_entries_.size()
+                                        : entries_.size();
+    }
     [[nodiscard]] std::uint32_t load_start() const noexcept { return load_start_; }
     [[nodiscard]] std::uint64_t load_end_exclusive() const noexcept {
         return load_end_exclusive_;

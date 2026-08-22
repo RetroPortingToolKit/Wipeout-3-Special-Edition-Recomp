@@ -2165,10 +2165,34 @@ DispatchStatus Runtime::bind_authenticated_copied_epoch(
         for(const auto& entry:binding.generated.packed_entries)
             if(conflicting_count(entry.pc,entry.instruction_count))
                 return DispatchStatus::InvalidBinding;
-        if(binding.generated.load_start==existing.stamp.virtual_start&&
-           candidate_end==existing_end&&
-           binding.destination_sha256==existing.destination_sha256)
-            return DispatchStatus::InvalidBinding;
+        const bool exact_duplicate_range =
+            binding.generated.load_start==existing.stamp.virtual_start&&
+            candidate_end==existing_end&&
+            binding.destination_sha256==existing.destination_sha256;
+        if(exact_duplicate_range){
+            if(binding.variant_identity_sha256==existing.dispatcher.identity())
+                return DispatchStatus::InvalidBinding;
+            const std::size_t candidate_entry_count =
+                binding.generated.entries.size()+
+                binding.generated.packed_entries.size();
+            if(candidate_entry_count!=existing.dispatcher.entry_count())
+                return DispatchStatus::InvalidBinding;
+            std::string existing_source_hash;
+            try{
+                if(!hash_bus_range(impl_->bus,existing.source_start,
+                                   existing.source_byte_count,
+                                   existing_source_hash))
+                    return DispatchStatus::LoadRejected;
+            }catch(...){return DispatchStatus::LoadRejected;}
+            /* Equal destination bytes do not select an epoch.  Replace only
+               when the old authenticated source window is provably stale;
+               the candidate source window was verified above. */
+            if(existing_source_hash==existing.source_sha256)
+                return DispatchStatus::InvalidBinding;
+            existing.bound=false;
+            target_index=index;
+            continue;
+        }
     }
     if(target_index==impl_->copied_epoch_capacity)return DispatchStatus::LoadRejected;
     const bool immutable_bios = binding.generated.load_start >= 0xBFC00000U &&

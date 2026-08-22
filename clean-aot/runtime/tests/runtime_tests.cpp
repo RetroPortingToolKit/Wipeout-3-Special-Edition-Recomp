@@ -315,6 +315,68 @@ void test_overlap_binding_refreshes_unchanged_exact_epoch(Runner& runner) {
                        DispatchStatus::InvalidBinding);
 }
 
+void test_exact_range_replacement_requires_stale_source_epoch(Runner& runner) {
+    using namespace clean_aot::runtime;
+    constexpr std::string_view bios_identity =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    constexpr std::string_view bios_sha =
+        "07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541";
+    constexpr std::string_view old_variant =
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    constexpr std::string_view live_variant =
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    constexpr std::string_view old_source =
+        "66840dda154e8a113c31dd0ad32f7f3a366a80e8136979d8f5a101d3d29d6f72";
+    constexpr std::string_view initial_wide_source =
+        "b74ad4a35b5e926b62d954d12d643c8d73f3b00ce45fa755921cc13fe674ba01";
+    constexpr std::string_view live_wide_source =
+        "42a1d96b5abedf0114bc34668d54c3626bfcce9c6430c0895d2241f73b4100c8";
+    constexpr std::string_view instruction_sha =
+        "b174f2779a9402fefb56a59a62bbac549744d3e08d641950fe3e4474de15e06c";
+
+    const std::array<std::uint32_t,1U> bios_roots{0xBFC00000U};
+    const std::array bios_entries{GeneratedRegionEntry{
+        0xBFC00000U,generated_to_copied_epoch,1U}};
+    const GeneratedExecutableBinding bios_binding{
+        bios_identity,bios_sha,0xBFC00000U,0xBFC80000ULL,bios_roots,bios_entries};
+    auto runtime=make_runtime();
+    EXPECT(runner,runtime->bind_authenticated_bios(
+        bios_identity,bios_binding)==DispatchStatus::Bound);
+    for(std::uint32_t i=0U;i<8U;++i)
+        EXPECT(runner,runtime->write8({},0x1000U+i,
+            static_cast<std::uint8_t>(i+1U)).ok());
+    EXPECT(runner,runtime->write32({},0x80U,0x240A00B0U).ok());
+
+    const std::array<std::uint32_t,1U> roots{0x80U};
+    const std::array old_entries{GeneratedRegionEntry{
+        0x80U,generated_copied_alias_step,1U}};
+    const GeneratedExecutableBinding old_generated{
+        old_variant,instruction_sha,0x80U,0x84ULL,roots,old_entries};
+    const Runtime::AuthenticatedCopiedEpochBinding old_binding{
+        old_variant,0x1000U,8U,old_source,instruction_sha,old_generated};
+    EXPECT(runner,runtime->bind_authenticated_copied_epoch(old_binding)==
+        DispatchStatus::Bound);
+
+    const std::array live_entries{GeneratedRegionEntry{
+        0x80U,generated_copied_alias_step,1U}};
+    const GeneratedExecutableBinding live_generated{
+        live_variant,instruction_sha,0x80U,0x84ULL,roots,live_entries};
+    const Runtime::AuthenticatedCopiedEpochBinding wrong_live_epoch{
+        live_variant,0x1000U,16U,initial_wide_source,instruction_sha,
+        live_generated};
+    /* Byte equality and different identity are insufficient while the old
+       authenticated source epoch is still current. */
+    EXPECT(runner,runtime->bind_authenticated_copied_epoch(wrong_live_epoch)==
+        DispatchStatus::InvalidBinding);
+
+    EXPECT(runner,runtime->write8({},0x1000U,9U).ok());
+    const Runtime::AuthenticatedCopiedEpochBinding current_live_epoch{
+        live_variant,0x1000U,16U,live_wide_source,instruction_sha,
+        live_generated};
+    EXPECT(runner,runtime->bind_authenticated_copied_epoch(current_live_epoch)==
+        DispatchStatus::Bound);
+}
+
 void test_same_epoch_overlap_dispatch_and_mutation(Runner& runner) {
     using namespace clean_aot::runtime;
     constexpr std::string_view bios_identity =
@@ -1171,6 +1233,7 @@ int main() {
     test_authenticated_copied_epoch(runner);
     test_manifest_sized_authenticated_registry(runner);
     test_overlap_binding_refreshes_unchanged_exact_epoch(runner);
+    test_exact_range_replacement_requires_stale_source_epoch(runner);
     test_same_epoch_overlap_dispatch_and_mutation(runner);
     test_generated_integer_differential(runner);
     test_generated_unaligned_memory_differential(runner);

@@ -1,5 +1,22 @@
 # Handoff
 
+## Epoch-qualified duplicate resolution through 0x80050DE0 (2026-08-22)
+
+- Dormant binding 207 and live binding 491 share exact destination
+  `0x8005ABA0-0x8005ABA4`, image hash `b174f277...15e06c`, and one-entry CFI,
+  but not source provenance. Binding 207's authenticated 64 KiB source hash
+  `4d473637...b74b7a` is now `8a4d4da0...ebf612`; binding 491's authenticated
+  2 MiB source hash is currently `aaea45af...2b42f4f`.
+- Exact duplicate replacement now requires a current candidate source, stale
+  existing source, identical exact destination range/hash, and identical full
+  CFI PC/count set. Equal bytes alone and a still-live competing epoch are
+  rejected. No range union or dormant edge is enabled.
+- The real probe binds 491 and exact shards through 571, reaching UnknownCode
+  `0x80050DE0` at 19,421,870 instructions / 1,837,516 dispatches. CD counters
+  remain `0/0/0`. The requested new 100K tranche is not complete (318 retired
+  instructions after the resolved handoff); resume with shard 572.
+- Receipt: `clean-aot/catalog/evidence/bios-shell-epoch-qualified-8005aba0-80050de0.json`.
+
 ## 140,586-instruction shell tranche to 0x8005ABA0 (2026-08-22)
 
 - After the exact-capacity checkpoint, bindings 474-490 advanced normally
