@@ -30,8 +30,11 @@ def main():
     args = ap.parse_args()
     keys = {
         "fingerprint": ("frame", "wr", "pc", "wc", "mmio", "mc", "sp", "sc", "cyc"),
-        "card": ("seq", "slot", "cmd", "sector", "checksum", "data_idx", "data_peek"),
-        "cd": ("seq", "kind", "addr", "val", "w", "frame", "stat", "request", "sector_pos", "read_cmd"),
+        # Trace sequence numbers are process-local ring counters.  List order
+        # remains significant, while the counter itself must not be treated as
+        # guest-visible state across separate runs.
+        "card": ("slot", "cmd", "sector", "checksum", "data_idx", "data_peek"),
+        "cd": ("kind", "addr", "val", "w", "frame", "stat", "request", "sector_pos", "read_cmd"),
     }[args.kind]
     error = compare(args.kind, load(args.normal), load(args.accelerated), keys)
     if error:
