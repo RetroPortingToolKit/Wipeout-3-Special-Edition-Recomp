@@ -46,6 +46,7 @@ void write_semantic(std::ostringstream& out, const Instruction& instruction) {
     if(op==0U&&fn==0x21U)out<<"        cpu_ops::addu(state,"<<rd<<","<<rs<<","<<rt<<");\n";
     else if(op==0U&&fn==0x23U)out<<"        cpu_ops::subu(state,"<<rd<<","<<rs<<","<<rt<<");\n";
     else if(op==0U&&fn==0x25U)out<<"        cpu_ops::bit_or(state,"<<rd<<","<<rs<<","<<rt<<");\n";
+    else if(op==0U&&(fn==0x2aU||fn==0x2bU))out<<"        cpu_ops::slt(state,"<<rd<<","<<rs<<","<<rt<<","<<(fn==0x2bU?"true":"false")<<");\n";
     else if(op==0x08U)out<<"        cpu_ops::add(state,"<<rt<<",state.gpr["<<rs<<"],0x"<<std::hex<<static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<std::int16_t>(imm)))<<"u);\n"<<std::dec;
     else if(op==0x09U)out<<"        state.write("<<rt<<", state.gpr["<<rs<<"] + 0x"<<std::hex<<static_cast<std::uint32_t>(static_cast<std::int32_t>(static_cast<std::int16_t>(imm)))<<"u);\n"<<std::dec;
     else if(op==0x0dU)out<<"        state.write("<<rt<<", state.gpr["<<rs<<"] | 0x"<<std::hex<<imm<<"u);\n"<<std::dec;

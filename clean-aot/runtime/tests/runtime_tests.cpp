@@ -82,6 +82,7 @@ bool generated_write32(void* context,std::uint32_t address,std::uint32_t value) 
     auto& memory=*static_cast<GeneratedMemory*>(context);if(address<0x1000U||address+4U>0x1010U)return false;
     const auto i=address-0x1000U;for(unsigned lane=0;lane<4U;++lane)memory.bytes[i+lane]=static_cast<std::uint8_t>(value>>(lane*8U));return true;
 }
+bool rejected_read32(void*,std::uint32_t,std::uint32_t&) noexcept{return false;}
 
 void test_authenticated_bios_reset_contract(Runner& runner) {
     using namespace clean_aot::runtime;
@@ -173,6 +174,10 @@ void test_generated_integer_differential(Runner& runner) {
         r3000a::reference::Machine oracle(memory,{0x1000U,0U,r3000a::reference::kGenericR3000AProcessorId}); oracle.cpu().gpr[1]=a;oracle.cpu().gpr[2]=b;
         ops::addu(generated,3,1,2); (void)oracle.step_word((1U<<21U)|(2U<<16U)|(3U<<11U)|0x21U);
         EXPECT(runner,generated.gpr[3]==oracle.cpu().gpr[3]);
+        ops::slt(generated,3,1,2,false); (void)oracle.step_word((1U<<21U)|(2U<<16U)|(3U<<11U)|0x2aU);
+        EXPECT(runner,generated.gpr[3]==oracle.cpu().gpr[3]);
+        ops::slt(generated,3,1,2,true); (void)oracle.step_word((1U<<21U)|(2U<<16U)|(3U<<11U)|0x2bU);
+        EXPECT(runner,generated.gpr[3]==oracle.cpu().gpr[3]);
         ops::mult(generated,a,b,false); (void)oracle.step_word((1U<<21U)|(2U<<16U)|0x18U);
         EXPECT(runner,generated.hi==oracle.cpu().hi); EXPECT(runner,generated.lo==oracle.cpu().lo);
         ops::div(generated,a,b,false); (void)oracle.step_word((1U<<21U)|(2U<<16U)|0x1aU);
@@ -200,6 +205,8 @@ void test_generated_unaligned_memory_differential(Runner& runner) {
     }
     GeneratedCpuState exception{};exception.cop0_status=clean_aot::runtime::kStatusBev|3U;exception.gpr[1]=0x1001U;ops::begin(exception,0x3004U,true,0x3000U);ops::lw(exception,1,2,0);ops::end(exception);
     EXPECT(runner,exception.exception_raised);EXPECT(runner,exception.exception_code==clean_aot::runtime::CpuException::AddressErrorLoad);EXPECT(runner,exception.cop0_epc==0x3000U);EXPECT(runner,(exception.cop0_cause&clean_aot::runtime::kCauseBd)!=0U);EXPECT(runner,exception.cop0_bad_vaddr==0x1001U);EXPECT(runner,exception.pc==clean_aot::runtime::kBootExceptionVector);EXPECT(runner,(exception.cop0_status&0x3FU)==12U);
+    GeneratedCpuState bus_error{};bus_error.gpr[1]=0x1000U;bus_error.read32=rejected_read32;ops::begin(bus_error,0x4000U);ops::lw(bus_error,1,2,0);ops::end(bus_error);EXPECT(runner,bus_error.fault==clean_aot::runtime::CpuFault::None);EXPECT(runner,bus_error.exception_raised);EXPECT(runner,bus_error.exception_code==clean_aot::runtime::CpuException::BusErrorData);EXPECT(runner,bus_error.cop0_epc==0x4000U);
+    GeneratedCpuState missing_abi{};missing_abi.gpr[1]=0x1000U;ops::begin(missing_abi,0x5000U);ops::lw(missing_abi,1,2,0);ops::end(missing_abi);EXPECT(runner,missing_abi.fault==clean_aot::runtime::CpuFault::MemoryAccess);EXPECT(runner,!missing_abi.exception_raised);EXPECT(runner,missing_abi.pc==0U);
 }
 
 void test_authenticated_load_and_first_dispatch(Runner& runner) {
