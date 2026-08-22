@@ -2,6 +2,20 @@
 
 ## BIOS shell/CD diagnosis (2026-08-21)
 
+- The syscall exception now returns correctly. Exact live authentication follows
+  vector `0x80000080`, handler `0xC80`, callback `0x1A00`, restore path
+  `0xF40`, and resumes at EPC+4 `0xBFC0D968` while retaining Cause `0x20` and
+  EPC `0xBFC0D964`. A stale packaged compiler had falsely emitted Reserved
+  Instruction for SLTIU at `0x1A38`; the current compiler removes that false
+  A0/0x40 path.
+- Subsequent exact shell callbacks advance deterministically to copied-shell PC
+  `0x8003FDB0`: 2,725,528 instructions / 458,801 dispatches, 445,880 reads,
+  452,860 writes, 7,680 isolated writes, and unchanged device totals (2 reads,
+  80 writes). Two repeated probes agree. No CD MMIO, GetID, ReadN, DMA transfer,
+  or raw-sector read has occurred, so this remains a pre-CD shell frontier.
+- Canonical execution evidence is
+  `clean-aot/catalog/evidence/bios-shell-cd-execution-02725528.json`.
+
 - The verified European Track 01 sector 4 contains the authentic spaced Sony
   Europe license banner. `DiscSource` previously discarded that identity and
   left GetID neutral; it now derives `disc_type=0x20` and `SCEE` strictly from
