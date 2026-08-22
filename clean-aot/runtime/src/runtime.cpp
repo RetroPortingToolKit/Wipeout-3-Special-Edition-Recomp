@@ -640,22 +640,36 @@ struct Runtime::Impl final {
                 }
                 return;
             }
+            if (pending_count_ != 0U) {
+                owner_->terminal_status = Status::DeviceRejected;
+                return;
+            }
             for (std::size_t index = 0U; index < samples.size(); ++index) {
                 converted_[index] =
                     spu::StereoSample{samples[index].left, samples[index].right};
             }
-            const spu::PushResult result = owner_->spu.push_cdda(
-                std::span<const spu::StereoSample>(converted_.data(),
-                                                   samples.size()));
-            if (result.overflow || result.dropped != 0U ||
-                result.accepted != samples.size()) {
-                owner_->terminal_status = Status::DeviceRejected;
+            pending_count_ = samples.size();
+        }
+
+        [[nodiscard]] bool publish_after_spu_boundary() noexcept {
+            if (owner_ == nullptr || pending_count_ == 0U) {
+                return true;
             }
+            const std::size_t expected = pending_count_;
+            const spu::PushResult result = owner_->spu.push_cdda(
+                std::span<const spu::StereoSample>(converted_.data(), expected));
+            pending_count_ = 0U;
+            if (result.overflow || result.dropped != 0U ||
+                result.accepted != expected) {
+                return false;
+            }
+            return true;
         }
 
     private:
         Impl* owner_ = nullptr;
         std::array<spu::StereoSample, cdrom::CddaSamplesPerSector> converted_{};
+        std::size_t pending_count_ = 0U;
     };
 
     class Router final : public memory::MmioRouter {
@@ -1085,6 +1099,11 @@ struct Runtime::Impl final {
                 audio_count += chunk;
                 produced_audio += chunk;
                 remaining_samples -= chunk;
+            }
+            /* A sector completed at this native cycle supplies the following
+               588 SPU intervals, never the catch-up samples ending here. */
+            if (!cdda_bridge.publish_after_spu_boundary()) {
+                return Status::DeviceRejected;
             }
         }
         sample_device_irqs();

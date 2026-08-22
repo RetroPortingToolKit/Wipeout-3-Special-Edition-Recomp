@@ -1,0 +1,34 @@
+{
+  "schema": "clean-aot.runtime.spu-cdda-native-event-order.v1",
+  "clock_domain": "33868800 Hz native device time",
+  "spu_sample_period_cycles": 768,
+  "cdda_sector_period_cycles": 451584,
+  "cdda_frames_per_sector": 588,
+  "tie_order": [
+    "render SPU boundaries through sector deadline",
+    "publish completed CDDA sector",
+    "consume first CDDA frame at following SPU boundary"
+  ],
+  "boundaries": {
+    "deadline_minus_one_fifo_frames": 0,
+    "deadline_fifo_frames": 588,
+    "deadline_plus_768_fifo_frames": 587
+  },
+  "chunking_cycles": [1, 767, 338688, 100000, 12128],
+  "snapshot_continuation_digest_equal": true,
+  "scope": {
+    "cdrom_command_controller_modified": false,
+    "timer_files_modified": false,
+    "boot_frontier_files_modified": false,
+    "product_package_files_modified": false
+  },
+  "verification": {
+    "gcc_16_1_0_full_runtime": "23/23 pass",
+    "clang_22_1_8_asan_ubsan_focused": "1/1 pass",
+    "focused_test": "clean_aot_spu_cdda_native_order_tests"
+  },
+  "remaining_unwaived": [
+    "sub-sample SPU MMIO timing",
+    "physical SPU RAM bus arbitration"
+  ]
+}

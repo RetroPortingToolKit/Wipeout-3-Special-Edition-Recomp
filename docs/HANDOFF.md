@@ -1,5 +1,14 @@
 # Handoff
 
+## Native SPU/CDDA deadline ordering (2026-08-22)
+
+- A completed CDDA sector is now published only after SPU catch-up through the
+  coincident native deadline, preventing up to 588 frames of retroactive audio.
+- Deadline-minus-one, exact-deadline, next-SPU-boundary, irregular-chunk, and
+  snapshot/replay checks are recorded in
+  `clean-aot/runtime/evidence/spu-cdda-native-event-order-v1.json`; the full
+  runtime suite and focused Clang ASan/UBSan test pass.
+
 ## Live a0==0 continuation through frontier 0x8005161C (2026-08-22)
 
 - Live stack/CFI execution followed 103 exact fail-closed frontiers from

@@ -106,4 +106,18 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME clean_aot_cdrom_bios_sequence_tests
         COMMAND clean_aot_cdrom_bios_sequence_tests)
+    add_executable(clean_aot_spu_cdda_native_order_tests
+        tests/spu_cdda_native_order_tests.cpp)
+    target_link_libraries(clean_aot_spu_cdda_native_order_tests PRIVATE
+        clean_aot_runtime)
+    target_compile_features(clean_aot_spu_cdda_native_order_tests PRIVATE cxx_std_20)
+    if(MSVC)
+        target_compile_options(clean_aot_spu_cdda_native_order_tests PRIVATE
+            /W4 /permissive-)
+    else()
+        target_compile_options(clean_aot_spu_cdda_native_order_tests PRIVATE
+            -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
+    endif()
+    add_test(NAME clean_aot_spu_cdda_native_order_tests
+        COMMAND clean_aot_spu_cdda_native_order_tests)
 endif()
