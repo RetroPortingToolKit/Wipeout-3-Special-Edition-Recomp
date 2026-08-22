@@ -375,6 +375,11 @@ instruction and fails closed on every unknown PC or executable identity.
 - Next: cross-evidence and authorize the corridor beginning at `0xBFC00150`,
   extend generated load/store/COP0 semantics as encountered, then continue the
   same receipt chain until the authenticated game transition is reached.
+- The next verified semantic frontier is 104 instructions in
+  `clean-aot/catalog/evidence/bios-frontier-00000104.json`. Generated MTC0,
+  MFC0, and RFE now operate on explicit COP0 status/cause/EPC/bad-address state.
+  The real BIOS reaches `0x80000080` and fails closed because the RAM exception
+  vector's copied-content epoch is not yet authorized.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control

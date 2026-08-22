@@ -561,6 +561,26 @@ void test_emitter_contains_compilable_graph_shape() {
             "emitter must provide a stable, region-unique dispatch ABI");
 }
 
+void test_emitter_contains_cop0_semantics() {
+    std::vector<std::uint8_t> text(16U, 0U);
+    write_le32(text, 0x00U, 0x408c6000U); // mtc0 t4,status
+    write_le32(text, 0x04U, 0x400d7000U); // mfc0 t5,epc
+    write_le32(text, 0x08U, 0x42000010U); // rfe
+    const PsxExeImage image = make_image(0x00004000U, 0x00004000U, std::move(text));
+    RegionBuildOptions options;
+    options.entry_points = {0x00004000U};
+    options.start_inclusive = 0x00004000U;
+    options.end_exclusive = 0x0000400cU;
+    const std::string source = clean_aot::compiler::CppEmitter::emit(
+        RegionBuilder::build(image, std::move(options)));
+    require(source.find("cpu_ops::mtc0(state,12,12)") != std::string::npos,
+            "emitter must lower MTC0 to explicit generated CPU state");
+    require(source.find("cpu_ops::mfc0(state,13,14)") != std::string::npos,
+            "emitter must lower MFC0 with load-delay semantics");
+    require(source.find("cpu_ops::rfe(state)") != std::string::npos,
+            "emitter must lower RFE status-stack restoration");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -608,6 +628,7 @@ int main(int argc, char** argv) {
          test_adversarial_instruction_streams_are_deterministic},
         {"backward_direct_edge_is_inside_the_region", test_backward_direct_edge_is_inside_the_region},
         {"emitter_contains_compilable_graph_shape", test_emitter_contains_compilable_graph_shape},
+        {"emitter_contains_cop0_semantics", test_emitter_contains_cop0_semantics},
     };
 
     std::size_t passed = 0U;
