@@ -129,6 +129,10 @@
   a paired normal/accelerated trace (CD sector/IRQ order, card writes, state
   fingerprint, and audio timing) is still required before treating that claim
   as verified for WipEout.
+- The framework load-acceleration guard was repaired for the current source
+  spelling/control-flow and now passes. It proves the static policy boundary
+  (mod-owned, host-pacing-only, bounded, and separate from XA/FMVs), but does
+  not replace the missing paired runtime trace.
 - Runtime still links generic overlay/autocompile/interpreter plumbing even
   though the release configuration disables its behavior; strict link-surface
   removal remains unfinished.
