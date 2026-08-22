@@ -63,8 +63,9 @@ DispatchStatus GeneratedDispatcher::bind(
     return DispatchStatus::Bound;
 }
 
-DispatchStatus GeneratedDispatcher::dispatch(std::uint32_t& pc,
-                                             bool branch_taken) const noexcept {
+DispatchStatus GeneratedDispatcher::dispatch(GeneratedCpuState& state) const noexcept {
+    last_instruction_count_ = 0U;
+    std::uint32_t& pc = state.pc;
     if (entries_.empty() || pc < load_start_ || pc >= load_end_exclusive_) {
         return DispatchStatus::UnknownCode;
     }
@@ -76,11 +77,22 @@ DispatchStatus GeneratedDispatcher::dispatch(std::uint32_t& pc,
     if (found == entries_.end() || found->pc != pc) {
         return DispatchStatus::UnknownCode;
     }
+    const GeneratedCpuState original_state = state;
     const std::uint32_t original_pc = pc;
-    if (!found->function(pc, branch_taken) || pc == original_pc) {
-        pc = original_pc;
+    if (!found->function(state)) {
+        const bool faulted = state.fault != CpuFault::None;
+        state = original_state;
+        return faulted ? DispatchStatus::CpuFault : DispatchStatus::UnknownCode;
+    }
+    if (pc == original_pc) {
+        state = original_state;
         return DispatchStatus::UnknownCode;
     }
+    if (state.fault != CpuFault::None) {
+        state = original_state;
+        return DispatchStatus::CpuFault;
+    }
+    last_instruction_count_ = found->instruction_count;
     return DispatchStatus::Executed;
 }
 

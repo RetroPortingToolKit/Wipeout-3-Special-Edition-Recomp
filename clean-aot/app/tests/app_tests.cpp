@@ -19,7 +19,8 @@ std::string hash(std::string_view value){return hash(std::span<const std::uint8_
 void write(const std::filesystem::path& path,std::span<const std::uint8_t> bytes){std::ofstream out(path,std::ios::binary);out.write(reinterpret_cast<const char*>(bytes.data()),static_cast<std::streamsize>(bytes.size()));}
 void write(const std::filesystem::path& path,const std::string& text){write(path,std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(text.data()),text.size()));}
 
-bool synthetic_region(std::uint32_t& pc,bool branch) noexcept {pc=branch?0x1008U:0x1004U;return true;}
+bool synthetic_region(clean_aot::runtime::GeneratedCpuState& state) noexcept {state.pc=state.branch_taken?0x1008U:0x1004U;return true;}
+bool synthetic_bios_region(clean_aot::runtime::GeneratedCpuState& state) noexcept {state.gpr[29]=0x801ffff0U;state.pc=0xbfc00010U;state.next_pc=0xbfc00014U;return true;}
 
 void test_authorized_synthetic_end_to_end(){
     const auto root=std::filesystem::temp_directory_path()/"clean-aot-app-contract";
@@ -57,6 +58,16 @@ void test_authorized_synthetic_end_to_end(){
     expect(bootstrap_receipt.generated_dispatches==1U&&bootstrap_receipt.stop_pc==0x1004U,"bootstrap receipt records deepest generated PC");
     expect(bootstrap_receipt.reason=="unknown-generated-pc"&&bootstrap_receipt.guest_instructions_executed==0U,"control-flow-only generated slice makes no semantic instruction claim");
     expect(bootstrap_receipt.canonical_json()==bootstrap_receipt.canonical_json(),"bootstrap receipt is deterministic");
+    const std::array<std::uint32_t,1U> bios_roots{0xbfc00000U};
+    const std::array bios_entries{clean_aot::runtime::GeneratedRegionEntry{0xbfc00000U,synthetic_bios_region,1U}};
+    const std::string bios_identity(64U,'a');
+    const clean_aot::runtime::GeneratedExecutableBinding bios_binding{bios_identity,bios_hash,0xbfc00000U,0xbfc80000ULL,bios_roots,bios_entries};
+    clean_aot::app::BootstrapSession bios_bootstrap;
+    const clean_aot::app::BiosBootstrapPlan bios_plan{bios_identity,&bios_binding,&binding,0xbfc00010U};
+    const auto bios_receipt=bios_bootstrap.start_bios_to_game(clean_aot::app::authorize_launch(inputs,binding),bios_plan,8U,8U);
+    expect(bios_receipt.stage==clean_aot::app::BootstrapStage::GeneratedSliceStopped,"authenticated BIOS reset slice transitions into generated game slice");
+    expect(bios_receipt.bios_generated_dispatches==1U&&bios_receipt.bios_instructions_executed==1U,"receipt counts the first generated BIOS semantic instruction");
+    expect(bios_receipt.reason=="unknown-generated-game-pc"&&bios_receipt.stop_pc==0x1004U,"BIOS-to-game path stops at exact unknown generated game PC");
     clean_aot::host::HeadlessBackend host;clean_aot::app::Application app(host);
     expect(app.initialize(std::move(authorization),binding,{1280U,720U,clean_aot::host::FullscreenMode::windowed})==clean_aot::app::AppCode::Ok,"authenticated shell initializes runtime and host");
     std::array<std::uint8_t,4U> pixels{10U,20U,30U,255U};std::array<std::int16_t,882U> audio{};

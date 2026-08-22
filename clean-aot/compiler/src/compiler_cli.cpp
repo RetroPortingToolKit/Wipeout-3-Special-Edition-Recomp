@@ -71,24 +71,24 @@ int run(int argc, char** argv) {
     const auto whole=clean_aot::compiler::PsxExeImage::parse_raw(bytes,static_cast<GuestAddress>(load),roots.front());
     if(std::filesystem::exists(output)) throw std::runtime_error("output already exists");
     std::filesystem::create_directories(output);
-    struct Entry { GuestAddress pc; GuestAddress region; }; std::vector<Entry> entries;
+    struct Entry { GuestAddress pc; GuestAddress region; std::uint32_t instruction_count; }; std::vector<Entry> entries;
     for(const Range range:ranges) {
         std::vector<GuestAddress> region_roots; std::copy_if(roots.begin(),roots.end(),std::back_inserter(region_roots),[&](auto root){return root>=range.start&&root<range.end;});
         if(region_roots.empty()) throw std::runtime_error("each code range requires an explicit entry");
         clean_aot::compiler::RegionBuildOptions options{region_roots,range.start,range.end};
         const auto region=clean_aot::compiler::RegionBuilder::build(whole,std::move(options));
         std::ofstream source(output/(symbol(range.start)+".cpp"),std::ios::binary); source<<clean_aot::compiler::CppEmitter::emit(region); if(!source) throw std::runtime_error("unable to write region source");
-        for(const auto& block:region.blocks) entries.push_back({block.start,range.start});
+        for(const auto& block:region.blocks) entries.push_back({block.start,range.start,static_cast<std::uint32_t>(block.instructions.size())});
     }
     std::sort(entries.begin(),entries.end(),[](auto a,auto b){return a.pc<b.pc;});
     if(std::adjacent_find(entries.begin(),entries.end(),[](auto a,auto b){return a.pc==b.pc;})!=entries.end()) throw std::runtime_error("overlapping generated entries");
     const std::string variant=one("variant_sha256"), digest=one("image_sha256");
     std::ofstream binding(output/"entry_table.cpp",std::ios::binary);
     binding<<"#include <array>\n#include <clean_aot/runtime/native_dispatch.hpp>\n\n";
-    for(const auto& entry:entries) binding<<"extern \"C\" bool "<<symbol(entry.region)<<"(std::uint32_t&, bool) noexcept;\n";
+    for(const auto& entry:entries) binding<<"extern \"C\" bool "<<symbol(entry.region)<<"(clean_aot::runtime::GeneratedCpuState&) noexcept;\n";
     binding<<"namespace {\nconstexpr std::array<std::uint32_t,"<<roots.size()<<"> roots{{"; for(auto root:roots) binding<<"0x"<<std::hex<<root<<"U,";
     binding<<"}};\nconst std::array<clean_aot::runtime::GeneratedRegionEntry,"<<std::dec<<entries.size()<<"> entries{{";
-    for(const auto& entry:entries) binding<<"{0x"<<std::hex<<entry.pc<<"U,"<<symbol(entry.region)<<"},";
+    for(const auto& entry:entries) binding<<"{0x"<<std::hex<<entry.pc<<"U,"<<symbol(entry.region)<<","<<std::dec<<entry.instruction_count<<"U},";
     binding<<"}};\nconst clean_aot::runtime::GeneratedExecutableBinding value{\""<<variant<<"\",\""<<digest<<"\",0x"<<std::hex<<load<<"U,0x"<<end<<"ULL,roots,entries};\n}\n";
     binding<<"extern \"C\" const clean_aot::runtime::GeneratedExecutableBinding* clean_aot_binding_"<<variant<<"() noexcept { return &value; }\n";
     if(!binding) throw std::runtime_error("unable to write entry table");

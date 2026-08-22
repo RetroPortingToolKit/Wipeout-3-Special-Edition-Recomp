@@ -356,5 +356,24 @@ instruction and fails closed on every unknown PC or executable identity.
   and authorization Python tests passed 8 tests. Repository-wide pytest still
   collects five unrelated legacy `psxrecomp` failures (encoding/newline,
   obsolete assertions, and the live readram socket probe).
+
+## Real BIOS reset execution checkpoint (2026-08-21)
+
+- The runtime now has a distinct authenticated BIOS reset binding at
+  `0xBFC00000`, immutable BIOS hash verification, generated CPU reset state,
+  fail-closed generated dispatch, instruction accounting, and an explicit
+  authenticated BIOS-to-game transition contract.
+- `clean-aot/catalog/bios-reset-corridor.manifest` compiles only the 30
+  cross-evidenced reset instructions. With the locally verified SCPH1001 BIOS,
+  the generated region executed all 30 instructions, including two clean-bus
+  MMIO stores, then stopped at the first excluded target `0xBFC00150`.
+- The canonical real execution receipt is
+  `clean-aot/catalog/evidence/bios-reset-execution.json`. This is the first real
+  clean BIOS instruction execution in the repository: BIOS instructions = 30,
+  game instructions = 0. No interpreter, JIT, legacy runtime, or fallback was
+  linked or invoked.
+- Next: cross-evidence and authorize the corridor beginning at `0xBFC00150`,
+  extend generated load/store/COP0 semantics as encountered, then continue the
+  same receipt chain until the authenticated game transition is reached.
 - Do not commit disc images, retail BIOS data, patched executables, captures,
   generated C, screenshots, saves, or packaged binaries.

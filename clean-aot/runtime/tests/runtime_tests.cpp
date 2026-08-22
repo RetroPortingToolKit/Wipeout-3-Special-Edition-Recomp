@@ -47,18 +47,51 @@ std::unique_ptr<clean_aot::runtime::Runtime> make_runtime(
     return std::make_unique<clean_aot::runtime::Runtime>(configuration);
 }
 
-bool generated_step_a(std::uint32_t& pc, bool branch_taken) noexcept {
-    pc = branch_taken ? 0x00001020U : 0x00001010U;
+bool generated_step_a(clean_aot::runtime::GeneratedCpuState& state) noexcept {
+    state.pc = state.branch_taken ? 0x00001020U : 0x00001010U;
     return true;
 }
 
-bool generated_step_b(std::uint32_t& pc, bool) noexcept {
-    pc = 0x00001030U;
+bool generated_step_b(clean_aot::runtime::GeneratedCpuState& state) noexcept {
+    state.pc = 0x00001030U;
     return true;
 }
 
-bool unresolved_generated_step(std::uint32_t&, bool) noexcept {
+bool unresolved_generated_step(clean_aot::runtime::GeneratedCpuState&) noexcept {
     return false;
+}
+
+bool generated_bios_reset_step(clean_aot::runtime::GeneratedCpuState& state) noexcept {
+    state.gpr[29] = 0x801f'fff0U;
+    state.pc = 0xbfc0'0010U;
+    state.next_pc = 0xbfc0'0014U;
+    return true;
+}
+
+void test_authenticated_bios_reset_contract(Runner& runner) {
+    using namespace clean_aot::runtime;
+    constexpr std::string_view identity =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    constexpr std::string_view bios_sha =
+        "07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541";
+    const std::array<std::uint32_t, 1U> roots{0xbfc0'0000U};
+    const std::array entries{
+        GeneratedRegionEntry{0xbfc0'0000U, generated_bios_reset_step, 1U},
+    };
+    const GeneratedExecutableBinding binding{
+        identity, bios_sha, 0xbfc0'0000U, 0xbfc8'0000ULL, roots, entries};
+    auto runtime = make_runtime();
+    EXPECT(runner, runtime->bios_pc() == 0U);
+    EXPECT(runner, runtime->bind_authenticated_bios(identity, binding) ==
+                       DispatchStatus::Bound);
+    EXPECT(runner, runtime->bios_pc() == 0xbfc0'0000U);
+    EXPECT(runner, runtime->dispatch_bios() == DispatchStatus::Executed);
+    EXPECT(runner, runtime->last_bios_instruction_count() == 1U);
+    EXPECT(runner, runtime->bios_pc() == 0xbfc0'0010U);
+    EXPECT(runner, runtime->dispatch_bios() == DispatchStatus::UnknownCode);
+    EXPECT(runner, runtime->reset() == Status::Ok);
+    EXPECT(runner, runtime->bios_pc() == 0xbfc0'0000U);
+    EXPECT(runner, runtime->dispatch_bios() == DispatchStatus::LoadRejected);
 }
 
 void test_authenticated_generated_dispatch(Runner& runner) {
@@ -80,18 +113,18 @@ void test_authenticated_generated_dispatch(Runner& runner) {
     GeneratedDispatcher dispatcher;
     EXPECT(runner, dispatcher.bind(identity, binding) == DispatchStatus::Bound);
 
-    std::uint32_t pc = 0x00001000U;
-    EXPECT(runner, dispatcher.dispatch(pc, false) == DispatchStatus::Executed);
-    EXPECT(runner, pc == 0x00001010U);
-    EXPECT(runner, dispatcher.dispatch(pc, false) == DispatchStatus::Executed);
-    EXPECT(runner, pc == 0x00001030U);
-    EXPECT(runner, dispatcher.dispatch(pc, false) == DispatchStatus::UnknownCode);
+    clean_aot::runtime::GeneratedCpuState cpu{}; cpu.pc=0x00001000U;
+    EXPECT(runner, dispatcher.dispatch(cpu) == DispatchStatus::Executed);
+    EXPECT(runner, cpu.pc == 0x00001010U);
+    EXPECT(runner, dispatcher.dispatch(cpu) == DispatchStatus::Executed);
+    EXPECT(runner, cpu.pc == 0x00001030U);
+    EXPECT(runner, dispatcher.dispatch(cpu) == DispatchStatus::UnknownCode);
 
-    pc = 0x00001004U;
-    EXPECT(runner, dispatcher.dispatch(pc, false) == DispatchStatus::UnknownCode);
-    pc = 0x00001020U;
-    EXPECT(runner, dispatcher.dispatch(pc, false) == DispatchStatus::UnknownCode);
-    EXPECT(runner, pc == 0x00001020U);
+    cpu.pc = 0x00001004U;
+    EXPECT(runner, dispatcher.dispatch(cpu) == DispatchStatus::UnknownCode);
+    cpu.pc = 0x00001020U;
+    EXPECT(runner, dispatcher.dispatch(cpu) == DispatchStatus::UnknownCode);
+    EXPECT(runner, cpu.pc == 0x00001020U);
 
     GeneratedDispatcher mismatch;
     EXPECT(runner, mismatch.bind(
@@ -394,6 +427,7 @@ void test_spu_irq_sample_deadline(Runner& runner) {
 int main() {
     Runner runner;
     test_authenticated_generated_dispatch(runner);
+    test_authenticated_bios_reset_contract(runner);
     test_generated_integer_differential(runner);
     test_authenticated_load_and_first_dispatch(runner);
     test_retirement_clock(runner);

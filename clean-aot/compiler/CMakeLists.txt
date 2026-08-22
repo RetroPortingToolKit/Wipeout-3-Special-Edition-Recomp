@@ -73,7 +73,16 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     add_library(clean_aot_compiler_generated_fixture OBJECT
         ${CLEAN_AOT_COMPILER_GENERATED_FIXTURE}
     )
+    add_executable(clean_aot_generated_fixture_tests
+        tests/generated_fixture_tests.cpp
+        $<TARGET_OBJECTS:clean_aot_compiler_generated_fixture>)
+    target_include_directories(clean_aot_generated_fixture_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../runtime/include)
+    target_compile_features(clean_aot_generated_fixture_tests PRIVATE cxx_std_20)
+    add_test(NAME clean_aot_generated_fixture_tests COMMAND clean_aot_generated_fixture_tests)
     target_compile_features(clean_aot_compiler_generated_fixture PRIVATE cxx_std_20)
+    target_include_directories(clean_aot_compiler_generated_fixture PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../runtime/include)
     if(MSVC)
         target_compile_options(clean_aot_compiler_generated_fixture PRIVATE
             /W4

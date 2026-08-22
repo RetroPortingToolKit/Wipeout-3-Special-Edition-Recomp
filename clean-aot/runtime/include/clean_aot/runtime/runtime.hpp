@@ -201,6 +201,12 @@ public:
     [[nodiscard]] bool operational() const noexcept;
     [[nodiscard]] Status status() const noexcept;
     [[nodiscard]] Status reset() noexcept;
+    [[nodiscard]] DispatchStatus bind_authenticated_bios(
+        std::string_view selected_bios_identity_sha256,
+        const GeneratedExecutableBinding& binding) noexcept;
+    [[nodiscard]] DispatchStatus dispatch_bios() noexcept;
+    [[nodiscard]] std::uint32_t bios_pc() const noexcept;
+    [[nodiscard]] std::uint32_t last_bios_instruction_count() const noexcept;
     [[nodiscard]] DispatchStatus load_authenticated_executable(
         std::string_view selected_variant_identity_sha256,
         std::span<const std::uint8_t> executable,
@@ -208,6 +214,7 @@ public:
         const GeneratedExecutableBinding& binding) noexcept;
     [[nodiscard]] DispatchStatus dispatch_selected(bool branch_taken) noexcept;
     [[nodiscard]] std::uint32_t selected_pc() const noexcept;
+    [[nodiscard]] std::uint32_t last_selected_instruction_count() const noexcept;
 
     [[nodiscard]] ReadResult read8(AccessContext context,
                                    std::uint32_t address) noexcept;

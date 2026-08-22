@@ -14,6 +14,8 @@ enum class BootstrapStage : std::uint8_t {
     Rejected,
     MediaMounted,
     RuntimeInitialized,
+    BiosBound,
+    BiosSliceStopped,
     ExecutableLoaded,
     GeneratedSliceStopped,
 };
@@ -25,14 +27,23 @@ struct BootstrapReceipt final {
     std::string variant_identity_sha256;
     std::string executable_sha256;
     std::string bios_sha256;
+    std::string bios_identity_sha256;
     std::uint32_t entry_pc = 0U;
     std::uint32_t stop_pc = 0U;
     std::uint64_t generated_dispatches = 0U;
+    std::uint64_t bios_generated_dispatches = 0U;
     std::uint64_t bios_instructions_executed = 0U;
     std::uint64_t guest_instructions_executed = 0U;
     std::uint64_t disc_sectors_read = 0U;
 
     [[nodiscard]] std::string canonical_json() const;
+};
+
+struct BiosBootstrapPlan final {
+    std::string bios_identity_sha256;
+    const runtime::GeneratedExecutableBinding* bios_binding = nullptr;
+    const runtime::GeneratedExecutableBinding* game_binding = nullptr;
+    std::uint32_t authenticated_game_transition_pc = 0U;
 };
 
 class BootstrapSession final {
@@ -41,6 +52,11 @@ public:
         Authorization authorization,
         const runtime::GeneratedExecutableBinding* binding,
         std::uint64_t maximum_dispatches = 1'000'000U) noexcept;
+    [[nodiscard]] BootstrapReceipt start_bios_to_game(
+        Authorization authorization,
+        const BiosBootstrapPlan& plan,
+        std::uint64_t maximum_bios_dispatches = 1'000'000U,
+        std::uint64_t maximum_game_dispatches = 1'000'000U) noexcept;
 
     [[nodiscard]] const runtime::Runtime* runtime() const noexcept {
         return runtime_.get();

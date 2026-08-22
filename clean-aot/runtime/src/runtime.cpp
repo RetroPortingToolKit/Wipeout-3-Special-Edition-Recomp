@@ -453,8 +453,23 @@ std::uint64_t RetirementClock::phase() const noexcept {
 
 struct Runtime::Impl final {
     GeneratedDispatcher generated_dispatcher{};
-    std::uint32_t generated_pc = 0U;
+    GeneratedDispatcher bios_dispatcher{};
+    GeneratedCpuState generated_cpu{};
+    GeneratedCpuState bios_cpu{};
+    std::string bios_sha256{};
+    bool bios_bound = false;
     bool executable_loaded = false;
+
+    static bool generated_write32(void* context, std::uint32_t address,
+                                  std::uint32_t value) noexcept {
+        auto* self = static_cast<Impl*>(context);
+        return self != nullptr && self->bus.write32(address, value).ok();
+    }
+    static bool generated_read8(void* c,std::uint32_t a,std::uint8_t& v) noexcept{auto*s=static_cast<Impl*>(c);if(!s)return false;auto r=s->bus.read8(a);v=r.value;return r.ok();}
+    static bool generated_read16(void* c,std::uint32_t a,std::uint16_t& v) noexcept{auto*s=static_cast<Impl*>(c);if(!s)return false;auto r=s->bus.read16(a);v=r.value;return r.ok();}
+    static bool generated_read32(void* c,std::uint32_t a,std::uint32_t& v) noexcept{auto*s=static_cast<Impl*>(c);if(!s)return false;auto r=s->bus.read32(a);v=r.value;return r.ok();}
+    static bool generated_write8(void* c,std::uint32_t a,std::uint8_t v) noexcept{auto*s=static_cast<Impl*>(c);return s&&s->bus.write8(a,v).ok();}
+    static bool generated_write16(void* c,std::uint32_t a,std::uint16_t v) noexcept{auto*s=static_cast<Impl*>(c);return s&&s->bus.write16(a,v).ok();}
 
     class CdScheduler final : public cdrom::MachineScheduler {
     public:
@@ -626,6 +641,11 @@ struct Runtime::Impl final {
           router(this),
           bus(memory::BusConfig{configuration.bios, &router}) {
         configured = multiplier_valid && clock.configured() && bus.configured();
+        try {
+            bios_sha256 = sha256_hex(configuration.bios);
+        } catch (...) {
+            configured = false;
+        }
         cdrom.attach_scheduler(&cd_scheduler);
         cdrom.attach_cdda_sink(&cdda_bridge);
         if (configuration.disc_source != nullptr) {
@@ -1608,10 +1628,67 @@ Status Runtime::reset() noexcept {
     impl_->install_dma_callbacks();
     impl_->reset_registers();
     impl_->generated_dispatcher = GeneratedDispatcher{};
-    impl_->generated_pc = 0U;
+    impl_->bios_dispatcher = GeneratedDispatcher{};
+    impl_->bios_cpu = GeneratedCpuState{};
+    impl_->bios_cpu.pc = 0xbfc0'0000U;
+    impl_->bios_cpu.next_pc = 0xbfc0'0004U;
+    impl_->bios_cpu.memory_context = impl_.get();
+    impl_->bios_cpu.read8=&Impl::generated_read8;impl_->bios_cpu.read16=&Impl::generated_read16;impl_->bios_cpu.read32=&Impl::generated_read32;
+    impl_->bios_cpu.write8=&Impl::generated_write8;impl_->bios_cpu.write16=&Impl::generated_write16;
+    impl_->bios_cpu.write32 = &Impl::generated_write32;
+    impl_->bios_bound = false;
+    impl_->generated_cpu = GeneratedCpuState{};
     impl_->executable_loaded = false;
     impl_->sample_device_irqs();
     return Status::Ok;
+}
+
+DispatchStatus Runtime::bind_authenticated_bios(
+    std::string_view selected_bios_identity_sha256,
+    const GeneratedExecutableBinding& binding) noexcept {
+    constexpr std::uint32_t reset_pc = 0xbfc0'0000U;
+    constexpr std::uint64_t bios_end = 0xbfc8'0000ULL;
+    if (!operational() || impl_->bios_bound || impl_->executable_loaded ||
+        binding.executable_sha256 != impl_->bios_sha256 ||
+        binding.load_start != reset_pc || binding.load_end_exclusive != bios_end) {
+        return binding.executable_sha256 != impl_->bios_sha256
+                   ? DispatchStatus::ExecutableHashMismatch
+                   : DispatchStatus::LoadRejected;
+    }
+    const auto root = std::lower_bound(binding.dispatch_roots.begin(),
+                                       binding.dispatch_roots.end(), reset_pc);
+    if (root == binding.dispatch_roots.end() || *root != reset_pc) {
+        return DispatchStatus::UnknownCode;
+    }
+    const DispatchStatus status = impl_->bios_dispatcher.bind(
+        selected_bios_identity_sha256, binding);
+    if (status != DispatchStatus::Bound) {
+        return status;
+    }
+    impl_->bios_cpu = GeneratedCpuState{};
+    impl_->bios_cpu.pc = reset_pc;
+    impl_->bios_cpu.next_pc = reset_pc + 4U;
+    impl_->bios_cpu.memory_context = impl_.get();
+    impl_->bios_cpu.read8=&Impl::generated_read8;impl_->bios_cpu.read16=&Impl::generated_read16;impl_->bios_cpu.read32=&Impl::generated_read32;
+    impl_->bios_cpu.write8=&Impl::generated_write8;impl_->bios_cpu.write16=&Impl::generated_write16;
+    impl_->bios_cpu.write32 = &Impl::generated_write32;
+    impl_->bios_bound = true;
+    return DispatchStatus::Bound;
+}
+
+DispatchStatus Runtime::dispatch_bios() noexcept {
+    if (!operational() || !impl_->bios_bound || impl_->executable_loaded) {
+        return DispatchStatus::LoadRejected;
+    }
+    return impl_->bios_dispatcher.dispatch(impl_->bios_cpu);
+}
+
+std::uint32_t Runtime::bios_pc() const noexcept {
+    return impl_ != nullptr ? impl_->bios_cpu.pc : 0U;
+}
+
+std::uint32_t Runtime::last_bios_instruction_count() const noexcept {
+    return impl_ != nullptr ? impl_->bios_dispatcher.last_instruction_count() : 0U;
 }
 
 DispatchStatus Runtime::load_authenticated_executable(
@@ -1654,7 +1731,12 @@ DispatchStatus Runtime::load_authenticated_executable(
             return DispatchStatus::LoadRejected;
         }
     }
-    impl_->generated_pc = selected_entry_pc;
+    impl_->generated_cpu.pc = selected_entry_pc;
+    impl_->generated_cpu.next_pc = selected_entry_pc + 4U;
+    impl_->generated_cpu.memory_context = impl_.get();
+    impl_->generated_cpu.read8=&Impl::generated_read8;impl_->generated_cpu.read16=&Impl::generated_read16;impl_->generated_cpu.read32=&Impl::generated_read32;
+    impl_->generated_cpu.write8=&Impl::generated_write8;impl_->generated_cpu.write16=&Impl::generated_write16;
+    impl_->generated_cpu.write32 = &Impl::generated_write32;
     impl_->executable_loaded = true;
     return DispatchStatus::Bound;
 }
@@ -1663,11 +1745,16 @@ DispatchStatus Runtime::dispatch_selected(bool branch_taken) noexcept {
     if (!operational() || !impl_->executable_loaded) {
         return DispatchStatus::LoadRejected;
     }
-    return impl_->generated_dispatcher.dispatch(impl_->generated_pc, branch_taken);
+    impl_->generated_cpu.branch_taken = branch_taken;
+    return impl_->generated_dispatcher.dispatch(impl_->generated_cpu);
 }
 
 std::uint32_t Runtime::selected_pc() const noexcept {
-    return impl_ != nullptr ? impl_->generated_pc : 0U;
+    return impl_ != nullptr ? impl_->generated_cpu.pc : 0U;
+}
+
+std::uint32_t Runtime::last_selected_instruction_count() const noexcept {
+    return impl_ != nullptr ? impl_->generated_dispatcher.last_instruction_count() : 0U;
 }
 
 ReadResult Runtime::read8(AccessContext context,

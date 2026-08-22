@@ -253,10 +253,10 @@ void test_direct_decoder_control_classes() {
 Region make_trampoline_region() {
     std::vector<std::uint8_t> text(0x24U, 0U);
     write_le32(text, 0x00U, encode_jump(0x00001000U, 0x00001010U));
-    write_le32(text, 0x04U, 0U);
+    write_le32(text, 0x04U, 0x24210001U);
     write_le32(text, 0x10U, encode_jump(0x00001010U, 0x00001020U));
-    write_le32(text, 0x14U, 0U);
-    write_le32(text, 0x20U, 0U);
+    write_le32(text, 0x14U, 0x24210001U);
+    write_le32(text, 0x20U, 0x34021234U);
 
     const PsxExeImage image = make_image(0x00001000U, 0x00001000U, std::move(text));
     RegionBuildOptions options;
@@ -548,7 +548,7 @@ void test_emitter_contains_compilable_graph_shape() {
     require(source.find("pc = 0;") == std::string::npos,
             "emitter must not synthesize a zero PC for an unresolved name");
     require(source.find(
-                "extern \"C\" bool clean_aot_region_00001000(std::uint32_t& pc, bool branch_taken) noexcept") !=
+                "extern \"C\" bool clean_aot_region_00001000(GeneratedCpuState& state) noexcept") !=
                 std::string::npos,
             "emitter must provide a stable, region-unique dispatch ABI");
 }
