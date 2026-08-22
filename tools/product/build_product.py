@@ -143,7 +143,7 @@ def _build_parser() -> argparse.ArgumentParser:
     smoke.add_argument("--package", type=Path, required=True)
     smoke.add_argument("--bios", type=Path, required=True)
     smoke.add_argument("--receipt", type=Path, required=True)
-    smoke.add_argument("--minimum-bios-instructions", type=int, default=1509)
+    smoke.add_argument("--minimum-bios-instructions", type=int, default=71_501)
 
     soak = subparsers.add_parser(
         "soak", help="run a deterministic bounded performance/soak command")

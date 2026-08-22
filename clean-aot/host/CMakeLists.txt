@@ -182,6 +182,7 @@ if(CLEAN_AOT_HOST_ENABLE_SDL_VULKAN)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(SDL3)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/colocate_sdl3.cmake")
 
     add_library(clean_aot_host_sdl_vulkan STATIC
         src/sdl_vulkan_backend_win32.cpp
@@ -229,10 +230,7 @@ if(CLEAN_AOT_HOST_ENABLE_SDL_VULKAN)
                 -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion
                 -Wshadow -Werror)
         endif()
-        add_custom_command(TARGET clean_aot_host_sdl_vulkan_tests POST_BUILD
-            COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-                "$<TARGET_FILE:SDL3::SDL3>"
-                "$<TARGET_FILE_DIR:clean_aot_host_sdl_vulkan_tests>")
+        clean_aot_colocate_sdl3(clean_aot_host_sdl_vulkan_tests)
         add_test(NAME clean_aot_host_sdl_vulkan_tests
             COMMAND clean_aot_host_sdl_vulkan_tests)
         set_tests_properties(clean_aot_host_sdl_vulkan_tests PROPERTIES

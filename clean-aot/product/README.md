@@ -216,7 +216,7 @@ gate, and binds its result to BIOS frontier evidence:
 ```powershell
 python tools/product/build_product.py audit-windows `
   --package D:/Games/Wipeout3SE --link-map build-release/Wipeout3SE.map `
-  --root . --frontier clean-aot/catalog/evidence/bios-frontier-00001509.json
+  --root . --frontier clean-aot/catalog/evidence/bios-frontier-00079405.json
 ```
 
 `clean-aot/product/evidence/windows-installed-launch-audit.json` records the
@@ -225,9 +225,12 @@ current boundary. `CLEAN_AOT_APP_ENABLE_SDL=ON` now defines the real
 locally generated clean region sources and its generated binding accessor;
 the linker emits `Wipeout3SE.map`, and the target copies `SDL3.dll` beside the
 PE. No BIOS, disc, patch, compiler, oracle, or legacy runtime is linked or
-copied. The committed installed-smoke receipt proves the relocated package
-reached the 1,509-instruction BIOS frontier using a separately supplied,
-hash-authenticated user BIOS, then stopped on the first unknown generated PC.
+copied. The package audit consumes the authenticated 79,405-instruction v2
+frontier. Installed smoke independently proves the executable's natural
+71,501-instruction frontier using a separately supplied, hash-authenticated
+user BIOS, then stops on the first unknown generated PC. The later authenticated
+receipt includes staged RAM epochs and is not represented as a directly
+reproduced installed boot.
 
 The deterministic soak command runs a headless validation executable multiple
 times with fixed locale/timezone/SDL drivers, requires identical output bytes,

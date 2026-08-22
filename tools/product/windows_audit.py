@@ -23,6 +23,12 @@ SYSTEM_DLLS = {name.casefold() for name in (
     "secur32.dll", "setupapi.dll", "cfgmgr32.dll", "imm32.dll", "version.dll",
     "winmm.dll", "ws2_32.dll", "bcrypt.dll", "crypt32.dll", "shlwapi.dll",
     "windowscodecs.dll", "vulkan-1.dll", "dwmapi.dll", "uxtheme.dll", "msvcrt.dll")}
+MINIMUM_AUTHENTICATED_BIOS_INSTRUCTIONS = 79_405
+MINIMUM_INSTALLED_PRODUCT_BIOS_INSTRUCTIONS = 71_501
+AUTHENTICATED_FRONTIER_SCHEMAS = {
+    "clean-aot.real-bios-execution.v1",
+    "clean-aot.real-bios-execution.v2",
+}
 
 
 def _hash(path: Path) -> str:
@@ -75,8 +81,8 @@ def audit_windows_package(package: Path, *, link_map: Path, root: Path,
     except GateError as error: raise ReleaseError(str(error)) from error
     if link_receipt["status"] != "pass": raise ReleaseError("package link-map leakage detected")
     frontier = load_json(frontier_evidence)
-    if (frontier.get("schema") != "clean-aot.real-bios-execution.v1"
-            or frontier.get("bios_instructions_executed", 0) < 1509):
+    if (frontier.get("schema") not in AUTHENTICATED_FRONTIER_SCHEMAS
+            or frontier.get("bios_instructions_executed", 0) < MINIMUM_AUTHENTICATED_BIOS_INSTRUCTIONS):
         raise ReleaseError("BIOS frontier evidence is stale")
     binaries = [path for path in package.rglob("*")
                 if path.is_file() and path.suffix.casefold() in {".exe", ".dll"}]
@@ -102,7 +108,7 @@ def audit_windows_package(package: Path, *, link_map: Path, root: Path,
 
 
 def smoke_windows_product(package: Path, *, bios: Path, receipt_path: Path,
-                          minimum_bios_instructions: int = 1509) -> dict[str, Any]:
+                          minimum_bios_instructions: int = MINIMUM_INSTALLED_PRODUCT_BIOS_INSTRUCTIONS) -> dict[str, Any]:
     package_receipt = validate_release(package)
     package = package.resolve(strict=True)
     bios = bios.resolve(strict=True)

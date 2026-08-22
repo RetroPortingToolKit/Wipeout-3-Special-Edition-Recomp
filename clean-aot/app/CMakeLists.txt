@@ -93,19 +93,12 @@ if(CLEAN_AOT_APP_ENABLE_SDL)
         target_link_options(Wipeout3SE PRIVATE "-Wl,-Map,$<TARGET_FILE_DIR:Wipeout3SE>/Wipeout3SE.map")
     endif()
     clean_aot_app_warnings(Wipeout3SE)
-    add_custom_command(TARGET Wipeout3SE POST_BUILD
-        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-            "$<TARGET_FILE:SDL3::SDL3>" "$<TARGET_FILE_DIR:Wipeout3SE>"
-        VERBATIM)
+    clean_aot_colocate_sdl3(Wipeout3SE)
     if(CLEAN_AOT_APP_BUILD_TESTS AND BUILD_TESTING)
         add_executable(clean_aot_app_sdl_tests tests/sdl_platform_tests.cpp)
         target_link_libraries(clean_aot_app_sdl_tests PRIVATE clean_aot_app_sdl)
         clean_aot_app_warnings(clean_aot_app_sdl_tests)
-        add_custom_command(TARGET clean_aot_app_sdl_tests POST_BUILD
-            COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-                "$<TARGET_FILE:SDL3::SDL3>"
-                "$<TARGET_FILE_DIR:clean_aot_app_sdl_tests>"
-            VERBATIM)
+        clean_aot_colocate_sdl3(clean_aot_app_sdl_tests)
         add_test(NAME clean_aot_app_sdl_tests COMMAND clean_aot_app_sdl_tests)
         set_tests_properties(clean_aot_app_sdl_tests PROPERTIES
             ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy")
