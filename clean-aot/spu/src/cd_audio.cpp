@@ -136,7 +136,10 @@ void CdAudioSink::receive_xa_sector(
     status_.dropped_frames += pushed.dropped;
     ++status_.xa_sectors;
     next_lba_ = lba + 1U;
-    stream_active_ = true;
+    stream_active_ = !metadata.end_of_file && !metadata.end_of_record;
+    if (!stream_active_) {
+        ++status_.stream_discontinuities;
+    }
 }
 
 } // namespace clean_aot::spu

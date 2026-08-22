@@ -132,12 +132,53 @@ void test_optical_audio_epoch_and_exact_100hz_cadence() {
             "three sectors and four 100 Hz frames close with zero phase or loss");
 }
 
+void test_xa_end_flags_close_predictor_and_fifo_epoch() {
+    static clean_aot::spu::Device device;
+    device.reset();
+    static clean_aot::spu::CdAudioSink sink(device);
+    sink.reset();
+    clean_aot::cdrom::XaMetadata terminal{};
+    terminal.file = 3U;
+    terminal.channel = 4U;
+    terminal.audio = true;
+    terminal.form_two = true;
+    terminal.end_of_file = true;
+    const auto bytes = xa_data(false);
+    sink.receive_xa_sector(100U, terminal, bytes,
+                           clean_aot::cdrom::AudioMatrix{}, false);
+    const std::size_t complete_sector =
+        device.input_status(clean_aot::spu::AudioSource::XaResampled).queued;
+    require(complete_sector != 0U && sink.status().stream_discontinuities == 1U,
+            "XA EOF closes the predictor epoch after queuing its final sector");
+
+    std::array<clean_aot::spu::StereoSample,
+               clean_aot::spu::SamplesPer100HzUpdate> frame{};
+    require(device.render(frame).ok(), "terminal XA 100 Hz frame renders");
+    require(device.input_status(clean_aot::spu::AudioSource::XaResampled).queued ==
+                complete_sector - clean_aot::spu::SamplesPer100HzUpdate,
+            "terminal XA sector advances by exactly 441 native samples");
+
+    terminal.end_of_file = false;
+    sink.receive_xa_sector(101U, terminal, bytes,
+                           clean_aot::cdrom::AudioMatrix{}, false);
+    require(device.input_status(clean_aot::spu::AudioSource::XaResampled).queued ==
+                complete_sector,
+            "post-EOF XA restart replaces queued tail instead of appending to it");
+    for (unsigned update = 0U; update < 4U; ++update) {
+        require(device.render(frame).ok(), "restarted XA 100 Hz frame renders");
+    }
+    require(device.input_status(clean_aot::spu::AudioSource::XaResampled).queued ==
+                complete_sector - 4U * clean_aot::spu::SamplesPer100HzUpdate,
+            "restarted XA epoch retains exact four-frame 100 Hz accounting");
+}
+
 } // namespace
 
 int main() {
     test_native_handoff_and_worst_case_burst();
     test_rejection_and_cdda_handoff();
     test_optical_audio_epoch_and_exact_100hz_cadence();
+    test_xa_end_flags_close_predictor_and_fifo_epoch();
     std::cout << "clean_aot_cd_audio_tests: ok\n";
     return EXIT_SUCCESS;
 }
