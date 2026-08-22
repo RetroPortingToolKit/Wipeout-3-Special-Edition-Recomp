@@ -451,6 +451,17 @@ instruction and fails closed on every unknown PC or executable identity.
   device writes. Receipt `bios-frontier-00079382.json` stops cleanly at the next
   unbound physical RAM target `0x00006A70`; final 64-KiB RAM SHA-256 is
   `f1f4eeac...766c8`.
+- The authenticated A0 call-44 stub at `0x00006A70` now transitions through
+  the exact low-RAM A0 trampoline and service dispatcher to BIOS
+  `0xBFC01920`. The compiler preserves `0xBFC0193C` both as the preceding
+  jump's architectural delay slot and as an explicitly authenticated
+  standalone entry; incidental edges into delay slots remain rejected. Two
+  repeated probes first cross `0xBFC01940`, then reach 80,802 instructions and
+  13,936 dispatches with 9,254 reads, 16,256 writes, one device read, and 34
+  device writes. Receipt `bios-frontier-00080802.json` stops fail-closed at
+  physical PC `0x000000B0`. The service-mutated 64-KiB RAM epoch is SHA-256
+  `a8d34d5b...d4f4`; its zero-filled B0 target is deliberately not authorized
+  as executable code.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control
