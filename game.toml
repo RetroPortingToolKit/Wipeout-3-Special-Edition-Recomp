@@ -40,6 +40,7 @@ mod_function_entry_funcs = ["0x800EDFC8"]
 window_title = "Wipeout 3 Special Edition Recompiled"
 memcard_dir = "saves"
 openbios = false
+bios_hle = false
 # Runtime code is statically linked; no runtime compiler or overlay cache.
 overlay_cache = false
 
