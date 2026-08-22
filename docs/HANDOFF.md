@@ -206,6 +206,14 @@
   comparator also includes run-local debug-global `seq`; normalize it to compare
   command, sector, IRQ content, and ordering without treating sequence numbers
   as guest state.
+- The corrected Fast-Loading-only run (PAL-100 explicitly off) reached the full
+  route. Its fingerprints match the retained normal run through frame 6,003;
+  the first common-frame difference is at frame 6,004, but the two probes were
+  armed at different post-boot anchors (normal ended at frame 6,012 while fast
+  ended at 6,557), and the normal card ring was empty while fast retained 32
+  reads. This localizes the remaining proof problem to probe synchronization,
+  not a demonstrated Fast Loading failure. Re-run both sides after waiting for
+  the same post-boot frame anchor, then capture card/CD traces from that anchor.
 
 ## Ruled out
 
