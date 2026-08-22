@@ -3,6 +3,7 @@
 #include "../src/sha256.hpp"
 
 #include <array>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -15,7 +16,8 @@ int failures = 0;
 void expect(bool condition, const char* message) {
     if (!condition) { ++failures; std::cerr << "FAIL: " << message << '\n'; }
 }
-class AcceleratedCaptureHost final : public clean_aot::host::IHostBackend {
+class AcceleratedCaptureHost final : public clean_aot::host::IHostBackend,
+                                     public clean_aot::host::IReplacementUploader {
 public:
     clean_aot::host::HostStatus submit_frame(
         const clean_aot::host::FrameSubmission& value) noexcept override {
@@ -29,9 +31,19 @@ public:
     void shutdown() noexcept override { down = true; }
     bool shutting_down() const noexcept override { return down; }
     clean_aot::host::PresentationCapabilities presentation_capabilities()
-        const noexcept override { return {true, true}; }
+        const noexcept override { return {true, true, true}; }
+    clean_aot::host::HostStatus upload_replacement(
+        const clean_aot::host::ReplacementImage&, std::uint64_t& handle) noexcept override {
+        handle = ++next_handle; return {};
+    }
+    clean_aot::host::HostStatus release_replacement(
+        std::uint64_t handle) noexcept override {
+        return handle == 0U ? clean_aot::host::HostStatus{
+            clean_aot::host::HostCode::invalid_argument} : clean_aot::host::HostStatus{};
+    }
     clean_aot::host::FrameSubmission frame{};
     bool down = false;
+    std::uint64_t next_handle = 0U;
 };
 class FakePngDecoder final : public clean_aot::app::IPngDecoder {
 public:
@@ -111,6 +123,35 @@ public:
                  std::uint64_t) noexcept override {}
     void observe_precise_draw(clean_aot::raster::VramRect) noexcept override {}
     std::uint64_t invalidation_serial() const noexcept override { return 0U; }
+};
+class FixedUiPolicy final : public clean_aot::app::IReplacementKeyPolicy {
+public:
+    explicit FixedUiPolicy(psx::render::ReplacementKey value) : key(value) {}
+    bool identify(const clean_aot::gpu::Event& event,
+                  std::span<const clean_aot::raster::VramWord>,
+                  std::uint64_t,
+                  clean_aot::app::ReplacementMatch& match) noexcept override {
+        const auto* rectangle = std::get_if<clean_aot::gpu::RectangleEvent>(&event);
+        if (rectangle == nullptr || !rectangle->textured || rectangle->width != 16U ||
+            rectangle->height != 1U) return false;
+        match.kind = psx::render::ReplacementAssetKind::Font;
+        match.key = key; match.source_generation = 1U;
+        match.asset_class = clean_aot::app::TitleAssetClass::Font;
+        match.depth = clean_aot::gpu::TextureDepth::Indexed4;
+        const std::uint16_t u = rectangle->texture_coordinate->u;
+        const std::uint16_t v = rectangle->texture_coordinate->v;
+        match.source = {
+            static_cast<std::uint16_t>(rectangle->state.draw_mode.x_base * 64U + u / 4U),
+            static_cast<std::uint16_t>(rectangle->state.draw_mode.y_base + v),
+            4U, 1U};
+        return true;
+    }
+    void observe(const clean_aot::gpu::Event&,
+                 std::span<const clean_aot::raster::VramWord>,
+                 std::uint64_t) noexcept override {}
+    void observe_precise_draw(clean_aot::raster::VramRect) noexcept override {}
+    std::uint64_t invalidation_serial() const noexcept override { return 0U; }
+    psx::render::ReplacementKey key{};
 };
 
 class LiveProvenance final : public clean_aot::app::IPolygonProvenanceProvider {
@@ -455,6 +496,110 @@ void test_live_gp0_primitive_compatibility_matrix() {
               << '/' << graphics.precise_fallbacks() << '\n';
     std::cout << "GP0 compatibility matrix digest: 0x" << std::hex
               << graphics.visual_digest() << std::dec << '\n';
+}
+
+void test_wipeout_like_100_frame_performance_receipt() {
+    using namespace clean_aot;
+    std::vector<std::uint8_t> bios(512U * 1024U, 0U);
+    runtime::Configuration runtime_config{}; runtime_config.bios = bios;
+    runtime::Runtime runtime(runtime_config);
+    IdentityProvenance provenance;
+    AcceleratedCaptureHost host;
+    const psx::render::ReplacementKey hd_key{0x8043be1bU, 0xd03041bdU};
+    const auto root = std::filesystem::temp_directory_path() /
+        "clean-aot-max-detail-hd";
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root);
+    const std::array<std::uint8_t, 4U> hd_bytes{7U, 8U, 9U, 10U};
+    { std::ofstream file(root / "ui.png", std::ios::binary);
+      file.write(reinterpret_cast<const char*>(hd_bytes.data()), 4); }
+    const std::array entries{psx::render::ReplacementManifestEntry{
+        psx::render::ReplacementAssetKind::Font, hd_key, "ui.png",
+        app::detail::sha256(hd_bytes), 64U, 4U}};
+    auto manifest = psx::render::ReplacementManifest::create(entries, 9U);
+    UiStripeDecoder decoder;
+    app::ReplacementAssetRuntime assets(std::move(*manifest), root, decoder, host);
+    FixedUiPolicy replacement_policy(hd_key);
+    app::GraphicsConfiguration config{};
+    config.runtime_scanout = true;
+    config.output_width = 5120U; config.output_height = 2160U;
+    config.presentation = raster::PresentationMode::Generic21x9;
+    config.custom_aspect_width = 21U; config.custom_aspect_height = 9U;
+    config.pgxp_enabled = true; config.provenance_provider = &provenance;
+    config.projection = psx::render::ProjectionPolicy::ExpandHorizontal;
+    config.culling = psx::render::CullingPolicy::MatchExpandedProjection;
+    config.precise_color = raster::PreciseColorMode::TrueColorDisplay;
+    config.texture_filter = raster::TextureFilterMode::BilinearTransparencySafe;
+    config.presentation_resolve = raster::PresentationResolveMode::EdgeAware;
+    config.replacement_assets = &assets;
+    config.replacement_policy = &replacement_policy;
+    config.high_resolution_ui = true;
+    app::RuntimeGraphics graphics(config);
+    auto& gpu = runtime.gpu();
+    (void)gpu.write_gp1(0x03000000U); (void)gpu.write_gp1(0x05000000U);
+    (void)gpu.write_gp1(0x06c00200U); (void)gpu.write_gp1(0x07040010U);
+    (void)gpu.write_gp1(0x08000001U);
+    const auto vertex = [](std::uint16_t x, std::uint16_t y) {
+        return static_cast<std::uint32_t>(x) |
+            (static_cast<std::uint32_t>(y) << 16U);
+    };
+    const auto initial = [&](std::uint32_t word) { (void)gpu.write_gp0(word); };
+    initial(0xa0000000U); initial(0U); initial((1U << 16U) | 4U);
+    initial(0xabcd1234U); initial(0xffff0000U);
+    initial(0xa0000000U); initial(16U); initial((1U << 16U) | 16U);
+    for (std::uint32_t value = 0U; value < 16U; value += 2U)
+        initial(value | ((value + 1U) << 16U));
+    std::uint64_t total_ns = 0U, maximum_ns = 0U;
+    for (std::uint64_t frame = 0U; frame < 100U; ++frame) {
+        const auto send = [&](std::uint32_t word) {
+            expect(gpu.write_gp0(word).accepted, "max-detail GP0 word accepts");
+        };
+        send(0xe3000000U); send(0xe4000000U | (239U << 10U) | 319U);
+        send(0xe1000000U); send(0xe2000001U);
+        for (std::uint32_t row = 0U; row < 6U; ++row) {
+            const std::uint16_t y = static_cast<std::uint16_t>(12U + row * 34U);
+            send(0x3f808080U); send(vertex(8U, y)); send(0U);
+            send(0x00808080U); send(vertex(152U, y)); send(0x001f001fU);
+            send(0x00808080U); send(vertex(8U, static_cast<std::uint16_t>(y + 30U))); send(0x0000001fU);
+            send(0x00808080U); send(vertex(152U, static_cast<std::uint16_t>(y + 30U))); send(0x001f0000U);
+        }
+        send(0x6500ffffU); send(vertex(180U, 40U)); send(0U); send((32U << 16U) | 64U);
+        send(0x65000000U); send(vertex(10U, 10U)); send(1U << 16U);
+        send((1U << 16U) | 16U);
+        send(0x500000ffU); send(vertex(20U, 220U)); send(0x00ff0000U); send(vertex(300U, 220U));
+        const auto begin = std::chrono::steady_clock::now();
+        expect(graphics.present(runtime, host, frame).success(),
+               "max-detail frame reaches accelerated host");
+        const auto elapsed = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - begin).count());
+        total_ns += elapsed; maximum_ns = std::max(maximum_ns, elapsed);
+    }
+    std::cout << "perf overlays=" << host.frame.ui_overlay_count
+              << " precise=" << graphics.precise_primitives()
+              << " uploaded=" << assets.stats().uploaded
+              << " ui=" << graphics.ui_stats().candidates << '/'
+              << graphics.ui_stats().composited << '/'
+              << graphics.ui_stats().native_fallbacks << '\n';
+    expect(maximum_ns <= 10'000'000U &&
+           host.frame.presentation_width == 5040U &&
+           host.frame.presentation_height == 2160U &&
+           host.frame.surface.byte_size == 320U * 240U * 3U &&
+           host.frame.ui_overlay_count == 1U &&
+           graphics.precise_primitives() == 600U &&
+           assets.stats().uploaded == 1U &&
+           graphics.visual_digest() == 15258056447892083260ULL,
+           "100-frame CPU raster and GPU submission remain inside 10 ms budget");
+    std::cout << "{\"average_ns\":" << total_ns / 100U
+              << ",\"frames\":100,\"maximum_ns\":" << maximum_ns
+              << ",\"schema\":\"clean-aot.graphics-performance.v1\""
+              << ",\"hd_uploads\":" << assets.stats().uploaded
+              << ",\"native_upload_bytes_per_frame\":"
+              << host.frame.surface.byte_size
+              << ",\"pgxp_primitives\":" << graphics.precise_primitives()
+              << ",\"visual_digest\":" << graphics.visual_digest()
+              << ",\"width\":5120}" << '\n';
+    std::filesystem::remove_all(root);
 }
 
 void test_identity_bound_gpu_trace_replay() {
@@ -1204,6 +1349,7 @@ void test_native_png_decode() {
 }
 } // namespace
 int main() {
+    test_wipeout_like_100_frame_performance_receipt();
     test_live_verified_camera_plane_clipping();
     test_live_pgxp_projection_pipeline();
     test_live_gp0_primitive_compatibility_matrix();

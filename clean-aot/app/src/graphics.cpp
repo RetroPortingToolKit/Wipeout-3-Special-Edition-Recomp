@@ -992,7 +992,9 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
             configuration_.custom_aspect_height});
         if (!planned.accepted) return {host::HostCode::invalid_argument};
         last_plan_ = planned.plan;
-        scanout_.assign(planned.plan.required_rgb_bytes, 0U);
+        // decode_rgb888 writes every byte. Retain capacity across 100 Hz frames
+        // without paying for a redundant clear immediately before overwrite.
+        scanout_.resize(planned.plan.required_rgb_bytes);
         const raster::EventResult decoded = raster::ScanoutMapper::decode_rgb888(
             planned.plan, raster_.vram_words(), scanout_);
         if (!decoded.accepted()) return {host::HostCode::internal_error};
