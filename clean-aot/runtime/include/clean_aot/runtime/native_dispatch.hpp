@@ -15,8 +15,10 @@ struct GeneratedRegionEntry final {
 
 struct GeneratedExecutableBinding final {
     std::string_view variant_identity_sha256;
+    std::string_view executable_sha256;
     std::uint32_t load_start = 0;
     std::uint64_t load_end_exclusive = 0;
+    std::span<const std::uint32_t> dispatch_roots;
     std::span<const GeneratedRegionEntry> entries;
 };
 
@@ -26,6 +28,8 @@ enum class DispatchStatus : std::uint8_t {
     UnknownCode,
     IdentityMismatch,
     InvalidBinding,
+    ExecutableHashMismatch,
+    LoadRejected,
 };
 
 class GeneratedDispatcher final {

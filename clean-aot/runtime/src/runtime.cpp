@@ -14,7 +14,9 @@
 #include <limits>
 #include <new>
 #include <optional>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace clean_aot::runtime {
 namespace {
@@ -43,6 +45,55 @@ constexpr std::uint32_t kSpuEnd = 0x1f80'1e00U;
 constexpr std::uint32_t kExpansionTwoBegin = 0x1f80'2000U;
 constexpr std::uint32_t kExpansionTwoEnd = 0x1f80'2080U;
 constexpr std::uint32_t kCacheControl = 0xfffe'0130U;
+
+[[nodiscard]] std::string sha256_hex(std::span<const std::uint8_t> input) {
+    static constexpr std::array<std::uint32_t, 64> constants = {
+        0x428a2f98U,0x71374491U,0xb5c0fbcfU,0xe9b5dba5U,0x3956c25bU,0x59f111f1U,0x923f82a4U,0xab1c5ed5U,
+        0xd807aa98U,0x12835b01U,0x243185beU,0x550c7dc3U,0x72be5d74U,0x80deb1feU,0x9bdc06a7U,0xc19bf174U,
+        0xe49b69c1U,0xefbe4786U,0x0fc19dc6U,0x240ca1ccU,0x2de92c6fU,0x4a7484aaU,0x5cb0a9dcU,0x76f988daU,
+        0x983e5152U,0xa831c66dU,0xb00327c8U,0xbf597fc7U,0xc6e00bf3U,0xd5a79147U,0x06ca6351U,0x14292967U,
+        0x27b70a85U,0x2e1b2138U,0x4d2c6dfcU,0x53380d13U,0x650a7354U,0x766a0abbU,0x81c2c92eU,0x92722c85U,
+        0xa2bfe8a1U,0xa81a664bU,0xc24b8b70U,0xc76c51a3U,0xd192e819U,0xd6990624U,0xf40e3585U,0x106aa070U,
+        0x19a4c116U,0x1e376c08U,0x2748774cU,0x34b0bcb5U,0x391c0cb3U,0x4ed8aa4aU,0x5b9cca4fU,0x682e6ff3U,
+        0x748f82eeU,0x78a5636fU,0x84c87814U,0x8cc70208U,0x90befffaU,0xa4506cebU,0xbef9a3f7U,0xc67178f2U};
+    std::array<std::uint32_t, 8> hash = {0x6a09e667U,0xbb67ae85U,0x3c6ef372U,0xa54ff53aU,
+                                         0x510e527fU,0x9b05688cU,0x1f83d9abU,0x5be0cd19U};
+    const std::uint64_t bit_length = static_cast<std::uint64_t>(input.size()) * 8U;
+    const std::size_t padded = ((input.size() + 9U + 63U) / 64U) * 64U;
+    std::vector<std::uint8_t> bytes(padded, 0U);
+    std::copy(input.begin(), input.end(), bytes.begin());
+    bytes[input.size()] = 0x80U;
+    for (std::size_t index = 0; index < 8U; ++index) {
+        bytes[padded - 1U - index] = static_cast<std::uint8_t>(bit_length >> (index * 8U));
+    }
+    auto rotate = [](std::uint32_t value, unsigned amount) { return (value >> amount) | (value << (32U - amount)); };
+    for (std::size_t offset = 0; offset < padded; offset += 64U) {
+        std::array<std::uint32_t, 64> words{};
+        for (std::size_t i = 0; i < 16U; ++i) {
+            const std::size_t p = offset + i * 4U;
+            words[i] = (static_cast<std::uint32_t>(bytes[p]) << 24U) | (static_cast<std::uint32_t>(bytes[p+1U]) << 16U) |
+                       (static_cast<std::uint32_t>(bytes[p+2U]) << 8U) | bytes[p+3U];
+        }
+        for (std::size_t i = 16U; i < 64U; ++i) {
+            const auto s0 = rotate(words[i-15U],7U) ^ rotate(words[i-15U],18U) ^ (words[i-15U] >> 3U);
+            const auto s1 = rotate(words[i-2U],17U) ^ rotate(words[i-2U],19U) ^ (words[i-2U] >> 10U);
+            words[i] = words[i-16U] + s0 + words[i-7U] + s1;
+        }
+        auto a=hash[0]; auto b=hash[1]; auto c=hash[2]; auto d=hash[3]; auto e=hash[4]; auto f=hash[5]; auto g=hash[6]; auto h=hash[7];
+        for (std::size_t i = 0; i < 64U; ++i) {
+            const auto s1=rotate(e,6U)^rotate(e,11U)^rotate(e,25U); const auto ch=(e&f)^((~e)&g);
+            const auto t1=h+s1+ch+constants[i]+words[i]; const auto s0=rotate(a,2U)^rotate(a,13U)^rotate(a,22U);
+            const auto maj=(a&b)^(a&c)^(b&c); const auto t2=s0+maj;
+            h=g; g=f; f=e; e=d+t1; d=c; c=b; b=a; a=t1+t2;
+        }
+        hash[0]+=a; hash[1]+=b; hash[2]+=c; hash[3]+=d; hash[4]+=e; hash[5]+=f; hash[6]+=g; hash[7]+=h;
+    }
+    static constexpr char digits[] = "0123456789abcdef";
+    std::string output(64U, '0');
+    for (std::size_t i=0;i<hash.size();++i) for (std::size_t j=0;j<8U;++j)
+        output[i*8U+j]=digits[(hash[i] >> ((7U-j)*4U)) & 0xfU];
+    return output;
+}
 
 [[nodiscard]] constexpr std::uint32_t access_width_bytes(
     memory::AccessWidth width) noexcept {
@@ -172,6 +223,7 @@ struct RationalPreview final {
     case Status::MissedDeadline:
         return AccessFault::MissedDeadline;
     case Status::InvalidConfiguration:
+    case Status::ExecutableRejected:
         return AccessFault::BusError;
     }
     return AccessFault::BusError;
@@ -400,6 +452,10 @@ std::uint64_t RetirementClock::phase() const noexcept {
 }
 
 struct Runtime::Impl final {
+    GeneratedDispatcher generated_dispatcher{};
+    std::uint32_t generated_pc = 0U;
+    bool executable_loaded = false;
+
     class CdScheduler final : public cdrom::MachineScheduler {
     public:
         static constexpr std::size_t kCapacity = cdrom::Cdrom::EventCapacity;
@@ -1551,8 +1607,67 @@ Status Runtime::reset() noexcept {
     impl_->cdrom.reset();
     impl_->install_dma_callbacks();
     impl_->reset_registers();
+    impl_->generated_dispatcher = GeneratedDispatcher{};
+    impl_->generated_pc = 0U;
+    impl_->executable_loaded = false;
     impl_->sample_device_irqs();
     return Status::Ok;
+}
+
+DispatchStatus Runtime::load_authenticated_executable(
+    std::string_view selected_variant_identity_sha256,
+    std::span<const std::uint8_t> executable,
+    std::uint32_t selected_entry_pc,
+    const GeneratedExecutableBinding& binding) noexcept {
+    if (!operational() || impl_->executable_loaded ||
+        binding.load_end_exclusive <= binding.load_start ||
+        binding.load_end_exclusive > (std::uint64_t{1} << 32U) ||
+        executable.size() != binding.load_end_exclusive - binding.load_start) {
+        return DispatchStatus::LoadRejected;
+    }
+    const auto start = memory::translate_address(binding.load_start);
+    if (!start.ok() || start.physical_address >= memory::kRamBytes ||
+        executable.size() > memory::kRamBytes - start.physical_address) {
+        return DispatchStatus::LoadRejected;
+    }
+    try {
+        if (sha256_hex(executable) != binding.executable_sha256) {
+            return DispatchStatus::ExecutableHashMismatch;
+        }
+    } catch (...) {
+        return DispatchStatus::LoadRejected;
+    }
+    const auto root = std::lower_bound(binding.dispatch_roots.begin(),
+                                       binding.dispatch_roots.end(), selected_entry_pc);
+    if (root == binding.dispatch_roots.end() || *root != selected_entry_pc) {
+        return DispatchStatus::UnknownCode;
+    }
+    const DispatchStatus bound = impl_->generated_dispatcher.bind(
+        selected_variant_identity_sha256, binding);
+    if (bound != DispatchStatus::Bound) {
+        return bound;
+    }
+    for (std::size_t index = 0; index < executable.size(); ++index) {
+        if (!impl_->bus.write8(binding.load_start + static_cast<std::uint32_t>(index),
+                               executable[index]).ok()) {
+            impl_->terminal_status = Status::ExecutableRejected;
+            return DispatchStatus::LoadRejected;
+        }
+    }
+    impl_->generated_pc = selected_entry_pc;
+    impl_->executable_loaded = true;
+    return DispatchStatus::Bound;
+}
+
+DispatchStatus Runtime::dispatch_selected(bool branch_taken) noexcept {
+    if (!operational() || !impl_->executable_loaded) {
+        return DispatchStatus::LoadRejected;
+    }
+    return impl_->generated_dispatcher.dispatch(impl_->generated_pc, branch_taken);
+}
+
+std::uint32_t Runtime::selected_pc() const noexcept {
+    return impl_ != nullptr ? impl_->generated_pc : 0U;
 }
 
 ReadResult Runtime::read8(AccessContext context,

@@ -17,10 +17,10 @@ using InstructionMap = std::map<GuestAddress, Instruction>;
 
 [[nodiscard]] bool valid_instruction_address(const PsxExeImage& image,
                                              GuestAddress address,
+                                             std::uint64_t region_start,
                                              std::uint64_t region_end) noexcept {
     return (address % sizeof(std::uint32_t)) == 0U &&
-           static_cast<std::uint64_t>(address) >=
-               static_cast<std::uint64_t>(image.load_address()) &&
+           static_cast<std::uint64_t>(address) >= region_start &&
            static_cast<std::uint64_t>(address) + sizeof(std::uint32_t) <= region_end &&
            image.contains(address, sizeof(std::uint32_t));
 }
@@ -45,7 +45,9 @@ void add_edge(Region& region,
 Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options) {
     const std::uint64_t region_end = options.end_exclusive.value_or(image.text_end_exclusive());
     const std::uint64_t image_begin = static_cast<std::uint64_t>(image.load_address());
-    if (region_end <= image_begin || region_end > image.text_end_exclusive()) {
+    const std::uint64_t region_start = options.start_inclusive.value_or(image.load_address());
+    if (region_start < image_begin || region_end <= region_start ||
+        region_end > image.text_end_exclusive()) {
         throw IrError("region end must lie inside the PS-X EXE text image");
     }
     if ((region_end % sizeof(std::uint32_t)) != 0U) {
@@ -60,7 +62,7 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
         std::unique(options.entry_points.begin(), options.entry_points.end()),
         options.entry_points.end());
     for (const GuestAddress entry : options.entry_points) {
-        if (!valid_instruction_address(image, entry, region_end)) {
+        if (!valid_instruction_address(image, entry, region_start, region_end)) {
             throw IrError("region entry point is outside the bounded text range");
         }
     }
@@ -73,7 +75,7 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
 
     auto queue_target = [&](GuestAddress target) {
         if (static_cast<std::uint64_t>(target) >= image_begin &&
-            valid_instruction_address(image, target, region_end)) {
+            valid_instruction_address(image, target, region_start, region_end)) {
             leaders.insert(target);
             pending.insert(target);
         }
@@ -88,7 +90,7 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
         std::set<GuestAddress> path;
         GuestAddress pc = start;
 
-        while (valid_instruction_address(image, pc, region_end)) {
+        while (valid_instruction_address(image, pc, region_start, region_end)) {
             if (!path.insert(pc).second) {
                 break;
             }
@@ -98,7 +100,7 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
             const Instruction& instruction = it->second;
             if (instruction.has_delay_slot) {
                 const GuestAddress delay_address = next_pc(pc, 4U);
-                if (!valid_instruction_address(image, delay_address, region_end)) {
+                if (!valid_instruction_address(image, delay_address, region_start, region_end)) {
                     throw IrError("control transfer has no bounded delay-slot instruction");
                 }
                 delay_slots.insert(delay_address);
@@ -128,7 +130,7 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
             }
 
             const GuestAddress next = next_pc(pc, 4U);
-            if (!valid_instruction_address(image, next, region_end)) {
+            if (!valid_instruction_address(image, next, region_start, region_end)) {
                 break;
             }
             pc = next;
@@ -145,7 +147,7 @@ Region RegionBuilder::build(const PsxExeImage& image, RegionBuildOptions options
     }
 
     Region region;
-    region.start = image.load_address();
+    region.start = static_cast<GuestAddress>(region_start);
     region.end_exclusive = region_end;
     region.entry_points = options.entry_points;
 

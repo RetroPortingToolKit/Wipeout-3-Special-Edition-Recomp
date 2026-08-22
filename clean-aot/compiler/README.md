@@ -22,3 +22,8 @@ the product disc, BIOS, generated sources, or any other project-specific input.
 The generated fixture is compiled as part of the normal build, and focused
 tests cover malformed headers/ranges, delay-slot ownership, calls/returns,
 loops, canonical ordering, address wrap, and fail-closed IR validation.
+
+`clean_aot_compiler_cli` implements both the PS-X EXE argument shape and the
+explicit `clean-aot-image-v1` raw-image shape used by the product pipeline. It
+accepts only manifest-bounded load/code ranges and sorted explicit roots, emits
+stable region symbols, and emits an exact variant entry table for the runtime.

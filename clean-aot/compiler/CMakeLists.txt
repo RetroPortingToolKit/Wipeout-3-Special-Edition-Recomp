@@ -33,6 +33,16 @@ endif()
 add_executable(clean_aot_compiler_tests
     tests/compiler_tests.cpp
 )
+
+add_executable(clean_aot_compiler_cli src/compiler_cli.cpp)
+target_compile_features(clean_aot_compiler_cli PRIVATE cxx_std_20)
+target_link_libraries(clean_aot_compiler_cli PRIVATE clean_aot_compiler)
+if(MSVC)
+    target_compile_options(clean_aot_compiler_cli PRIVATE /W4 /permissive-)
+else()
+    target_compile_options(clean_aot_compiler_cli PRIVATE
+        -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
+endif()
 target_compile_features(clean_aot_compiler_tests PRIVATE cxx_std_20)
 target_link_libraries(clean_aot_compiler_tests PRIVATE clean_aot_compiler)
 
@@ -82,4 +92,9 @@ endif()
 
 if(BUILD_TESTING)
     add_test(NAME clean_aot_compiler_tests COMMAND clean_aot_compiler_tests)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME clean_aot_image_adapter_integration
+        COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/product/tests/test_clean_aot_image_adapter.py
+            $<TARGET_FILE:clean_aot_compiler_cli>)
 endif()

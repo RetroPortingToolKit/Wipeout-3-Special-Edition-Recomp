@@ -19,12 +19,13 @@ DispatchStatus GeneratedDispatcher::bind(
     const GeneratedExecutableBinding& binding) noexcept {
     entries_ = {};
     if (!is_sha256(selected_variant_identity_sha256) ||
+        !is_sha256(binding.executable_sha256) ||
         selected_variant_identity_sha256 != binding.variant_identity_sha256) {
         return DispatchStatus::IdentityMismatch;
     }
     if (binding.load_end_exclusive <= binding.load_start ||
         binding.load_end_exclusive > (std::uint64_t{1} << 32U) ||
-        binding.entries.empty()) {
+        binding.entries.empty() || binding.dispatch_roots.empty()) {
         return DispatchStatus::InvalidBinding;
     }
     std::uint64_t previous = 0;
@@ -36,6 +37,24 @@ DispatchStatus GeneratedDispatcher::bind(
             return DispatchStatus::InvalidBinding;
         }
         previous = entry.pc;
+        first = false;
+    }
+    previous = 0;
+    first = true;
+    for (const std::uint32_t root : binding.dispatch_roots) {
+        if ((root % 4U) != 0U || root < binding.load_start ||
+            root >= binding.load_end_exclusive || (!first && root <= previous)) {
+            return DispatchStatus::InvalidBinding;
+        }
+        const auto entry = std::lower_bound(
+            binding.entries.begin(), binding.entries.end(), root,
+            [](const GeneratedRegionEntry& candidate, std::uint32_t value) {
+                return candidate.pc < value;
+            });
+        if (entry == binding.entries.end() || entry->pc != root) {
+            return DispatchStatus::InvalidBinding;
+        }
+        previous = root;
         first = false;
     }
     load_start_ = binding.load_start;

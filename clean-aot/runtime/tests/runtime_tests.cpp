@@ -106,6 +106,37 @@ void test_authenticated_generated_dispatch(Runner& runner) {
     EXPECT(runner, mismatch.bind(identity, bad) == DispatchStatus::InvalidBinding);
 }
 
+void test_authenticated_load_and_first_dispatch(Runner& runner) {
+    using clean_aot::runtime::DispatchStatus;
+    using clean_aot::runtime::GeneratedExecutableBinding;
+    using clean_aot::runtime::GeneratedRegionEntry;
+    constexpr std::string_view identity =
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    constexpr std::string_view executable_sha =
+        "66840dda154e8a113c31dd0ad32f7f3a366a80e8136979d8f5a101d3d29d6f72";
+    const std::array<std::uint8_t, 8U> executable{1U,2U,3U,4U,5U,6U,7U,8U};
+    const std::array<std::uint32_t, 1U> roots{0x00001000U};
+    const std::array entries{GeneratedRegionEntry{0x00001000U, generated_step_a}};
+    const GeneratedExecutableBinding binding{identity, executable_sha, 0x00001000U,
+                                              0x00001008U, roots, entries};
+    auto runtime = make_runtime();
+    auto mutated = executable; mutated[0] ^= 1U;
+    EXPECT(runner, runtime->load_authenticated_executable(identity, mutated, 0x00001000U,
+                                                           binding) ==
+                       DispatchStatus::ExecutableHashMismatch);
+    EXPECT(runner, runtime->load_authenticated_executable(identity, executable,
+                                                           0x00001004U, binding) ==
+                       DispatchStatus::UnknownCode);
+    EXPECT(runner, runtime->load_authenticated_executable(identity, executable,
+                                                           0x00001000U, binding) ==
+                       DispatchStatus::Bound);
+    EXPECT(runner, runtime->read32({}, 0x00001000U).value == 0x04030201U);
+    EXPECT(runner, runtime->selected_pc() == 0x00001000U);
+    EXPECT(runner, runtime->dispatch_selected(false) == DispatchStatus::Executed);
+    EXPECT(runner, runtime->selected_pc() == 0x00001010U);
+    EXPECT(runner, runtime->dispatch_selected(false) == DispatchStatus::UnknownCode);
+}
+
 void test_retirement_clock(Runner& runner) {
     using clean_aot::runtime::RetirementClock;
     using clean_aot::runtime::Status;
@@ -345,6 +376,7 @@ void test_spu_irq_sample_deadline(Runner& runner) {
 int main() {
     Runner runner;
     test_authenticated_generated_dispatch(runner);
+    test_authenticated_load_and_first_dispatch(runner);
     test_retirement_clock(runner);
     test_configuration_and_plain_memory(runner);
     test_issue_cycle_and_mmio(runner);

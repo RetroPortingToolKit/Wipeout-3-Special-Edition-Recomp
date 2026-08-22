@@ -1897,6 +1897,9 @@ def _compiler_manifest(
         f"image_sha256={record['image_sha256']}",
         f"catalog_sha256={catalog_sha256}",
         f"variant_sha256={variant_sha256}",
+        f"image_kind={record['image_kind']}",
+        f"load_start=0x{record['load_range']['start']:08X}",
+        f"load_end_exclusive=0x{record['load_range']['end_exclusive']:08X}",
     ]
     lines.extend(f"entry=0x{value:08X}" for value in region["entry_points"])
     lines.extend(

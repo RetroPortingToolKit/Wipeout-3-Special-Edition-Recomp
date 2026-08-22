@@ -56,8 +56,8 @@ python tools/product/build_product.py setup `
 `--compiler-interface clean-aot-v1` matches the current offline compiler CLI
 shape (`--exe`, `--manifest`, `--output`) for PS-X EXE images. The
 `clean-aot-image-v1` is the explicit bounded-raw-image adapter. The compiler
-library now accepts raw bytes only with caller-supplied load and entry addresses;
-the remaining CLI adapter must pass those checked manifest values through. The
+library and CLI now accept raw bytes only with manifest-supplied load, code, and
+entry bounds. The compiler emits a variant-bound native entry table. The
 setup command never wraps a raw payload in a fabricated PS-X EXE header.
 
 The region file is mandatory for a real setup. It is the authorization boundary
@@ -111,9 +111,8 @@ external directory and are not repository assets.
 
 The product boundary is ready, but it cannot honestly claim a finished game
 until the clean compiler has a reviewed CLI in the canonical worktree, a
-complete region/CFG authorization for the main image, the
-`clean-aot-image-v1` CLI adapter for `NFE.PB` entry 5, and a product target that
-constructs the generated entry table and drives the clean runtime dispatcher.
-The underlying bounded raw-image parser, catalog binding receipt, stable
-generated-region ABI, and fail-closed dispatcher now exist. Those are explicit
-fail-closed inputs rather than hidden fallbacks.
+complete region/CFG authorization for the main image and a final product
+executable/host target that selects the catalog variant and invokes the emitted
+binding accessor. The bounded raw-image CLI, catalog binding receipt, generated
+entry table, authenticated RAM loader, and fail-closed first dispatch now
+exist. These are explicit fail-closed inputs rather than hidden fallbacks.

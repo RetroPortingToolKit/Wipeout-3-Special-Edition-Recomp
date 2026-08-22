@@ -25,7 +25,9 @@ This first integration slice owns:
 - cache-control and deterministic SIO1 bootstrap registers;
 - exact-identity binding of sorted generated-region entry tables, with unknown
   PCs, unresolved generated edges, malformed tables, and identity mismatches
-  rejected before any fallback can occur.
+  rejected before any fallback can occur;
+- independent executable SHA-256 verification, bounded RAM loading, selected
+  catalog-root validation, and first generated-region dispatch.
 
 Host presentation, media-file parsing, scanout/raster draining, frame pacing,
 audio-device queues, and product policy are separate components.

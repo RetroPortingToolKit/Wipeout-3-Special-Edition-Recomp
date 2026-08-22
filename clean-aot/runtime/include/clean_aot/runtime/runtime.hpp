@@ -1,11 +1,13 @@
 #pragma once
 
 #include "clean_aot/memory/bus.hpp"
+#include "clean_aot/runtime/native_dispatch.hpp"
 #include "machine.hpp"
 
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <string_view>
 
 namespace clean_aot::cdrom {
 class RawSectorSource;
@@ -46,6 +48,7 @@ enum class Status : std::uint8_t {
     DeviceRejected,
     ReentrantAccess,
     MissedDeadline,
+    ExecutableRejected,
 };
 
 [[nodiscard]] constexpr bool succeeded(Status status) noexcept {
@@ -198,6 +201,13 @@ public:
     [[nodiscard]] bool operational() const noexcept;
     [[nodiscard]] Status status() const noexcept;
     [[nodiscard]] Status reset() noexcept;
+    [[nodiscard]] DispatchStatus load_authenticated_executable(
+        std::string_view selected_variant_identity_sha256,
+        std::span<const std::uint8_t> executable,
+        std::uint32_t selected_entry_pc,
+        const GeneratedExecutableBinding& binding) noexcept;
+    [[nodiscard]] DispatchStatus dispatch_selected(bool branch_taken) noexcept;
+    [[nodiscard]] std::uint32_t selected_pc() const noexcept;
 
     [[nodiscard]] ReadResult read8(AccessContext context,
                                    std::uint32_t address) noexcept;
