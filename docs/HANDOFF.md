@@ -1107,3 +1107,22 @@ instruction and fails closed on every unknown PC or executable identity.
 - Windows Clang ASan aggregate tests require a 16 MiB PE stack reservation for
   the CD-ROM and SIO test harnesses. The reservation is independent of local
   sanitizer toggles because aggregate flags are injected by the parent build.
+
+## d066748 product regression rebinding (2026-08-22)
+
+- Rebuilt `Wipeout3SE.exe` from an isolated detached worktree at exact canonical
+  commit `d066748`, so concurrent uncommitted runtime/frontier work was not
+  consumed. The executable SHA-256 is
+  `e7fa1a7046028dca43e4ab664a792f3ee78bc0e232993505dff379240600d8ab` and
+  the package manifest SHA-256 is
+  `56905a3e329b137c0f9039f1a478eedef06d9da13c40155aa254918702f1bb9e`.
+- Rebound setup, settings, dual-card persistence, Windows installed launch,
+  graphics matrix, and all four deterministic 4K/5120x2160 soak receipts. The
+  two-stage installer contains exactly 135,829 authenticated game instructions
+  in 290 regions with zero exclusions and zero unresolved CFI sites. Its
+  runtime payload independently passes compiler/patch/oracle/legacy leakage and
+  SDL3 DLL-closure audits after a Unicode-path atomic relocation.
+- All 32 product tests pass. Release readiness remains honestly fail-closed at
+  12/15: direct BIOS-to-game execution, all 64 behavioral routes, and
+  authenticated media execution are the only failures. Physical present timing
+  remains `unavailable`; no readiness claim or timing waiver was introduced.
