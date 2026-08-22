@@ -398,6 +398,11 @@ instruction and fails closed on every unknown PC or executable identity.
   `clean-aot/catalog/evidence/bios-frontier-00001509.json`. The stop remains the
   exact fail-closed RAM exception vector `0x80000080`; no RAM content epoch or
   indirect target was inferred from the address alone.
+- SLT/SLTU plus ANDI semantics advance authenticated execution to 17,353
+  instructions and 3,232 dispatches. The new receipt
+  `clean-aot/catalog/evidence/bios-frontier-00017353.json` stops without an
+  exception at `0xBFC0703C`; this is a finite runtime return target inside the
+  exact BIOS and can seed the next static direct-closure pass.
 
 - Frontier 89: the authenticated second corridor `[0xBFC00150,0xBFC0023C)`
   executes another 59 instructions, including memory-control and cache-control
