@@ -1028,3 +1028,21 @@ instruction and fails closed on every unknown PC or executable identity.
   reduces aggregate CMake relinks on linear corridors while leaving compiler
   CFI rejection authoritative. The committed shard-371 receipt audits as 103
   unique exact bindings covering 116 instructions.
+# 2026-08-22 accelerated shell frontier checkpoint
+
+- Adopted the compiler acceleration from `02b712c` with
+  `advance_live_shell_frontiers.py --max-batch-instructions 16`.
+- Reconciled durable binding 410 (`0x800476CC-0x800476D0`) directly into
+  binding 411 (`0x800476D0-0x800476D8`): no gap and no duplicate identity.
+- Exact bindings 411-422 advanced 340 authenticated instructions before the
+  materially different terminal condition. The repeated terminal is the known
+  `BFC0D8E4 -> A0 -> 0x5C4 -> BFC0D8E0` service SCC at the unchanged
+  3,000,000-dispatch bound, not UnknownCode. CD reads/writes/raw sectors remain
+  zero. Canonical evidence is
+  `clean-aot/catalog/evidence/bios-shell-live-frontiers-800476d0-bfc0d8e4.json`.
+- Next bounded action: diagnose why live service index `a0=0xA0` repeatedly
+  returns through this SCC with `Cause=0x1C`, `EPC=0x8005027C`, and
+  `$ra=0x00001B10`; do not raise the dispatch bound.
+- Windows Clang ASan aggregate tests require a 16 MiB PE stack reservation for
+  the CD-ROM and SIO test harnesses. The reservation is independent of local
+  sanitizer toggles because aggregate flags are injected by the parent build.

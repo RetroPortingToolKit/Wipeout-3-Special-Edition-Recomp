@@ -65,6 +65,13 @@ if(CLEAN_AOT_CDROM_ENABLE_SANITIZERS)
     endif()
 endif()
 
+# Clang's Windows ASan instrumentation substantially increases these tests'
+# stack use.  Aggregate sanitizer builds inject the flags above this subtree,
+# so this reservation must not depend on the local sanitizer option.
+if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_link_options(clean_aot_cdrom_tests PRIVATE -Wl,--stack,16777216)
+endif()
+
 if(BUILD_TESTING)
     add_test(NAME clean_aot_cdrom_tests COMMAND clean_aot_cdrom_tests)
 endif()

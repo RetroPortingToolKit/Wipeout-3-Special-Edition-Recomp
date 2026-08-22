@@ -48,6 +48,13 @@ if(CLEAN_AOT_SIO_SANITIZERS AND NOT MSVC)
     target_link_options(clean_aot_sio_tests PRIVATE -fsanitize=address,undefined)
 endif()
 
+# Aggregate sanitizer builds inject instrumentation above this subtree.  Keep
+# the Windows test harness non-interactive and give ASan's frames enough stack
+# independently of the local sanitizer toggle.
+if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_link_options(clean_aot_sio_tests PRIVATE -Wl,--stack,16777216)
+endif()
+
 if(BUILD_TESTING)
     add_test(NAME clean_aot_sio_tests COMMAND clean_aot_sio_tests)
 endif()
