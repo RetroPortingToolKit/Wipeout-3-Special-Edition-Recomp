@@ -451,8 +451,6 @@ ByteTransfer PadDevice::exchange_configuration(std::uint8_t value,
         if (phase_ == 7U) {
             if (pending_mode_ == 0U) {
                 state_.configuration_mode = false;
-                watchdog_active_ = false;
-                watchdog_deadline_ = 0U;
             }
         }
         return response(phase_ == 1U ? response_id_high() : 0x00U, 7U);
@@ -648,7 +646,7 @@ bool PadDevice::restore(const PadSnapshot& snapshot_value) noexcept {
          (!snapshot_value.configuration_used ||
           snapshot_value.watchdog_deadline <= snapshot_value.last_cycle ||
           snapshot_value.watchdog_deadline >= kNoEventCycle ||
-          snapshot_value.watchdog_deadline - snapshot_value.last_cycle !=
+          snapshot_value.watchdog_deadline - snapshot_value.last_cycle >
               kPadConfigurationWatchdogCycles ||
           !cycle_add_fits(snapshot_value.last_cycle,
                           snapshot_value.watchdog_deadline - snapshot_value.last_cycle))) ||

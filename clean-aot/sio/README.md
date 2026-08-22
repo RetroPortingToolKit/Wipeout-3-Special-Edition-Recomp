@@ -84,6 +84,8 @@ data; no host API is called. Configuration-mode communication refreshes the
 documented approximately one-second watchdog. Watchdog expiry and the exposed
 physical Analog-button edge stop and lock rumble, select digital/analog mode,
 and preserve the documented post-configuration `00h` ID-high quirk. The
+watchdog remains armed after command 43 exits configuration mode, matching the
+hardware requirement that normal polls continue refreshing it. The
 physical-button boundary is explicit (`press_analog_button`); callers may use
 `set_analog_mode` for a direct unlocked host/input initialization. Advancing
 `Sio0` also advances attached pad watchdogs during idle bus time. Pressure-

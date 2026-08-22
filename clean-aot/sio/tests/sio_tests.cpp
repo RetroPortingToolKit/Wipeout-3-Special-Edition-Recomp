@@ -778,7 +778,8 @@ void test_pad_watchdog_and_analog_button() {
     CHECK(!watchdog_pad.restore(forged_watchdog));
     auto shortened_watchdog = configured;
     --shortened_watchdog.watchdog_deadline;
-    CHECK(!watchdog_pad.restore(shortened_watchdog));
+    CHECK(watchdog_pad.restore(shortened_watchdog));
+    CHECK(watchdog_pad.restore(configured));
     watchdog_pad.advance_to(clean_aot::sio::kPadConfigurationWatchdogCycles - 1U);
     CHECK(watchdog_pad.state().configuration_mode);
     watchdog_pad.advance_to(configured.watchdog_deadline);
@@ -799,11 +800,33 @@ void test_pad_watchdog_and_analog_button() {
     const auto exit_reply = exchange_pad_packet(exit_pad, exit_config, 100U);
     CHECK(exit_reply[2].value == 0x5AU);
     const auto exited = exit_pad.snapshot();
-    CHECK(!exited.state.configuration_mode && !exited.watchdog_active &&
-          exited.watchdog_deadline == 0U && exited.configuration_used &&
+    CHECK(!exited.state.configuration_mode && exited.watchdog_active &&
+          exited.watchdog_deadline > exited.last_cycle &&
+          exited.watchdog_deadline - exited.last_cycle <=
+              clean_aot::sio::kPadConfigurationWatchdogCycles &&
+          exited.configuration_used &&
           !exited.id_high_suppressed);
-    exit_pad.advance_to(clean_aot::sio::kPadConfigurationWatchdogCycles + 200U);
-    CHECK(!exit_pad.state().mode_locked);
+    PadDevice exit_replay;
+    CHECK(exit_replay.restore(exited));
+    exit_pad.advance_to(exited.watchdog_deadline - 1U);
+    exit_replay.advance_to(exited.watchdog_deadline - 1U);
+    CHECK(!exit_pad.state().mode_locked && !exit_replay.state().mode_locked &&
+          exit_pad.snapshot().watchdog_active &&
+          exit_replay.snapshot().watchdog_active);
+    const auto boundary_snapshot = exit_pad.snapshot();
+    PadDevice boundary_replay;
+    CHECK(boundary_replay.restore(boundary_snapshot));
+    exit_pad.advance_to(exited.watchdog_deadline);
+    exit_replay.advance_to(exited.watchdog_deadline);
+    boundary_replay.advance_to(exited.watchdog_deadline);
+    const auto expired_exit = exit_pad.snapshot();
+    const auto expired_exit_replay = exit_replay.snapshot();
+    CHECK(exit_pad.state().mode_locked && exit_replay.state().mode_locked &&
+          boundary_replay.state().mode_locked &&
+          !expired_exit.watchdog_active &&
+          !expired_exit_replay.watchdog_active &&
+          expired_exit.state.input.buttons ==
+              expired_exit_replay.state.input.buttons);
 
     PadDevice button_pad;
     CHECK(button_pad.set_analog_mode(false));

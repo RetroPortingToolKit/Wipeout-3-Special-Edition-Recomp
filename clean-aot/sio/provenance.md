@@ -43,7 +43,8 @@ Configuration-mode communication refreshes the documented approximately
 one-second watchdog. Expiry and the physical Analog-button boundary reset
 rumble/mode state as described by the controller notes, including the
 post-configuration `00h` replacement for the usual `5Ah` ID-high byte. The
-watchdog is advanced by the SIO bus clock even between byte events, and the
+watchdog remains active after command 43 returns to normal mode, is advanced
+by the SIO bus clock even between byte events, and the
 watchdog and button clock fields are part of the in-memory snapshot so a
 restored transaction cannot silently change mode because host time elapsed.
 
