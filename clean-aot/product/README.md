@@ -116,3 +116,57 @@ executable/host target that selects the catalog variant and invokes the emitted
 binding accessor. The bounded raw-image CLI, catalog binding receipt, generated
 entry table, authenticated RAM loader, and fail-closed first dispatch now
 exist. These are explicit fail-closed inputs rather than hidden fallbacks.
+
+## Modern-PC release and validation lane
+
+`build_product.py package` creates a new, atomic and relocatable Windows
+directory from an explicitly supplied clean application executable, `SDL3.dll`,
+and one or more generated native artifacts. Packaging is refused unless the
+shipping sources and real release link map pass the clean-room gates. The
+product profile is also used as a forbidden-hash set, preventing any pinned
+disc, BIOS, executable, patch, or raw runtime payload from being relabeled as a
+clean artifact.
+
+```powershell
+python tools/product/build_product.py package `
+  --app build-release/Wipeout3SE.exe `
+  --sdl build-release/SDL3.dll `
+  --artifact regions/main.native=build-release/main.native `
+  --root . `
+  --source clean-aot/app `
+  --source clean-aot/runtime `
+  --source clean-aot/host `
+  --link-map build-release/Wipeout3SE.map `
+  --allowlist clean-aot/product/cleanroom_allowlist.json `
+  --output dist/Wipeout3SE
+```
+
+The package contains only the application, SDL runtime, declared generated
+clean artifacts, a hash manifest, a one-time first-run setup contract, and
+portable configuration defaults. Disc tracks, CUE files, BIOS bytes, selected
+executable bytes, setup receipts, compiler/oracle tools, legacy runtime code,
+and absolute build paths are forbidden. First run imports and verifies the
+player's lawful inputs into `${USER_DATA}/Wipeout3SE`; unknown identities are
+rejected before runtime initialization. Saves, two controller/card slots,
+input deadzone/hotplug policy, exact 44.1-kHz stereo audio, 100-Hz presentation,
+and 4K/ultrawide defaults have separate bounded configuration sections.
+
+After copying or extracting the directory elsewhere, remeasure every file and
+reject additions or tampering:
+
+```powershell
+python tools/product/build_product.py validate-release --package D:/Games/Wipeout3SE
+```
+
+The deterministic soak command runs a headless validation executable multiple
+times with fixed locale/timezone/SDL drivers, requires identical output bytes,
+enforces bounded execution, and checks a declared p95 ceiling:
+
+```powershell
+python tools/product/build_product.py soak --iterations 1000 `
+  --timeout-seconds 30 --max-p95-ms 10 -- build-release/product_soak.exe
+```
+
+Passing these gates proves package isolation, relocation, deterministic harness
+output, and the measured performance threshold only. It does not prove BIOS or
+game boot, race completion, or release readiness.
