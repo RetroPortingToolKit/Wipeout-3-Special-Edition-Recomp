@@ -27,3 +27,8 @@ loops, canonical ordering, address wrap, and fail-closed IR validation.
 explicit `clean-aot-image-v1` raw-image shape used by the product pipeline. It
 accepts only manifest-bounded load/code ranges and sorted explicit roots, emits
 stable region symbols, and emits an exact variant entry table for the runtime.
+Finalized runtime-discovered finite targets enter through
+`tools/analysis/ingest_runtime_target_trace.py`. That offline adapter verifies
+the complete trace and every source/destination image identity before emitting
+ordinary compiler manifests; the compiler itself remains decoder-free at
+runtime and gains no interpreter or unknown-PC fallback.

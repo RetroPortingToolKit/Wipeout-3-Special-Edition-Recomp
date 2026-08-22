@@ -45,3 +45,17 @@ capture remains discovery evidence and does not establish complete execution.
 `--runtime-offset` and `--comparison-bytes` can measure an aligned subrange
 without manufacturing a standalone capture file; the complete region hash and
 identity are still verified before the subrange is compared.
+
+`ingest_runtime_target_trace.py` is the fail-closed bridge from a finalized
+runtime indirect-target trace to the static compiler. Its v1 receipt must name
+every source and destination image epoch, bind each epoch to exact bytes and a
+variant identity, attest a complete gap-free event interval with zero drops,
+and provide sorted unique aggregate observations for every closed JR/JALR
+site. The adapter independently checks the authenticated source opcode, image
+bounds, exact event accounting, and all identities. It emits a canonical
+identity-bound closure plus one deterministic `clean-aot-compiler-manifest-v1`
+file per targeted image. Guest-address overlap across epochs is allowed only
+because each edge names its image identity; missing, duplicate, ambiguous,
+unsorted, incomplete, or byte-mismatched evidence is rejected. This mechanism
+does not interpret guest code and does not claim that a partial trace is
+complete—the capture producer must explicitly finalize that claim.
