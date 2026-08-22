@@ -150,6 +150,7 @@ def _build_parser() -> argparse.ArgumentParser:
     smoke.add_argument("--package", type=Path, required=True)
     smoke.add_argument("--bios", type=Path, required=True)
     smoke.add_argument("--receipt", type=Path, required=True)
+    smoke.add_argument("--frontier", type=Path, required=True)
     smoke.add_argument("--minimum-bios-instructions", type=int, default=71_501)
 
     soak = subparsers.add_parser(
@@ -272,6 +273,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "smoke-windows":
             document = smoke_windows_product(
                 args.package, bios=args.bios, receipt_path=args.receipt,
+                frontier_evidence=args.frontier,
                 minimum_bios_instructions=args.minimum_bios_instructions)
         elif args.command == "soak":
             command_line = args.command_line

@@ -108,10 +108,17 @@ def audit_windows_package(package: Path, *, link_map: Path, root: Path,
 
 
 def smoke_windows_product(package: Path, *, bios: Path, receipt_path: Path,
+                          frontier_evidence: Path,
                           minimum_bios_instructions: int = MINIMUM_INSTALLED_PRODUCT_BIOS_INSTRUCTIONS) -> dict[str, Any]:
     package_receipt = validate_release(package)
     package = package.resolve(strict=True)
     bios = bios.resolve(strict=True)
+    authenticated = load_json(frontier_evidence)
+    if (authenticated.get("schema") not in AUTHENTICATED_FRONTIER_SCHEMAS
+            or type(authenticated.get("bios_instructions_executed")) is not int
+            or authenticated["bios_instructions_executed"] < minimum_bios_instructions
+            or authenticated.get("bios_sha256") != _hash(bios)):
+        raise ReleaseError("authenticated smoke frontier is stale or belongs to another BIOS")
     try: bios.relative_to(package)
     except ValueError: pass
     else: raise ReleaseError("copyrighted BIOS input must remain outside the package")
@@ -126,12 +133,17 @@ def smoke_windows_product(package: Path, *, bios: Path, receipt_path: Path,
             or frontier.get("stage") != "bios-slice-stopped"
             or frontier.get("reason") != "unknown-generated-bios-pc"
             or type(frontier.get("bios_instructions_executed")) is not int
-            or frontier["bios_instructions_executed"] < minimum_bios_instructions):
+            or frontier["bios_instructions_executed"] < minimum_bios_instructions
+            or frontier["bios_instructions_executed"] > authenticated["bios_instructions_executed"]):
         raise ReleaseError("installed product did not reach the required fail-closed frontier")
     receipt = {"schema": "wipeout3se.clean-aot.windows-installed-smoke.v1",
                "status": "passed-not-game-ready", "game_ready": False,
                "package_manifest_sha256": package_receipt["manifest_sha256"],
                "bios_input_sha256": _hash(bios), "frontier": frontier,
+               "authenticated_frontier": {
+                   "schema": authenticated["schema"],
+                   "sha256": _hash(frontier_evidence),
+                   "bios_instructions_executed": authenticated["bios_instructions_executed"]},
                "stdout_sha256": hashlib.sha256(completed.stdout).hexdigest(),
                "stderr_sha256": hashlib.sha256(completed.stderr).hexdigest()}
     receipt_path.parent.mkdir(parents=True, exist_ok=True)

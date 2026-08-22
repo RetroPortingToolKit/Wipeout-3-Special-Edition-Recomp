@@ -304,6 +304,16 @@ class ReleaseLaneTests(unittest.TestCase):
         with self.assertRaisesRegex(ReleaseError, "PE signature"):
             pe_imports(malformed)
 
+    def test_smoke_requires_authenticated_frontier_binding(self) -> None:
+        from tools.product.windows_audit import smoke_windows_product
+        package = self.root / "release"; self.package(package)
+        frontier = self.root / "frontier.json"
+        frontier.write_text(json.dumps({"schema":"clean-aot.real-bios-execution.v2",
+            "bios_instructions_executed": 86062, "bios_sha256":"0" * 64}))
+        with self.assertRaisesRegex(ReleaseError, "another BIOS"):
+            smoke_windows_product(package, bios=self.artifact,
+                receipt_path=self.root / "smoke.json", frontier_evidence=frontier)
+
 
 if __name__ == "__main__":
     unittest.main()
