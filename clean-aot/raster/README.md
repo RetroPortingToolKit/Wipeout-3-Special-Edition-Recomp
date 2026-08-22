@@ -83,9 +83,18 @@ GPU bus timing.
 ## Deliberate boundary and integration requirements
 
 This is a functional VRAM reference, not a complete CRTC or timed GPU. It does
-not model FIFO/bus timing, texture-cache staleness, interlace fields, 24-bit
-scanout packing, or a 2 MB VRAM extension. Cache-flush events are accepted as
+not model FIFO/bus timing, texture-cache staleness, field timing, or a 2 MB
+VRAM extension. Cache-flush events are accepted as
 ordering markers because texture sampling currently reads VRAM directly.
+
+`ScanoutMapper` is the typed production boundary for the current GP1 display
+state. It retains the raw horizontal/vertical display ranges, resolves the
+nominal 256/320/368/512/640-pixel mode, exposes a 480-line interlaced frame as
+an explicit even or odd 240-line field, and decodes wrapped VRAM into caller-
+owned RGB888 storage. Both native RGB555 expansion and packed 24-bit byte
+layout are deterministic and bounded. A disabled display decodes to black.
+This is spatial scanout extraction only; field cadence, deinterlacing, scaling,
+HDR conversion, and host presentation remain native-backend policy.
 
 The current GPU event snapshot does not carry the active GP1 display rectangle.
 Therefore GP0(E1).10 "draw to display area" gating cannot be enforced here: a

@@ -16,6 +16,7 @@
 namespace {
 
 using clean_aot::gpu::Color;
+using clean_aot::gpu::DisplayTiming;
 using clean_aot::gpu::Event;
 using clean_aot::gpu::EventKind;
 using clean_aot::gpu::LineEvent;
@@ -37,8 +38,14 @@ using clean_aot::raster::PresentationMode;
 using clean_aot::raster::PresentationRequest;
 using clean_aot::raster::RasterError;
 using clean_aot::raster::ReferenceRasterizer;
+using clean_aot::raster::ScanoutField;
+using clean_aot::raster::ScanoutMapper;
+using clean_aot::raster::ScanoutPixelFormat;
+using clean_aot::raster::ScanoutRequest;
 using clean_aot::raster::VramRect;
+using clean_aot::raster::VramWord;
 using clean_aot::raster::WorkBudget;
+using clean_aot::raster::kVramWordCount;
 
 class TestFailure final : public std::exception {
 public:
@@ -1206,6 +1213,93 @@ void test_golden_digest() {
           "golden VRAM digest changed unexpectedly");
 }
 
+void test_scanout_boundaries() {
+  DisplayTiming display{};
+  display.display_enabled = true;
+  display.display_start_x = 0u;
+  display.display_start_y = 0u;
+  display.horizontal_start = 0x200u;
+  display.horizontal_end = 0xc00u;
+  display.vertical_start = 0x10u;
+  display.vertical_end = 0x100u;
+  display.horizontal_resolution = 1u;
+
+  const auto baseline = ScanoutMapper::plan(ScanoutRequest{
+      display, ScanoutField::Progressive, 3840u, 2160u,
+      PresentationMode::Identity4x3, 4u, 3u});
+  require(baseline.accepted && baseline.plan.logical_width == 320u &&
+              baseline.plan.logical_height == 240u &&
+              baseline.plan.pixel_format == ScanoutPixelFormat::Rgb555 &&
+              baseline.plan.presentation.identity_4x3 &&
+              baseline.plan.presentation.destination_x == 480u &&
+              baseline.plan.presentation.destination_width == 2880u &&
+              baseline.plan.presentation.destination_height == 2160u &&
+              baseline.plan.horizontal_start == display.horizontal_start &&
+              baseline.plan.vertical_end == display.vertical_end,
+          "4K scanout did not preserve the exact 4:3 baseline/boundaries");
+
+  std::vector<VramWord> vram(kVramWordCount, 0u);
+  vram[0] = 0x7c1fu;
+  std::vector<std::uint8_t> rgb(baseline.plan.required_rgb_bytes, 0u);
+  const auto decoded = ScanoutMapper::decode_rgb888(baseline.plan, vram, rgb);
+  require(decoded.accepted() && decoded.work_units == 320u * 240u &&
+              rgb[0] == 255u && rgb[1] == 0u && rgb[2] == 255u,
+          "15-bit scanout channel expansion is incorrect");
+  const auto too_small = ScanoutMapper::decode_rgb888(
+      baseline.plan, vram, std::span<std::uint8_t>(rgb).first(rgb.size() - 1u));
+  require(too_small.error == RasterError::ScanoutBufferTooSmall,
+          "undersized scanout destination was not rejected");
+  auto disabled_plan = baseline.plan;
+  disabled_plan.display_enabled = false;
+  std::fill(rgb.begin(), rgb.end(), 0xffu);
+  require(ScanoutMapper::decode_rgb888(disabled_plan, vram, rgb).accepted() &&
+              rgb.front() == 0u && rgb.back() == 0u,
+          "disabled display did not produce bounded black scanout");
+
+  display.display_depth_24 = true;
+  display.display_start_x = 1023u;
+  const auto packed = ScanoutMapper::plan(ScanoutRequest{
+      display, ScanoutField::Progressive, 2560u, 1080u,
+      PresentationMode::Generic32x9, 4u, 3u});
+  require(packed.accepted &&
+              packed.plan.pixel_format == ScanoutPixelFormat::PackedRgb888 &&
+              packed.plan.presentation.aspect_width == 32u,
+          "packed 24-bit ultrawide scanout plan is incorrect");
+  vram[1023] = 0x2211u;
+  vram[0] = 0x4433u;
+  vram[1] = 0x6655u;
+  rgb.assign(packed.plan.required_rgb_bytes, 0u);
+  require(ScanoutMapper::decode_rgb888(packed.plan, vram, rgb).accepted() &&
+              rgb[0] == 0x11u && rgb[1] == 0x22u && rgb[2] == 0x33u &&
+              rgb[3] == 0x44u && rgb[4] == 0x55u && rgb[5] == 0x66u,
+          "24-bit scanout packing did not wrap within the VRAM row");
+
+  display.display_depth_24 = false;
+  display.display_start_x = 0u;
+  display.vertical_resolution_480 = true;
+  display.interlaced = true;
+  const auto odd = ScanoutMapper::plan(ScanoutRequest{
+      display, ScanoutField::Odd, 1920u, 1080u,
+      PresentationMode::Identity4x3, 4u, 3u});
+  require(odd.accepted && odd.plan.logical_height == 240u &&
+              odd.plan.source_line_step == 2u &&
+              odd.plan.source_field_offset == 1u,
+          "480-line odd-field scanout boundary is incorrect");
+  const auto impossible_progressive = ScanoutMapper::plan(ScanoutRequest{
+      display, ScanoutField::Progressive, 1920u, 1080u,
+      PresentationMode::Identity4x3, 4u, 3u});
+  require(!impossible_progressive.accepted,
+          "interlaced scanout accepted an impossible progressive field");
+
+  display.interlaced = false;
+  display.horizontal_resolution = 4u;
+  const auto forged_mode = ScanoutMapper::plan(ScanoutRequest{
+      display, ScanoutField::Progressive, 1920u, 1080u,
+      PresentationMode::Identity4x3, 4u, 3u});
+  require(!forged_mode.accepted,
+          "out-of-domain horizontal resolution was silently masked");
+}
+
 } // namespace
 
 int main() {
@@ -1221,6 +1315,7 @@ int main() {
     test_texture_mask_transparency_and_modulation();
     test_bounds_presentation_and_backend();
     test_adversarial_coordinates_and_budgets();
+    test_scanout_boundaries();
     test_golden_digest();
   } catch (const TestFailure &failure) {
     std::cerr << "FAIL: " << failure.what() << '\n';

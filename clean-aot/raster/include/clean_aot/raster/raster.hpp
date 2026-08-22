@@ -39,6 +39,8 @@ enum class RasterError : std::uint8_t {
   InvalidTexture,
   TransferDataMismatch,
   InvalidPresentationRequest,
+  InvalidScanoutRequest,
+  ScanoutBufferTooSmall,
 };
 
 struct WorkBudget {
@@ -112,6 +114,59 @@ class PresentationMapper final {
 public:
   [[nodiscard]] static PresentationResult
   map(const PresentationRequest &request) noexcept;
+};
+
+enum class ScanoutPixelFormat : std::uint8_t {
+  Rgb555,
+  PackedRgb888,
+};
+
+enum class ScanoutField : std::uint8_t {
+  Progressive,
+  Even,
+  Odd,
+};
+
+struct ScanoutRequest {
+  gpu::DisplayTiming display{};
+  ScanoutField field = ScanoutField::Progressive;
+  std::uint32_t output_width = 0;
+  std::uint32_t output_height = 0;
+  PresentationMode presentation_mode = PresentationMode::Identity4x3;
+  std::uint32_t custom_aspect_width = 4;
+  std::uint32_t custom_aspect_height = 3;
+};
+
+struct ScanoutPlan {
+  bool display_enabled = false;
+  ScanoutPixelFormat pixel_format = ScanoutPixelFormat::Rgb555;
+  ScanoutField field = ScanoutField::Progressive;
+  std::uint16_t vram_start_x_words = 0;
+  std::uint16_t vram_start_y = 0;
+  std::uint16_t logical_width = 0;
+  std::uint16_t logical_height = 0;
+  std::uint16_t source_line_step = 1;
+  std::uint16_t source_field_offset = 0;
+  std::uint16_t horizontal_start = 0;
+  std::uint16_t horizontal_end = 0;
+  std::uint16_t vertical_start = 0;
+  std::uint16_t vertical_end = 0;
+  std::size_t required_rgb_bytes = 0;
+  PresentationPlan presentation{};
+};
+
+struct ScanoutResult {
+  bool accepted = false;
+  RasterError error = RasterError::InvalidScanoutRequest;
+  ScanoutPlan plan{};
+};
+
+class ScanoutMapper final {
+public:
+  [[nodiscard]] static ScanoutResult plan(const ScanoutRequest &request) noexcept;
+  [[nodiscard]] static EventResult decode_rgb888(
+      const ScanoutPlan &plan, std::span<const VramWord> vram,
+      std::span<std::uint8_t> destination) noexcept;
 };
 
 using BackendConsumeEvent = EventResult (*)(void *context,

@@ -2,6 +2,7 @@
 #include "psx_render/gpu_packet.h"
 #include "psx_render/interpolation.h"
 #include "psx_render/provenance.h"
+#include "psx_render/projection_policy.h"
 
 #include <array>
 #include <cmath>
@@ -27,6 +28,31 @@ void expect(bool condition, std::string_view expression, int line) {
 }
 
 #define EXPECT(...) expect(static_cast<bool>(__VA_ARGS__), #__VA_ARGS__, __LINE__)
+
+void projection_and_culling_policy_is_explicit() {
+    const auto baseline = ProjectionPolicyPlanner::plan({});
+    EXPECT(baseline.accepted);
+    EXPECT(baseline.plan.exact_native_4x3);
+    EXPECT(baseline.plan.horizontal_clip_scale == 1.0);
+    EXPECT(baseline.plan.culling == CullingPolicy::NativeHardware);
+
+    const auto ultrawide = ProjectionPolicyPlanner::plan(
+        ProjectionRequest{ProjectionPolicy::ExpandHorizontal,
+                          CullingPolicy::MatchExpandedProjection, 32u, 9u});
+    EXPECT(ultrawide.accepted);
+    EXPECT(!ultrawide.plan.exact_native_4x3);
+    EXPECT(std::abs(ultrawide.plan.horizontal_clip_scale - 0.375) < 1e-12);
+    EXPECT(ultrawide.plan.culling == CullingPolicy::MatchExpandedProjection);
+
+    EXPECT(!ProjectionPolicyPlanner::plan(
+                ProjectionRequest{ProjectionPolicy::PreserveNative4x3,
+                                  CullingPolicy::MatchExpandedProjection, 4u, 3u})
+                .accepted);
+    EXPECT(!ProjectionPolicyPlanner::plan(
+                ProjectionRequest{ProjectionPolicy::ExpandHorizontal,
+                                  CullingPolicy::NativeHardware, 3u, 4u})
+                .accepted);
+}
 
 void expect_near(double actual, double expected, double tolerance, std::string_view expression, int line) {
     expect(std::abs(actual - expected) <= tolerance, expression, line);
@@ -801,6 +827,7 @@ void perspective_attributes_are_all_or_nothing() {
 } // namespace
 
 int main() {
+    projection_and_culling_policy_is_explicit();
     parser_decodes_flat_triangle();
     parser_decodes_textured_gouraud_quad();
     parser_rejects_invalid_or_truncated_packets();

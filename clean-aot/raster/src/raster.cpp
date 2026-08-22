@@ -1269,6 +1269,131 @@ PresentationMapper::map(const PresentationRequest &request) noexcept {
   return result;
 }
 
+ScanoutResult ScanoutMapper::plan(const ScanoutRequest &request) noexcept {
+  ScanoutResult result{};
+  const gpu::DisplayTiming &display = request.display;
+  const std::uint16_t width = display.resolution_368
+                                  ? 368u
+                                  : std::array<std::uint16_t, 4>{256u, 320u, 512u, 640u}
+                                        [display.horizontal_resolution & 3u];
+  const bool full_height = display.vertical_resolution_480 && display.interlaced;
+  const bool field_requested = request.field == ScanoutField::Even ||
+                               request.field == ScanoutField::Odd;
+  if (request.output_width == 0u || request.output_height == 0u ||
+      display.display_start_x >= kVramWidth ||
+      display.display_start_y >= kVramHeight ||
+      display.horizontal_resolution > 3u ||
+      display.horizontal_start >= display.horizontal_end ||
+      display.vertical_start >= display.vertical_end ||
+      (display.interlaced != field_requested) ||
+      (!display.interlaced && request.field != ScanoutField::Progressive)) {
+    return result;
+  }
+
+  // A 480-line interlaced frame is exposed as one bounded 240-line field.
+  // The vertical-resolution bit has no 480-line scanout meaning without
+  // interlace, matching GPUSTAT's effective vertical-resolution rule.
+  const std::uint16_t height = 240u;
+  const std::size_t pixels = static_cast<std::size_t>(width) * height;
+  if (pixels > std::numeric_limits<std::size_t>::max() / 3u) {
+    return result;
+  }
+  const PresentationResult presentation = PresentationMapper::map(
+      PresentationRequest{request.output_width, request.output_height,
+                          VramRect{0u, 0u, width, height},
+                          request.presentation_mode, request.custom_aspect_width,
+                          request.custom_aspect_height});
+  if (!presentation.accepted) {
+    return result;
+  }
+
+  result.accepted = true;
+  result.error = RasterError::None;
+  result.plan.display_enabled = display.display_enabled;
+  result.plan.pixel_format = display.display_depth_24
+                                 ? ScanoutPixelFormat::PackedRgb888
+                                 : ScanoutPixelFormat::Rgb555;
+  result.plan.field = request.field;
+  result.plan.vram_start_x_words = display.display_start_x;
+  result.plan.vram_start_y = display.display_start_y;
+  result.plan.logical_width = width;
+  result.plan.logical_height = height;
+  result.plan.source_line_step = full_height ? 2u : 1u;
+  result.plan.source_field_offset =
+      full_height && request.field == ScanoutField::Odd ? 1u : 0u;
+  result.plan.horizontal_start = display.horizontal_start;
+  result.plan.horizontal_end = display.horizontal_end;
+  result.plan.vertical_start = display.vertical_start;
+  result.plan.vertical_end = display.vertical_end;
+  result.plan.required_rgb_bytes = pixels * 3u;
+  result.plan.presentation = presentation.plan;
+  return result;
+}
+
+EventResult ScanoutMapper::decode_rgb888(
+    const ScanoutPlan &plan, std::span<const VramWord> vram,
+    std::span<std::uint8_t> destination) noexcept {
+  if (vram.size() != kVramWordCount || plan.logical_width == 0u ||
+      plan.logical_height == 0u || plan.source_line_step == 0u ||
+      plan.vram_start_x_words >= kVramWidth || plan.vram_start_y >= kVramHeight ||
+      (plan.pixel_format != ScanoutPixelFormat::Rgb555 &&
+       plan.pixel_format != ScanoutPixelFormat::PackedRgb888) ||
+      plan.required_rgb_bytes != static_cast<std::size_t>(plan.logical_width) *
+                                     plan.logical_height * 3u) {
+    return EventResult{EventStatus::Rejected, RasterError::InvalidScanoutRequest};
+  }
+  if (destination.size() < plan.required_rgb_bytes) {
+    return EventResult{EventStatus::Rejected, RasterError::ScanoutBufferTooSmall};
+  }
+  if (!plan.display_enabled) {
+    std::fill_n(destination.begin(), static_cast<std::ptrdiff_t>(plan.required_rgb_bytes), 0u);
+    return EventResult{EventStatus::Applied, RasterError::None,
+                       static_cast<std::uint64_t>(plan.logical_width) *
+                           plan.logical_height};
+  }
+
+  const auto row_byte_at = [&vram](std::uint32_t y,
+                                   std::size_t byte_x) noexcept {
+    constexpr std::size_t row_bytes = static_cast<std::size_t>(kVramWidth) * 2u;
+    const std::size_t wrapped_byte_x = byte_x % row_bytes;
+    const VramWord word = vram[static_cast<std::size_t>(y) * kVramWidth +
+                               wrapped_byte_x / 2u];
+    return static_cast<std::uint8_t>((wrapped_byte_x & 1u) == 0u ? word & 0xffu
+                                                                 : word >> 8u);
+  };
+  std::size_t output = 0u;
+  for (std::uint32_t y = 0; y < plan.logical_height; ++y) {
+    const std::uint32_t source_y =
+        (static_cast<std::uint32_t>(plan.vram_start_y) +
+         plan.source_field_offset + y * plan.source_line_step) % kVramHeight;
+    if (plan.pixel_format == ScanoutPixelFormat::PackedRgb888) {
+      const std::size_t row_byte =
+          static_cast<std::size_t>(plan.vram_start_x_words) * 2u;
+      for (std::uint32_t x = 0; x < plan.logical_width; ++x) {
+        const std::size_t pixel_byte = row_byte + static_cast<std::size_t>(x) * 3u;
+        destination[output++] = row_byte_at(source_y, pixel_byte);
+        destination[output++] = row_byte_at(source_y, pixel_byte + 1u);
+        destination[output++] = row_byte_at(source_y, pixel_byte + 2u);
+      }
+    } else {
+      for (std::uint32_t x = 0; x < plan.logical_width; ++x) {
+        const std::size_t word_index = static_cast<std::size_t>(source_y) * kVramWidth +
+            ((static_cast<std::uint32_t>(plan.vram_start_x_words) + x) % kVramWidth);
+        const VramWord pixel = vram[word_index];
+        const auto expand = [](std::uint16_t channel) noexcept {
+          return static_cast<std::uint8_t>((channel << 3u) | (channel >> 2u));
+        };
+        destination[output++] = expand(pixel & 0x1fu);
+        destination[output++] = expand((pixel >> 5u) & 0x1fu);
+        destination[output++] = expand((pixel >> 10u) & 0x1fu);
+      }
+    }
+  }
+  return EventResult{EventStatus::Applied, RasterError::None,
+                     static_cast<std::uint64_t>(plan.logical_width) *
+                         plan.logical_height};
+}
+
 bool native_backend_compatible(const NativeBackendV1 &backend) noexcept {
   return backend.abi_version == kNativeBackendAbiVersion &&
          backend.consume_event != nullptr;

@@ -21,6 +21,13 @@ stale, or unvalidated candidate converts the entire triangle to native
 fixed-point vertices with an explicit `NativeFallbackIdentity`; partial-
 provenance triangles are not emitted.
 
+`ProjectionPolicyPlanner` keeps composition policy outside packet and
+provenance code. Its default plan is exactly neutral 4:3 geometry with native
+hardware culling. Horizontal expansion requires an explicit target aspect and
+an explicit choice between native culling and a matching expanded frustum;
+the planner supplies only a generic clip-space scale and contains no title
+addresses, track constants, or object exceptions.
+
 The interpolation functions implement the renderer-independent perspective
 formula using clip-space `w`. Scaling all `w` values by a common finite factor
 does not change the result while the scaled inputs remain finite and non-zero.
