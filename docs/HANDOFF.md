@@ -1,5 +1,22 @@
 # Handoff
 
+## BIOS allocator-runaway checkpoint (2026-08-21)
+
+- From UnknownCode `0x1174` / RAM epoch `6c6da3c3...`, exact live-region
+  authentication advanced through `[0x1174,0x1408)`, callback
+  `[0x1030,0x10B8)`, and the observed branch continuation
+  `[0x10E4,0x113C)`. The adjacent entry at `0x10B8` remains unauthorized.
+- The path no longer reaches UnknownCode. Two repeated bounded probes remain
+  authenticated for the full 1,000,000-dispatch ceiling and stop at `0x1274`
+  inside the allocator loop: 2,320,994 instructions, 13,663 reads, 22,646
+  writes, 6,200 isolated writes, one device read, and 62 device writes.
+- This is a materially different blocker, not an authorization frontier. The
+  final RAM epoch is `a968043add6eed35610a894bbef805faeaafe205981e3402b7f9ec18953ca9db`;
+  canonical evidence is
+  `clean-aot/catalog/evidence/bios-frontier-02320994.json`. Diagnose the free
+  list/state feeding the live `0x1274` loop before extending any code region or
+  dispatch ceiling.
+
 ## Authenticated BIOS frontier checkpoint (2026-08-21)
 
 - The real SCPH1001 BIOS path advanced through five additional exact,
