@@ -449,6 +449,15 @@ void test_issue_cycle_and_mmio(Runner& runner) {
     const auto ram_size = runtime->read32(at_nine_hundred, 0x1f80'1060U);
     EXPECT(runner, ram_size.ok());
     EXPECT(runner, (ram_size.value & 0xffffU) == 0x0b88U);
+    EXPECT(runner, runtime->write32(at_nine_hundred, 0x0020'0000U,
+                                    0x5566'7788U).ok());
+    EXPECT(runner, runtime->read32(at_nine_hundred, 0U).value ==
+                       0x5566'7788U);
+    EXPECT(runner, runtime->write16(at_nine_hundred, 0x1f80'1060U,
+                                    0x0888U).ok());
+    EXPECT(runner, !runtime->read32(at_nine_hundred, 0x0020'0000U).ok());
+    EXPECT(runner, runtime->read32(at_nine_hundred, 0U).value ==
+                       0x5566'7788U);
 
     const auto bad_gpu = runtime->write16(
         at_nine_hundred, 0x1f80'1810U, 0U);

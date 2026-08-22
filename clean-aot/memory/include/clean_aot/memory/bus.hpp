@@ -411,6 +411,16 @@ public:
         return bios_;
     }
 
+    // Retail 2 MiB RAM is visible through an 8 MiB aperture while RAM_SIZE
+    // selects an 8 MiB bank, and only through its canonical 2 MiB aperture
+    // when software selects the corrected 2 MiB bank geometry.
+    void set_extended_ram_mirrors(bool enabled) noexcept {
+        ram_aperture_bytes_ = enabled ? kRamMirrorBytes : kRamBytes;
+    }
+    [[nodiscard]] bool extended_ram_mirrors() const noexcept {
+        return ram_aperture_bytes_ == kRamMirrorBytes;
+    }
+
     /*
      * Clears RAM, scratchpad, and page generations while preserving the BIOS
      * image and MMIO router.  Every previously captured region becomes stale.
@@ -495,6 +505,7 @@ private:
     bool configured_ = false;
     std::uint64_t bus_domain_ = 0u;
     std::uint64_t reset_epoch_ = 1u;
+    std::uint32_t ram_aperture_bytes_ = kRamMirrorBytes;
     std::array<std::uint8_t, kRamBytes> ram_{};
     std::array<std::uint8_t, kScratchpadBytes> scratchpad_{};
     std::array<std::uint64_t, kRamCodePageCount> generations_{};

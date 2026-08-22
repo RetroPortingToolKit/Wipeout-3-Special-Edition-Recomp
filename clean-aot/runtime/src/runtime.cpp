@@ -738,6 +738,7 @@ struct Runtime::Impl final {
         memory_control[0] = 0x1f00'0000U;
         memory_control[1] = 0x1f80'2000U;
         ram_size = 0U;
+        bus.set_extended_ram_mirrors(true);
         cache_control = 0U;
         expansion_two.fill(0U);
         sio1_data = 0xffU;
@@ -1206,6 +1207,12 @@ struct Runtime::Impl final {
         }
         if (interval_contains(address, width, kRamSize, kRamSize + 4U)) {
             ram_size = lane_merge(ram_size, address, width, value);
+            const std::uint32_t bank_geometry = (ram_size >> 9U) & 7U;
+            if (bank_geometry == 4U) {
+                bus.set_extended_ram_mirrors(false);
+            } else if (bank_geometry == 5U) {
+                bus.set_extended_ram_mirrors(true);
+            }
             return handled_write();
         }
         if (interval_contains(address, width, kInterruptStatus,

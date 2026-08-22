@@ -44,6 +44,10 @@ unmapped, or rejected. Expansion region 1 and the gap around scratchpad remain
 unmapped in this tranche. Region checks are non-overlapping, so RAM, scratchpad,
 hardware, and BIOS cannot steal bytes from one another.
 
+The caller can switch the physical RAM aperture between the reset/`0B88h`
+8 MiB geometry (four aliases of the retail 2 MiB chip) and the corrected
+`0888h` 2 MiB geometry. Changing the aperture never copies or clears RAM.
+
 ## Access semantics
 
 `read8/read16/read32` and `write8/write16/write32` are little-endian and

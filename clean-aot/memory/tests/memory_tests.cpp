@@ -203,6 +203,17 @@ void test_translation_and_mirrors() {
     require(kKernelCachedBase != kKernelUncachedBase,
             "cached and uncached architectural selectors are distinct");
 
+    fixture.bus->set_extended_ram_mirrors(false);
+    require(!fixture.bus->extended_ram_mirrors() &&
+                fixture.bus->read32(physical).value == value &&
+                fixture.bus->read32(physical + kRamBytes).status ==
+                    AccessStatus::Unmapped,
+            "corrected 2 MiB RAM geometry removes the extended aliases");
+    fixture.bus->set_extended_ram_mirrors(true);
+    require(fixture.bus->extended_ram_mirrors() &&
+                fixture.bus->read32(physical + 3u * kRamBytes).value == value,
+            "8 MiB RAM aperture deterministically restores physical mirrors");
+
     const auto segment_fault = fixture.bus->read8(2u << 29u);
     require(segment_fault.status == AccessStatus::UnsupportedSegment &&
                 segment_fault.fault.virtual_address == (2u << 29u),

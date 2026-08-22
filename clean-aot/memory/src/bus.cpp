@@ -87,7 +87,7 @@ Bus::ResolvedByte Bus::resolve_byte(
     }
 
     const std::uint32_t physical = translation.physical_address;
-    if (physical < kRamMirrorBytes) {
+    if (physical < ram_aperture_bytes_) {
         return {Region::Ram,
                 translation.status,
                 translation.segment,
