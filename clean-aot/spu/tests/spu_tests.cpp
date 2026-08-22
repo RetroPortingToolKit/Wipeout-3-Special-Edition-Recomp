@@ -1454,7 +1454,61 @@ void test_mix_capture_and_input_fifos() {
     put(retained_reverb_reads, Device::IrqAddress, 0x1001u);
     require(retained_reverb_reads.render(passive_output).ok() &&
                 retained_reverb_irq.calls == 1u,
-            "disabled reverb retains COMB/APF RAM reads and IRQs");
+            "disabled zero-vAPF2 reverb retains only the delayed APF2 IRQ read");
+
+    const auto configure_pruned_reverb = [](Device& target) {
+        target.reset();
+        put(target, Device::ReverbBase, 0x1000u);
+        put(target, Device::ReverbRegisterBase + 12u * 2u, 2u);
+        put(target, Device::ReverbRegisterBase + 26u * 2u, 3u);
+        put(target, Device::ReverbRegisterBase + 28u * 2u, 1u);
+        put(target, Device::IrqAddress, 0x1002u);
+        put(target, Device::Control,
+            static_cast<std::uint16_t>(kLive | Device::ControlIrqEnable));
+    };
+    IrqCounter pruned_irq;
+    static Device pruned_reverb;
+    configure_pruned_reverb(pruned_reverb);
+    pruned_reverb.set_irq_callback(IrqCounter::signal, &pruned_irq);
+    std::array<StereoSample, 2u> pruned_output{};
+    require(pruned_reverb.render(pruned_output).ok() &&
+                pruned_irq.calls == 0u && !pruned_reverb.irq_pending(),
+            "zero vAPF2 prunes APF1 and COMB sound-RAM IRQ visibility");
+    configure_pruned_reverb(pruned_reverb);
+    pruned_reverb.set_irq_callback(IrqCounter::signal, &pruned_irq);
+    put(pruned_reverb, Device::ReverbRegisterBase + 9u * 2u, 0x4000u);
+    require(pruned_reverb.render(pruned_output).ok() &&
+                pruned_irq.calls == 0u && !pruned_reverb.irq_pending(),
+            "zero vAPF1 still prunes COMB sound-RAM IRQ visibility");
+    configure_pruned_reverb(pruned_reverb);
+    pruned_reverb.set_irq_callback(IrqCounter::signal, &pruned_irq);
+    put(pruned_reverb, Device::ReverbRegisterBase + 9u * 2u, 0x4000u);
+    put(pruned_reverb, Device::ReverbRegisterBase + 8u * 2u, 0x4000u);
+    static std::array<std::byte, Device::SnapshotBytes>
+        pruned_reverb_snapshot{};
+    require(pruned_reverb.save_snapshot(pruned_reverb_snapshot).ok(),
+            "snapshot before enabling the disabled-reverb COMB read path");
+    IrqCounter pruned_replay_irq;
+    static Device pruned_reverb_replay;
+    pruned_reverb_replay.reset();
+    pruned_reverb_replay.set_irq_callback(IrqCounter::signal,
+                                          &pruned_replay_irq);
+    require(pruned_reverb_replay.restore_snapshot(pruned_reverb_snapshot).ok(),
+            "restore disabled-reverb coefficient topology");
+    std::array<StereoSample, 2u> pruned_replay_output{};
+    require(pruned_reverb.render(pruned_output).ok() &&
+                pruned_reverb_replay.render(pruned_replay_output).ok(),
+            "render restored disabled-reverb coefficient topology");
+    require(pruned_irq.calls == 1u && pruned_replay_irq.calls == 1u &&
+                pruned_reverb.irq_pending() &&
+                pruned_reverb_replay.irq_pending(),
+            "nonzero vAPF1/vAPF2 exposes exactly one COMB IRQ per pair");
+    const std::uint64_t pruned_audio_digest = audio_digest(pruned_output);
+    require(pruned_output == pruned_replay_output &&
+                pruned_reverb.deterministic_digest() ==
+                    pruned_reverb_replay.deterministic_digest() &&
+                pruned_audio_digest == 12'161'962'213'042'174'405ull,
+            "disabled-reverb COMB reads replay with deterministic audio");
 }
 
 struct DmaCollector final {

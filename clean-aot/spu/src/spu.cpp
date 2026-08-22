@@ -1362,8 +1362,6 @@ StereoSample Device::process_reverb_side(bool right_channel,
     const std::array<std::size_t, 4u> comb_addresses = right_channel
                                                            ? std::array<std::size_t, 4u>{13u, 15u, 21u, 23u}
                                                            : std::array<std::size_t, 4u>{12u, 14u, 20u, 22u};
-    std::int16_t output = comb(comb_addresses, 3u);
-
     const auto all_pass = [this, &volume, write_buffer](std::int16_t input_value,
                                                         std::size_t address_index,
                                                         std::size_t depth_index,
@@ -1381,8 +1379,6 @@ StereoSample Device::process_reverb_side(bool right_channel,
             static_cast<std::int32_t>(reverb_multiply(delayed, coefficient)));
         if (write_buffer) {
             write_reverb_sample(address, first);
-        } else {
-            static_cast<void>(read_reverb_sample(address));
         }
         output_value = saturate_i16(
             static_cast<std::int32_t>(reverb_multiply(first, coefficient)) +
@@ -1390,8 +1386,28 @@ StereoSample Device::process_reverb_side(bool right_channel,
     };
     const std::size_t apf1_address = right_channel ? 27u : 26u;
     const std::size_t apf2_address = right_channel ? 29u : 28u;
-    all_pass(output, apf1_address, 0u, output);
-    all_pass(output, apf2_address, 1u, output);
+    const auto read_apf_delay = [this](std::size_t address_index,
+                                       std::size_t depth_index) noexcept {
+        const std::uint32_t address =
+            reverb_address(reverb_registers_[address_index]);
+        return read_reverb_sample(wrap_reverb(
+            static_cast<std::int64_t>(address) -
+            static_cast<std::int64_t>(sign_extend(
+                reverb_registers_[depth_index], 16u)) * 8));
+    };
+
+    std::int16_t output = 0;
+    if (!write_buffer && volume(9u) == 0) {
+        output = read_apf_delay(apf2_address, 1u);
+    } else {
+        if (!write_buffer && volume(8u) == 0) {
+            output = read_apf_delay(apf1_address, 0u);
+        } else {
+            output = comb(comb_addresses, 3u);
+            all_pass(output, apf1_address, 0u, output);
+        }
+        all_pass(output, apf2_address, 1u, output);
+    }
 
     if (right_channel) {
         reverb_cursor_byte_ = wrap_reverb(

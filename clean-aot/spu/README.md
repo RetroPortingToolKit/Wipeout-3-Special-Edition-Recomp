@@ -66,7 +66,8 @@ Implemented surface
   The public measurements still leave exact silicon evaluation order and the
   output FIR polyphase convention underdetermined; this implementation uses a
   centered zero-stuffed polyphase reconstruction and does not claim bit-exact
-  wet audio.
+  wet audio. With reverb writes disabled, APF coefficient gates prune the
+  documented upstream APF/COMB RAM reads and their IRQ visibility.
 - Canonical little-endian snapshots containing all device state and sound RAM,
   payload validation, FNV-1a replay digests, and callback-independent restore.
   Callbacks are synchronous/non-owning, may not re-enter the device, and remain
@@ -101,7 +102,8 @@ continuously clocked noise, modulation ordering,
 saturation, masks and malformed MMIO, transfer FIFO/DMA modes,
 always-on capture and IRQ gates, CD/XA/external routing, chunking, adversarial
 snapshot validation, 39-tap reverb FIR phase and combined-delay behavior, long
-transfer-gated reverb writes, deterministic generation, and a fixed
+transfer-gated reverb writes, disabled-reverb read/IRQ pruning, deterministic
+generation, and a fixed
 441-sample 100 Hz boundary under varying
 simulated CPU retirement multipliers. The benchmark runs a representative
 24-voice/reverb workload and reports measured samples per second; its timing is
