@@ -45,12 +45,10 @@ emitted in BGR order, and 15-bit pixels use PS1 BGR555 bit placement with the
 command-controlled bit 15. These choices are deterministic implementation
 behavior, not a claim that every undocumented revision has identical rounding.
 
-A color macroblock is decoded in input order `Cr, Cb, Y1, Y2, Y3, Y4`; the
-output FIFO retains four 8x8 raster blocks in `Y1, Y2, Y3, Y4` order. The
-current-block status field carries `Cr=4`, `Cb=5`, `Y1..Y4=0..3`, and `Y=4` in
-monochrome mode. A caller that wants a contiguous 16x16 image can place those
-four blocks at the corresponding quadrants; the device does not silently
-change the DMA-visible block stream.
+A color macroblock is decoded in input order `Cr, Cb, Y1, Y2, Y3, Y4` and the
+output FIFO exposes the reconstructed pixels as one contiguous row-major
+16x16 raster macroblock. The current-block status field carries `Cr=4`,
+`Cb=5`, `Y1..Y4=0..3`, and `Y=4` in monochrome mode.
 
 Build and test in isolation:
 

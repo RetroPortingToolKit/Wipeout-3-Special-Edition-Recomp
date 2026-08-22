@@ -896,16 +896,15 @@ bool Device::emit_color() noexcept
 {
     std::array<std::uint8_t, 768> packed{};
     std::size_t output_offset = 0U;
-    const std::array<std::uint8_t, 4> y_blocks = {2U, 3U, 4U, 5U};
-    for (std::size_t quadrant = 0U; quadrant < y_blocks.size(); ++quadrant) {
-        const std::size_t origin_x = (quadrant & 1U) != 0U ? 8U : 0U;
-        const std::size_t origin_y = quadrant >= 2U ? 8U : 0U;
-        for (std::size_t y = 0U; y < 8U; ++y) {
-            for (std::size_t x = 0U; x < 8U; ++x) {
-                const std::size_t global_x = origin_x + x;
-                const std::size_t global_y = origin_y + y;
+    for (std::size_t global_y = 0U; global_y < 16U; ++global_y) {
+        for (std::size_t global_x = 0U; global_x < 16U; ++global_x) {
+                const std::size_t quadrant = (global_y >= 8U ? 2U : 0U) +
+                                             (global_x >= 8U ? 1U : 0U);
+                const std::size_t local_x = global_x & 7U;
+                const std::size_t local_y = global_y & 7U;
                 const std::size_t chroma_index = (global_x / 2U) + (global_y / 2U) * 8U;
-                const std::int32_t y_value = state_.blocks[y_blocks[quadrant]][x + y * 8U];
+                const std::int32_t y_value = state_.blocks[quadrant + 2U]
+                                                         [local_x + local_y * 8U];
                 const std::int32_t cr = state_.blocks[0][chroma_index];
                 const std::int32_t cb = state_.blocks[1][chroma_index];
                 std::int32_t red = y_value + mdec_divide_add(
@@ -946,7 +945,6 @@ bool Device::emit_color() noexcept
                     packed[output_offset++] = static_cast<std::uint8_t>(pixel & 0xFFU);
                     packed[output_offset++] = static_cast<std::uint8_t>(pixel >> 8U);
                 }
-            }
         }
     }
     if (output_offset != output_bytes_for(state_.depth)) {

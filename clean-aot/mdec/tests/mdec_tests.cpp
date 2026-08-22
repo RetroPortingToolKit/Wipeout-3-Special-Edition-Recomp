@@ -142,6 +142,19 @@ std::vector<std::uint32_t> make_color_stream(std::int32_t cr,
     return pack_halfwords(halfwords);
 }
 
+std::vector<std::uint32_t> make_asymmetric_color_stream(
+    const std::array<std::int32_t, 4>& luma)
+{
+    std::vector<std::uint16_t> halfwords;
+    const std::array<std::int32_t, 6> values = {
+        0, 0, luma[0], luma[1], luma[2], luma[3]};
+    for (const std::int32_t value : values) {
+        const auto fixture = make_block(0U, value);
+        halfwords.insert(halfwords.end(), fixture.begin(), fixture.end());
+    }
+    return pack_halfwords(halfwords);
+}
+
 void send_direct(Device& device,
                  std::uint32_t command_word,
                  std::span<const std::uint32_t> words)
@@ -395,6 +408,36 @@ void test_color_conversion_and_flags()
             "signed output does not imply bit15");
     require((signed15.front() & 0x0000FFFFU) != (words15_clear.front() & 0x0000FFFFU),
             "signed and unsigned color packing differ");
+}
+
+void test_color_macroblock_raster_order()
+{
+    const auto stream = make_asymmetric_color_stream({-64, -16, 32, 80});
+    Device device;
+    send_direct(device, command(1U, OutputDepth::TwentyFourBit, false, false,
+                                static_cast<std::uint16_t>(stream.size())), stream);
+    const auto words = drain(device);
+    require_equal(words.size(), 192U, "asymmetric 24-bit output size");
+    std::array<std::uint8_t, 768> bytes{};
+    for (std::size_t index = 0U; index < words.size(); ++index) {
+        for (unsigned lane = 0U; lane < 4U; ++lane) {
+            bytes[index * 4U + lane] = static_cast<std::uint8_t>(words[index] >> (lane * 8U));
+        }
+    }
+    const auto blue = [&bytes](std::size_t x, std::size_t y) {
+        return bytes[(y * 16U + x) * 3U];
+    };
+    require(blue(0U, 0U) == blue(7U, 0U), "top-left luma block continuity");
+    require(blue(8U, 0U) == blue(15U, 0U), "top-right luma block continuity");
+    require(blue(0U, 0U) != blue(8U, 0U), "top row crosses Y1 to Y2 at x=8");
+    require(blue(0U, 8U) != blue(8U, 8U), "bottom row crosses Y3 to Y4 at x=8");
+    require(blue(0U, 0U) != blue(0U, 8U), "left column crosses Y1 to Y3 at y=8");
+
+    Device replay;
+    send_direct(replay, command(1U, OutputDepth::TwentyFourBit, false, false,
+                                static_cast<std::uint16_t>(stream.size())), stream);
+    require_equal(drain(replay), words, "asymmetric raster replay determinism");
+    require_equal(replay.cycles(), device.cycles(), "raster layout preserves exact cycles");
 }
 
 void test_rle_saturation_and_boundaries()
@@ -802,12 +845,13 @@ void test_adversarial_bounded_sequences()
 
 int main()
 {
-    const std::array<std::pair<const char*, void (*)()>, 12> tests = {
+    const std::array<std::pair<const char*, void (*)()>, 13> tests = {
         std::pair{"reset_and_status", &test_reset_and_status},
         std::pair{"quant_and_scale_loads", &test_quant_and_scale_loads},
         std::pair{"monochrome_output_and_packing", &test_monochrome_output_and_packing},
         std::pair{"reference_rle_idct_vectors", &test_reference_rle_idct_vectors},
         std::pair{"color_conversion_and_flags", &test_color_conversion_and_flags},
+        std::pair{"color_macroblock_raster_order", &test_color_macroblock_raster_order},
         std::pair{"rle_saturation_and_boundaries", &test_rle_saturation_and_boundaries},
         std::pair{"parameter_receipt_under_output_backpressure",
                   &test_parameter_receipt_under_output_backpressure},
