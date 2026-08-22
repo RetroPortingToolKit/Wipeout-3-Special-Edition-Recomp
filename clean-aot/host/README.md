@@ -72,6 +72,18 @@ SDL3 3.4.10 source archive and build
   deliberately remains zero and VRR remains unknown rather than being inferred
   from a successful GPU submission.
 
+At device creation the Vulkan path probes `VK_KHR_present_id` plus
+`VK_KHR_present_wait`, then `VK_GOOGLE_display_timing`, by requesting each
+extension set through SDL's Vulkan options and falling back to the portable
+device when unsupported. Extension enablement is diagnostic only: SDL's public
+GPU API does not expose its `VkDevice`, queue, swapchain, or a way to attach a
+present ID. A platform bridge may provide `IPresentCompletionProbe` when those
+native objects are legitimately available. Completion receipts are then bound
+to a swapchain generation and contiguous present ID, checked for monotonic
+timestamps and 100 Hz interval tolerance, and fail closed on stale, duplicate,
+out-of-order, or future receipts. Resize starts a new evidence generation;
+device loss cannot be reported as a completion.
+
 The Vulkan SDK is therefore not a runtime dependency. A Windows release still
 needs the SDL3 runtime DLL and a Vulkan-capable driver. The current shell does
 not provide an audio device; the display-free headless backend is the accepted

@@ -131,10 +131,14 @@ struct SdlVulkanPresentation::Impl final {
     bool swapchain_recreation_requested = false;
     std::uint64_t next_sequence = 0U;
     std::uint64_t next_update_index = 0U;
+    std::uint64_t next_completion_present_id = 0U;
+    std::uint64_t generation_completion_count = 0U;
     std::uint64_t next_audio_update = 0U;
     SdlAudioMetrics audio_metrics{};
     ControllerState controller{};
     SdlPresentationMetrics metrics{};
+    IPresentCompletionProbe* completion_probe = nullptr;
+    std::uint64_t completion_cadence_tolerance_ns = 0U;
 };
 
 namespace {
@@ -177,6 +181,87 @@ template <typename ImplType>
             static_cast<std::uint64_t>(mode->refresh_rate_denominator);
     }
     return true;
+}
+
+template <typename ImplType>
+void poll_present_completions(ImplType& impl) noexcept {
+    if (impl.completion_probe == nullptr ||
+        impl.metrics.completion_evidence_fault) return;
+    PresentCompletion completion{};
+    while (impl.completion_probe->poll(completion)) {
+        const std::uint64_t expected = impl.next_completion_present_id;
+        if (completion.generation != impl.metrics.present_generation ||
+            completion.present_id != expected || completion.completion_ns == 0U ||
+            completion.present_id >= impl.metrics.gpu_present_submissions ||
+            (impl.generation_completion_count != 0U &&
+             completion.completion_ns <= impl.metrics.last_completion_ns)) {
+            impl.metrics.completion_evidence_fault = true;
+            impl.metrics.completion_source = PresentCompletionSource::fault;
+            return;
+        }
+        if (impl.generation_completion_count != 0U) {
+            const std::uint64_t interval = completion.completion_ns -
+                impl.metrics.last_completion_ns;
+            impl.metrics.completion_interval_ns_total += interval;
+            impl.metrics.completion_interval_ns_max =
+                std::max(impl.metrics.completion_interval_ns_max, interval);
+            const std::uint64_t target = 1'000'000'000U /
+                impl.metrics.target_refresh_hz;
+            const std::uint64_t error = interval > target
+                ? interval - target : target - interval;
+            if (error <= impl.completion_cadence_tolerance_ns) {
+                ++impl.metrics.completion_intervals_at_target;
+            } else {
+                ++impl.metrics.completion_interval_violations;
+            }
+        }
+        impl.metrics.last_completed_present_id = completion.present_id;
+        impl.metrics.last_completion_ns = completion.completion_ns;
+        ++impl.metrics.display_presentations_confirmed;
+        ++impl.generation_completion_count;
+        ++impl.next_completion_present_id;
+    }
+}
+
+template <typename ImplType>
+[[nodiscard]] SDL_GPUDevice* create_vulkan_device(ImplType& impl,
+    const SdlVulkanConfig& config) noexcept {
+    const auto attempt = [&config](const char** extensions,
+                                   Uint32 count) noexcept {
+        SDL_GPUVulkanOptions options{};
+        options.device_extension_count = count;
+        options.device_extension_names = extensions;
+        const SDL_PropertiesID props = SDL_CreateProperties();
+        if (props == 0U) return static_cast<SDL_GPUDevice*>(nullptr);
+        const bool configured = SDL_SetStringProperty(props,
+                SDL_PROP_GPU_DEVICE_CREATE_NAME_STRING, "vulkan") &&
+            SDL_SetBooleanProperty(props,
+                SDL_PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN, config.debug_gpu) &&
+            SDL_SetBooleanProperty(props,
+                SDL_PROP_GPU_DEVICE_CREATE_SHADERS_SPIRV_BOOLEAN, true) &&
+            SDL_SetPointerProperty(props,
+                SDL_PROP_GPU_DEVICE_CREATE_VULKAN_OPTIONS_POINTER, &options);
+        SDL_GPUDevice* device = configured
+            ? SDL_CreateGPUDeviceWithProperties(props) : nullptr;
+        SDL_DestroyProperties(props);
+        return device;
+    };
+    const char* present_wait_extensions[]{
+        "VK_KHR_present_id", "VK_KHR_present_wait"};
+    SDL_GPUDevice* device = attempt(present_wait_extensions, 2U);
+    if (device != nullptr) {
+        impl.metrics.present_wait_extensions_enabled = true;
+        return device;
+    }
+    SDL_ClearError();
+    const char* display_timing_extensions[]{"VK_GOOGLE_display_timing"};
+    device = attempt(display_timing_extensions, 1U);
+    if (device != nullptr) {
+        impl.metrics.display_timing_extension_enabled = true;
+        return device;
+    }
+    SDL_ClearError();
+    return SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, config.debug_gpu, "vulkan");
 }
 
 template <typename ImplType>
@@ -326,6 +411,16 @@ HostStatus SdlVulkanPresentation::initialize() noexcept {
     impl_->requested_fullscreen = config_.fullscreen;
     impl_->metrics.target_refresh_hz = config_.target_refresh_hz;
     impl_->metrics.allowed_frames_in_flight = config_.allowed_frames_in_flight;
+    impl_->completion_probe = config_.completion_probe;
+    impl_->completion_cadence_tolerance_ns =
+        config_.completion_cadence_tolerance_ns;
+    impl_->metrics.present_generation = 1U;
+    if (impl_->completion_probe != nullptr) {
+        impl_->metrics.completion_source = impl_->completion_probe->source();
+        if (impl_->metrics.completion_source != PresentCompletionSource::unavailable) {
+            impl_->completion_probe->reset(impl_->metrics.present_generation);
+        }
+    }
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) {
         shutdown();
@@ -371,10 +466,7 @@ HostStatus SdlVulkanPresentation::initialize() noexcept {
         return sdl_failure();
     }
 
-    impl_->device = SDL_CreateGPUDevice(
-        SDL_GPU_SHADERFORMAT_SPIRV,
-        config_.debug_gpu,
-        "vulkan");
+    impl_->device = create_vulkan_device(*impl_, config_);
     if (impl_->device == nullptr) {
         shutdown();
         return sdl_failure(HostCode::unsupported);
@@ -597,6 +689,16 @@ HostStatus SdlVulkanPresentation::recreate_swapchain() noexcept {
     }
     impl_->swapchain_recreation_requested = false;
     ++impl_->metrics.swapchain_recreations;
+    ++impl_->metrics.present_generation;
+    impl_->generation_completion_count = 0U;
+    impl_->metrics.last_completed_present_id = 0U;
+    impl_->metrics.last_completion_ns = 0U;
+    impl_->next_completion_present_id = impl_->next_sequence;
+    if (impl_->completion_probe != nullptr &&
+        impl_->metrics.completion_source != PresentCompletionSource::unavailable &&
+        impl_->metrics.completion_source != PresentCompletionSource::fault) {
+        impl_->completion_probe->reset(impl_->metrics.present_generation);
+    }
     return HostStatus{};
 }
 
@@ -604,6 +706,7 @@ HostStatus SdlVulkanPresentation::service() noexcept {
     if (impl_ == nullptr || !impl_->initialized || impl_->shutting_down) {
         return sdl_failure(HostCode::shutting_down);
     }
+    poll_present_completions(*impl_);
 
     if (impl_->has_pending_event) {
         if (!impl_->events.try_push(impl_->pending_event)) {
@@ -788,6 +891,13 @@ HostStatus SdlVulkanPresentation::service() noexcept {
     impl_->metrics.queue_latency_ns_total += latency;
     impl_->metrics.queue_latency_ns_max =
         std::max(impl_->metrics.queue_latency_ns_max, latency);
+    if (impl_->completion_probe != nullptr &&
+        impl_->metrics.completion_source != PresentCompletionSource::unavailable &&
+        impl_->metrics.completion_source != PresentCompletionSource::fault) {
+        impl_->completion_probe->submitted(impl_->metrics.present_generation,
+                                           impl_->pending_frame.sequence);
+        poll_present_completions(*impl_);
+    }
     return HostStatus{};
 }
 

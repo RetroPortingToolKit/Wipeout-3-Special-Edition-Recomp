@@ -7,6 +7,34 @@
 
 namespace {
 using namespace clean_aot::host;
+class MockPresentWaitProbe final : public IPresentCompletionProbe {
+public:
+    explicit MockPresentWaitProbe(PresentCompletionSource source =
+        PresentCompletionSource::present_wait) noexcept : source_(source) {}
+    [[nodiscard]] PresentCompletionSource source() const noexcept override {
+        return source_;
+    }
+    void reset(std::uint64_t generation) noexcept override { generation_ = generation; }
+    void submitted(std::uint64_t generation, std::uint64_t present_id) noexcept override {
+        pending_ = PresentCompletion{generation, present_id,
+            1'000'000'000U + (present_id + 1U) * 10'000'000U};
+        has_pending_ = true;
+    }
+    [[nodiscard]] bool poll(PresentCompletion& completion) noexcept override {
+        if (!has_pending_) return false;
+        completion = pending_; has_pending_ = false; return true;
+    }
+    void forge_stale() noexcept {
+        pending_ = PresentCompletion{generation_ - 1U, 3U, 2'000'000'000U};
+        has_pending_ = true;
+    }
+private:
+    PresentCompletion pending_{};
+    PresentCompletionSource source_ = PresentCompletionSource::present_wait;
+    std::uint64_t generation_ = 0U;
+    bool has_pending_ = false;
+};
+
 [[nodiscard]] bool service_until_submitted(SdlVulkanPresentation& backend,
                                             std::uint64_t count) {
     for (std::uint32_t attempt = 0U; attempt < 512U; ++attempt) {
@@ -100,6 +128,43 @@ int main() {
     if (backend.service().code != HostCode::device_lost ||
         backend.presentation_metrics().device_losses != 1U) return 16;
     backend.shutdown();
+
+    MockPresentWaitProbe probe{};
+    config.width = 640U; config.height = 360U;
+    config.completion_probe = &probe;
+    SdlVulkanPresentation evidenced(config);
+    if (!evidenced.initialize().success()) return 17;
+    for (std::uint64_t index = 0U; index < 3U; ++index) {
+        if (!evidenced.submit_frame({index,index,surface}).success() ||
+            !service_until_submitted(evidenced,index+1U)) return 18;
+    }
+    SdlPresentationMetrics evidence = evidenced.presentation_metrics();
+    if (evidence.completion_source != PresentCompletionSource::present_wait ||
+        evidence.display_presentations_confirmed != 3U ||
+        evidence.last_completed_present_id != 2U ||
+        evidence.completion_interval_ns_total != 20'000'000U ||
+        evidence.completion_interval_ns_max != 10'000'000U ||
+        evidence.completion_intervals_at_target != 2U ||
+        evidence.completion_interval_violations != 0U) return 19;
+    probe.forge_stale();
+    if (evidenced.service().code != HostCode::not_ready) return 20;
+    evidence = evidenced.presentation_metrics();
+    if (!evidence.completion_evidence_fault ||
+        evidence.completion_source != PresentCompletionSource::fault ||
+        evidence.display_presentations_confirmed != 3U) return 21;
+    evidenced.shutdown();
+
+    MockPresentWaitProbe timing_probe{PresentCompletionSource::display_timing};
+    config.completion_probe = &timing_probe;
+    SdlVulkanPresentation timed(config);
+    if (!timed.initialize().success() ||
+        !timed.submit_frame({0U,0U,surface}).success() ||
+        !service_until_submitted(timed,1U)) return 22;
+    const SdlPresentationMetrics timed_metrics = timed.presentation_metrics();
+    if (timed_metrics.completion_source != PresentCompletionSource::display_timing ||
+        timed_metrics.display_presentations_confirmed != 1U ||
+        timed_metrics.completion_evidence_fault) return 23;
+    timed.shutdown();
     std::cout << "clean_aot_host_sdl_vulkan_tests: 101 unique GPU submissions; "
                  "physical presentation intentionally unclaimed\n";
     return 0;

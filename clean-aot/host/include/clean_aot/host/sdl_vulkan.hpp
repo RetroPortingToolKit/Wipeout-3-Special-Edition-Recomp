@@ -15,6 +15,25 @@ enum class PresentationFilter : std::uint8_t {
 
 enum class SdlPresentPolicy : std::uint8_t { vsync, low_latency_100hz, immediate, mailbox };
 enum class SdlActivePresentMode : std::uint8_t { unknown, vsync, immediate, mailbox };
+enum class PresentCompletionSource : std::uint8_t {
+    unavailable, present_wait, display_timing, fault
+};
+
+struct PresentCompletion final {
+    std::uint64_t generation = 0U;
+    std::uint64_t present_id = 0U;
+    std::uint64_t completion_ns = 0U;
+};
+
+class IPresentCompletionProbe {
+public:
+    virtual ~IPresentCompletionProbe() = default;
+    [[nodiscard]] virtual PresentCompletionSource source() const noexcept = 0;
+    virtual void reset(std::uint64_t generation) noexcept = 0;
+    virtual void submitted(std::uint64_t generation,
+                           std::uint64_t present_id) noexcept = 0;
+    [[nodiscard]] virtual bool poll(PresentCompletion& completion) noexcept = 0;
+};
 
 // SDL confirms GPU queue submission, not compositor or scanout completion.
 struct SdlPresentationMetrics final {
@@ -30,13 +49,24 @@ struct SdlPresentationMetrics final {
     std::uint64_t queue_latency_ns_max = 0U;
     std::uint64_t next_sequence = 0U;
     std::uint64_t next_update_index = 0U;
+    std::uint64_t present_generation = 0U;
+    std::uint64_t last_completed_present_id = 0U;
+    std::uint64_t last_completion_ns = 0U;
+    std::uint64_t completion_interval_ns_total = 0U;
+    std::uint64_t completion_interval_ns_max = 0U;
+    std::uint64_t completion_intervals_at_target = 0U;
+    std::uint64_t completion_interval_violations = 0U;
     std::uint32_t display_refresh_numerator = 0U;
     std::uint32_t display_refresh_denominator = 0U;
     std::uint32_t target_refresh_hz = 100U;
     std::uint8_t allowed_frames_in_flight = 1U;
     SdlActivePresentMode active_present_mode = SdlActivePresentMode::unknown;
+    PresentCompletionSource completion_source = PresentCompletionSource::unavailable;
     bool exact_target_refresh = false;
     bool vrr_status_known = false;
+    bool present_wait_extensions_enabled = false;
+    bool display_timing_extension_enabled = false;
+    bool completion_evidence_fault = false;
 };
 
 struct SdlVulkanConfig final {
@@ -53,6 +83,8 @@ struct SdlVulkanConfig final {
     SdlPresentPolicy present_policy = SdlPresentPolicy::low_latency_100hz;
     std::uint32_t target_refresh_hz = 100U;
     std::uint8_t allowed_frames_in_flight = 1U;
+    std::uint64_t completion_cadence_tolerance_ns = 1'000'000U;
+    IPresentCompletionProbe* completion_probe = nullptr;
     std::uint32_t audio_target_buffer_frames = 882U;
     std::uint32_t audio_max_buffer_frames = 3528U;
 };
