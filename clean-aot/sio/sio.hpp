@@ -492,6 +492,8 @@ private:
     [[nodiscard]] static bool valid_port(Port port) noexcept;
     [[nodiscard]] SioDevice* active_device() const noexcept;
     [[nodiscard]] SioDevice* device_for(Port port, DeviceKind kind) const noexcept;
+    [[nodiscard]] bool detach_device(Port port, SioDevice& device,
+                                     DeviceKind kind) noexcept;
     [[nodiscard]] bool validate_mmio(std::uint32_t offset,
                                      MmioWidth width,
                                      MmioWidth expected) noexcept;

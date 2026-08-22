@@ -1416,39 +1416,46 @@ bool Sio0::attach_memory_card(Port port, MemoryCard& device) noexcept {
 }
 
 bool Sio0::detach_controller(Port port, PadDevice& device) noexcept {
-    if (!valid_port(port)) {
-        last_error_ = MmioError::UnsupportedValue;
-        return false;
-    }
-    if ((control_ & kControlDtr) != 0U) {
-        last_error_ = MmioError::DeviceDisabled;
-        return false;
-    }
-    Slot& slot = slots_[port_index(port)];
-    if (slot.controller != &device) {
-        last_error_ = MmioError::NoDevice;
-        return false;
-    }
-    slot.controller = nullptr;
-    last_error_ = MmioError::None;
-    return true;
+    return detach_device(port, device, DeviceKind::Controller);
 }
 
 bool Sio0::detach_memory_card(Port port, MemoryCard& device) noexcept {
+    return detach_device(port, device, DeviceKind::MemoryCard);
+}
+
+bool Sio0::detach_device(Port port, SioDevice& device,
+                         DeviceKind kind) noexcept {
     if (!valid_port(port)) {
         last_error_ = MmioError::UnsupportedValue;
         return false;
     }
-    if ((control_ & kControlDtr) != 0U) {
-        last_error_ = MmioError::DeviceDisabled;
-        return false;
-    }
     Slot& slot = slots_[port_index(port)];
-    if (slot.memory_card != &device) {
+    SioDevice*& attached = kind == DeviceKind::Controller
+                               ? slot.controller
+                               : slot.memory_card;
+    if (attached != &device) {
         last_error_ = MmioError::NoDevice;
         return false;
     }
-    slot.memory_card = nullptr;
+    const bool selected = (control_ & kControlDtr) != 0U &&
+                          selected_port_ == port;
+    const bool active = selected && active_kind_ == kind;
+    if (selected) {
+        device.on_deselect(cycle_);
+    }
+    attached = nullptr;
+    if (active) {
+        active_kind_ = DeviceKind::None;
+        // A removed peripheral releases its open-collector /ACK immediately.
+        // The SIO interrupt remains latched until the guest acknowledges it.
+        ack_pending_ = false;
+        dsr_ = false;
+        ack_begin_ = 0U;
+        ack_until_ = 0U;
+        ack_delay_ = 0U;
+        (void)try_start_transfer();
+        update_irq();
+    }
     last_error_ = MmioError::None;
     return true;
 }
@@ -2413,16 +2420,16 @@ bool Sio0::restore(const SioSnapshot& snapshot_value) noexcept {
             } else {
                 entry_index = kTxCapacity;
             }
+        } else if (snapshot_value.ack_pending || snapshot_value.dsr) {
+            start = snapshot_value.ack_until;
         }
         if (entry_index < kTxCapacity) {
             const bool enabled = snapshot_value.tx_fifo[entry_index].tx_enabled_when_written ||
                                  (snapshot_value.control & kControlTxEnable) != 0U;
             if (enabled) {
-                queued_window_valid = snapshot_value.shift_active &&
-                                      event_time_fits(
-                                          start,
-                                          (snapshot_bit_period * 8U) +
-                                              kMaximumAckLeadCycles);
+                queued_window_valid = event_time_fits(
+                    start, (snapshot_bit_period * 8U) +
+                               kMaximumAckLeadCycles);
             }
         }
     }

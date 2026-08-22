@@ -63,6 +63,10 @@ without changing protocol code.
 ## Typed devices
 
 Attach one `PadDevice` and one `MemoryCard` to each of the two SIO0 ports.
+Runtime removal is valid even while `/CS` is asserted. Removing the addressed
+device ends its protocol state and releases a pending or asserted `/ACK` line;
+an already-clocking byte completes as undriven `FFh`, while an IRQ raised by an
+earlier `/ACK` edge remains latched for guest acknowledgement.
 When `/CS` is asserted, both devices see the first address byte. `0x01`
 addresses the controller and `0x81` addresses the memory card; exactly one
 acknowledging device becomes active. Multiple acknowledgements are reported as

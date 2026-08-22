@@ -1159,18 +1159,51 @@ void test_generation_safe_device_hotplug() {
     begin_bus(sio);
     Cycle cycle = 0U;
     CHECK(clock_byte(sio, 0x81U, cycle) == 0xFFU);
-    CHECK(!sio.detach_memory_card(Port::One, card_one));
-    CHECK(sio.last_error() == MmioError::DeviceDisabled);
-    CHECK(sio.next_event_cycle() == cycle + clean_aot::sio::kMemoryCardAckDelayCycles);
-    drain_device_ack(sio, cycle);
+    CHECK(sio.write(clean_aot::sio::kDataOffset, MmioWidth::Byte, 0x52U, cycle).accepted);
+    const auto pending_removal = sio.snapshot();
+    const auto pending_card = card_one.snapshot();
+    CHECK(pending_removal.ack_pending && pending_removal.tx_count == 1U);
+    CHECK(sio.advance_to(pending_removal.ack_begin - 1U));
+    cycle = pending_removal.ack_begin - 1U;
+    CHECK(sio.detach_memory_card(Port::One, card_one));
+    CHECK(!sio.dsr_active() && !sio.irq_pending());
+    CHECK(sio.next_event_cycle() == cycle + sio.cycles_per_byte());
+    cycle += sio.cycles_per_byte();
+    CHECK(sio.advance_to(cycle));
+    const auto removed_reply = sio.read(clean_aot::sio::kDataOffset,
+                                        MmioWidth::Byte, cycle);
+    CHECK(removed_reply.accepted && removed_reply.value == 0xFFU);
+    CHECK(sio.next_event_cycle() == clean_aot::sio::kNoEventCycle);
     end_bus(sio, cycle);
 
     CHECK(!sio.detach_memory_card(Port::One, card_two));
     CHECK(sio.last_error() == MmioError::NoDevice);
-    CHECK(sio.detach_memory_card(Port::One, card_one));
     CHECK(!sio.detach_memory_card(Port::One, card_one));
     CHECK(sio.last_error() == MmioError::NoDevice);
     CHECK(sio.detach_controller(Port::One, pad_one));
+
+    CHECK(sio.attach_memory_card(Port::One, card_one));
+    CHECK(sio.restore(pending_removal));
+    CHECK(card_one.restore(pending_card));
+    cycle = pending_removal.cycle;
+    CHECK(sio.advance_to(pending_removal.ack_begin));
+    cycle = pending_removal.ack_begin;
+    CHECK(sio.dsr_active() && sio.irq_pending());
+    CHECK(sio.detach_memory_card(Port::One, card_one));
+    CHECK(!sio.dsr_active() && sio.irq_pending());
+    CHECK(sio.next_event_cycle() == cycle + sio.cycles_per_byte());
+    cycle += sio.cycles_per_byte();
+    CHECK(sio.advance_to(cycle));
+    const auto asserted_removal_reply = sio.read(
+        clean_aot::sio::kDataOffset, MmioWidth::Byte, cycle);
+    CHECK(asserted_removal_reply.accepted &&
+          asserted_removal_reply.value == 0xFFU);
+    CHECK(sio.write(clean_aot::sio::kControlOffset, MmioWidth::Halfword,
+                    static_cast<std::uint16_t>(sio.control() |
+                                               clean_aot::sio::kControlAcknowledge),
+                    cycle).accepted);
+    CHECK(!sio.irq_pending());
+    end_bus(sio, cycle);
 
     begin_bus(sio, cycle);
     CHECK(clock_byte(sio, 0x81U, cycle) == 0xFFU);
