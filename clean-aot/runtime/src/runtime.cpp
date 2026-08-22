@@ -780,6 +780,10 @@ struct Runtime::Impl final {
     }
 
     void sample_device_irqs() noexcept {
+        if (soc.dma().irq_line()) {
+            soc.interrupts().raise(soc::InterruptSource::dma);
+        }
+        soc.counters().resample_irq_lines();
         if (cdrom.irq_line()) {
             soc.interrupts().raise(soc::InterruptSource::disc);
         }
@@ -1209,8 +1213,7 @@ struct Runtime::Impl final {
             const std::uint32_t written = lane_merge(
                 0xffff'ffffU, address, width, value);
             soc.interrupts().write_status(written);
-            soc.counters().resample_irq_lines();
-            update_interrupt_lines();
+            sample_device_irqs();
             return handled_write();
         }
         if (interval_contains(address, width, kInterruptMask,

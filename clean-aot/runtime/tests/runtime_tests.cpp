@@ -484,29 +484,45 @@ void test_interrupt_latch(Runner& runner) {
     const AccessContext at_zero{0U, 0x8001'0100U, false};
     const std::uint32_t counter0 = clean_aot::soc::interrupt_bit(
         clean_aot::soc::InterruptSource::counter0);
+    const std::uint32_t graphics = clean_aot::soc::interrupt_bit(
+        clean_aot::soc::InterruptSource::graphics);
+    const std::uint32_t dma = clean_aot::soc::interrupt_bit(
+        clean_aot::soc::InterruptSource::dma);
+    const std::uint32_t simultaneous = counter0 | graphics | dma;
     EXPECT(runner,
-           timer_runtime->write32(at_zero, 0x1f80'1074U, counter0).ok());
+           timer_runtime->write32(at_zero, 0x1f80'1074U, simultaneous).ok());
+    EXPECT(runner,
+           timer_runtime->write32(at_zero, 0x1f80'1810U, 0x1f00'0000U).ok());
+    timer_runtime->soc().dma().write_interrupt_control(1U << 15U);
     EXPECT(runner,
            timer_runtime->write16(at_zero, 0x1f80'1108U, 1U).ok());
     EXPECT(runner,
            timer_runtime->write16(at_zero, 0x1f80'1104U, 0x00d8U).ok());
 
     const AccessContext first_target{1U, 0x8001'0104U, false};
-    EXPECT(runner,
-           timer_runtime->read32(first_target, 0x1f80'1070U).ok());
+    const auto simultaneous_status =
+        timer_runtime->read32(first_target, 0x1f80'1070U);
+    EXPECT(runner, simultaneous_status.ok());
+    EXPECT(runner, (simultaneous_status.value & simultaneous) == simultaneous);
     EXPECT(runner, timer_runtime->cpu_interrupt_line());
     EXPECT(runner, timer_runtime->write32(
-                       first_target, 0x1f80'1070U, ~counter0)
+                       first_target, 0x1f80'1070U, ~simultaneous)
                        .ok());
     EXPECT(runner, timer_runtime->cpu_interrupt_line());
-    EXPECT(runner, timer_runtime->soc().interrupts().pending(
-                       clean_aot::soc::InterruptSource::counter0));
+    EXPECT(runner,
+           (timer_runtime->soc().interrupts().status() & simultaneous) ==
+               simultaneous);
+
+    EXPECT(runner,
+           timer_runtime->write32(first_target, 0x1f80'1814U, 0x0200'0000U)
+               .ok());
+    timer_runtime->soc().dma().write_interrupt_control(0U);
 
     const AccessContext second_target{2U, 0x8001'0108U, false};
     EXPECT(runner,
            timer_runtime->read32(second_target, 0x1f80'1070U).ok());
     EXPECT(runner, timer_runtime->write32(
-                       second_target, 0x1f80'1070U, ~counter0)
+                       second_target, 0x1f80'1070U, ~simultaneous)
                        .ok());
     EXPECT(runner, !timer_runtime->cpu_interrupt_line());
 }
