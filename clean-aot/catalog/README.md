@@ -112,3 +112,14 @@ zero-trip initializer loop at `0x80162564`: its authenticated link-time count is
 zero and its branch skips the table call, so the only honest finite target set
 for that unreachable `jalr` is empty. Near-matches in the count, skip branch,
 or loop backedge fail closed.
+
+`evidence/content-static-coverage.json` is the deterministic media-to-static
+coverage audit. The current tranche catalogs the main executable plus every
+expanded NFE/PBP payload (5,179 records), binds the two authenticated executable
+identities, reconciles the two supplemental finite main-image sites, and maps
+four observed NFE runtime epochs. It deliberately remains
+`incomplete-fail-closed`: 5,177 payloads lack an authenticated code/data role,
+140 indirect sites, 71 direct edges, and 288 unknown code ranges remain, and no
+main/NFE static region set is yet marked compiled. The 13 ISO audio pseudo-files
+outside the data-track image are explicitly excluded rather than silently
+treated as payloads.

@@ -59,3 +59,12 @@ because each edge names its image identity; missing, duplicate, ambiguous,
 unsorted, incomplete, or byte-mismatched evidence is rejected. This mechanism
 does not interpret guest code and does not claim that a partial trace is
 complete—the capture producer must explicitly finalize that claim.
+
+`audit_content_static_coverage.py` builds the deterministic whole-media ledger
+used to measure content closure. It cross-checks the verified ISO inventory,
+all exact PBP expansions, the NFE expansion, executable authorization, finite
+target proofs, and runtime-variant epochs. Every cataloged payload appears in
+the output even when its code/data role is unknown. Only identities supported
+by the supplied evidence are marked executable; unknown payloads, code ranges,
+callbacks, direct edges, runtime epochs, and absent compiled regions each hold
+their own completeness gate closed.
