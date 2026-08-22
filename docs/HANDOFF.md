@@ -94,12 +94,18 @@
   input has yet selected and completed a race, so race stability and full
   content coverage remain open. The shipped config was restored to
   `auto_skip_fmv=false`.
-- The attempted automated race probe did not produce a valid race trace: the
-  debug executable path in the disposable harness was wrong on the first run,
-  and the corrected run only confirmed PAL x2 activation before the short
-  process window ended. It must not be treated as race evidence. The temporary
-  probe harness was removed and the production build was restored with debug
-  tools off, `auto_skip_fmv=false`, netplay off, and rewind off.
+- A corrected deterministic input route now reaches an actual on-track race:
+  title → memory-card UI → main menu → vehicle class → ship → race track. The
+  final capture is `race_probe.png` (disposable, not shipped). With FPS
+  telemetry enabled, the on-track interval reports guest cadence about
+  99–101 Hz. The SPU/CD/host taps remain 44.1 kHz; the final run records zero
+  new SPU trace underruns, but the bridge's cumulative output-underrun counter
+  remains nonzero after the long media/menu transitions. The GPU diagnostic
+  `render` value is display-area flips, not swap cadence, and is not used as a
+  presentation-FPS claim. FMV, race stability, and normal-vs-accelerated load
+  equivalence therefore remain gated rather than declared complete. The
+  temporary probe harness is being removed and the production build restored
+  with debug tools off, `auto_skip_fmv=false`, netplay off, and rewind off.
 - The restored production executable passes the static Release boundary,
   `guest_clock_test`, and the authenticated PAL-title verifier. The build emits
   only existing third-party `stb_image` overflow warnings; no build or test
