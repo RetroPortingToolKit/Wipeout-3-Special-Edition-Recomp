@@ -214,6 +214,14 @@
   reads. This localizes the remaining proof problem to probe synchronization,
   not a demonstrated Fast Loading failure. Re-run both sides after waiting for
   the same post-boot frame anchor, then capture card/CD traces from that anchor.
+- A detached, file-backed synchronized probe now produced a usable paired
+  window. Both runs were anchored at fingerprint total 629; the memory-card
+  traces match exactly. Fingerprints agree through the shared window until
+  frame 2,105, where the first RAM-write hash differs even though PC, write
+  count, MMIO hash/count, SPU hash/count, and guest cycles still agree. The
+  normal and fast route lengths were different, so endpoint counts are not
+  comparable; the frame-2,105 divergence is the current narrow correctness
+  boundary requiring a longer equal-route capture and CD/XA event alignment.
 
 ## Ruled out
 
