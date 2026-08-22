@@ -8,6 +8,12 @@
   external retail BIOS boundary (`SCPH1001.BIN` supplied by the user).
 - Direct launch with the PAL SCES-02845 cue reaches `game_started=1` through
   the recompiled BIOS path. The disc is not bundled.
+- The currently supplied PAL Track 01 is already the target of the upstream
+  PAL 25/50/100 patch: xdelta3 reports `source is already up to date` when
+  applying `pal_track01.xdelta3` from upstream `dev` at revision
+  `ac46a5dc500a9581ea55b8efb5c1a0d4be944aba`. The supplied executable also
+  contains the `100HZ` title data. This authenticates the title input, but is
+  not yet proof that the clean runtime drives its 100-Hz menu path.
 - Debug RelWithDebInfo run verified the external HD pack is live: 445 indexed
   entries, 299 matched, 300 decoded images, 47,919 replacement hits, and zero
   decode failures.
