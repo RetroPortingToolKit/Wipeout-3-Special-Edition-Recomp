@@ -1415,6 +1415,44 @@ bool Sio0::attach_memory_card(Port port, MemoryCard& device) noexcept {
     return true;
 }
 
+bool Sio0::detach_controller(Port port, PadDevice& device) noexcept {
+    if (!valid_port(port)) {
+        last_error_ = MmioError::UnsupportedValue;
+        return false;
+    }
+    if ((control_ & kControlDtr) != 0U) {
+        last_error_ = MmioError::DeviceDisabled;
+        return false;
+    }
+    Slot& slot = slots_[port_index(port)];
+    if (slot.controller != &device) {
+        last_error_ = MmioError::NoDevice;
+        return false;
+    }
+    slot.controller = nullptr;
+    last_error_ = MmioError::None;
+    return true;
+}
+
+bool Sio0::detach_memory_card(Port port, MemoryCard& device) noexcept {
+    if (!valid_port(port)) {
+        last_error_ = MmioError::UnsupportedValue;
+        return false;
+    }
+    if ((control_ & kControlDtr) != 0U) {
+        last_error_ = MmioError::DeviceDisabled;
+        return false;
+    }
+    Slot& slot = slots_[port_index(port)];
+    if (slot.memory_card != &device) {
+        last_error_ = MmioError::NoDevice;
+        return false;
+    }
+    slot.memory_card = nullptr;
+    last_error_ = MmioError::None;
+    return true;
+}
+
 SioDevice* Sio0::device_for(Port port, DeviceKind kind) const noexcept {
     if (!valid_port(port)) {
         return nullptr;

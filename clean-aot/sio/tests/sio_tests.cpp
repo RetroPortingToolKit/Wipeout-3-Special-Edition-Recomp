@@ -1141,6 +1141,58 @@ void test_snapshots_and_randomized_malformed_streams() {
     CHECK(sio.last_error() == MmioError::TimeWentBackwards);
 }
 
+void test_generation_safe_device_hotplug() {
+    std::array<std::uint8_t, MemoryCard::kImageSize> image_one{};
+    std::array<std::uint8_t, MemoryCard::kImageSize> image_two{};
+    std::array<std::uint8_t, MemoryCard::kImageSize> replacement_image{};
+    CHECK(MemoryCard::format_new_image(image_one));
+    CHECK(MemoryCard::format_new_image(image_two));
+    CHECK(MemoryCard::format_new_image(replacement_image));
+    MemoryCard card_one(image_one), card_two(image_two), replacement(replacement_image);
+    PadDevice pad_one, pad_two, replacement_pad;
+    Sio0 sio;
+    CHECK(sio.attach_memory_card(Port::One, card_one));
+    CHECK(sio.attach_memory_card(Port::Two, card_two));
+    CHECK(sio.attach_controller(Port::One, pad_one));
+    CHECK(sio.attach_controller(Port::Two, pad_two));
+
+    begin_bus(sio);
+    Cycle cycle = 0U;
+    CHECK(clock_byte(sio, 0x81U, cycle) == 0xFFU);
+    CHECK(!sio.detach_memory_card(Port::One, card_one));
+    CHECK(sio.last_error() == MmioError::DeviceDisabled);
+    CHECK(sio.next_event_cycle() == cycle + clean_aot::sio::kMemoryCardAckDelayCycles);
+    drain_device_ack(sio, cycle);
+    end_bus(sio, cycle);
+
+    CHECK(!sio.detach_memory_card(Port::One, card_two));
+    CHECK(sio.last_error() == MmioError::NoDevice);
+    CHECK(sio.detach_memory_card(Port::One, card_one));
+    CHECK(!sio.detach_memory_card(Port::One, card_one));
+    CHECK(sio.last_error() == MmioError::NoDevice);
+    CHECK(sio.detach_controller(Port::One, pad_one));
+
+    begin_bus(sio, cycle);
+    CHECK(clock_byte(sio, 0x81U, cycle) == 0xFFU);
+    CHECK(sio.next_event_cycle() == clean_aot::sio::kNoEventCycle);
+    end_bus(sio, cycle);
+
+    CHECK(sio.attach_memory_card(Port::One, replacement));
+    CHECK(sio.attach_controller(Port::One, replacement_pad));
+    begin_bus(sio, cycle);
+    CHECK(clock_byte(sio, 0x81U, cycle) == 0xFFU);
+    CHECK(sio.next_event_cycle() == cycle + clean_aot::sio::kMemoryCardAckDelayCycles);
+    drain_device_ack(sio, cycle);
+    CHECK(sio.select(Port::Two, cycle).accepted);
+    CHECK(exchange_byte(sio, 0x81U, cycle) == 0xFFU);
+    end_bus(sio, cycle);
+
+    CHECK(sio.detach_memory_card(Port::One, replacement));
+    CHECK(sio.detach_memory_card(Port::Two, card_two));
+    CHECK(sio.detach_controller(Port::One, replacement_pad));
+    CHECK(sio.detach_controller(Port::Two, pad_two));
+}
+
 } // namespace
 
 int main() {
@@ -1158,6 +1210,7 @@ int main() {
     test_memory_card_protocol();
     test_invalid_card_and_snapshot_guards();
     test_snapshots_and_randomized_malformed_streams();
-    std::puts("clean_aot_sio_tests: 14 suites passed");
+    test_generation_safe_device_hotplug();
+    std::puts("clean_aot_sio_tests: 15 suites passed");
     return 0;
 }

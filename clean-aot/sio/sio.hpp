@@ -449,6 +449,8 @@ public:
 
     [[nodiscard]] bool attach_controller(Port port, PadDevice& device) noexcept;
     [[nodiscard]] bool attach_memory_card(Port port, MemoryCard& device) noexcept;
+    [[nodiscard]] bool detach_controller(Port port, PadDevice& device) noexcept;
+    [[nodiscard]] bool detach_memory_card(Port port, MemoryCard& device) noexcept;
 
     [[nodiscard]] MmioReadResult read(std::uint32_t offset,
                                       MmioWidth width,
