@@ -284,7 +284,21 @@ python tools/product/build_product.py validate-release `
   --receipt clean-aot/product/evidence/release-readiness.json
 ```
 
+The four installed soak receipts feed a package-bound graphics receipt only
+after every 4K/ultrawide profile reports all feature flags from the real
+executable. Physical presentation timing remains `unavailable` unless every
+profile supplies verified host completion evidence:
+
+```powershell
+python tools/product/build_product.py graphics-matrix `
+  --package build-product-runtime-135829 `
+  --soak clean-aot/product/evidence/installed-soak-4k-headless.json `
+  --soak clean-aot/product/evidence/installed-soak-4k-hidden.json `
+  --soak clean-aot/product/evidence/installed-soak-5120x2160-headless.json `
+  --soak clean-aot/product/evidence/installed-soak-5120x2160-hidden.json `
+  --receipt clean-aot/product/evidence/graphics-matrix.json
+```
+
 The current receipt is intentionally `not-ready`: direct game instructions and
-authenticated media reads have not occurred, the content-coverage receipt still
-contains unresolved gates, the complete graphics matrix has not been recorded,
-and the existing soak receipts predate the current package.
+authenticated media reads have not occurred, and the content-coverage receipt
+still contains unresolved gates. Graphics and current-package soak gates pass.

@@ -12,6 +12,7 @@ from tools.product.release_lane import (
     CONFIG_SCHEMA,
     ReleaseError,
     create_release,
+    generate_graphics_matrix_receipt,
     initialize_install,
     run_installed_product_soak,
     run_soak,
@@ -88,6 +89,38 @@ class ReleaseLaneTests(unittest.TestCase):
             link_map=self.link_map,
             sources=[self.source],
         )
+
+    def test_graphics_matrix_binds_all_real_product_profiles(self) -> None:
+        package = self.root / "release"
+        self.package(package)
+        manifest = validate_release(package)["manifest_sha256"]
+        features = {name: True for name in (
+            "complete_gp0_fallback", "exact_native_fallback", "hd_fonts", "hd_textures",
+            "pgxp_vertex_projection_perspective", "scaled_dither_resolve",
+            "scanout_24bit_chroma", "transparency_safe_filtering", "true_color",
+            "vulkan_4k_ultrawide", "widescreen_projection_culling")}
+        paths = []
+        for profile in ("4k-headless", "4k-hidden", "5120x2160-headless",
+                        "5120x2160-hidden"):
+            path = self.root / f"{profile}.json"
+            path.write_bytes(canonical_json_bytes({
+                "schema": "wipeout3se.clean-aot.installed-soak.v1",
+                "status": "passed-not-game-ready", "profile": profile,
+                "package_manifest_sha256": manifest,
+                "graphics_feature_matrix": {
+                    "schema": "clean-aot.graphics-feature-matrix.v1",
+                    "features": features, "physical_present_timing": "unavailable"}}) + b"\n")
+            paths.append(path)
+        receipt = generate_graphics_matrix_receipt(
+            package, paths, self.root / "graphics-matrix.json")
+        self.assertTrue(receipt["matrix_complete"])
+        self.assertEqual(receipt["physical_present_timing"], "unavailable")
+        self.assertEqual(receipt["package_manifest_sha256"], manifest)
+        mutated = json.loads(paths[0].read_text())
+        mutated["package_manifest_sha256"] = "0" * 64
+        paths[0].write_text(json.dumps(mutated), encoding="utf-8")
+        with self.assertRaisesRegex(ReleaseError, "stale or incomplete"):
+            generate_graphics_matrix_receipt(package, paths)
 
     def test_package_is_measured_relocatable_and_contains_only_explicit_roles(self) -> None:
         package = self.root / "out" / "release"

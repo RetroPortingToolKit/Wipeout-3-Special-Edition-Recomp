@@ -2,6 +2,7 @@
 #include "clean_aot/host/pacing.hpp"
 #include "clean_aot/host/sdl_vulkan.hpp"
 #include "clean_aot/runtime/runtime.hpp"
+#include "clean_aot/app/graphics.hpp"
 #include "clean_aot/app/settings.hpp"
 
 #include <array>
@@ -32,6 +33,7 @@ CLEAN_AOT_PRODUCT_BINDING_SYMBOL() noexcept;
 namespace {
 struct Receipt final {
     std::string bios_identity_sha256, bios_sha256, workload_profile;
+    std::string graphics_feature_matrix = "null";
     std::string reason = "product-setup-unavailable", stage = "rejected";
     std::uint32_t stop_pc = 0U;
     std::uint64_t dispatches = 0U, instructions = 0U, updates = 0U;
@@ -46,7 +48,8 @@ struct Receipt final {
           << "\",\"catalog_sha256\":\"\",\"disc_sectors_read\":0,\"entry_pc\":0"
           << ",\"executable_sha256\":\"\",\"generated_dispatches\":0"
           << ",\"guest_instructions_executed\":0,\"reason\":\"" << reason
-          << "\",\"schema\":\"clean-aot.bootstrap-receipt.v1\",\"stage\":\""
+          << "\",\"graphics_feature_matrix\":" << graphics_feature_matrix
+          << ",\"schema\":\"clean-aot.bootstrap-receipt.v1\",\"stage\":\""
           << stage << "\",\"stop_pc\":" << stop_pc
           << ",\"variant_identity_sha256\":\"\",\"workload\":{"
           << "\"audio_batches_submitted\":" << audio_batches
@@ -328,6 +331,20 @@ int main(int argc, char** argv) {
     if (receipt.stage == "bios-slice-stopped" && workload &&
         !run_workload(*host, host_config.width, host_config.height, workload_updates, receipt)) {
         receipt.stage = "workload-rejected"; receipt.reason = "workload-threshold-failed";
+    }
+    if (workload) {
+        clean_aot::app::GraphicsConfiguration graphics{};
+        settings.apply_graphics_settings(graphics);
+        graphics.output_width = host_config.width;
+        graphics.output_height = host_config.height;
+        if (headless) {
+            receipt.graphics_feature_matrix =
+                settings.graphics_feature_receipt(graphics, nullptr).canonical_json();
+        } else {
+            const auto presentation = live.presentation_metrics();
+            receipt.graphics_feature_matrix =
+                settings.graphics_feature_receipt(graphics, &presentation).canonical_json();
+        }
     }
     host->shutdown(); receipt.print();
     return (receipt.stage == "bios-slice-stopped" || receipt.stage == "game-shard-stopped") ? 0 : 69;

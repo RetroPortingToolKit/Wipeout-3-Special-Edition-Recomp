@@ -10,6 +10,12 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA = "wipeout3se.clean-aot.release-readiness.v1"
+GRAPHICS_FEATURES = {
+    "complete_gp0_fallback", "exact_native_fallback", "hd_fonts", "hd_textures",
+    "pgxp_vertex_projection_perspective", "scaled_dither_resolve",
+    "scanout_24bit_chroma", "transparency_safe_filtering", "true_color",
+    "vulkan_4k_ultrawide", "widescreen_projection_culling",
+}
 
 
 def write_readiness_receipt(path: Path, document: dict[str, Any]) -> None:
@@ -132,7 +138,21 @@ def audit_release_readiness(package: Path, evidence_root: Path,
 
     graphics_path = product / "graphics-matrix.json"
     graphics = _load(graphics_path) or {}
-    graphics_ok = graphics.get("status") == "pass" and graphics.get("matrix_complete") is True
+    graphics_profiles = graphics.get("profiles", {})
+    expected_profiles = {"4k-headless", "4k-hidden", "5120x2160-headless",
+                         "5120x2160-hidden"}
+    graphics_ok = (
+        graphics.get("schema") == "wipeout3se.clean-aot.graphics-feature-matrix.v1" and
+        graphics.get("status") == "pass" and graphics.get("matrix_complete") is True and
+        graphics.get("package_manifest_sha256") == structural.get("manifest_sha256") and
+        graphics.get("runtime_executable_sha256") == _sha(executable) and
+        graphics.get("settings_sha256") == _sha(package / "policy" / "default-config.json") and
+        graphics.get("physical_present_timing") in {"unavailable", "verified"} and
+        set(graphics_profiles) == expected_profiles and
+        all(set(value.get("features", {})) == GRAPHICS_FEATURES and
+            all(enabled is True for enabled in value["features"].values()) and
+            value.get("physical_present_timing") in {"unavailable", "verified"}
+            for value in graphics_profiles.values()))
     gate("graphics-feature-matrix", graphics_ok, [graphics_path],
          "4K/ultrawide/PGXP/true-color/filter/HD matrix passes" if graphics_ok else
          "no complete product-bound graphics matrix receipt")

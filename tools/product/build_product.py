@@ -20,7 +20,8 @@ if __package__ in {None, ""}:
         setup_product,
     )
     from release_lane import (  # type: ignore[import-not-found]
-        ReleaseError, create_release, initialize_install, run_installed_product_soak,
+        ReleaseError, create_release, generate_graphics_matrix_receipt, initialize_install,
+        run_installed_product_soak,
         run_soak, validate_release)
     from install_lane import (InstallError, launch_and_record, migrate_upgrade, rollback_upgrade,
                               orchestrate_first_run)  # type: ignore[import-not-found]
@@ -39,8 +40,9 @@ else:
         run_dry_run,
         setup_product,
     )
-    from .release_lane import (ReleaseError, create_release, initialize_install,
-                               run_installed_product_soak, run_soak, validate_release)
+    from .release_lane import (ReleaseError, create_release, generate_graphics_matrix_receipt,
+                               initialize_install, run_installed_product_soak, run_soak,
+                               validate_release)
     from .install_lane import (InstallError, launch_and_record, migrate_upgrade, rollback_upgrade,
                                orchestrate_first_run)
     from .windows_audit import audit_windows_package, smoke_windows_product
@@ -180,6 +182,11 @@ def _build_parser() -> argparse.ArgumentParser:
     installed_soak.add_argument("--timeout-seconds", type=float, default=30.0)
     installed_soak.add_argument("--max-p95-ms", type=float, required=True)
     installed_soak.add_argument("--receipt", type=Path)
+    graphics_matrix = subparsers.add_parser(
+        "graphics-matrix", help="bind four installed-product graphics workloads")
+    graphics_matrix.add_argument("--package", type=Path, required=True)
+    graphics_matrix.add_argument("--soak", action="append", type=Path, required=True)
+    graphics_matrix.add_argument("--receipt", type=Path, required=True)
     installer = subparsers.add_parser("package-installer", help="create the two-stage offline installer")
     installer.add_argument("--setup-exe", type=Path, required=True)
     installer.add_argument("--runtime-payload", type=Path, required=True)
@@ -309,6 +316,9 @@ def main(argv: list[str] | None = None) -> int:
                 args.package, bios=args.bios, profile=args.profile, updates=args.updates,
                 iterations=args.iterations, timeout_seconds=args.timeout_seconds,
                 max_p95_ms=args.max_p95_ms, receipt_path=args.receipt)
+        elif args.command == "graphics-matrix":
+            document = generate_graphics_matrix_receipt(
+                args.package, args.soak, receipt_path=args.receipt)
         elif args.command == "package-installer":
             document = create_installer(setup_exe=args.setup_exe,
                 runtime_payload=args.runtime_payload, setup_payload=_artifacts(args.setup_payload),

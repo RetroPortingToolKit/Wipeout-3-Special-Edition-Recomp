@@ -29,6 +29,12 @@ CONFIG_SCHEMA = "wipeout3se.runtime-settings.v2"
 LEGACY_CONFIG_SCHEMA = "wipeout3se.clean-aot.config.v1"
 INSTALL_SCHEMA = "wipeout3se.clean-aot.install.v1"
 CARD_SIZE = 128 * 1024
+GRAPHICS_FEATURES = {
+    "complete_gp0_fallback", "exact_native_fallback", "hd_fonts", "hd_textures",
+    "pgxp_vertex_projection_perspective", "scaled_dither_resolve",
+    "scanout_24bit_chroma", "transparency_safe_filtering", "true_color",
+    "vulkan_4k_ultrawide", "widescreen_projection_culling",
+}
 FORBIDDEN_NAMES = (
     "bios", "scph", "track01", ".cue", ".iso", ".bin", "compiler",
     "oracle", "interpreter", "legacy", "ghidra", "duckstation", "goosestation",
@@ -391,7 +397,7 @@ def run_installed_product_soak(package: Path, *, bios: Path, profile: str,
         raise ReleaseError("installed-product workload update bound is invalid")
     if not 2 <= iterations <= 1000 or timeout_seconds <= 0 or max_p95_ms <= 0:
         raise ReleaseError("installed-product soak bound is invalid")
-    validate_release(package)
+    package_validation = validate_release(package)
     command = [str(package.resolve(strict=True) / "bin" / "Wipeout3SE.exe"),
                "--bios", str(bios.resolve(strict=True)), "--smoke-hidden",
                "--workload-profile", profile, "--workload-updates", str(updates)]
@@ -418,6 +424,7 @@ def run_installed_product_soak(package: Path, *, bios: Path, profile: str,
         except (UnicodeError, ValueError, IndexError) as error:
             raise ReleaseError("installed-product workload emitted no metrics") from error
         workload = current.get("workload", {})
+        graphics = current.get("graphics_feature_matrix", {})
         if (current.get("stage") != "bios-slice-stopped" or
                 workload.get("profile") != profile or workload.get("rate_hz") != 100 or
                 workload.get("updates") != updates or
@@ -428,7 +435,11 @@ def run_installed_product_soak(package: Path, *, bios: Path, profile: str,
                 workload.get("gpu_submission_failures") != 0 or
                 not 0 <= workload.get("gpu_deferred_updates", -1) <= updates or
                 workload.get("audio_underruns") != 0 or
-                workload.get("pacing_late_updates") != 0):
+                workload.get("pacing_late_updates") != 0 or
+                graphics.get("schema") != "clean-aot.graphics-feature-matrix.v1" or
+                set(graphics.get("features", {})) != GRAPHICS_FEATURES or
+                not all(value is True for value in graphics["features"].values()) or
+                graphics.get("physical_present_timing") not in {"unavailable", "verified"}):
             raise ReleaseError("installed-product workload metrics exceeded thresholds")
         frontier = current
     digests = {hashlib.sha256(output).hexdigest() for output in outputs}
@@ -438,6 +449,8 @@ def run_installed_product_soak(package: Path, *, bios: Path, profile: str,
     if p95 > max_p95_ms: raise ReleaseError("installed-product workload p95 exceeded threshold")
     receipt = {"schema": "wipeout3se.clean-aot.installed-soak.v1", "status": "passed-not-game-ready",
         "game_ready": False, "profile": profile, "updates_per_iteration": updates,
+        "package_manifest_sha256": package_validation["manifest_sha256"],
+        "graphics_feature_matrix": frontier["graphics_feature_matrix"],
         "iterations": iterations, "metrics": frontier["workload"],
         "cpu": {"bios_instructions_executed": frontier["bios_instructions_executed"],
                 "generated_dispatches": frontier["bios_generated_dispatches"],
@@ -446,4 +459,48 @@ def run_installed_product_soak(package: Path, *, bios: Path, profile: str,
         "timing_ms": {"min": min(elapsed), "median": statistics.median(elapsed),
                       "p95": p95, "max": max(elapsed), "limit_p95": max_p95_ms}}
     if receipt_path is not None: _atomic_write(receipt_path.resolve(strict=False), _canonical(receipt))
+    return receipt
+
+
+def generate_graphics_matrix_receipt(package: Path, soak_paths: Sequence[Path],
+                                     receipt_path: Path | None = None) -> dict[str, Any]:
+    """Bind actual installed-product graphics observations to one package identity."""
+    package = package.resolve(strict=True)
+    validation = validate_release(package)
+    expected = {"4k-headless", "4k-hidden", "5120x2160-headless", "5120x2160-hidden"}
+    profiles: dict[str, Any] = {}
+    for source in soak_paths:
+        source = source.resolve(strict=True)
+        try:
+            soak = json.loads(source.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            raise ReleaseError("graphics matrix input is malformed") from error
+        profile = soak.get("profile")
+        graphics = soak.get("graphics_feature_matrix", {})
+        if (soak.get("schema") != "wipeout3se.clean-aot.installed-soak.v1" or
+                soak.get("status") != "passed-not-game-ready" or profile not in expected or
+                profile in profiles or
+                soak.get("package_manifest_sha256") != validation["manifest_sha256"] or
+                graphics.get("schema") != "clean-aot.graphics-feature-matrix.v1" or
+                set(graphics.get("features", {})) != GRAPHICS_FEATURES or
+                not all(value is True for value in graphics["features"].values()) or
+                graphics.get("physical_present_timing") not in {"unavailable", "verified"}):
+            raise ReleaseError("graphics matrix input is stale or incomplete")
+        profiles[profile] = {"receipt_sha256": _sha256(source),
+                             "features": graphics["features"],
+                             "physical_present_timing": graphics["physical_present_timing"]}
+    if set(profiles) != expected:
+        raise ReleaseError("graphics matrix requires all four installed workload profiles")
+    timings = {value["physical_present_timing"] for value in profiles.values()}
+    physical_timing = "verified" if timings == {"verified"} else "unavailable"
+    receipt = {
+        "schema": "wipeout3se.clean-aot.graphics-feature-matrix.v1", "status": "pass",
+        "matrix_complete": True, "game_ready": False,
+        "package_manifest_sha256": validation["manifest_sha256"],
+        "runtime_executable_sha256": _sha256(package / "bin" / "Wipeout3SE.exe"),
+        "settings_sha256": _sha256(package / "policy" / "default-config.json"),
+        "physical_present_timing": physical_timing,
+        "profiles": {name: profiles[name] for name in sorted(profiles)}}
+    if receipt_path is not None:
+        _atomic_write(receipt_path.resolve(strict=False), _canonical(receipt))
     return receipt
