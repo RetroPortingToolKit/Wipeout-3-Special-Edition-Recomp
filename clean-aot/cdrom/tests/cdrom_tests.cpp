@@ -303,6 +303,27 @@ DiscLayout mixed_layout() {
     return layout;
 }
 
+DiscLayout wipeout_special_edition_layout() {
+    DiscLayout layout{};
+    layout.track_count = 14U;
+    layout.lead_out_lba = 274479U;
+    layout.disc_type = 0x20U;
+    layout.license_region = {'S', 'C', 'E', 'E'};
+    layout.tracks[0U] = Track{1U, 0U, TrackKind::Data};
+    constexpr std::array<Lba, 13U> index_zero{
+        40247U, 58730U, 72723U, 92156U, 111072U, 130000U, 146708U,
+        163286U, 182593U, 201706U, 220884U, 237542U, 255788U};
+    constexpr std::array<Lba, 13U> index_one{
+        40397U, 58880U, 72873U, 92306U, 111222U, 130150U, 146858U,
+        163436U, 182743U, 201856U, 221034U, 237692U, 255938U};
+    for (std::size_t index = 0U; index < index_zero.size(); ++index) {
+        layout.tracks[index + 1U] =
+            Track{static_cast<std::uint8_t>(index + 2U), index_one[index],
+                  TrackKind::Audio, index_zero[index], true};
+    }
+    return layout;
+}
+
 void populate_mode_one(MemorySource& source, Lba first, Lba count) {
     for (Lba offset = 0U; offset < count; ++offset) {
         const Lba lba = first + offset;
@@ -418,6 +439,23 @@ void test_layout_validation_and_boundaries() {
     require(layout.track_for_lba(1U)->kind == TrackKind::Data &&
                 layout.track_for_lba(2U)->kind == TrackKind::Audio,
             "track type lookup");
+
+    const DiscLayout wipeout = wipeout_special_edition_layout();
+    require(wipeout.valid() && wipeout.track_at(40246U) == 1U &&
+                wipeout.track_at(40247U) == 2U &&
+                wipeout.track_at(40396U) == 2U &&
+                wipeout.find_track(2U)->start_lba == 40397U &&
+                wipeout.track_at(274479U) == 0xaaU,
+            "verified 14-track INDEX 00 ownership and exclusive lead-out");
+
+    DiscLayout invalid_index_zero = wipeout;
+    invalid_index_zero.tracks[1U].index_zero_lba = 40397U;
+    require(!invalid_index_zero.valid(),
+            "INDEX 00 must strictly precede its INDEX 01");
+    invalid_index_zero = wipeout;
+    invalid_index_zero.tracks[1U].index_zero_lba = 0U;
+    require(!invalid_index_zero.valid(),
+            "INDEX 00 cannot overlap the preceding program start");
 
     layout.tracks[1U].start_lba = 0U;
     require(!layout.valid(), "duplicate start rejected");
@@ -654,6 +692,49 @@ void test_seek_status_queries_and_identity_packets() {
         require(neutral_identity.pop_response() == expected,
                 "neutral GetID denied response byte");
     }
+}
+
+void test_wipeout_real_layout_toc_and_pregap_setloc() {
+    MemorySource source;
+    Cdrom device(&source, wipeout_special_edition_layout());
+
+    issue(device, Command::GetTN);
+    require(device.pop_response() == 0U && device.pop_response() == 0x01U &&
+                device.pop_response() == 0x14U,
+            "verified WipEout layout reports tracks 01 through 14");
+    acknowledge(device);
+
+    issue(device, Command::GetTD, {0x02U});
+    require(device.pop_response() == 0U && device.pop_response() == 0x09U &&
+                device.pop_response() == 0x00U,
+            "GetTD track 02 reports INDEX 01 at absolute 09:00:47");
+    acknowledge(device);
+    issue(device, Command::GetTD, {0x14U});
+    require(device.pop_response() == 0U && device.pop_response() == 0x56U &&
+                device.pop_response() == 0x54U,
+            "GetTD track 14 reports INDEX 01 at absolute 56:54:38");
+    acknowledge(device);
+    issue(device, Command::GetTD, {0x00U});
+    require(device.pop_response() == 0U && device.pop_response() == 0x61U &&
+                device.pop_response() == 0x01U,
+            "GetTD track 00 reports exclusive lead-out at absolute 61:01:54");
+    acknowledge(device);
+
+    set_location(device, 40247U);
+    issue(device, Command::SeekP);
+    (void)device.pop_response();
+    acknowledge(device);
+    device.advance_to(device.current_cycle() + SeekLatencyCycles);
+    require(device.current_lba() == 40247U,
+            "Setloc packed BCD resolves the stored track-02 pregap LBA");
+    (void)device.pop_response();
+    acknowledge(device);
+    issue(device, Command::GetlocP);
+    require(device.pop_response() == 0x02U,
+            "INDEX 00 pregap is owned by audio track 02, not data track 01");
+    require(device.pop_response() == 0x00U,
+            "GetlocP reports INDEX 00 inside the stored audio pregap");
+    acknowledge(device);
 }
 
 void test_data_request_widths_sector_sizes_and_location_header() {
@@ -1253,6 +1334,7 @@ int main() {
     test_host_registers_interrupt_reasons_and_latched_audio();
     test_parameter_ownership_errors_and_second_response_queue();
     test_seek_status_queries_and_identity_packets();
+    test_wipeout_real_layout_toc_and_pregap_setloc();
     test_data_request_widths_sector_sizes_and_location_header();
     test_dma_is_request_gated_and_cadence_is_exact();
     test_delayed_100hz_service_preserves_sector_irq_dma_order();

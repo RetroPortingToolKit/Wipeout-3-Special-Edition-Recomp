@@ -97,6 +97,11 @@ bool DiscLayout::valid() const noexcept {
         if (index != 0U && track.start_lba <= previous) {
             return false;
         }
+        if (track.has_index_zero &&
+            (index == 0U || track.index_zero_lba >= track.start_lba ||
+             track.index_zero_lba <= previous)) {
+            return false;
+        }
         previous = track.start_lba;
     }
     return lead_out_lba > previous;
@@ -119,7 +124,10 @@ const Track* DiscLayout::track_for_lba(Lba lba) const noexcept {
     }
     const Track* result = &tracks[0U];
     for (std::size_t index = 1U; index < count; ++index) {
-        if (tracks[index].start_lba > lba) {
+        const Lba boundary = tracks[index].has_index_zero
+                                 ? tracks[index].index_zero_lba
+                                 : tracks[index].start_lba;
+        if (boundary > lba) {
             break;
         }
         result = &tracks[index];
@@ -1143,11 +1151,13 @@ void Cdrom::begin_command(std::uint8_t command,
         const Lba relative_frames = track == nullptr || position < track->start_lba
                                         ? 0U
                                         : position - track->start_lba;
+        const std::uint8_t index_number =
+            track != nullptr && position < track->start_lba ? 0U : 1U;
         const Msf relative = frames_to_msf(relative_frames);
         const Msf absolute = lba_to_msf(std::min(position, MaximumAddressableLba));
         const std::array<std::uint8_t, 8U> response{
             track_number == LeadOutTrack ? LeadOutTrack : to_bcd(track_number),
-            to_bcd(1U),
+            to_bcd(index_number),
             to_bcd(relative.minute),
             to_bcd(relative.second),
             to_bcd(relative.frame),

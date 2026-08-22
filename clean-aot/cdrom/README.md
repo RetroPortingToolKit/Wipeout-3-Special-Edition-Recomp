@@ -53,7 +53,10 @@ that checksum is optional. CPU data delivery is separate from the decoded
 2,324-byte Form 2 payload and always follows the selected 2,048/2,340-byte host
 transfer size.
 
-`DiscLayout` describes normalized index-1 starts, track type, and lead-out.
+`DiscLayout` describes normalized index-1 starts, optional stored index-0
+ownership boundaries, track type, and lead-out. `GetTD` and track-select Play
+use index 1, while lookup and `GetlocP` attribute pregap sectors to index 0 of
+the following track.
 CDDA playback uses track type, emits silence on data tracks, applies the active
 four-coefficient matrix, preserves muted timing, stops at lead-out, and honors
 track-boundary autopause. XA audio/realtime Form 2 sectors can be filtered and

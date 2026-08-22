@@ -200,6 +200,8 @@ struct Track final {
     std::uint8_t number = 1U;
     Lba start_lba = 0U;
     TrackKind kind = TrackKind::Data;
+    Lba index_zero_lba = 0U;
+    bool has_index_zero = false;
 };
 
 struct DiscLayout final {
