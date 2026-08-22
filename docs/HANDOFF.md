@@ -1,5 +1,21 @@
 # Handoff
 
+## Live graphics integration checkpoint (2026-08-21)
+
+- The application has an opt-in production scanout mode which drains the
+  runtime GPU queue into application-owned raster VRAM, plans scanout from live
+  GP1 display registers, decodes RGB555/packed-24-bit output, and submits it to
+  the host within the same update.
+- Runtime configuration supports 4K and explicit generic/custom wide modes.
+  Exact 4:3 remains the default and has pinned end-to-end visual digest
+  `a0c4b5214903b3dd` from native GP0 fill through host consumption.
+- Replacement loading verifies generation-safe identity, confined canonical
+  paths, SHA-256, declared dimensions, native WIC PNG-to-RGBA8 decode, and an
+  explicit upload sink. Texture/font key derivation remains title-owned; no
+  title hashes were added to generic code.
+- Strict GCC application-graph tests pass 10/10. Focused Clang 22 ASan/UBSan
+  tests pass 5/5 across app, GPU, render, and raster.
+
 ## Current position
 
 - Cross-evidenced executable authorization v2 is ready in

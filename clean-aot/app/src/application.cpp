@@ -7,7 +7,8 @@ Application::~Application() { shutdown(); }
 
 AppCode Application::initialize(Authorization authorization,
                                 const runtime::GeneratedExecutableBinding& binding,
-                                host::WindowState initial_window) noexcept {
+                                host::WindowState initial_window,
+                                GraphicsConfiguration graphics) noexcept {
     if(initialized_)return AppCode::NotReady;
     if(!authorization.authorized())return AppCode::AuthorizationRejected;
     runtime::Configuration configuration{};
@@ -23,8 +24,11 @@ AppCode Application::initialize(Authorization authorization,
            authorization.selected_entry_pc,
            binding)!=runtime::DispatchStatus::Bound)
         return AppCode::DispatchRejected;
+    auto runtime_graphics=std::make_unique<RuntimeGraphics>(graphics);
+    if(!runtime_graphics->configured())return AppCode::RuntimeRejected;
     if(!host_.request_window(host::WindowRequest{initial_window}).success())return AppCode::HostRejected;
-    authorization_=std::move(authorization);runtime_=std::move(runtime);initialized_=true;return AppCode::Ok;
+    authorization_=std::move(authorization);runtime_=std::move(runtime);
+    graphics_=std::move(runtime_graphics);initialized_=true;return AppCode::Ok;
 }
 
 AppCode Application::run_update(Update& update) noexcept {
@@ -34,12 +38,15 @@ AppCode Application::run_update(Update& update) noexcept {
     if(update.pc!=runtime_->selected_pc()||runtime_->dispatch_selected(update.branch_taken)!=runtime::DispatchStatus::Executed)return AppCode::DispatchRejected;
     update.pc=runtime_->selected_pc();
     if(!runtime_->advance_to_retirement_cycle(update.retirement_cycle).ok())return AppCode::RuntimeRejected;
-    if(!host_.submit_frame(update.frame).success()||!host_.submit_audio(update.audio).success()||!host_.submit_controller(update.controller).success())return AppCode::HostRejected;
+    const host::HostStatus frame_status = graphics_->present(*runtime_,host_,update.frame.update_index);
+    if((frame_status.code==host::HostCode::not_ready&&!host_.submit_frame(update.frame).success())||
+       (frame_status.code!=host::HostCode::not_ready&&!frame_status.success())||
+       !host_.submit_audio(update.audio).success()||!host_.submit_controller(update.controller).success())return AppCode::HostRejected;
     const host::HostStatus serviced=host_.service();
     return serviced.success()?AppCode::Ok:AppCode::HostRejected;
 }
 
-void Application::shutdown() noexcept { if(initialized_&&!host_.shutting_down())host_.shutdown();runtime_.reset();initialized_=false; }
+void Application::shutdown() noexcept { if(initialized_&&!host_.shutting_down())host_.shutdown();graphics_.reset();runtime_.reset();initialized_=false; }
 bool Application::initialized() const noexcept { return initialized_; }
 const Authorization& Application::authorization() const noexcept { return authorization_; }
 

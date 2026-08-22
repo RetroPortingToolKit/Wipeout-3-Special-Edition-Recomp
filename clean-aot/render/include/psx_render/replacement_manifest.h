@@ -53,6 +53,9 @@ public:
         std::uint64_t source_generation) const;
     [[nodiscard]] bool is_current(const ReplacementIdentity& identity,
                                   std::uint64_t source_generation) const noexcept;
+    [[nodiscard]] const ReplacementManifestEntry* entry(
+        const ReplacementIdentity& identity,
+        std::uint64_t source_generation) const noexcept;
     [[nodiscard]] std::uint64_t generation() const noexcept;
     [[nodiscard]] std::size_t size() const noexcept;
 

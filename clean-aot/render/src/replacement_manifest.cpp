@@ -123,6 +123,15 @@ bool ReplacementManifest::is_current(const ReplacementIdentity& identity,
            entry.sha256 == identity.sha256;
 }
 
+const ReplacementManifestEntry* ReplacementManifest::entry(
+    const ReplacementIdentity& identity,
+    std::uint64_t source_generation) const noexcept {
+    if (!is_current(identity, source_generation)) {
+        return nullptr;
+    }
+    return &entries_[identity.entry_index];
+}
+
 std::uint64_t ReplacementManifest::generation() const noexcept { return generation_; }
 std::size_t ReplacementManifest::size() const noexcept { return entries_.size(); }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "clean_aot/app/authorization.hpp"
+#include "clean_aot/app/graphics.hpp"
 #include "clean_aot/host/host.hpp"
 #include "clean_aot/runtime/runtime.hpp"
 
@@ -40,7 +41,8 @@ public:
     [[nodiscard]] AppCode initialize(
         Authorization authorization,
         const runtime::GeneratedExecutableBinding& binding,
-        host::WindowState initial_window) noexcept;
+        host::WindowState initial_window,
+        GraphicsConfiguration graphics = {}) noexcept;
     [[nodiscard]] AppCode run_update(Update& update) noexcept;
     void shutdown() noexcept;
 
@@ -51,6 +53,7 @@ private:
     host::IHostBackend& host_;
     Authorization authorization_{};
     std::unique_ptr<runtime::Runtime> runtime_{};
+    std::unique_ptr<RuntimeGraphics> graphics_{};
     bool initialized_ = false;
 };
 

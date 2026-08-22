@@ -32,6 +32,7 @@ add_library(clean_aot_app STATIC
     src/authorization.cpp
     src/bootstrap.cpp
     src/disc_source.cpp
+    src/graphics.cpp
     src/json.cpp
     src/memory_card.cpp
     src/sha256.cpp
@@ -42,6 +43,9 @@ if(NOT TARGET clean_aot_media)
                      "${CMAKE_CURRENT_BINARY_DIR}/media")
 endif()
 target_link_libraries(clean_aot_app PUBLIC clean_aot_runtime clean_aot_host clean_aot_media)
+if(WIN32)
+    target_link_libraries(clean_aot_app PRIVATE windowscodecs ole32)
+endif()
 target_compile_features(clean_aot_app PUBLIC cxx_std_20)
 
 function(clean_aot_app_warnings target)
@@ -89,4 +93,8 @@ if(CLEAN_AOT_APP_BUILD_TESTS AND BUILD_TESTING)
     target_link_libraries(clean_aot_memory_card_tests PRIVATE clean_aot_app)
     clean_aot_app_warnings(clean_aot_memory_card_tests)
     add_test(NAME clean_aot_memory_card_tests COMMAND clean_aot_memory_card_tests)
+    add_executable(clean_aot_app_graphics_tests tests/graphics_tests.cpp)
+    target_link_libraries(clean_aot_app_graphics_tests PRIVATE clean_aot_app)
+    clean_aot_app_warnings(clean_aot_app_graphics_tests)
+    add_test(NAME clean_aot_app_graphics_tests COMMAND clean_aot_app_graphics_tests)
 endif()
