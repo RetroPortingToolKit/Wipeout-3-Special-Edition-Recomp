@@ -20,6 +20,8 @@ set(PSX_NETPLAY OFF CACHE BOOL
     "Link recomp-net delay-sync (opt-in; needs recomp-net)" FORCE)
 set(PSX_REWIND OFF CACHE BOOL
     "Build and expose local rewind support (opt-in)" FORCE)
+set(PSX_ENABLE_LTO ON CACHE BOOL
+    "Enable LTO for the full-detail recompiled runtime" FORCE)
 set(PSX_SETUP_WIZARD OFF CACHE BOOL
     "Advertise first-run setup wizard + Generate & rebuild in recomp-ui" FORCE)
 # WipEout 3 is a retail-BIOS product: never link or stage OpenBIOS.
