@@ -1023,15 +1023,36 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
         std::uint32_t presented_width = planned.plan.logical_width;
         std::uint32_t presented_height = planned.plan.logical_height;
         bool high_resolution_resolved = false;
+        std::uint32_t gpu_presentation_effects = 0U;
+        const host::PresentationCapabilities host_presentation =
+            host.presentation_capabilities();
+        const std::uint32_t target_width =
+            planned.plan.presentation.destination_width;
+        const std::uint32_t target_height =
+            planned.plan.presentation.destination_height;
+        const std::uint64_t target_pixels =
+            static_cast<std::uint64_t>(target_width) * target_height;
+        const bool gpu_edge_resolve =
+            configuration_.presentation_resolve ==
+                raster::PresentationResolveMode::EdgeAware &&
+            host_presentation.gpu_edge_aware && ui_draws_.empty() &&
+            target_pixels <= configuration_.maximum_resolved_pixels &&
+            target_width >= planned.plan.logical_width * 2ULL &&
+            target_height >= planned.plan.logical_height * 2ULL;
+        if (gpu_edge_resolve) {
+            gpu_presentation_effects |= host::kPresentationEffectEdgeAware;
+            if (configuration_.display_postprocess ==
+                    raster::DisplayPostprocessMode::ChromaSmooth24Bit &&
+                planned.plan.pixel_format == raster::ScanoutPixelFormat::PackedRgb888 &&
+                host_presentation.gpu_chroma_smooth &&
+                target_pixels <= configuration_.maximum_postprocess_pixels) {
+                gpu_presentation_effects |= host::kPresentationEffectChromaSmooth;
+            }
+        }
         upscale_stats_ = {};
         if (configuration_.presentation_resolve ==
-                raster::PresentationResolveMode::EdgeAware) {
-            const std::uint32_t target_width =
-                planned.plan.presentation.destination_width;
-            const std::uint32_t target_height =
-                planned.plan.presentation.destination_height;
-            const std::uint64_t target_pixels =
-                static_cast<std::uint64_t>(target_width) * target_height;
+                raster::PresentationResolveMode::EdgeAware &&
+            !gpu_edge_resolve) {
             bool resolved = target_pixels <= configuration_.maximum_resolved_pixels &&
                 target_pixels <= 8192ULL * 8192ULL &&
                 target_pixels <= std::numeric_limits<std::size_t>::max() / 3U;
@@ -1065,7 +1086,7 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
         if (configuration_.display_postprocess ==
                 raster::DisplayPostprocessMode::ChromaSmooth24Bit &&
             planned.plan.pixel_format == raster::ScanoutPixelFormat::PackedRgb888 &&
-            high_resolution_resolved) {
+            high_resolution_resolved && gpu_presentation_effects == 0U) {
             const std::uint64_t pixels =
                 static_cast<std::uint64_t>(presented_width) * presented_height;
             bool processed = pixels <= configuration_.maximum_postprocess_pixels &&
@@ -1272,6 +1293,11 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
             presented_width, presented_height, presented,
             sequence_, update_index, submission);
         if (!bound.success()) return bound;
+        if (gpu_presentation_effects != 0U) {
+            submission.presentation_width = target_width;
+            submission.presentation_height = target_height;
+            submission.presentation_effects = gpu_presentation_effects;
+        }
         visual_digest_ = kFnvOffset;
         digest_bytes(visual_digest_, presented);
         const std::array<std::uint64_t, 4U> metadata{

@@ -40,6 +40,9 @@ struct SdlPresentationMetrics final {
     std::uint64_t frames_accepted = 0U;
     std::uint64_t swapchain_images_acquired = 0U;
     std::uint64_t gpu_present_submissions = 0U;
+    std::uint64_t frame_upload_bytes = 0U;
+    std::uint64_t gpu_effect_frames = 0U;
+    std::uint64_t gpu_effect_output_pixels = 0U;
     std::uint64_t display_presentations_confirmed = 0U;
     std::uint64_t acquire_not_ready = 0U;
     std::uint64_t sequence_errors = 0U;
@@ -143,6 +146,8 @@ public:
     [[nodiscard]] WindowState window_state() const noexcept;
     [[nodiscard]] SdlPresentationMetrics presentation_metrics() const noexcept;
     [[nodiscard]] SdlAudioMetrics audio_metrics() const noexcept;
+    [[nodiscard]] PresentationCapabilities presentation_capabilities()
+        const noexcept override;
 
 private:
     struct Impl;

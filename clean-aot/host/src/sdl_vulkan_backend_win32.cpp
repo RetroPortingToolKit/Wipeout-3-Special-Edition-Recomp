@@ -1,6 +1,7 @@
 #include "clean_aot/host/sdl_vulkan.hpp"
 
 #include <algorithm>
+#include <array>
 
 #if !defined(_WIN32)
 #error "The SDL3/Vulkan presentation backend is Windows-only"
@@ -48,8 +49,11 @@ constexpr std::size_t kMaxEventsPerService = 32U;
     const std::uint64_t required_bytes =
         static_cast<std::uint64_t>(frame.surface.pitch) *
         prior_rows + minimum_pitch;
+    const bool transformed = frame.presentation_effects != 0U;
     return frame.surface.pitch >= minimum_pitch &&
-        required_bytes <= frame.surface.byte_size;
+        required_bytes <= frame.surface.byte_size &&
+        (!transformed || (frame.presentation_width >= frame.surface.width * 2ULL &&
+                          frame.presentation_height >= frame.surface.height * 2ULL));
 }
 
 [[nodiscard]] HostStatus sdl_failure(
@@ -351,7 +355,8 @@ template <typename ImplType>
 template <typename ImplType>
 [[nodiscard]] bool encode_default_frame(ImplType& impl,
     SDL_GPUCommandBuffer* command_buffer, SDL_GPUTexture* swapchain_texture,
-    const FrameView& frame, const Viewport& viewport) noexcept {
+    const FrameSubmission& submission, const Viewport& viewport) noexcept {
+    const FrameView& frame = submission.surface;
     if (!create_texture_upload_resources(impl, frame.width, frame.height)) return false;
     auto* mapped = static_cast<std::uint8_t*>(
         SDL_MapGPUTransferBuffer(impl.device, impl.frame_transfer, true));
@@ -375,12 +380,29 @@ template <typename ImplType>
     SDL_BindGPUGraphicsPipeline(pass, impl.present_pipeline);
     const SDL_GPUTextureSamplerBinding binding{impl.frame_texture, impl.present_sampler};
     SDL_BindGPUFragmentSamplers(pass, 0U, &binding, 1U);
+    const std::array<std::uint32_t, 8U> presentation{
+        frame.width, frame.height,
+        submission.presentation_effects == 0U ? frame.width : submission.presentation_width,
+        submission.presentation_effects == 0U ? frame.height : submission.presentation_height,
+        submission.presentation_effects,
+        static_cast<std::uint32_t>(std::max(viewport.x, 0)),
+        static_cast<std::uint32_t>(std::max(viewport.y, 0)), 0U};
+    SDL_PushGPUFragmentUniformData(command_buffer, 0U, presentation.data(),
+                                   sizeof(presentation));
     const SDL_GPUViewport gpu_viewport{static_cast<float>(viewport.x),
         static_cast<float>(viewport.y), static_cast<float>(viewport.width),
         static_cast<float>(viewport.height), 0.0F, 1.0F};
     SDL_SetGPUViewport(pass, &gpu_viewport);
     SDL_DrawGPUPrimitives(pass, 3U, 1U, 0U, 0U);
     SDL_EndGPURenderPass(pass);
+    impl.metrics.frame_upload_bytes +=
+        static_cast<std::uint64_t>(frame.width) * frame.height * 4U;
+    if (submission.presentation_effects != 0U) {
+        ++impl.metrics.gpu_effect_frames;
+        impl.metrics.gpu_effect_output_pixels +=
+            static_cast<std::uint64_t>(submission.presentation_width) *
+            submission.presentation_height;
+    }
     return true;
 }
 
@@ -504,6 +526,7 @@ HostStatus SdlVulkanPresentation::initialize() noexcept {
     fragment_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
     fragment_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
     fragment_info.num_samplers = 1U;
+    fragment_info.num_uniform_buffers = 1U;
     SDL_GPUShader* fragment_shader =
         SDL_CreateGPUShader(impl_->device, &fragment_info);
     if (vertex_shader == nullptr || fragment_shader == nullptr) {
@@ -844,8 +867,12 @@ HostStatus SdlVulkanPresentation::service() noexcept {
     const ViewportRequest viewport_request{
         target_width,
         target_height,
-        impl_->pending_frame.surface.width,
-        impl_->pending_frame.surface.height,
+        impl_->pending_frame.presentation_effects == 0U
+            ? impl_->pending_frame.surface.width
+            : impl_->pending_frame.presentation_width,
+        impl_->pending_frame.presentation_effects == 0U
+            ? impl_->pending_frame.surface.height
+            : impl_->pending_frame.presentation_height,
         config_.aspect,
         config_.custom_aspect,
         config_.scale};
@@ -867,7 +894,7 @@ HostStatus SdlVulkanPresentation::service() noexcept {
         encode_status = encoder_->encode(
             context, impl_->pending_frame.surface);
     } else if (!encode_default_frame(*impl_, command_buffer, swapchain_texture,
-                                     impl_->pending_frame.surface, viewport)) {
+                                     impl_->pending_frame, viewport)) {
         encode_status = sdl_failure(HostCode::internal_error);
     }
     if (!encode_status.success()) {
@@ -899,6 +926,12 @@ HostStatus SdlVulkanPresentation::service() noexcept {
         poll_present_completions(*impl_);
     }
     return HostStatus{};
+}
+
+PresentationCapabilities SdlVulkanPresentation::presentation_capabilities()
+    const noexcept {
+    return impl_ != nullptr && impl_->initialized
+        ? PresentationCapabilities{true, true} : PresentationCapabilities{};
 }
 
 bool SdlVulkanPresentation::poll_event(HostEvent& event) noexcept {

@@ -1,11 +1,13 @@
 #include "clean_aot/host/sdl_vulkan.hpp"
 #include "clean_aot/host/direct_vulkan_bridge.hpp"
+#include "present_shaders.hpp"
 #include <SDL3/SDL.h>
 #include <array>
 #include <chrono>
 #include <cstdint>
 #include <iostream>
 #include <thread>
+#include <string_view>
 
 namespace {
 using namespace clean_aot::host;
@@ -49,6 +51,8 @@ private:
 } // namespace
 
 int main() {
+    if (std::string_view{clean_aot::host::shaders::kPresentFragmentSpirvSha256} !=
+        "ccfdfe170a126a56ff2566d8258b874e3bca59983d616ff71cb2e5338730e1f6") return 31;
     using namespace clean_aot::host;
     SdlVulkanConfig config{};
     config.title = "clean-aot hidden 100 Hz Vulkan acceptance";
@@ -86,16 +90,28 @@ int main() {
     if (!backend.initialize().success()) return 5;
     if (!backend.submit_frame({7U,0U,surface}).success()) return 3;
     if (backend.service().code != HostCode::sequence_error) return 4;
+    const auto gpu_effect_begin = std::chrono::steady_clock::now();
     for (std::uint64_t index = 0U; index < 100U; ++index) {
-        if (!backend.submit_frame({index,index,surface}).success()) return 5;
+        FrameSubmission transformed{index,index,surface};
+        transformed.presentation_width = 2880U;
+        transformed.presentation_height = 2160U;
+        transformed.presentation_effects = kPresentationEffectEdgeAware;
+        if (!backend.submit_frame(transformed).success()) return 5;
         if (!service_until_submitted(backend,index+1U)) return 6;
     }
+    const auto gpu_effect_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now() - gpu_effect_begin).count();
+    std::cout << "real Vulkan 4K effect submissions=100 elapsed_ns="
+              << gpu_effect_ns << '\n';
     SdlPresentationMetrics metrics = backend.presentation_metrics();
     if (metrics.frames_accepted != 101U || metrics.swapchain_images_acquired != 100U ||
         metrics.gpu_present_submissions != 100U ||
         metrics.display_presentations_confirmed != 0U ||
         metrics.next_sequence != 100U || metrics.next_update_index != 100U ||
-        metrics.sequence_errors != 1U || metrics.queue_latency_ns_max == 0U) return 7;
+        metrics.sequence_errors != 1U || metrics.queue_latency_ns_max == 0U ||
+        metrics.gpu_effect_frames != 100U ||
+        metrics.gpu_effect_output_pixels != 100ULL * 2880ULL * 2160ULL ||
+        metrics.frame_upload_bytes != 100U * 2U * 2U * 4U) return 7;
     if (!backend.request_window({{5120U,2160U,FullscreenMode::windowed}}).success() ||
         !backend.recreate_swapchain().success()) return 8;
     if (!backend.submit_frame({100U,100U,surface}).success() ||

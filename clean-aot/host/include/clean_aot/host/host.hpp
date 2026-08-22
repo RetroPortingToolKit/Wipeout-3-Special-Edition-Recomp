@@ -70,6 +70,17 @@ struct FrameSubmission final {
     std::uint64_t sequence = 0U;
     std::uint64_t update_index = 0U;
     FrameView surface{};
+    std::uint32_t presentation_width = 0U;
+    std::uint32_t presentation_height = 0U;
+    std::uint32_t presentation_effects = 0U;
+};
+
+inline constexpr std::uint32_t kPresentationEffectEdgeAware = 1U << 0U;
+inline constexpr std::uint32_t kPresentationEffectChromaSmooth = 1U << 1U;
+
+struct PresentationCapabilities final {
+    bool gpu_edge_aware = false;
+    bool gpu_chroma_smooth = false;
 };
 
 struct StereoAudioBatch final {
@@ -137,6 +148,8 @@ public:
     [[nodiscard]] virtual bool poll_event(HostEvent& event) noexcept = 0;
     virtual void shutdown() noexcept = 0;
     [[nodiscard]] virtual bool shutting_down() const noexcept = 0;
+    [[nodiscard]] virtual PresentationCapabilities presentation_capabilities()
+        const noexcept { return {}; }
 };
 
 } // namespace clean_aot::host

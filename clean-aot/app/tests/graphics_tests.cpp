@@ -15,6 +15,24 @@ int failures = 0;
 void expect(bool condition, const char* message) {
     if (!condition) { ++failures; std::cerr << "FAIL: " << message << '\n'; }
 }
+class AcceleratedCaptureHost final : public clean_aot::host::IHostBackend {
+public:
+    clean_aot::host::HostStatus submit_frame(
+        const clean_aot::host::FrameSubmission& value) noexcept override {
+        frame = value; return {};
+    }
+    clean_aot::host::HostStatus submit_audio(const clean_aot::host::StereoAudioBatch&) noexcept override { return {}; }
+    clean_aot::host::HostStatus submit_controller(const clean_aot::host::ControllerState&) noexcept override { return {}; }
+    clean_aot::host::HostStatus request_window(const clean_aot::host::WindowRequest&) noexcept override { return {}; }
+    clean_aot::host::HostStatus service() noexcept override { return {}; }
+    bool poll_event(clean_aot::host::HostEvent&) noexcept override { return false; }
+    void shutdown() noexcept override { down = true; }
+    bool shutting_down() const noexcept override { return down; }
+    clean_aot::host::PresentationCapabilities presentation_capabilities()
+        const noexcept override { return {true, true}; }
+    clean_aot::host::FrameSubmission frame{};
+    bool down = false;
+};
 class FakePngDecoder final : public clean_aot::app::IPngDecoder {
 public:
     bool decode(std::span<const std::uint8_t> png, std::uint32_t width,
@@ -902,6 +920,22 @@ void test_4k_edge_aware_runtime_resolve() {
               << enhanced.visual_digest() << std::dec << '\n';
     expect(enhanced.visual_digest() == 0x552f7b477c3b979cULL,
            "4K edge-aware visual digest changed");
+
+    clean_aot::runtime::Runtime gpu_runtime(runtime_config);
+    prepare(gpu_runtime);
+    clean_aot::app::RuntimeGraphics gpu_present(enhanced_config);
+    AcceleratedCaptureHost gpu_host;
+    expect(gpu_present.present(gpu_runtime, gpu_host, 0U).success() &&
+           gpu_host.frame.surface.width == 320U &&
+           gpu_host.frame.surface.height == 240U &&
+           gpu_host.frame.presentation_width == 2880U &&
+           gpu_host.frame.presentation_height == 2160U &&
+           gpu_host.frame.presentation_effects ==
+               clean_aot::host::kPresentationEffectEdgeAware &&
+           gpu_host.frame.surface.byte_size == 320U * 240U * 3U,
+           "GPU resolve uploads native scanout and dispatches the pinned 4K transform");
+    expect(gpu_host.frame.surface.byte_size * 80ULL < output_pixels * 3ULL,
+           "GPU resolve removes more than 98 percent of per-frame upload bytes");
 
     clean_aot::runtime::Runtime fallback_runtime(runtime_config);
     prepare(fallback_runtime);
