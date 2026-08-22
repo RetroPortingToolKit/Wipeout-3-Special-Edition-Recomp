@@ -11,6 +11,8 @@ import re
 import subprocess
 from pathlib import Path
 
+from tools.analysis.live_shell_frontier_batch import authenticated_straight_line_span
+
 
 TERMINAL = re.compile(r"^(\d+) (\d+) (\d+) (\d+) (?:\d+ ){8}(\d+) (\d+) ", re.M)
 
@@ -50,6 +52,8 @@ def main() -> int:
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--count", type=int, default=100)
     parser.add_argument("--first-index", type=int, default=269)
+    parser.add_argument("--max-batch-instructions", type=int, default=1,
+                        help="batch authenticated straight-line instructions before one rebuild")
     parser.add_argument("--normalize-receipt", action="store_true")
     args = parser.parse_args()
     root = args.root.resolve()
@@ -134,7 +138,7 @@ def main() -> int:
             print("MATERIAL_BLOCKER repeated-exact-frontier", flush=True)
             break
         seen.add(key)
-        span = instruction_span(source, offset)
+        span = authenticated_straight_line_span(source, offset, args.max_batch_instructions)
         payload = source[offset:offset + span]
         end = pc + span
         identity = sha(f"{source_hash}:{pc:08x}:{end:08x}".encode("ascii"))

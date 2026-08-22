@@ -1011,3 +1011,11 @@ instruction and fails closed on every unknown PC or executable identity.
   live-handler state is not `UnknownCode`; diagnose its indirect vector target
   and interrupt/event source before extending frontiers or bounds. Receipt:
   `clean-aot/catalog/evidence/bios-shell-exact-frontiers-00000267.json`.
+- Live-shell frontier advancement has an opt-in authenticated straight-line
+  batch mode: `advance_live_shell_frontiers.py --max-batch-instructions N`.
+  It keeps the default at one, never crosses a later control transfer, keeps a
+  frontier control transfer and delay slot atomic, and derives the variant
+  identity from the same exact source-epoch hash and enlarged range. This
+  reduces aggregate CMake relinks on linear corridors while leaving compiler
+  CFI rejection authoritative. The committed shard-371 receipt audits as 103
+  unique exact bindings covering 116 instructions.
