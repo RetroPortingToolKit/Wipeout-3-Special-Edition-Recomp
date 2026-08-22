@@ -94,6 +94,16 @@
   input has yet selected and completed a race, so race stability and full
   content coverage remain open. The shipped config was restored to
   `auto_skip_fmv=false`.
+- The attempted automated race probe did not produce a valid race trace: the
+  debug executable path in the disposable harness was wrong on the first run,
+  and the corrected run only confirmed PAL x2 activation before the short
+  process window ended. It must not be treated as race evidence. The temporary
+  probe harness was removed and the production build was restored with debug
+  tools off, `auto_skip_fmv=false`, netplay off, and rewind off.
+- The restored production executable passes the static Release boundary,
+  `guest_clock_test`, and the authenticated PAL-title verifier. The build emits
+  only existing third-party `stb_image` overflow warnings; no build or test
+  failure occurred. PAL100 remains opt-in/default-off.
 
 - PAL100 title timing is now authenticated for the supplied PAL target: the
   title selector/state path at 0x8017BB8C–0x8017BBAC maps selector 2 to
