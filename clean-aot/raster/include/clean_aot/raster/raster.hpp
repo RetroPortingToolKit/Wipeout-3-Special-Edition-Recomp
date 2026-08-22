@@ -87,11 +87,21 @@ enum class TextureFilterMode : std::uint8_t {
   BilinearTransparencySafe,
 };
 
+enum class PreciseColorMode : std::uint8_t {
+  NativeRgb555,
+  TrueColorDisplay,
+};
+
 struct PreciseRasterStats final {
   std::uint64_t precise_fragments = 0U;
   std::uint64_t bilinear_fragments = 0U;
   std::uint64_t bilinear_texture_fetches = 0U;
   std::uint64_t transparency_fallbacks = 0U;
+  std::uint64_t true_color_fragments = 0U;
+  std::uint64_t feedback_fallbacks = 0U;
+  std::uint64_t true_color_invalidations = 0U;
+  std::uint64_t true_color_scanout_tests = 0U;
+  std::uint64_t true_color_scanout_pixels = 0U;
 };
 
 struct EventResult {
@@ -296,7 +306,10 @@ public:
       const ReplacementTexture *replacement = nullptr,
       PreciseCullingPolicy culling =
           PreciseCullingPolicy::NativeHardware,
-      TextureFilterMode filtering = TextureFilterMode::NearestNative) noexcept;
+      TextureFilterMode filtering = TextureFilterMode::NearestNative,
+      PreciseColorMode color_mode = PreciseColorMode::NativeRgb555) noexcept;
+  [[nodiscard]] EventResult apply_true_color_scanout(
+      const ScanoutPlan &plan, std::span<std::uint8_t> rgb888) noexcept;
   [[nodiscard]] EventResult consume(const gpu::Event &event,
                                     WorkBudget &budget) noexcept;
   [[nodiscard]] BatchResult

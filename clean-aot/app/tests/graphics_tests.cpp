@@ -243,6 +243,9 @@ void test_live_pgxp_projection_pipeline() {
     fallback_config.runtime_scanout = true;
     fallback_config.pgxp_enabled = true;
     fallback_config.provenance_provider = &reject;
+    fallback_config.precise_color =
+        raster::PreciseColorMode::TrueColorDisplay;
+    fallback_config.maximum_true_color_scanout_pixels = 1U;
     app::RuntimeGraphics fallback(fallback_config);
     app::GraphicsConfiguration native_config{};
     native_config.runtime_scanout = true;
@@ -251,8 +254,9 @@ void test_live_pgxp_projection_pipeline() {
     expect(fallback.present(rejected_runtime, fallback_host, 0U).success() &&
            native.present(native_runtime, native_host, 0U).success() &&
            fallback.precise_fallbacks() == 1U &&
+           fallback.true_color_fallbacks() == 1U &&
            fallback.visual_digest() == native.visual_digest(),
-           "missing provenance produces byte-exact native frame fallback");
+           "missing provenance and true-color budget preserve exact native frame");
 }
 
 void test_live_gp0_primitive_compatibility_matrix() {
@@ -324,6 +328,9 @@ void test_live_gp0_primitive_compatibility_matrix() {
     configuration.runtime_scanout = true;
     configuration.pgxp_enabled = true;
     configuration.provenance_provider = &provenance;
+    configuration.precise_color = raster::PreciseColorMode::TrueColorDisplay;
+    configuration.presentation_resolve =
+        raster::PresentationResolveMode::EdgeAware;
     app::RuntimeGraphics graphics(configuration);
     host::HeadlessBackend host;
     expect(graphics.present(runtime, host, 0U).success() &&
@@ -332,7 +339,16 @@ void test_live_gp0_primitive_compatibility_matrix() {
     expect(graphics.precise_primitives() == 5U &&
            graphics.precise_fallbacks() == 0U &&
            graphics.precise_raster_stats().precise_fragments != 0U &&
-           graphics.visual_digest() == 0x0720ae19714abdb8ULL,
+           graphics.precise_raster_stats().true_color_fragments != 0U &&
+           graphics.precise_raster_stats().feedback_fallbacks != 0U &&
+           graphics.precise_raster_stats().true_color_scanout_tests ==
+               320U * 240U &&
+           graphics.precise_raster_stats().true_color_scanout_pixels <=
+               320U * 240U &&
+           graphics.upscale_stats().output_pixels == 2880ULL * 2160ULL &&
+           graphics.upscale_stats().source_pixel_reads ==
+               graphics.upscale_stats().output_pixels * 5U &&
+           graphics.visual_digest() == 0xfd39004a4be2d9d1ULL,
            "all polygon matrix modes reach precise raster without drops");
     std::cout << "GP0 matrix precise/fallback: " << graphics.precise_primitives()
               << '/' << graphics.precise_fallbacks() << '\n';

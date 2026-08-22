@@ -172,6 +172,17 @@ separate identity-projection test requires a semi-transparent precise quad to
 match the complete native VRAM digest, protecting shared-edge blend and mask
 semantics.
 
+`PreciseColorMode::TrueColorDisplay` does not turn VRAM into a true-color
+framebuffer. Precise fragments always quantize, dither, blend, and set/check
+mask bits in authoritative RGB555 storage. An opaque successful write may also
+retain its pre-dither RGB888 result for display scanout. Any later write that
+actually reaches that VRAM pixel invalidates the retained color; rejected mask
+writes do not. Semi-transparent fragments never enter the display plane because
+their result depends on RGB555 framebuffer feedback. This gives scaled
+true-color Gouraud gradients and removes enlarged 4x4 dither noise without
+changing texture reads, copies, downloads, blending, masks, or guest-visible
+VRAM. `NativeRgb555` remains byte-identical and is the default.
+
 `ScanoutMapper::upscale_edge_aware_rgb888()` is the high-resolution
 presentation resolve. It applies the Scale2x edge rules directly at an
 arbitrary 2x-or-greater target size, selecting only colors already present in

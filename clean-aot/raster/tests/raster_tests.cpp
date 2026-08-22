@@ -1407,6 +1407,112 @@ void test_precise_quad_half_open_ownership() {
           "identity-projected precise quad diverged from native blend/mask coverage");
 }
 
+void test_true_color_plane_feedback_contract() {
+  using clean_aot::raster::PreciseColorMode;
+  ReferenceRasterizer rasterizer;
+  PolygonEvent triangle{};
+  triangle.vertex_count = 3U;
+  triangle.gouraud = true;
+  triangle.state = full_state();
+  triangle.state.draw_mode.dither = true;
+  triangle.vertices[0] = vertex(4, 4);
+  triangle.vertices[1] = vertex(12, 4);
+  triangle.vertices[2] = vertex(4, 12);
+  constexpr std::uint32_t rgba = 0xff332211U;
+  const auto precise = [](double x, double y) {
+    return clean_aot::raster::PreciseVertex{
+        x, y, 1.0, 1.0, 0.0, 0.0, rgba, 1U, 1U};
+  };
+  const std::array<clean_aot::raster::PreciseVertex, 3U> vertices{
+      precise(4.0, 4.0), precise(12.0, 4.0), precise(4.0, 12.0)};
+  require(rasterizer.consume_precise_polygon(
+              triangle, vertices, nullptr,
+              clean_aot::raster::PreciseCullingPolicy::NativeHardware,
+              clean_aot::raster::TextureFilterMode::NearestNative,
+              PreciseColorMode::TrueColorDisplay).accepted(),
+          "true-color precise polygon was rejected");
+  const VramWord authoritative = rasterizer.read_vram(5U, 5U);
+  require(authoritative == 0x1881U,
+          "true-color mode changed authoritative dithered RGB555 storage");
+
+  DisplayTiming display{};
+  display.display_enabled = true;
+  display.horizontal_resolution = 1U;
+  display.horizontal_start = 0x200U;
+  display.horizontal_end = 0xc00U;
+  display.vertical_start = 0x10U;
+  display.vertical_end = 0x100U;
+  const auto planned = ScanoutMapper::plan(ScanoutRequest{
+      display, ScanoutField::Progressive, 640U, 480U,
+      PresentationMode::Identity4x3, 4U, 3U});
+  std::vector<std::uint8_t> scanout(planned.plan.required_rgb_bytes, 0U);
+  require(ScanoutMapper::decode_rgb888(
+              planned.plan, rasterizer.vram_words(), scanout).accepted() &&
+              rasterizer.apply_true_color_scanout(planned.plan, scanout).accepted(),
+          "true-color display plane did not apply to RGB555 scanout");
+  const std::size_t pixel = (5U * 320U + 5U) * 3U;
+  require(scanout[pixel] == 17U && scanout[pixel + 1U] == 34U &&
+              scanout[pixel + 2U] == 51U &&
+              rasterizer.precise_stats().true_color_fragments != 0U,
+          "pre-dither RGB888 precision was not retained for presentation");
+
+  RectangleEvent masked{};
+  masked.state = full_state();
+  masked.state.mask.check_mask_bit = true;
+  masked.origin = vertex(5, 5);
+  masked.width = 1U;
+  masked.height = 1U;
+  masked.color = color(255U, 255U, 255U);
+  triangle.state.mask.set_mask_bit = true;
+  require(rasterizer.consume_precise_polygon(
+              triangle, vertices, nullptr,
+              clean_aot::raster::PreciseCullingPolicy::NativeHardware,
+              clean_aot::raster::TextureFilterMode::NearestNative,
+              PreciseColorMode::TrueColorDisplay).accepted(),
+          "mask-setting true-color polygon was rejected");
+  consume_ok(rasterizer, Event{masked});
+  std::fill(scanout.begin(), scanout.end(), 0U);
+  require(ScanoutMapper::decode_rgb888(
+              planned.plan, rasterizer.vram_words(), scanout).accepted() &&
+              rasterizer.apply_true_color_scanout(planned.plan, scanout).accepted() &&
+              scanout[pixel] == 17U,
+          "mask-rejected feedback incorrectly invalidated true color");
+
+  RectangleEvent feedback = masked;
+  feedback.state.mask.check_mask_bit = false;
+  feedback.state.mask.set_mask_bit = false;
+  feedback.semi_transparent = true;
+  feedback.color = color(255U, 0U, 0U);
+  consume_ok(rasterizer, Event{feedback});
+  std::fill(scanout.begin(), scanout.end(), 0U);
+  require(ScanoutMapper::decode_rgb888(
+              planned.plan, rasterizer.vram_words(), scanout).accepted() &&
+              rasterizer.apply_true_color_scanout(planned.plan, scanout).status ==
+                  clean_aot::raster::EventStatus::Applied &&
+              scanout[pixel] != 17U &&
+              rasterizer.precise_stats().true_color_invalidations != 0U,
+          "framebuffer blend did not retire enhanced color at its destination");
+
+  ReferenceRasterizer blended;
+  ReferenceRasterizer blended_native;
+  triangle.state.mask = {};
+  triangle.semi_transparent = true;
+  require(blended.consume_precise_polygon(
+              triangle, vertices, nullptr,
+              clean_aot::raster::PreciseCullingPolicy::NativeHardware,
+              clean_aot::raster::TextureFilterMode::NearestNative,
+              PreciseColorMode::TrueColorDisplay).accepted() &&
+              blended_native.consume_precise_polygon(
+                  triangle, vertices, nullptr,
+                  clean_aot::raster::PreciseCullingPolicy::NativeHardware,
+                  clean_aot::raster::TextureFilterMode::NearestNative,
+                  PreciseColorMode::NativeRgb555).accepted() &&
+              blended.digest() == blended_native.digest() &&
+              blended.precise_stats().true_color_fragments == 0U &&
+              blended.precise_stats().feedback_fallbacks != 0U,
+          "semi-transparent precise feedback escaped RGB555 fallback");
+}
+
 void test_edge_aware_4k_resolve_contract() {
   constexpr std::uint32_t width = 3U;
   constexpr std::uint32_t height = 3U;
@@ -1499,6 +1605,7 @@ int main() {
     test_adversarial_coordinates_and_budgets();
     test_precise_transparency_safe_filtering();
     test_precise_quad_half_open_ownership();
+    test_true_color_plane_feedback_contract();
     test_edge_aware_4k_resolve_contract();
     test_bounded_chroma_smoothing_contract();
     test_scanout_boundaries();

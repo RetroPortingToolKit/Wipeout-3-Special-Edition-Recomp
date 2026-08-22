@@ -141,6 +141,9 @@ struct GraphicsConfiguration final {
         psx::render::CullingPolicy::NativeHardware;
     raster::TextureFilterMode texture_filter =
         raster::TextureFilterMode::NearestNative;
+    raster::PreciseColorMode precise_color =
+        raster::PreciseColorMode::NativeRgb555;
+    std::uint64_t maximum_true_color_scanout_pixels = 640ULL * 480ULL;
     raster::PresentationResolveMode presentation_resolve =
         raster::PresentationResolveMode::Native;
     std::uint64_t maximum_resolved_pixels = 5120ULL * 2160ULL;
@@ -269,11 +272,13 @@ public:
     [[nodiscard]] const raster::DisplayPostprocessStats&
         display_postprocess_stats() const noexcept;
     [[nodiscard]] std::uint64_t display_postprocess_fallbacks() const noexcept;
+    [[nodiscard]] std::uint64_t true_color_fallbacks() const noexcept;
 
 private:
     GraphicsConfiguration configuration_{};
     raster::ReferenceRasterizer raster_{};
     std::vector<std::uint8_t> scanout_{};
+    std::vector<std::uint8_t> true_color_scanout_{};
     std::vector<std::uint8_t> resolved_scanout_{};
     std::vector<std::uint8_t> postprocessed_scanout_{};
     std::uint64_t sequence_ = 0U;
@@ -300,6 +305,7 @@ private:
     std::uint32_t resolved_height_ = 0U;
     raster::DisplayPostprocessStats display_postprocess_stats_{};
     std::uint64_t display_postprocess_fallbacks_ = 0U;
+    std::uint64_t true_color_fallbacks_ = 0U;
     bool using_postprocessed_scanout_ = false;
 };
 

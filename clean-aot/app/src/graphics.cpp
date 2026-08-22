@@ -701,7 +701,12 @@ RuntimeGraphics::RuntimeGraphics(GraphicsConfiguration configuration)
              raster::DisplayPostprocessMode::ChromaSmooth24Bit) &&
         (configuration_.display_postprocess ==
              raster::DisplayPostprocessMode::None ||
-         configuration_.maximum_postprocess_pixels != 0U);
+         configuration_.maximum_postprocess_pixels != 0U) &&
+        (configuration_.precise_color == raster::PreciseColorMode::NativeRgb555 ||
+         configuration_.precise_color ==
+             raster::PreciseColorMode::TrueColorDisplay) &&
+        (configuration_.precise_color == raster::PreciseColorMode::NativeRgb555 ||
+         configuration_.maximum_true_color_scanout_pixels != 0U);
     const psx::render::ProjectionResult projection =
         psx::render::ProjectionPolicyPlanner::plan({
             configuration_.projection, configuration_.culling,
@@ -818,8 +823,9 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                                     projection_plan_.culling ==
                                             psx::render::CullingPolicy::NativeHardware
                                         ? raster::PreciseCullingPolicy::NativeHardware
-                                        : raster::PreciseCullingPolicy::ProjectedBounds,
-                                    configuration_.texture_filter);
+                                            : raster::PreciseCullingPolicy::ProjectedBounds,
+                                    configuration_.texture_filter,
+                                    configuration_.precise_color);
                             if (rendered.accepted()) {
                                 consumed_precise = true;
                                 ++precise_primitives_;
@@ -894,9 +900,33 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
         const raster::EventResult decoded = raster::ScanoutMapper::decode_rgb888(
             planned.plan, raster_.vram_words(), scanout_);
         if (!decoded.accepted()) return {host::HostCode::internal_error};
-        std::span<const std::uint8_t> presented = scanout_;
+        std::span<const std::uint8_t> resolve_source = scanout_;
+        if (configuration_.precise_color ==
+                raster::PreciseColorMode::TrueColorDisplay &&
+            planned.plan.pixel_format == raster::ScanoutPixelFormat::Rgb555) {
+            const std::uint64_t pixels =
+                static_cast<std::uint64_t>(planned.plan.logical_width) *
+                planned.plan.logical_height;
+            bool enhanced =
+                pixels <= configuration_.maximum_true_color_scanout_pixels;
+            if (enhanced) {
+                try {
+                    true_color_scanout_.assign(scanout_.begin(), scanout_.end());
+                } catch (...) {
+                    enhanced = false;
+                }
+            }
+            if (enhanced) {
+                enhanced = raster_.apply_true_color_scanout(
+                    planned.plan, true_color_scanout_).accepted();
+            }
+            if (enhanced) resolve_source = true_color_scanout_;
+            else ++true_color_fallbacks_;
+        }
+        std::span<const std::uint8_t> presented = resolve_source;
         std::uint32_t presented_width = planned.plan.logical_width;
         std::uint32_t presented_height = planned.plan.logical_height;
+        bool high_resolution_resolved = false;
         upscale_stats_ = {};
         if (configuration_.presentation_resolve ==
                 raster::PresentationResolveMode::EdgeAware) {
@@ -921,7 +951,8 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                 const raster::EventResult upscale =
                     raster::ScanoutMapper::upscale_edge_aware_rgb888(
                         planned.plan.logical_width, planned.plan.logical_height,
-                        target_width, target_height, scanout_, resolved_scanout_,
+                        target_width, target_height, resolve_source,
+                        resolved_scanout_,
                         upscale_stats_);
                 resolved = upscale.accepted();
             }
@@ -929,6 +960,7 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                 presented = resolved_scanout_;
                 presented_width = target_width;
                 presented_height = target_height;
+                high_resolution_resolved = true;
             } else {
                 ++upscale_fallbacks_;
             }
@@ -937,7 +969,7 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
         if (configuration_.display_postprocess ==
                 raster::DisplayPostprocessMode::ChromaSmooth24Bit &&
             planned.plan.pixel_format == raster::ScanoutPixelFormat::PackedRgb888 &&
-            presented.data() == resolved_scanout_.data()) {
+            high_resolution_resolved) {
             const std::uint64_t pixels =
                 static_cast<std::uint64_t>(presented_width) * presented_height;
             bool processed = pixels <= configuration_.maximum_postprocess_pixels &&
@@ -963,7 +995,7 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
             }
         }
         if (configuration_.high_resolution_ui &&
-            presented.data() != scanout_.data() && !ui_draws_.empty()) {
+            high_resolution_resolved && !ui_draws_.empty()) {
             std::span<std::uint8_t> enhanced_output =
                 using_postprocessed_scanout_
                     ? std::span<std::uint8_t>(postprocessed_scanout_)
@@ -1135,7 +1167,7 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                 }
             }
         }
-        if (presented.data() != scanout_.data()) {
+        if (high_resolution_resolved) {
             resolved_width_ = presented_width;
             resolved_height_ = presented_height;
         }
@@ -1153,7 +1185,7 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
         digest_bytes(visual_digest_, std::span<const std::uint8_t>(
             reinterpret_cast<const std::uint8_t*>(metadata.data()),
             sizeof(metadata)));
-        if (presented.data() != scanout_.data()) {
+        if (high_resolution_resolved) {
             const std::array<std::uint64_t, 2U> resolved_metadata{
                 presented_width, presented_height};
             digest_bytes(visual_digest_, std::span<const std::uint8_t>(
@@ -1219,6 +1251,10 @@ RuntimeGraphics::display_postprocess_stats() const noexcept {
 
 std::uint64_t RuntimeGraphics::display_postprocess_fallbacks() const noexcept {
     return display_postprocess_fallbacks_;
+}
+
+std::uint64_t RuntimeGraphics::true_color_fallbacks() const noexcept {
+    return true_color_fallbacks_;
 }
 
 std::uint64_t RuntimeGraphics::visual_digest() const noexcept {

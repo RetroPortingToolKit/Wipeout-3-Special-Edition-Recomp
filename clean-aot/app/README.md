@@ -25,6 +25,18 @@ unchanged frame. The fixed cost is three RGB reads, two luma comparisons, and
 one RGB write per output pixel; HD UI replacement is composited afterward so
 text and banners remain crisp.
 
+`PreciseColorMode::TrueColorDisplay` is the opt-in true-color polygon seam.
+Every precise fragment still performs the authoritative dithered RGB555 VRAM
+write first. Safe opaque fragments additionally retain their pre-dither RGB888
+color in a display-only plane, which scanout applies before bounded 4K resolve.
+Semi-transparent framebuffer blends stay RGB555-only, and any later native
+draw, fill, copy, or upload invalidates enhanced color only at destinations it
+actually changes. Mask-rejected writes leave both authoritative and enhanced
+color untouched. Packed 24-bit scanout bypasses this plane. Allocation, source
+pixel-budget, missing-provenance, and disabled-mode paths preserve exact native
+scanout. The display-plane merge performs one validity test and at most one RGB
+write per native scanout pixel; the existing 4K resolve budget is unchanged.
+
 Replacement assets remain separated from title policy. A title-owned key
 policy may identify a texture or font while the generic runtime validates
 manifest/source generations, confines paths to the asset root, verifies

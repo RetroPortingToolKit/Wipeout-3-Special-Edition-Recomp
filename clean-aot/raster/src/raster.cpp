@@ -428,10 +428,27 @@ struct ReferenceRasterizer::Impl {
   explicit Impl(RasterLimits value) noexcept : limits(value) {}
 
   std::array<VramWord, kVramWordCount> vram{};
+  std::array<std::uint32_t, kVramWordCount> true_color{};
+  std::array<std::uint8_t, kVramWordCount> true_color_valid{};
   RasterLimits limits{};
   std::uint64_t vram_generation = 0u;
   const ReplacementTexture *replacement = nullptr;
   PreciseRasterStats precise_stats{};
+
+  void invalidate_true_color(std::size_t index) noexcept {
+    if (true_color_valid[index] != 0U) {
+      true_color_valid[index] = 0U;
+      ++precise_stats.true_color_invalidations;
+    }
+  }
+
+  void invalidate_true_color_wrapped(std::int64_t x, std::int64_t y) noexcept {
+    const std::size_t wrapped_x = static_cast<std::size_t>(
+        wrap_coordinate(x, static_cast<std::int64_t>(kVramWidth)));
+    const std::size_t wrapped_y = static_cast<std::size_t>(
+        wrap_coordinate(y, static_cast<std::int64_t>(kVramHeight)));
+    invalidate_true_color(wrapped_y * kVramWidth + wrapped_x);
+  }
 
   [[nodiscard]] EventResult reject(RasterError error) const noexcept {
     return EventResult{EventStatus::Rejected, error, 0, {}};
@@ -657,18 +674,18 @@ struct ReferenceRasterizer::Impl {
                  multiply(texture_5bit.blue, vertex.blue)};
   }
 
-  void write_pixel(const gpu::RenderStateSnapshot &state, std::int64_t x,
+  bool write_pixel(const gpu::RenderStateSnapshot &state, std::int64_t x,
                    std::int64_t y, Color color, bool transparent, bool blend,
                    bool dither, bool source_mask_bit) noexcept {
     if (transparent) {
-      return;
+      return false;
     }
     const std::size_t index =
         static_cast<std::size_t>(y) * static_cast<std::size_t>(kVramWidth) +
         static_cast<std::size_t>(x);
     const std::uint16_t old_value = vram[index];
     if (state.mask.check_mask_bit && (old_value & 0x8000u) != 0u) {
-      return;
+      return false;
     }
 
     std::uint16_t value = pack_color(color, x, y, dither);
@@ -679,6 +696,8 @@ struct ReferenceRasterizer::Impl {
       value = static_cast<std::uint16_t>(value | 0x8000u);
     }
     vram[index] = value;
+    invalidate_true_color(index);
+    return true;
   }
 
   void draw_triangle(const gpu::RenderStateSnapshot &state,
@@ -772,6 +791,7 @@ struct ReferenceRasterizer::Impl {
       std::span<const PreciseVertex> vertices,
       PreciseCullingPolicy culling,
       TextureFilterMode filtering,
+      PreciseColorMode color_mode,
       WorkBudget &budget) noexcept {
     const std::size_t expected = event.quad ? 6u : 3u;
     const bool textured = event.textured && !event.state.draw_mode.texture_disable;
@@ -779,7 +799,9 @@ struct ReferenceRasterizer::Impl {
         !valid_common_state(event.state) ||
         !valid_texture_state(event.state, textured, event.clut) ||
         (filtering != TextureFilterMode::NearestNative &&
-         filtering != TextureFilterMode::BilinearTransparencySafe)) {
+         filtering != TextureFilterMode::BilinearTransparencySafe) ||
+        (color_mode != PreciseColorMode::NativeRgb555 &&
+         color_mode != PreciseColorMode::TrueColorDisplay)) {
       return reject(RasterError::MalformedEvent);
     }
     std::uint64_t work_units = 0U;
@@ -895,8 +917,24 @@ struct ReferenceRasterizer::Impl {
           const bool blend = event.semi_transparent && (!textured || texture_semi);
           const bool dither = event.state.draw_mode.dither &&
               ((event.gouraud && !textured) || (textured && !event.raw_texture));
-          write_pixel(event.state, x, y, color, transparent, blend, dither,
-                      textured && texture_semi);
+          const bool written = write_pixel(
+              event.state, x, y, color, transparent, blend, dither,
+              textured && texture_semi);
+          if (written && color_mode == PreciseColorMode::TrueColorDisplay) {
+            if (!blend) {
+              const std::size_t index = static_cast<std::size_t>(y) *
+                  static_cast<std::size_t>(kVramWidth) +
+                  static_cast<std::size_t>(x);
+              true_color[index] =
+                  static_cast<std::uint32_t>(clamp_u8(color.red)) |
+                  (static_cast<std::uint32_t>(clamp_u8(color.green)) << 8U) |
+                  (static_cast<std::uint32_t>(clamp_u8(color.blue)) << 16U);
+              true_color_valid[index] = 1U;
+              ++precise_stats.true_color_fragments;
+            } else {
+              ++precise_stats.feedback_fallbacks;
+            }
+          }
         }
       }
     }
@@ -1218,6 +1256,9 @@ struct ReferenceRasterizer::Impl {
     const std::uint16_t value = color_to_word(event.color);
     for (std::uint32_t y = 0; y < event.extent.height; ++y) {
       for (std::uint32_t x = 0; x < event.extent.width; ++x) {
+        invalidate_true_color_wrapped(
+            static_cast<std::int64_t>(event.origin.x) + x,
+            static_cast<std::int64_t>(event.origin.y) + y);
         write_wrapped(vram, static_cast<std::int64_t>(event.origin.x) + x,
                       static_cast<std::int64_t>(event.origin.y) + y, value);
       }
@@ -1261,6 +1302,7 @@ struct ReferenceRasterizer::Impl {
         if (event.mask.set_mask_bit) {
           value = static_cast<VramWord>(value | 0x8000u);
         }
+        invalidate_true_color_wrapped(destination_x, destination_y);
         write_wrapped(vram, destination_x, destination_y, value);
       }
     }
@@ -1305,6 +1347,7 @@ struct ReferenceRasterizer::Impl {
         if (event.mask.set_mask_bit) {
           value = static_cast<VramWord>(value | 0x8000u);
         }
+        invalidate_true_color_wrapped(destination_x, destination_y);
         write_wrapped(vram, destination_x, destination_y, value);
       }
     }
@@ -1812,6 +1855,8 @@ ReferenceRasterizer::~ReferenceRasterizer() noexcept = default;
 
 void ReferenceRasterizer::reset(VramWord value) noexcept {
   impl_->vram.fill(value);
+  impl_->true_color.fill(0U);
+  impl_->true_color_valid.fill(0U);
   impl_->precise_stats = {};
   if (impl_->vram_generation != std::numeric_limits<std::uint64_t>::max()) {
     ++impl_->vram_generation;
@@ -1837,14 +1882,59 @@ EventResult ReferenceRasterizer::consume_precise_polygon(
     std::span<const PreciseVertex> triangle_vertices,
     const ReplacementTexture *replacement,
     PreciseCullingPolicy culling,
-    TextureFilterMode filtering) noexcept {
+    TextureFilterMode filtering,
+    PreciseColorMode color_mode) noexcept {
   WorkBudget budget{};
   impl_->replacement = replacement;
   const EventResult result =
       impl_->consume_precise_polygon(
-          event, triangle_vertices, culling, filtering, budget);
+          event, triangle_vertices, culling, filtering, color_mode, budget);
   impl_->replacement = nullptr;
   return result;
+}
+
+EventResult ReferenceRasterizer::apply_true_color_scanout(
+    const ScanoutPlan &plan, std::span<std::uint8_t> rgb888) noexcept {
+  if (plan.pixel_format != ScanoutPixelFormat::Rgb555 ||
+      plan.logical_width == 0U || plan.logical_height == 0U ||
+      plan.source_line_step == 0U ||
+      plan.vram_start_x_words >= kVramWidth || plan.vram_start_y >= kVramHeight ||
+      plan.required_rgb_bytes != static_cast<std::size_t>(plan.logical_width) *
+                                     plan.logical_height * 3U ||
+      rgb888.size() != plan.required_rgb_bytes) {
+    return EventResult{EventStatus::Rejected,
+                       RasterError::InvalidScanoutRequest};
+  }
+  if (!plan.display_enabled) {
+    return EventResult{EventStatus::Ignored, RasterError::None, 0U};
+  }
+  std::uint64_t applied = 0U;
+  for (std::uint32_t y = 0U; y < plan.logical_height; ++y) {
+    const std::uint32_t source_y =
+        (static_cast<std::uint32_t>(plan.vram_start_y) +
+         plan.source_field_offset + y * plan.source_line_step) % kVramHeight;
+    for (std::uint32_t x = 0U; x < plan.logical_width; ++x) {
+      const std::uint32_t source_x =
+          (static_cast<std::uint32_t>(plan.vram_start_x_words) + x) % kVramWidth;
+      const std::size_t source =
+          static_cast<std::size_t>(source_y) * kVramWidth + source_x;
+      if (impl_->true_color_valid[source] == 0U) continue;
+      const std::uint32_t color = impl_->true_color[source];
+      const std::size_t destination =
+          (static_cast<std::size_t>(y) * plan.logical_width + x) * 3U;
+      rgb888[destination] = static_cast<std::uint8_t>(color);
+      rgb888[destination + 1U] = static_cast<std::uint8_t>(color >> 8U);
+      rgb888[destination + 2U] = static_cast<std::uint8_t>(color >> 16U);
+      ++applied;
+    }
+  }
+  impl_->precise_stats.true_color_scanout_tests +=
+      static_cast<std::uint64_t>(plan.logical_width) * plan.logical_height;
+  impl_->precise_stats.true_color_scanout_pixels += applied;
+  return EventResult{applied == 0U ? EventStatus::Ignored : EventStatus::Applied,
+                     RasterError::None,
+                     static_cast<std::uint64_t>(plan.logical_width) *
+                         plan.logical_height};
 }
 
 EventResult ReferenceRasterizer::consume(const gpu::Event &event,
