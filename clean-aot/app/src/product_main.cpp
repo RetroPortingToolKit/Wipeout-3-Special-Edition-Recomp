@@ -204,19 +204,32 @@ int main(int argc, char** argv) {
     };
     run_bound_region();
 #ifdef CLEAN_AOT_PRODUCT_HAS_EPOCH_BINDINGS
-    for (const auto* epoch : clean_aot_product_epoch_bindings()) {
-        if (!epoch || receipt.dispatches == dispatch_limit) break;
-        const clean_aot::runtime::Runtime::AuthenticatedCopiedEpochBinding copied{
-            epoch->variant_identity_sha256, binding->load_start,
-            static_cast<std::uint32_t>(binding->load_end_exclusive - binding->load_start),
-            binding->executable_sha256, epoch->executable_sha256, *epoch};
-        const auto status = runtime.bind_authenticated_copied_epoch(copied);
-        if (status != clean_aot::runtime::DispatchStatus::Bound) {
-            receipt.reason = "authenticated-epoch-bind-rejected";
+    const auto epoch_bindings = clean_aot_product_epoch_bindings();
+    std::vector<bool> bound_epochs(epoch_bindings.size(), false);
+    while (receipt.stage == "bios-slice-stopped" && receipt.dispatches < dispatch_limit) {
+        const auto stop_pc = runtime.bios_pc();
+        bool candidate_seen = false, candidate_bound = false;
+        for (std::size_t index = 0; index < epoch_bindings.size(); ++index) {
+            const auto* epoch = epoch_bindings[index];
+            if (bound_epochs[index] || epoch == nullptr || stop_pc < epoch->load_start ||
+                stop_pc >= epoch->load_end_exclusive) continue;
+            candidate_seen = true;
+            const clean_aot::runtime::Runtime::AuthenticatedCopiedEpochBinding copied{
+                epoch->variant_identity_sha256, binding->load_start,
+                static_cast<std::uint32_t>(binding->load_end_exclusive - binding->load_start),
+                binding->executable_sha256, epoch->executable_sha256, *epoch};
+            if (runtime.bind_authenticated_copied_epoch(copied) !=
+                clean_aot::runtime::DispatchStatus::Bound) continue;
+            bound_epochs[index] = true;
+            candidate_bound = true;
+            receipt.stage = "bios-bound";
+            run_bound_region();
             break;
         }
-        receipt.stage = "bios-bound";
-        run_bound_region();
+        if (!candidate_bound) {
+            if (candidate_seen) receipt.reason = "authenticated-epoch-bind-rejected";
+            break;
+        }
     }
 #endif
     if (receipt.stage == "bios-slice-stopped") {
