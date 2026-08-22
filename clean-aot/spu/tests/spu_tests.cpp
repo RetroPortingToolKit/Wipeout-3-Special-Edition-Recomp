@@ -51,6 +51,22 @@ void render_count(Device& device, std::size_t sample_count,
     }
 }
 
+std::uint64_t audio_digest(std::span<const StereoSample> samples) noexcept {
+    constexpr std::uint64_t fnv_offset = 14695981039346656037ull;
+    constexpr std::uint64_t fnv_prime = 1099511628211ull;
+    std::uint64_t digest = fnv_offset;
+    for (const StereoSample sample : samples) {
+        for (const std::int16_t channel : {sample.left, sample.right}) {
+            const std::uint16_t bits = static_cast<std::uint16_t>(channel);
+            digest ^= static_cast<std::uint8_t>(bits & 0x00FFu);
+            digest *= fnv_prime;
+            digest ^= static_cast<std::uint8_t>(bits >> 8u);
+            digest *= fnv_prime;
+        }
+    }
+    return digest;
+}
+
 std::uint16_t ram_word(const Device& device, std::size_t byte_address) {
     const auto ram = device.sound_ram();
     require(byte_address + 1u < ram.size(), "sound RAM word is in range");
@@ -622,6 +638,36 @@ void test_adsr_sweep_noise_and_modulation() {
     require(device.voice_state(0u).phase == clean_aot::spu::AdsrPhase::Off &&
                 device.voice_state(0u).active,
             "release reaches silent off phase while voice scanning continues");
+
+    const auto configure_digest_voice = [](Device& target) {
+        target.reset();
+        load_block(target, make_constant_block(7, 0x03u));
+        put(target, Device::MainVolume, 0x3FFFu);
+        put(target, Device::MainVolume + 2u, 0x3FFFu);
+        configure_voice(target, 0u, 0x1000u, 0x300Fu, 0x007Fu);
+        put(target, Device::KeyOn, 1u);
+    };
+    static Device digest_whole;
+    static Device digest_chunked;
+    configure_digest_voice(digest_whole);
+    configure_digest_voice(digest_chunked);
+    std::array<StereoSample, SamplesPer100HzUpdate> whole_audio{};
+    std::array<StereoSample, SamplesPer100HzUpdate> chunked_audio{};
+    require(digest_whole.render_100hz_update(whole_audio).ok(),
+            "render ADSR digest at exact 100 Hz");
+    for (std::size_t offset = 0u; offset < chunked_audio.size(); offset += 147u) {
+        require(digest_chunked.render(
+                    std::span<StereoSample>(chunked_audio).subspan(offset, 147u))
+                    .ok(),
+                "render chunked ADSR digest");
+    }
+    const std::uint64_t envelope_digest = audio_digest(whole_audio);
+    require(whole_audio == chunked_audio &&
+                digest_whole.deterministic_digest() ==
+                    digest_chunked.deterministic_digest(),
+            "ADSR timing is invariant across 100 Hz render chunking");
+    require(envelope_digest == 9'303'418'669'728'391'773ull,
+            "ADSR one-sample edge audio digest");
 
     for (std::uint16_t shift = 0u; shift < 32u; ++shift) {
         static Device rate_device;

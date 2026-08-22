@@ -22,7 +22,8 @@ Implemented surface
 
 - 24 voices with key-on/key-off, start/repeat/current positions, pitch,
   channel volume fixed and sweep modes, ADSR attack/decay/sustain/release,
-  noise, pitch modulation, end flags, saturation, and stereo mixing. Key-off
+  threshold-consuming envelope counters, noise, pitch modulation, end flags,
+  saturation, and stereo mixing. Key-off
   and end-mute silence the envelope while retaining the bounded RAM scan state
   needed for sound-RAM IRQ behavior.
 - 16-byte, 28-sample ADPCM blocks with predictor/filter reconstruction,

@@ -574,7 +574,7 @@ void Device::advance_volume(VolumeControl& volume) noexcept {
 
     const std::uint32_t next_counter =
         static_cast<std::uint32_t>(volume.counter) + increment;
-    volume.counter = static_cast<std::uint16_t>(next_counter & 0xFFFFu);
+    volume.counter = static_cast<std::uint16_t>(next_counter & 0x7FFFu);
     if ((next_counter & 0x8000u) == 0u) {
         return;
     }
@@ -1157,7 +1157,7 @@ std::int32_t Device::adsr_step(const Voice& voice,
 
     const std::uint32_t next_counter =
         static_cast<std::uint32_t>(counter) + increment;
-    counter = static_cast<std::uint16_t>(next_counter & 0xFFFFu);
+    counter = static_cast<std::uint16_t>(next_counter & 0x7FFFu);
     if ((next_counter & 0x8000u) == 0u) {
         return 0;
     }
