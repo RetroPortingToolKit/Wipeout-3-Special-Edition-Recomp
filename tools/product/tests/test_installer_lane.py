@@ -32,7 +32,10 @@ class InstallerLaneTests(unittest.TestCase):
         for relative in ("patch/pal_track01.xdelta3", "bin/xdelta3.exe",
                          "bin/clean-aot-compiler.exe", "policy/product-regions.json",
                          "policy/artifacts.json", "policy/product-profile.json",
-                         "policy/media-manifest.json", "native/placeholder.dat"):
+                         "policy/media-manifest.json", "policy/generated-game-shards.json",
+                         "policy/game-shards/main-exe-closed-shards.manifest",
+                         "policy/game-shards/nfe-entry5-route-variant-closed-shards.manifest",
+                         "native/placeholder.dat"):
             path = self.root / ("input-" + str(len(self.payload)))
             path.write_text("{}" if relative.endswith(".json") else "clean")
             self.payload.append((relative, path))
@@ -60,7 +63,8 @@ class InstallerLaneTests(unittest.TestCase):
         package = self.root / "pkg"; package.mkdir(); shutil.copytree(self.runtime, package / "runtime-payload")
         payload = package / "setup-payload"; payload.mkdir()
         contract = {"patch":"p", "xdelta3":"x", "compiler":"c", "regions":"r",
-                    "artifacts":"a", "artifact_root":"n", "profile":"q", "media_manifest":"m"}
+                    "artifacts":"a", "artifact_root":"n", "profile":"q", "media_manifest":"m",
+                    "game_shards":"g", "game_shard_manifest_root":"s"}
         (payload / "setup-contract.json").write_text(json.dumps(contract), encoding="utf-8")
         seen = {}
         def orchestrator(**kwargs): seen.update(kwargs); return {"version":"v"}

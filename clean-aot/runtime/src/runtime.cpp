@@ -1945,6 +1945,47 @@ DispatchStatus Runtime::dispatch_selected(bool branch_taken) noexcept {
     return result;
 }
 
+DispatchStatus Runtime::bind_authenticated_resident_executable(
+    std::string_view selected_variant_identity_sha256,
+    std::uint32_t selected_entry_pc,
+    const GeneratedExecutableBinding& binding) noexcept {
+    if (!operational() || impl_->executable_loaded ||
+        binding.load_end_exclusive <= binding.load_start ||
+        binding.load_end_exclusive - binding.load_start > memory::kRamBytes) {
+        return DispatchStatus::LoadRejected;
+    }
+    const auto root = std::lower_bound(binding.dispatch_roots.begin(),
+        binding.dispatch_roots.end(), selected_entry_pc);
+    if (root == binding.dispatch_roots.end() || *root != selected_entry_pc) {
+        return DispatchStatus::UnknownCode;
+    }
+    try {
+        std::vector<std::uint8_t> bytes(
+            static_cast<std::size_t>(binding.load_end_exclusive - binding.load_start));
+        for (std::size_t index = 0U; index < bytes.size(); ++index) {
+            const auto value = impl_->bus.read8(binding.load_start +
+                static_cast<std::uint32_t>(index));
+            if (!value.ok()) return DispatchStatus::LoadRejected;
+            bytes[index] = value.value;
+        }
+        if (sha256_hex(bytes) != binding.executable_sha256) {
+            return DispatchStatus::ExecutableHashMismatch;
+        }
+    } catch (...) { return DispatchStatus::LoadRejected; }
+    const DispatchStatus bound = impl_->generated_dispatcher.bind(
+        selected_variant_identity_sha256, binding);
+    if (bound != DispatchStatus::Bound) return bound;
+    impl_->generated_cpu = impl_->bios_cpu;
+    impl_->generated_cpu.pc = selected_entry_pc;
+    impl_->generated_cpu.next_pc = selected_entry_pc + 4U;
+    impl_->generated_cpu.memory_context = impl_.get();
+    impl_->generated_cpu.read8=&Impl::generated_read8; impl_->generated_cpu.read16=&Impl::generated_read16; impl_->generated_cpu.read32=&Impl::generated_read32;
+    impl_->generated_cpu.write8=&Impl::generated_write8; impl_->generated_cpu.write16=&Impl::generated_write16; impl_->generated_cpu.write32=&Impl::generated_write32;
+    Impl::bind_generated_cop2(*impl_, impl_->generated_cpu);
+    impl_->executable_loaded = true;
+    return DispatchStatus::Bound;
+}
+
 std::uint32_t Runtime::selected_pc() const noexcept {
     return impl_ != nullptr ? impl_->generated_cpu.pc : 0U;
 }

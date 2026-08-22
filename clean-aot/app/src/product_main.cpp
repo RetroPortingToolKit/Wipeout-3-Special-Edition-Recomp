@@ -219,6 +219,35 @@ int main(int argc, char** argv) {
         run_bound_region();
     }
 #endif
+    if (receipt.stage == "bios-slice-stopped") {
+#ifdef CLEAN_AOT_PRODUCT_HAS_EPOCH_BINDINGS
+      const std::uint32_t transition_pc = runtime.bios_pc();
+      for (const auto* game : clean_aot_product_game_bindings()) {
+        if (game == nullptr || transition_pc < game->load_start ||
+            transition_pc >= game->load_end_exclusive) continue;
+        const auto bound = runtime.bind_authenticated_resident_executable(
+            game->variant_identity_sha256, transition_pc, *game);
+        if (bound != clean_aot::runtime::DispatchStatus::Bound) {
+            receipt.reason = bound == clean_aot::runtime::DispatchStatus::ExecutableHashMismatch
+                ? "resident-game-identity-mismatch" : "resident-game-bind-rejected";
+            break;
+        }
+        receipt.stage = "game-shard-bound";
+        while (receipt.dispatches < dispatch_limit) {
+            const auto status = runtime.dispatch_selected(false);
+            if (status != clean_aot::runtime::DispatchStatus::Executed) {
+                receipt.stage = "game-shard-stopped";
+                receipt.reason = status == clean_aot::runtime::DispatchStatus::UnknownCode
+                    ? "unknown-generated-game-pc" : "generated-game-dispatch-rejected";
+                break;
+            }
+            ++receipt.dispatches;
+            receipt.instructions += runtime.last_selected_instruction_count();
+        }
+        break;
+      }
+#endif
+    }
     receipt.stop_pc = runtime.bios_pc();
     if (receipt.dispatches == dispatch_limit) receipt.reason = "bios-dispatch-budget-exhausted";
     if (receipt.stage == "bios-slice-stopped" && workload &&
@@ -226,5 +255,5 @@ int main(int argc, char** argv) {
         receipt.stage = "workload-rejected"; receipt.reason = "workload-threshold-failed";
     }
     host->shutdown(); receipt.print();
-    return receipt.stage == "bios-slice-stopped" ? 0 : 69;
+    return (receipt.stage == "bios-slice-stopped" || receipt.stage == "game-shard-stopped") ? 0 : 69;
 }

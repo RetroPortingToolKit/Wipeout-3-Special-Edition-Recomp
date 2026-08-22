@@ -91,7 +91,9 @@ def run_setup(package_root: Path, install_dir: Path, user_data: Path, *,
             xdelta3=payload / contract["xdelta3"], compiler=payload / contract["compiler"],
             regions=payload / contract["regions"], artifacts=payload / contract["artifacts"],
             artifact_root=payload / contract["artifact_root"], user_data=user_data,
-            profile=payload / contract["profile"], media_manifest=payload / contract["media_manifest"])
+            profile=payload / contract["profile"], media_manifest=payload / contract["media_manifest"],
+            game_shards=payload / contract["game_shards"],
+            game_shard_manifest_root=payload / contract["game_shard_manifest_root"])
         runtime_audit = install_runtime(package_root / "runtime-payload", install_dir)
     except Exception:
         if old_active is not None:

@@ -88,6 +88,8 @@ def create_installer(*, setup_exe: Path, runtime_payload: Path,
                     "patch": "patch/pal_track01.xdelta3", "xdelta3": "bin/xdelta3.exe",
                     "compiler": "bin/clean-aot-compiler.exe",
                     "regions": "policy/product-regions.json",
+                    "game_shards": "policy/generated-game-shards.json",
+                    "game_shard_manifest_root": "policy/game-shards",
                     "artifacts": "policy/artifacts.json", "artifact_root": "native",
                     "profile": "policy/product-profile.json",
                     "media_manifest": "policy/media-manifest.json"}

@@ -88,14 +88,18 @@ def orchestrate_first_run(*, cue: Path, bios: Path, patch: Path, xdelta3: Path,
                           compiler: Path, regions: Path, artifacts: Path,
                           artifact_root: Path, user_data: Path,
                           profile: Path = DEFAULT_PROFILE,
-                          media_manifest: Path = DEFAULT_MEDIA_MANIFEST) -> dict[str, Any]:
+                          media_manifest: Path = DEFAULT_MEDIA_MANIFEST,
+                          game_shards: Path | None = None,
+                          game_shard_manifest_root: Path | None = None) -> dict[str, Any]:
     user_data = user_data.resolve(strict=False)
     user_data.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix="setup-", dir=user_data))
     try:
         setup_product(cue=cue, bios=bios, patch=patch, xdelta3=xdelta3,
                       compiler=compiler, output=staging / "prepared", profile_path=profile,
-                      media_manifest=media_manifest, regions_path=regions)
+                      media_manifest=media_manifest, regions_path=regions,
+                      game_shards_path=game_shards,
+                      game_shard_manifest_root=game_shard_manifest_root)
         prepared = staging / "prepared"
         finalize_catalog(catalog_input_path=prepared / "catalog-input.json",
                          artifacts_path=artifacts, artifact_root=artifact_root,

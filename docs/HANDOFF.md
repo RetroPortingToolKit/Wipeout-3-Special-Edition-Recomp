@@ -1,5 +1,22 @@
 # Handoff
 
+## Two-stage authenticated game-shard integration (2026-08-21)
+
+- First-run setup can now consume the hash-pinned game-shard authority and its
+  two closed manifests, derive the exact main and route-mutated NFE images from
+  verified user media, and emit native sources without retaining source media.
+- The generated product registry binds game identities/accessors one-to-one and
+  links their sources into `Wipeout3SE.exe`; the installed runtime remains
+  compiler/setup-free. Resident game dispatch hashes the complete RAM image and
+  rejects identity mutation or PCs outside closed shard coverage before dispatch.
+- The original 756-unit receipt was superseded by the tracked direct-corridor
+  authority at `c1f8228`: equivalent identity coverage is currently partitioned
+  into 727 closed units. Registry/setup validation follows the authenticated,
+  self-consistent receipt count rather than stale partition cardinality.
+- Synthetic BIOS-to-game transition and identity-mutation tests pass. A genuine
+  direct product launch still stops in the authenticated BIOS frontier; this is
+  not evidence of real game execution and game-ready remains false.
+
 ## BIOS allocator-runaway checkpoint (2026-08-21)
 
 - From UnknownCode `0x1174` / RAM epoch `6c6da3c3...`, exact live-region

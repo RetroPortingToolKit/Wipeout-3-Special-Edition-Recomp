@@ -238,6 +238,10 @@ public:
         std::span<const std::uint8_t> executable,
         std::uint32_t selected_entry_pc,
         const GeneratedExecutableBinding& binding) noexcept;
+    [[nodiscard]] DispatchStatus bind_authenticated_resident_executable(
+        std::string_view selected_variant_identity_sha256,
+        std::uint32_t selected_entry_pc,
+        const GeneratedExecutableBinding& binding) noexcept;
     [[nodiscard]] DispatchStatus dispatch_selected(bool branch_taken) noexcept;
     [[nodiscard]] std::uint32_t selected_pc() const noexcept;
     [[nodiscard]] std::uint32_t last_selected_instruction_count() const noexcept;

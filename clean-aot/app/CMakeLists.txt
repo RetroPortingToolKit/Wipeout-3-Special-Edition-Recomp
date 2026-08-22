@@ -14,6 +14,7 @@ set(CLEAN_AOT_PRODUCT_BINDING_SYMBOL "" CACHE STRING "Generated BIOS binding acc
 set(CLEAN_AOT_PRODUCT_EPOCH_BINDING_SYMBOLS "" CACHE STRING "Setup-generated authenticated epoch binding accessors")
 set(CLEAN_AOT_PRODUCT_AUTHENTICATED_EVIDENCE_DIR "" CACHE PATH "Committed authenticated frontier receipt directory")
 set(CLEAN_AOT_PRODUCT_GENERATED_ROOT "" CACHE PATH "Setup-generated unique region artifact root")
+set(CLEAN_AOT_PRODUCT_GAME_SHARD_EVIDENCE "" CACHE FILEPATH "Authenticated game shard receipt")
 
 include(CTest)
 set(_clean_aot_app_build_testing "${BUILD_TESTING}")
@@ -94,11 +95,16 @@ if(CLEAN_AOT_APP_ENABLE_SDL)
         endif()
         find_package(Python3 REQUIRED COMPONENTS Interpreter)
         set(_clean_aot_registry_dir "${CMAKE_CURRENT_BINARY_DIR}/epoch-registry")
-        execute_process(COMMAND "${Python3_EXECUTABLE}"
+        set(_clean_aot_registry_command "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/product/generate_epoch_registry.py"
             --evidence-dir "${CLEAN_AOT_PRODUCT_AUTHENTICATED_EVIDENCE_DIR}"
             --generated-root "${CLEAN_AOT_PRODUCT_GENERATED_ROOT}"
-            --output "${_clean_aot_registry_dir}"
+            --output "${_clean_aot_registry_dir}")
+        if(CLEAN_AOT_PRODUCT_GAME_SHARD_EVIDENCE)
+            list(APPEND _clean_aot_registry_command --game-shards
+                "${CLEAN_AOT_PRODUCT_GAME_SHARD_EVIDENCE}")
+        endif()
+        execute_process(COMMAND ${_clean_aot_registry_command}
             RESULT_VARIABLE _clean_aot_registry_result ERROR_VARIABLE _clean_aot_registry_error)
         if(NOT _clean_aot_registry_result EQUAL 0)
             message(FATAL_ERROR "Authenticated epoch registry generation failed: ${_clean_aot_registry_error}")
@@ -136,6 +142,7 @@ if(CLEAN_AOT_APP_ENABLE_SDL)
             file(APPEND "${_clean_aot_epoch_header}" "${_clean_aot_symbol}(),")
         endforeach()
         file(APPEND "${_clean_aot_epoch_header}" "}; }\n")
+        file(APPEND "${_clean_aot_epoch_header}" "inline std::array<const clean_aot::runtime::GeneratedExecutableBinding*, 0> clean_aot_product_game_bindings() noexcept { return {}; }\n")
         target_include_directories(Wipeout3SE PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
         target_compile_definitions(Wipeout3SE PRIVATE CLEAN_AOT_PRODUCT_HAS_EPOCH_BINDINGS=1)
     endif()

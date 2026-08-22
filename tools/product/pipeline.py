@@ -2102,6 +2102,8 @@ def setup_product(
     compiler_interface: str = "clean-aot-v1",
     artifacts_path: Path | None = None,
     artifact_root: Path | None = None,
+    game_shards_path: Path | None = None,
+    game_shard_manifest_root: Path | None = None,
 ) -> dict[str, Any]:
     profile, profile_sha = _load_profile(profile_path)
     paths = _preflight_inputs(
@@ -2225,6 +2227,58 @@ def setup_product(
                         "tool": compiler_tool_receipt,
                     }
                 )
+            game_shard_receipt = None
+            if game_shards_path is not None:
+                if game_shard_manifest_root is None:
+                    raise ProductError("game shard authority requires its manifest root")
+                game_shard_receipt = load_json(game_shards_path)
+                if (game_shard_receipt.get("schema") != "wo3se.generated-game-shards.v1" or
+                        game_shard_receipt.get("status") != "partial-fail-closed" or
+                        game_shard_receipt.get("policy", {}).get("unknown_pc_action") != "reject"):
+                    raise ProductError("game shard authority is not the authenticated fail-closed set")
+                if game_shard_receipt.get("compiled_region_count") != sum(
+                        image.get("compiled_region_count", -1)
+                        for image in game_shard_receipt.get("images", [])):
+                    raise ProductError("game shard authority region count is inconsistent")
+                by_name = {"main-exe": media["main"], "nfe-entry5-route-variant": media["runtime"][0]}
+                for image in game_shard_receipt.get("images", []):
+                    name = image.get("name")
+                    if name not in by_name:
+                        raise ProductError("game shard authority names an unknown image")
+                    manifest_source = _require_regular_file(
+                        game_shard_manifest_root / str(image.get("manifest")),
+                        "game shard manifest", max_bytes=16 * 1024 * 1024)
+                    manifest_hash, _ = sha256_file(manifest_source)
+                    if manifest_hash != image.get("manifest_sha256"):
+                        raise ProductError("game shard manifest identity changed")
+                    image_path = by_name[name]["image_path"]
+                    if name == "nfe-entry5-route-variant":
+                        payload = bytearray(image_path.read_bytes())
+                        base = int(image["load_start"])
+                        for address in (0x800DF188, 0x800DF18C, 0x800DF204, 0x800DF208):
+                            offset = address - base
+                            word = int.from_bytes(payload[offset:offset + 4], "little")
+                            immediate = word & 0xFFFF
+                            payload[offset:offset + 4] = ((word & 0xFFFF0000) |
+                                ((immediate * 2) & 0xFFFF)).to_bytes(4, "little")
+                        image_path = work / "nfe-entry5-route-variant.bin"
+                        image_path.write_bytes(payload)
+                    image_hash, _ = sha256_file(image_path)
+                    if image_hash != image.get("identity_sha256"):
+                        raise ProductError("verified media does not produce authenticated game identity")
+                    manifest_target = partial / "game-shard-manifests" / manifest_source.name
+                    manifest_target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(manifest_source, manifest_target)
+                    generated = partial / "generated" / f"game-{name}"
+                    tool = _run_process(f"clean-aot-game-shards-{name}", [str(compiler),
+                        "--image", str(image_path), "--image-kind", "raw-payload",
+                        "--manifest", str(manifest_target), "--output", str(generated)],
+                        cwd=work, max_output_bytes=limits["max_compiler_output_bytes"])
+                    files = _scan_output_tree(generated, limits=limits,
+                        forbidden_hashes=forbidden_hashes, forbidden_names=forbidden_names)
+                    compiler_receipts.append({"variant_id": f"game-{name}",
+                        "variant_sha256": image_hash, "generated_directory":
+                        f"generated/game-{name}", "generated_files": files, "tool": tool})
             if not compiler_receipts:
                 raise ProductError("regions authorize no compiled variant")
 
@@ -2279,6 +2333,10 @@ def setup_product(
                     "interface": compiler_interface,
                     "manifests_directory": "compiler-manifests",
                     "variants": compiler_receipts,
+                    "game_shards": None if game_shard_receipt is None else {
+                        "compiled_region_count": game_shard_receipt["compiled_region_count"],
+                        "authority_sha256": sha256_file(game_shards_path)[0],
+                        "unknown_pc_action": "reject"},
                 },
                 "provenance_tools": media["run_receipts"],
                 "sources_manifest": source_manifest,

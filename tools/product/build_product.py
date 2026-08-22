@@ -82,6 +82,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     setup.add_argument("--artifacts", type=Path)
     setup.add_argument("--artifact-root", type=Path)
+    setup.add_argument("--game-shards", type=Path)
+    setup.add_argument("--game-shard-manifest-root", type=Path)
 
     finalize = subparsers.add_parser(
         "finalize",
@@ -122,6 +124,8 @@ def _build_parser() -> argparse.ArgumentParser:
     first_run.add_argument("--artifacts", type=Path, required=True)
     first_run.add_argument("--artifact-root", type=Path, required=True)
     first_run.add_argument("--user-data", type=Path, required=True)
+    first_run.add_argument("--game-shards", type=Path)
+    first_run.add_argument("--game-shard-manifest-root", type=Path)
 
     launch = subparsers.add_parser(
         "launch", help="remeasure active generation, launch app, and persist boot frontier")
@@ -230,6 +234,8 @@ def main(argv: list[str] | None = None) -> int:
                 compiler_interface=args.compiler_interface,
                 artifacts_path=args.artifacts,
                 artifact_root=args.artifact_root,
+                game_shards_path=args.game_shards,
+                game_shard_manifest_root=args.game_shard_manifest_root,
             )
         elif args.command == "finalize":
             document = finalize_catalog(
@@ -254,7 +260,9 @@ def main(argv: list[str] | None = None) -> int:
                 cue=args.cue, bios=args.bios, patch=args.patch, xdelta3=args.xdelta3,
                 compiler=args.compiler, regions=args.regions, artifacts=args.artifacts,
                 artifact_root=args.artifact_root, user_data=args.user_data,
-                profile=args.profile, media_manifest=args.media_manifest)
+                profile=args.profile, media_manifest=args.media_manifest,
+                game_shards=args.game_shards,
+                game_shard_manifest_root=args.game_shard_manifest_root)
         elif args.command == "launch":
             command_line = args.command_line
             if command_line and command_line[0] == "--": command_line = command_line[1:]

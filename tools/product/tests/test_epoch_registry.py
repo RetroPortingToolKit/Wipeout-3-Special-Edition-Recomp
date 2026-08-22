@@ -25,4 +25,18 @@ class EpochRegistryTests(unittest.TestCase):
             (duplicate/"entry_table.cpp").write_text((generated/ids[0][:4]/"entry_table.cpp").read_text())
             with self.assertRaisesRegex(RegistryError,"one-to-one"): generate(evidence,generated,root/"bad")
 
+    def test_game_shards_are_exact_and_identity_mutation_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary); evidence=root/"evidence"; generated=root/"generated"; evidence.mkdir(); generated.mkdir()
+            (evidence/"bios-frontier-1.json").write_text(json.dumps({"schema":"clean-aot.real-bios-execution.v2","bios_instructions_executed":1,"bios_identity_sha256":"a"*64,"bios_sha256":"b"*64,"transitions":[]}))
+            identities=["1"*64,"2"*64]
+            for identity in identities:
+                directory=generated/identity[:4]; directory.mkdir(); (directory/"region.cpp").write_text("// generated\n")
+                (directory/"entry_table.cpp").write_text(f'GeneratedExecutableBinding value{{"{identity}","{identity}"\nGeneratedExecutableBinding* clean_aot_binding_{identity}() noexcept;\n')
+            authority=root/"game.json"; authority.write_text(json.dumps({"schema":"wo3se.generated-game-shards.v1","status":"partial-fail-closed","compiled_region_count":756,"policy":{"unknown_pc_action":"reject"},"images":[{"identity_sha256":value,"compiled_region_count":378} for value in identities]}))
+            receipt=generate(evidence,generated,root/"out",authority)
+            self.assertEqual(len(receipt["game_shards"]["entries"]),2)
+            (generated/identities[0][:4]/"entry_table.cpp").write_text((generated/identities[0][:4]/"entry_table.cpp").read_text().replace(identities[0],"3"*64,1))
+            with self.assertRaises(RegistryError): generate(evidence,generated,root/"mutated",authority)
+
 if __name__ == "__main__": unittest.main()
