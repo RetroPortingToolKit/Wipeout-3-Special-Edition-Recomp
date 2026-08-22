@@ -792,6 +792,7 @@ struct ReferenceRasterizer::Impl {
       PreciseCullingPolicy culling,
       TextureFilterMode filtering,
       PreciseColorMode color_mode,
+      PreciseNearPlanePolicy near_plane,
       WorkBudget &budget) noexcept {
     const std::size_t expected = event.quad ? 6u : 3u;
     const bool textured = event.textured && !event.state.draw_mode.texture_disable;
@@ -801,21 +802,26 @@ struct ReferenceRasterizer::Impl {
         (filtering != TextureFilterMode::NearestNative &&
          filtering != TextureFilterMode::BilinearTransparencySafe) ||
         (color_mode != PreciseColorMode::NativeRgb555 &&
-         color_mode != PreciseColorMode::TrueColorDisplay)) {
+         color_mode != PreciseColorMode::TrueColorDisplay) ||
+        (near_plane != PreciseNearPlanePolicy::NativeFallback &&
+         near_plane != PreciseNearPlanePolicy::ClipPositiveW)) {
       return reject(RasterError::MalformedEvent);
     }
     std::uint64_t work_units = 0U;
-    std::array<Bounds, 2> bounds{};
+    std::array<PreciseVertex, 12> clipped_vertices{};
+    std::size_t clipped_count = 0U;
+    std::uint64_t clipped_primitives=0U;
+    std::uint64_t generated_triangles=0U;
+    constexpr double near_w = 1.0e-6;
     const std::array<std::array<std::size_t, 3U>, 2U> native_indices{{
         {{0U, 1U, 2U}}, {{1U, 2U, 3U}}}};
     for (std::size_t triangle = 0U; triangle < expected / 3U; ++triangle) {
       const PreciseVertex* v = vertices.data() + triangle * 3U;
-      const bool sign = std::signbit(v[0].w);
       for (std::size_t corner = 0U; corner < 3U; ++corner) {
         if (!std::isfinite(v[corner].x) || !std::isfinite(v[corner].y) ||
             !std::isfinite(v[corner].z) || !std::isfinite(v[corner].w) ||
             !std::isfinite(v[corner].u) || !std::isfinite(v[corner].v) ||
-            v[corner].w == 0.0 || std::signbit(v[corner].w) != sign ||
+            v[corner].w == 0.0 ||
             v[corner].storage_generation == 0U ||
             v[corner].origin_generation == 0U) {
           return reject(RasterError::MalformedEvent);
@@ -826,6 +832,70 @@ struct ReferenceRasterizer::Impl {
             event, native_indices[triangle], textured);
         if (!valid_triangle_size(native.vertices)) continue;
       }
+      const bool first_sign = std::signbit(v[0].w);
+      const bool same_sign = std::signbit(v[1].w) == first_sign &&
+          std::signbit(v[2].w) == first_sign;
+      const bool safely_outside_near = std::abs(v[0].w)>=near_w &&
+          std::abs(v[1].w)>=near_w && std::abs(v[2].w)>=near_w;
+      if (same_sign && safely_outside_near) {
+        if (first_sign && near_plane==PreciseNearPlanePolicy::ClipPositiveW)
+          return reject(RasterError::MalformedEvent);
+        for (std::size_t corner=0U; corner<3U; ++corner)
+          clipped_vertices[clipped_count++]=v[corner];
+        continue;
+      }
+      if (near_plane != PreciseNearPlanePolicy::ClipPositiveW) {
+        return reject(RasterError::MalformedEvent);
+      }
+      ++clipped_primitives;
+      std::array<PreciseVertex,4> polygon{};
+      std::size_t polygon_count=0U;
+      const auto intersection = [](const PreciseVertex& a,
+                                   const PreciseVertex& b) noexcept {
+        const double t=(near_w-a.w)/(b.w-a.w);
+        const double clip_x=a.x*a.w+t*(b.x*b.w-a.x*a.w);
+        const double clip_y=a.y*a.w+t*(b.y*b.w-a.y*a.w);
+        const auto lerp=[t](double x,double y) noexcept { return x+t*(y-x); };
+        PreciseVertex out{};
+        out.x=clip_x/near_w; out.y=clip_y/near_w;
+        out.z=lerp(a.z,b.z); out.w=near_w;
+        out.u=lerp(a.u,b.u); out.v=lerp(a.v,b.v);
+        const auto channel=[&](unsigned shift) noexcept {
+          return static_cast<std::uint32_t>(std::clamp(std::llround(lerp(
+              static_cast<double>((a.color_rgba>>shift)&0xffU),
+              static_cast<double>((b.color_rgba>>shift)&0xffU))),0LL,255LL));
+        };
+        out.color_rgba=channel(0U)|(channel(8U)<<8U)|(channel(16U)<<16U)|
+            (channel(24U)<<24U);
+        out.storage_generation=std::min(a.storage_generation,b.storage_generation);
+        out.origin_generation=std::min(a.origin_generation,b.origin_generation);
+        return out;
+      };
+      for (std::size_t edge=0U; edge<3U; ++edge) {
+        const PreciseVertex& a=v[edge];
+        const PreciseVertex& b=v[(edge+1U)%3U];
+        const bool a_inside=a.w>=near_w;
+        const bool b_inside=b.w>=near_w;
+        if (a_inside) polygon[polygon_count++]=a;
+        if (a_inside != b_inside) polygon[polygon_count++]=intersection(a,b);
+      }
+      if (polygon_count<3U || polygon_count>4U) {
+        return reject(RasterError::MalformedEvent);
+      }
+      clipped_vertices[clipped_count++]=polygon[0];
+      clipped_vertices[clipped_count++]=polygon[1];
+      clipped_vertices[clipped_count++]=polygon[2];
+      ++generated_triangles;
+      if (polygon_count==4U) {
+        clipped_vertices[clipped_count++]=polygon[0];
+        clipped_vertices[clipped_count++]=polygon[2];
+        clipped_vertices[clipped_count++]=polygon[3];
+        ++generated_triangles;
+      }
+    }
+    std::array<Bounds, 4> bounds{};
+    for (std::size_t triangle = 0U; triangle < clipped_count / 3U; ++triangle) {
+      const PreciseVertex* v=clipped_vertices.data()+triangle*3U;
       const double min_x = std::min({v[0].x, v[1].x, v[2].x});
       const double max_x = std::max({v[0].x, v[1].x, v[2].x});
       const double min_y = std::min({v[0].y, v[1].y, v[2].y});
@@ -850,6 +920,8 @@ struct ReferenceRasterizer::Impl {
     EventResult result = accept(budget, work_units,
         work_units == 0U ? EventStatus::Ignored : EventStatus::Applied);
     if (!result.accepted()) return result;
+    precise_stats.near_plane_clipped_primitives += clipped_primitives;
+    precise_stats.near_plane_generated_triangles += generated_triangles;
 
     const auto edge_d = [](const PreciseVertex& a, const PreciseVertex& b,
                            double x, double y) noexcept {
@@ -859,10 +931,10 @@ struct ReferenceRasterizer::Impl {
                                const PreciseVertex& b) noexcept {
       return b.y < a.y || (b.y == a.y && b.x > a.x);
     };
-    for (std::size_t triangle = 0U; triangle < expected / 3U; ++triangle) {
+    for (std::size_t triangle = 0U; triangle < clipped_count / 3U; ++triangle) {
       std::array<PreciseVertex, 3> v{
-          vertices[triangle * 3U], vertices[triangle * 3U + 1U],
-          vertices[triangle * 3U + 2U]};
+          clipped_vertices[triangle * 3U], clipped_vertices[triangle * 3U + 1U],
+          clipped_vertices[triangle * 3U + 2U]};
       double area = edge_d(v[0], v[1], v[2].x, v[2].y);
       if (area == 0.0 || bounds[triangle].empty) continue;
       if (area < 0.0) { std::swap(v[1], v[2]); area = -area; }
@@ -1883,12 +1955,14 @@ EventResult ReferenceRasterizer::consume_precise_polygon(
     const ReplacementTexture *replacement,
     PreciseCullingPolicy culling,
     TextureFilterMode filtering,
-    PreciseColorMode color_mode) noexcept {
+    PreciseColorMode color_mode,
+    PreciseNearPlanePolicy near_plane) noexcept {
   WorkBudget budget{};
   impl_->replacement = replacement;
   const EventResult result =
       impl_->consume_precise_polygon(
-          event, triangle_vertices, culling, filtering, color_mode, budget);
+          event, triangle_vertices, culling, filtering, color_mode, near_plane,
+          budget);
   impl_->replacement = nullptr;
   return result;
 }

@@ -151,6 +151,17 @@ hardware blend class. `NearestNative` remains the default and is byte-identical
 to the unenhanced path. Counters expose fragment, fetch, and fallback costs for
 deterministic performance receipts.
 
+Near-plane handling is likewise explicit. `PreciseNearPlanePolicy::NativeFallback`
+is the default: mixed-sign, zero, or sub-near W rejects the enhanced primitive
+before VRAM changes so the unchanged GP0 event can run natively. A producer
+that has proved positive-W clip-space convention may request `ClipPositiveW`.
+The rasterizer then clips each provenance-complete source triangle at a finite
+W plane, interpolates homogeneous screen position and vertex UV/color along
+the clip edges, and emits an ordered three- or six-vertex fan. Quad source
+triangles remain in GP0 order, and the normal half-open edge rule gives their
+generated diagonal one owner. Counters distinguish clipped source primitives
+from generated triangles.
+
 ## Live GP0 compatibility matrix
 
 The application drains every decoded primitive through one authoritative VRAM

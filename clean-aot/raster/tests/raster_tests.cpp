@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cmath>
 #include <cstdint>
 #include <exception>
 #include <iomanip>
@@ -1407,6 +1408,114 @@ void test_precise_quad_half_open_ownership() {
           "identity-projected precise quad diverged from native blend/mask coverage");
 }
 
+void test_precise_near_plane_clipping_contract() {
+  using clean_aot::raster::PreciseCullingPolicy;
+  using clean_aot::raster::PreciseColorMode;
+  using clean_aot::raster::PreciseNearPlanePolicy;
+  using clean_aot::raster::PreciseVertex;
+  using clean_aot::raster::TextureFilterMode;
+  PolygonEvent triangle{};
+  triangle.vertex_count=3U; triangle.gouraud=true; triangle.semi_transparent=true;
+  triangle.state=full_state();
+  triangle.vertices[0]=vertex(10,10); triangle.vertices[1]=vertex(30,10);
+  triangle.vertices[2]=vertex(20,30);
+  const auto precise=[](double x,double y,double w,std::uint32_t color_value) {
+    return PreciseVertex{x,y,1.0,w,0.0,0.0,color_value,7U,9U};
+  };
+  const std::array<PreciseVertex,3U> crossing{
+      precise(10.0,10.0,1.0,0xff0000ffU),
+      precise(30.0,10.0,2.0,0xff00ff00U),
+      precise(20.0,30.0,-1.0,0xffff0000U)};
+
+  ReferenceRasterizer ambiguous;
+  ambiguous.reset(0x001fU);
+  const std::uint64_t before=ambiguous.digest();
+  require(!ambiguous.consume_precise_polygon(
+              triangle,crossing,nullptr,PreciseCullingPolicy::ProjectedBounds,
+              TextureFilterMode::NearestNative,PreciseColorMode::NativeRgb555,
+              PreciseNearPlanePolicy::NativeFallback).accepted() &&
+              ambiguous.digest()==before,
+          "ambiguous mixed-W polygon did not fail before touching VRAM");
+
+  ReferenceRasterizer first;
+  ReferenceRasterizer second;
+  first.reset(0x001fU); second.reset(0x001fU);
+  const auto draw=[&](ReferenceRasterizer& target) {
+    return target.consume_precise_polygon(
+        triangle,crossing,nullptr,PreciseCullingPolicy::ProjectedBounds,
+        TextureFilterMode::NearestNative,PreciseColorMode::NativeRgb555,
+        PreciseNearPlanePolicy::ClipPositiveW);
+  };
+  require(draw(first).accepted() && draw(second).accepted() &&
+              first.digest()==second.digest(),
+          "provable near-plane clipping was rejected or nondeterministic");
+  require(first.precise_stats().near_plane_clipped_primitives==1U &&
+              first.precise_stats().near_plane_generated_triangles==2U &&
+              first.precise_stats().precise_fragments!=0U,
+          "crossing triangle did not produce an ordered clipped triangle fan");
+
+  const auto clipped_edge=[](const PreciseVertex& a,const PreciseVertex& b) {
+    constexpr double near=1.0e-6;
+    const double t=(near-a.w)/(b.w-a.w);
+    const auto lerp=[t](double x,double y) { return x+t*(y-x); };
+    PreciseVertex out{};
+    out.x=(a.x*a.w+t*(b.x*b.w-a.x*a.w))/near;
+    out.y=(a.y*a.w+t*(b.y*b.w-a.y*a.w))/near;
+    out.z=lerp(a.z,b.z); out.w=near;
+    out.u=lerp(a.u,b.u); out.v=lerp(a.v,b.v);
+    const auto channel=[&](unsigned shift) {
+      return static_cast<std::uint32_t>(std::clamp(std::llround(lerp(
+          static_cast<double>((a.color_rgba>>shift)&0xffU),
+          static_cast<double>((b.color_rgba>>shift)&0xffU))),0LL,255LL));
+    };
+    out.color_rgba=channel(0U)|(channel(8U)<<8U)|(channel(16U)<<16U)|
+        (channel(24U)<<24U);
+    out.storage_generation=7U; out.origin_generation=9U;
+    return out;
+  };
+  const PreciseVertex i12=clipped_edge(crossing[1],crossing[2]);
+  const PreciseVertex i20=clipped_edge(crossing[2],crossing[0]);
+  const std::array<PreciseVertex,3U> manual_first{crossing[0],crossing[1],i12};
+  const std::array<PreciseVertex,3U> manual_second{crossing[0],i12,i20};
+  ReferenceRasterizer manual;
+  manual.reset(0x001fU);
+  require(manual.consume_precise_polygon(
+              triangle,manual_first,nullptr,PreciseCullingPolicy::ProjectedBounds).accepted() &&
+              manual.consume_precise_polygon(
+              triangle,manual_second,nullptr,PreciseCullingPolicy::ProjectedBounds).accepted() &&
+              manual.digest()==first.digest(),
+          "clipped fan changed edge ownership or perspective attribute interpolation");
+
+  auto invalid=crossing;
+  invalid[2].w=0.0;
+  const std::uint64_t clipped_digest=first.digest();
+  require(!first.consume_precise_polygon(
+              triangle,invalid,nullptr,PreciseCullingPolicy::ProjectedBounds,
+              TextureFilterMode::NearestNative,PreciseColorMode::NativeRgb555,
+              PreciseNearPlanePolicy::ClipPositiveW).accepted() &&
+              first.digest()==clipped_digest,
+          "zero-W polygon did not fail closed without a partial draw");
+  auto behind=crossing;
+  behind[0].w=-1.0; behind[1].w=-2.0; behind[2].w=-3.0;
+  require(!first.consume_precise_polygon(
+              triangle,behind,nullptr,PreciseCullingPolicy::ProjectedBounds,
+              TextureFilterMode::NearestNative,PreciseColorMode::NativeRgb555,
+              PreciseNearPlanePolicy::ClipPositiveW).accepted() &&
+              first.digest()==clipped_digest,
+          "proved positive-W policy enhanced a wholly behind-plane triangle");
+
+  auto shallow=crossing;
+  shallow[2].w=5.0e-7;
+  require(draw(second).accepted(), "repeat clipping state became unstable");
+  ReferenceRasterizer shallow_raster;
+  require(shallow_raster.consume_precise_polygon(
+              triangle,shallow,nullptr,PreciseCullingPolicy::ProjectedBounds,
+              TextureFilterMode::NearestNative,PreciseColorMode::NativeRgb555,
+              PreciseNearPlanePolicy::ClipPositiveW).accepted() &&
+              shallow_raster.precise_stats().near_plane_generated_triangles==2U,
+          "positive sub-near W did not clip at the finite near plane");
+}
+
 void test_true_color_plane_feedback_contract() {
   using clean_aot::raster::PreciseColorMode;
   ReferenceRasterizer rasterizer;
@@ -1605,6 +1714,7 @@ int main() {
     test_adversarial_coordinates_and_budgets();
     test_precise_transparency_safe_filtering();
     test_precise_quad_half_open_ownership();
+    test_precise_near_plane_clipping_contract();
     test_true_color_plane_feedback_contract();
     test_edge_aware_4k_resolve_contract();
     test_bounded_chroma_smoothing_contract();

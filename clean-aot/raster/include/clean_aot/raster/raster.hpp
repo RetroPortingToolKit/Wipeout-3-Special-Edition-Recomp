@@ -82,6 +82,11 @@ enum class PreciseCullingPolicy : std::uint8_t {
   ProjectedBounds,
 };
 
+enum class PreciseNearPlanePolicy : std::uint8_t {
+  NativeFallback,
+  ClipPositiveW,
+};
+
 enum class TextureFilterMode : std::uint8_t {
   NearestNative,
   BilinearTransparencySafe,
@@ -94,6 +99,8 @@ enum class PreciseColorMode : std::uint8_t {
 
 struct PreciseRasterStats final {
   std::uint64_t precise_fragments = 0U;
+  std::uint64_t near_plane_clipped_primitives = 0U;
+  std::uint64_t near_plane_generated_triangles = 0U;
   std::uint64_t bilinear_fragments = 0U;
   std::uint64_t bilinear_texture_fetches = 0U;
   std::uint64_t transparency_fallbacks = 0U;
@@ -307,7 +314,9 @@ public:
       PreciseCullingPolicy culling =
           PreciseCullingPolicy::NativeHardware,
       TextureFilterMode filtering = TextureFilterMode::NearestNative,
-      PreciseColorMode color_mode = PreciseColorMode::NativeRgb555) noexcept;
+      PreciseColorMode color_mode = PreciseColorMode::NativeRgb555,
+      PreciseNearPlanePolicy near_plane =
+          PreciseNearPlanePolicy::NativeFallback) noexcept;
   [[nodiscard]] EventResult apply_true_color_scanout(
       const ScanoutPlan &plan, std::span<std::uint8_t> rgb888) noexcept;
   [[nodiscard]] EventResult consume(const gpu::Event &event,
