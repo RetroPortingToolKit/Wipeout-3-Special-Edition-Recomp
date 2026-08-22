@@ -314,5 +314,29 @@ instruction and fails closed on every unknown PC or executable identity.
   100-Hz VBlank and CDDA at three sectors per four frames. Do not accept the
   multiplier until a deterministic max-detail race proves 100 unique updates,
   1.00x wall/audio/media time, and no missed simulation deadlines.
+
+## Authenticated bootstrap checkpoint (2026-08-21)
+
+- The clean application now remeasures finalized setup, catalog, selection,
+  BIOS, executable, CUE, and track inputs, mounts the measured disc, initializes
+  the clean runtime at 100 Hz, loads the selected executable through its
+  generated binding, and emits a canonical fail-closed bootstrap receipt.
+- Synthetic end-to-end coverage reaches the first unknown generated PC and
+  records zero semantic guest instructions; it intentionally does not convert
+  control-flow dispatch into a guest-execution claim.
+- The real executable authorization receipt is
+  `clean-aot/catalog/evidence/executable-authorization.json` with status
+  `partial-fail-closed`. It records 98,831 authorized main-EXE instructions and
+  31,719 authorized NFE entry-5 instructions, but unresolved closure prevents a
+  finalized selectable catalog and generated artifact.
+- Consequently the deepest real product state remains authenticated evidence
+  generation before runtime dispatch: BIOS instructions executed = 0 and game
+  instructions executed = 0. Do not report BIOS or game boot until complete
+  semantic generated regions and BIOS entry/reset-state binding exist.
+- Fresh GCC and Clang ASan/UBSan application graphs each passed all 8 aggregate
+  tests. Standalone host/render/GPU/raster passed all 4 tests; focused product
+  and authorization Python tests passed 8 tests. Repository-wide pytest still
+  collects five unrelated legacy `psxrecomp` failures (encoding/newline,
+  obsolete assertions, and the live readram socket probe).
 - Do not commit disc images, retail BIOS data, patched executables, captures,
   generated C, screenshots, saves, or packaged binaries.
