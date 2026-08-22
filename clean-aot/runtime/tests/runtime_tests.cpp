@@ -73,6 +73,18 @@ bool generated_bios_reset_step(clean_aot::runtime::GeneratedCpuState& state) noe
     state.next_pc = 0xbfc0'0014U;
     return true;
 }
+bool generated_cache_isolation_step(
+    clean_aot::runtime::GeneratedCpuState& state) noexcept {
+    state.cop0_status = 1U << 16U;
+    if (!state.write8(state.memory_context, 0x0000'0100U, 0x11U) ||
+        !state.write16(state.memory_context, 0x8000'0200U, 0x2233U) ||
+        !state.write32(state.memory_context, 0x0000'0300U, 0x4455'6677U) ||
+        !state.write32(state.memory_context, 0xa000'0400U, 0x89ab'cdefU)) {
+        return false;
+    }
+    state.pc = 0xbfc0'0010U;
+    return true;
+}
 bool generated_to_copied_epoch(clean_aot::runtime::GeneratedCpuState&state)noexcept{state.pc=0xA0000080U;return true;}bool generated_copied_step(clean_aot::runtime::GeneratedCpuState&state)noexcept{state.gpr[4]=0xC0DEF00DU;state.pc=0xA0000084U;return true;}bool generated_copied_alias_jump(clean_aot::runtime::GeneratedCpuState&state)noexcept{state.pc=0x000000C0U;return true;}bool generated_copied_alias_step(clean_aot::runtime::GeneratedCpuState&state)noexcept{state.gpr[5]=0xA11A5EDU;state.pc=0x000000C4U;return true;}
 
 struct GeneratedMemory final { std::array<std::uint8_t,16> bytes{}; };
@@ -111,6 +123,33 @@ void test_authenticated_bios_reset_contract(Runner& runner) {
     EXPECT(runner, runtime->reset() == Status::Ok);
     EXPECT(runner, runtime->bios_pc() == 0xbfc0'0000U);
     EXPECT(runner, runtime->dispatch_bios() == DispatchStatus::LoadRejected);
+}
+
+void test_generated_cache_isolation(Runner& runner) {
+    using namespace clean_aot::runtime;
+    constexpr std::string_view identity =
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    constexpr std::string_view bios_sha =
+        "07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541";
+    const std::array<std::uint32_t, 1U> roots{0xbfc0'0000U};
+    const std::array entries{GeneratedRegionEntry{
+        0xbfc0'0000U, generated_cache_isolation_step, 4U}};
+    const GeneratedExecutableBinding binding{
+        identity, bios_sha, 0xbfc0'0000U, 0xbfc8'0000ULL, roots, entries};
+    auto runtime = make_runtime();
+    EXPECT(runner, runtime->write8({}, 0x100U, 0xaaU).ok());
+    EXPECT(runner, runtime->write16({}, 0x200U, 0xbbccU).ok());
+    EXPECT(runner, runtime->write32({}, 0x300U, 0xddee'ff00U).ok());
+    EXPECT(runner, runtime->write32({}, 0x400U, 0x1020'3040U).ok());
+    EXPECT(runner, runtime->bind_authenticated_bios(identity, binding) ==
+                       DispatchStatus::Bound);
+    EXPECT(runner, runtime->dispatch_bios() == DispatchStatus::Executed);
+    EXPECT(runner,
+           runtime->bios_execution_snapshot().cache_isolated_writes == 3U);
+    EXPECT(runner, runtime->read8({}, 0x100U).value == 0xaaU);
+    EXPECT(runner, runtime->read16({}, 0x200U).value == 0xbbccU);
+    EXPECT(runner, runtime->read32({}, 0x300U).value == 0xddee'ff00U);
+    EXPECT(runner, runtime->read32({}, 0x400U).value == 0x89ab'cdefU);
 }
 
 void test_authenticated_copied_epoch(Runner&runner){using namespace clean_aot::runtime;constexpr std::string_view identity="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";constexpr std::string_view bios_sha="07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541";constexpr std::string_view payload_sha="66840dda154e8a113c31dd0ad32f7f3a366a80e8136979d8f5a101d3d29d6f72";const std::array<std::uint32_t,1>bios_roots{0xBFC00000U};const std::array bios_entries{GeneratedRegionEntry{0xBFC00000U,generated_to_copied_epoch,1U}};const GeneratedExecutableBinding bios_binding{identity,bios_sha,0xBFC00000U,0xBFC80000ULL,bios_roots,bios_entries};auto runtime=make_runtime();EXPECT(runner,runtime->bind_authenticated_bios(identity,bios_binding)==DispatchStatus::Bound);for(std::uint32_t i=0;i<8U;++i){EXPECT(runner,runtime->write8({},0x1000U+i,static_cast<std::uint8_t>(i+1U)).ok());EXPECT(runner,runtime->write8({},0x2000U+i,static_cast<std::uint8_t>(i+1U)).ok());EXPECT(runner,runtime->write8({},0xA0000080U+i,static_cast<std::uint8_t>(i+1U)).ok());EXPECT(runner,runtime->write8({},0x000000C0U+i,static_cast<std::uint8_t>(i+1U)).ok());}EXPECT(runner,runtime->dispatch_bios()==DispatchStatus::Executed);const std::array<std::uint32_t,2>roots{0xA0000080U,0xA0000084U};const std::array entries{GeneratedRegionEntry{0xA0000080U,generated_copied_step,1U},GeneratedRegionEntry{0xA0000084U,generated_copied_alias_jump,1U}};const GeneratedExecutableBinding generated{identity,payload_sha,0xA0000080U,0xA0000088ULL,roots,entries};const Runtime::AuthenticatedCopiedEpochBinding epoch{identity,0x1000U,8U,payload_sha,payload_sha,generated};EXPECT(runner,runtime->bind_authenticated_copied_epoch(epoch)==DispatchStatus::Bound);const std::array<std::uint32_t,1>alias_roots{0x000000C0U};const std::array alias_entries{GeneratedRegionEntry{0x000000C0U,generated_copied_alias_step,1U}};const GeneratedExecutableBinding alias_generated{identity,payload_sha,0x000000C0U,0x000000C8ULL,alias_roots,alias_entries};const Runtime::AuthenticatedCopiedEpochBinding alias_epoch{identity,0x2000U,8U,payload_sha,payload_sha,alias_generated};EXPECT(runner,runtime->bind_authenticated_copied_epoch(alias_epoch)==DispatchStatus::Bound);EXPECT(runner,runtime->bind_authenticated_copied_epoch(alias_epoch)==DispatchStatus::InvalidBinding);EXPECT(runner,runtime->dispatch_bios()==DispatchStatus::Executed);EXPECT(runner,runtime->bios_pc()==0xA0000084U);EXPECT(runner,runtime->dispatch_bios()==DispatchStatus::Executed);EXPECT(runner,runtime->bios_pc()==0x000000C0U);EXPECT(runner,runtime->dispatch_bios()==DispatchStatus::Executed);EXPECT(runner,runtime->bios_pc()==0x000000C4U);EXPECT(runner,runtime->write8({},0xC0U,0xFFU).ok());EXPECT(runner,runtime->dispatch_bios()==DispatchStatus::EpochMismatch);auto wrong=epoch;wrong.source_sha256="ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";EXPECT(runner,runtime->bind_authenticated_copied_epoch(wrong)==DispatchStatus::ExecutableHashMismatch);}
@@ -495,6 +534,7 @@ int main() {
     Runner runner;
     test_authenticated_generated_dispatch(runner);
     test_authenticated_bios_reset_contract(runner);
+    test_generated_cache_isolation(runner);
     test_authenticated_copied_epoch(runner);
     test_generated_integer_differential(runner);
     test_generated_unaligned_memory_differential(runner);

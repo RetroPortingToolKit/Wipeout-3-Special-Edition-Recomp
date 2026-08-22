@@ -289,6 +289,13 @@ struct RationalPreview final {
            address - kCacheControl <= 4U - bytes;
 }
 
+[[nodiscard]] constexpr bool is_cached_cpu_address(
+    std::uint32_t address) noexcept {
+    // KUSEG and KSEG0 use the R3000A data cache. KSEG1 is the uncached alias;
+    // KSEG2 is not directly mapped by this runtime.
+    return address < 0xa000'0000U;
+}
+
 [[nodiscard]] bool is_device_access(std::uint32_t address,
                                     memory::AccessWidth width) noexcept {
     if (is_cache_control(address, width)) {
@@ -497,9 +504,18 @@ struct Runtime::Impl final {
     GeneratedCpuState* active_generated_cpu = nullptr;
     std::uint64_t generated_memory_reads = 0U;
     std::uint64_t generated_memory_writes = 0U;
+    std::uint64_t generated_cache_isolated_writes = 0U;
     std::uint64_t generated_device_reads = 0U;
     std::uint64_t generated_device_writes = 0U;
     std::uint32_t last_bios_instruction_count = 0U;
+
+    [[nodiscard]] static bool generated_store_is_cache_isolated(
+        const Impl& self, std::uint32_t address) noexcept {
+        return self.active_generated_cpu != nullptr &&
+               (cpu_ops::effective_status(*self.active_generated_cpu) &
+                (1U << 16U)) != 0U &&
+               is_cached_cpu_address(address);
+    }
 
     static bool generated_write32(void* context, std::uint32_t address,
                                   std::uint32_t value) noexcept {
@@ -513,13 +529,17 @@ struct Runtime::Impl final {
             self->cache_control = value;
             return true;
         }
+        if (generated_store_is_cache_isolated(*self, address)) {
+            ++self->generated_cache_isolated_writes;
+            return true;
+        }
         return self->bus.write32(address, value).ok();
     }
     static bool generated_read8(void* c,std::uint32_t a,std::uint8_t& v) noexcept{auto*s=static_cast<Impl*>(c);if(!s||!s->active_generated_cpu)return false;AccessFault f=AccessFault::None;if(!s->sync_for_access({s->active_generated_cpu->issue_cycle,s->active_generated_cpu->instruction_pc,s->active_generated_cpu->in_delay_slot},a,memory::AccessWidth::Byte,f))return false;++s->generated_memory_reads;if(is_device_access(a,memory::AccessWidth::Byte)||is_expansion_one(a,memory::AccessWidth::Byte))++s->generated_device_reads;if(is_expansion_one(a,memory::AccessWidth::Byte)){v=0xffU;return true;}auto r=s->bus.read8(a);v=r.value;return r.ok();}
     static bool generated_read16(void* c,std::uint32_t a,std::uint16_t& v) noexcept{auto*s=static_cast<Impl*>(c);if(!s||!s->active_generated_cpu)return false;AccessFault f=AccessFault::None;if(!s->sync_for_access({s->active_generated_cpu->issue_cycle,s->active_generated_cpu->instruction_pc,s->active_generated_cpu->in_delay_slot},a,memory::AccessWidth::Halfword,f))return false;++s->generated_memory_reads;if(is_device_access(a,memory::AccessWidth::Halfword)||is_expansion_one(a,memory::AccessWidth::Halfword))++s->generated_device_reads;if(is_expansion_one(a,memory::AccessWidth::Halfword)){v=0xffffU;return true;}auto r=s->bus.read16(a);v=r.value;return r.ok();}
     static bool generated_read32(void* c,std::uint32_t a,std::uint32_t& v) noexcept{auto*s=static_cast<Impl*>(c);if(!s||!s->active_generated_cpu)return false;AccessFault f=AccessFault::None;if(!s->sync_for_access({s->active_generated_cpu->issue_cycle,s->active_generated_cpu->instruction_pc,s->active_generated_cpu->in_delay_slot},a,memory::AccessWidth::Word,f))return false;++s->generated_memory_reads;if(is_device_access(a,memory::AccessWidth::Word)||is_expansion_one(a,memory::AccessWidth::Word))++s->generated_device_reads;if(is_expansion_one(a,memory::AccessWidth::Word)){v=0xffff'ffffU;return true;}auto r=s->bus.read32(a);v=r.value;return r.ok();}
-    static bool generated_write8(void* c,std::uint32_t a,std::uint8_t v) noexcept{auto*s=static_cast<Impl*>(c);if(!s||!s->active_generated_cpu)return false;AccessFault f=AccessFault::None;if(!s->sync_for_access({s->active_generated_cpu->issue_cycle,s->active_generated_cpu->instruction_pc,s->active_generated_cpu->in_delay_slot},a,memory::AccessWidth::Byte,f))return false;++s->generated_memory_writes;if(is_device_access(a,memory::AccessWidth::Byte))++s->generated_device_writes;return s->bus.write8(a,v).ok();}
-    static bool generated_write16(void* c,std::uint32_t a,std::uint16_t v) noexcept{auto*s=static_cast<Impl*>(c);if(!s||!s->active_generated_cpu)return false;AccessFault f=AccessFault::None;if(!s->sync_for_access({s->active_generated_cpu->issue_cycle,s->active_generated_cpu->instruction_pc,s->active_generated_cpu->in_delay_slot},a,memory::AccessWidth::Halfword,f))return false;++s->generated_memory_writes;if(is_device_access(a,memory::AccessWidth::Halfword))++s->generated_device_writes;return s->bus.write16(a,v).ok();}
+    static bool generated_write8(void* c,std::uint32_t a,std::uint8_t v) noexcept{auto*s=static_cast<Impl*>(c);if(!s||!s->active_generated_cpu)return false;AccessFault f=AccessFault::None;if(!s->sync_for_access({s->active_generated_cpu->issue_cycle,s->active_generated_cpu->instruction_pc,s->active_generated_cpu->in_delay_slot},a,memory::AccessWidth::Byte,f))return false;++s->generated_memory_writes;if(is_device_access(a,memory::AccessWidth::Byte))++s->generated_device_writes;if(generated_store_is_cache_isolated(*s,a)){++s->generated_cache_isolated_writes;return true;}return s->bus.write8(a,v).ok();}
+    static bool generated_write16(void* c,std::uint32_t a,std::uint16_t v) noexcept{auto*s=static_cast<Impl*>(c);if(!s||!s->active_generated_cpu)return false;AccessFault f=AccessFault::None;if(!s->sync_for_access({s->active_generated_cpu->issue_cycle,s->active_generated_cpu->instruction_pc,s->active_generated_cpu->in_delay_slot},a,memory::AccessWidth::Halfword,f))return false;++s->generated_memory_writes;if(is_device_access(a,memory::AccessWidth::Halfword))++s->generated_device_writes;if(generated_store_is_cache_isolated(*s,a)){++s->generated_cache_isolated_writes;return true;}return s->bus.write16(a,v).ok();}
     static std::uint32_t generated_cop2_read_data(void*c,std::uint8_t r)noexcept{auto*s=static_cast<Impl*>(c);return s?s->gte.read_data(r):0U;}static std::uint32_t generated_cop2_read_control(void*c,std::uint8_t r)noexcept{auto*s=static_cast<Impl*>(c);return s?s->gte.read_control(r):0U;}static void generated_cop2_write_data(void*c,std::uint8_t r,std::uint32_t v)noexcept{auto*s=static_cast<Impl*>(c);if(s)s->gte.write_data(r,v);}static void generated_cop2_write_control(void*c,std::uint8_t r,std::uint32_t v)noexcept{auto*s=static_cast<Impl*>(c);if(s)s->gte.write_control(r,v);}static std::uint8_t generated_cop2_execute(void*c,std::uint32_t raw,bool&recognized)noexcept{auto*s=static_cast<Impl*>(c);if(!s){recognized=false;return 0U;}const auto receipt=s->gte.execute(raw);recognized=receipt.recognized;return receipt.cycles;}
     static void bind_generated_cop2(Impl&self,GeneratedCpuState&cpu)noexcept{cpu.cop2_context=&self;cpu.cop2_read_data=&generated_cop2_read_data;cpu.cop2_read_control=&generated_cop2_read_control;cpu.cop2_write_data=&generated_cop2_write_data;cpu.cop2_write_control=&generated_cop2_write_control;cpu.cop2_execute=&generated_cop2_execute;}
 
@@ -1694,6 +1714,7 @@ Status Runtime::reset() noexcept {
     impl_->copied_epoch_count = 0U;
     impl_->generated_memory_reads = 0U;
     impl_->generated_memory_writes = 0U;
+    impl_->generated_cache_isolated_writes = 0U;
     impl_->generated_device_reads = 0U;
     impl_->generated_device_writes = 0U;
     impl_->last_bios_instruction_count = 0U;
@@ -1736,6 +1757,7 @@ DispatchStatus Runtime::bind_authenticated_bios(
     impl_->bios_bound = true;
     impl_->generated_memory_reads = 0U;
     impl_->generated_memory_writes = 0U;
+    impl_->generated_cache_isolated_writes = 0U;
     impl_->generated_device_reads = 0U;
     impl_->generated_device_writes = 0U;
     return DispatchStatus::Bound;
@@ -1820,7 +1842,9 @@ Runtime::GeneratedExecutionSnapshot Runtime::bios_execution_snapshot() const noe
             impl_->bios_cpu.cop0_bad_vaddr, impl_->bios_cpu.instruction_pc,
             impl_->bios_cpu.branch_pc, impl_->bios_cpu.in_delay_slot,
             impl_->generated_memory_reads,
-            impl_->generated_memory_writes, impl_->generated_device_reads,
+            impl_->generated_memory_writes,
+            impl_->generated_cache_isolated_writes,
+            impl_->generated_device_reads,
             impl_->generated_device_writes};
 }
 

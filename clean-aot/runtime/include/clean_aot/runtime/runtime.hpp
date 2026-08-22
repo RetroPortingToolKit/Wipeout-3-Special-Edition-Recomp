@@ -208,6 +208,7 @@ public:
         bool in_delay_slot = false;
         std::uint64_t memory_reads = 0U;
         std::uint64_t memory_writes = 0U;
+        std::uint64_t cache_isolated_writes = 0U;
         std::uint64_t device_reads = 0U;
         std::uint64_t device_writes = 0U;
     };
