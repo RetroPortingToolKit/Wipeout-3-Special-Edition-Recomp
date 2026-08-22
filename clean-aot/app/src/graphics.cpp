@@ -5,6 +5,7 @@
 #include "sha256.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <iterator>
 #include <limits>
@@ -318,6 +319,11 @@ void Wip3outUploadKeyPolicy::observe(
     } catch (...) {
         impl_->invalidate_all();
     }
+}
+
+void Wip3outUploadKeyPolicy::observe_precise_draw(
+    raster::VramRect destination) noexcept {
+    impl_->invalidate(destination);
 }
 
 bool Wip3outUploadKeyPolicy::identify(
@@ -679,6 +685,18 @@ RuntimeGraphics::RuntimeGraphics(GraphicsConfiguration configuration)
         configuration_.output_height != 0U &&
         configuration_.custom_aspect_width != 0U &&
         configuration_.custom_aspect_height != 0U;
+    const psx::render::ProjectionResult projection =
+        psx::render::ProjectionPolicyPlanner::plan({
+            configuration_.projection, configuration_.culling,
+            configuration_.custom_aspect_width,
+            configuration_.custom_aspect_height});
+    if (!projection.accepted ||
+        (configuration_.projection == psx::render::ProjectionPolicy::ExpandHorizontal &&
+         !configuration_.pgxp_enabled)) {
+        configured_ = false;
+    } else {
+        projection_plan_ = projection.plan;
+    }
     if (configuration_.replacement_policy != nullptr) {
         policy_invalidation_serial_ =
             configuration_.replacement_policy->invalidation_serial();
@@ -723,13 +741,87 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
                     else ++native_fallbacks_;
                 }
             }
-            if (!raster_.consume(*event,
+            bool consumed_precise = false;
+            std::optional<raster::VramRect> precise_destination{};
+            if (configuration_.pgxp_enabled &&
+                configuration_.provenance_provider != nullptr) {
+                if (const auto* polygon = std::get_if<gpu::PolygonEvent>(&*event)) {
+                    PolygonProvenanceView provenance{};
+                    if (configuration_.provenance_provider->resolve(
+                            *polygon, provenance)) {
+                        std::array<host::RenderVertex, 6U> host_vertices{};
+                        std::array<std::uint16_t, 6U> indices{};
+                        const host::GeometryBridgeResult geometry =
+                            host::build_gpu_polygon_geometry(
+                                *polygon, provenance.candidates, provenance.state,
+                                projection_plan_, host_vertices, indices);
+                        if (geometry.status.success()) {
+                            std::array<raster::PreciseVertex, 6U> precise{};
+                            for (std::uint32_t i = 0U;
+                                 i < geometry.geometry.vertex_count; ++i) {
+                                const host::RenderVertex& source = host_vertices[i];
+                                precise[i] = {source.x + polygon->state.draw_offset.x,
+                                    source.y + polygon->state.draw_offset.y,
+                                    source.z, source.w, source.u, source.v,
+                                    source.color_rgba, source.storage_generation,
+                                    source.origin_generation};
+                            }
+                            const auto precise_span = std::span<const raster::PreciseVertex>(
+                                precise.data(), geometry.geometry.vertex_count);
+                            const raster::EventResult rendered =
+                                raster_.consume_precise_polygon(
+                                    *polygon, precise_span,
+                                    use_replacement ? &sampling : nullptr,
+                                    projection_plan_.culling ==
+                                            psx::render::CullingPolicy::NativeHardware
+                                        ? raster::PreciseCullingPolicy::NativeHardware
+                                        : raster::PreciseCullingPolicy::ProjectedBounds);
+                            if (rendered.accepted()) {
+                                consumed_precise = true;
+                                ++precise_primitives_;
+                                geometry_digest_ ^= geometry.visual_digest +
+                                    0x9e3779b97f4a7c15ULL +
+                                    (geometry_digest_ << 6U) + (geometry_digest_ >> 2U);
+                                double left = precise[0].x, right = precise[0].x;
+                                double top = precise[0].y, bottom = precise[0].y;
+                                for (const raster::PreciseVertex& vertex : precise_span) {
+                                    left = std::min(left, vertex.x);
+                                    right = std::max(right, vertex.x);
+                                    top = std::min(top, vertex.y);
+                                    bottom = std::max(bottom, vertex.y);
+                                }
+                                const std::int32_t x0 = std::clamp(
+                                    static_cast<std::int32_t>(std::floor(left)), 0, 1023);
+                                const std::int32_t y0 = std::clamp(
+                                    static_cast<std::int32_t>(std::floor(top)), 0, 511);
+                                const std::int32_t x1 = std::clamp(
+                                    static_cast<std::int32_t>(std::ceil(right)), 0, 1024);
+                                const std::int32_t y1 = std::clamp(
+                                    static_cast<std::int32_t>(std::ceil(bottom)), 0, 512);
+                                if (x1 > x0 && y1 > y0) {
+                                    precise_destination = raster::VramRect{
+                                        static_cast<std::uint16_t>(x0),
+                                        static_cast<std::uint16_t>(y0),
+                                        static_cast<std::uint16_t>(x1 - x0),
+                                        static_cast<std::uint16_t>(y1 - y0)};
+                                }
+                            }
+                        }
+                    }
+                    if (!consumed_precise) ++precise_fallbacks_;
+                }
+            }
+            if (!consumed_precise && !raster_.consume(*event,
                     use_replacement ? &sampling : nullptr).accepted()) {
                 return {host::HostCode::unsupported};
             }
             if (configuration_.replacement_policy != nullptr) {
                 configuration_.replacement_policy->observe(
                     *event, raster_.vram_words(), raster_.vram_generation());
+                if (precise_destination.has_value()) {
+                    configuration_.replacement_policy->observe_precise_draw(
+                        *precise_destination);
+                }
                 const std::uint64_t invalidation =
                     configuration_.replacement_policy->invalidation_serial();
                 if (invalidation != policy_invalidation_serial_) {
@@ -777,6 +869,18 @@ host::HostStatus RuntimeGraphics::present(runtime::Runtime& runtime,
     } catch (...) {
         return {host::HostCode::internal_error};
     }
+}
+
+std::uint64_t RuntimeGraphics::precise_primitives() const noexcept {
+    return precise_primitives_;
+}
+
+std::uint64_t RuntimeGraphics::precise_fallbacks() const noexcept {
+    return precise_fallbacks_;
+}
+
+std::uint64_t RuntimeGraphics::geometry_digest() const noexcept {
+    return geometry_digest_;
 }
 
 std::uint64_t RuntimeGraphics::visual_digest() const noexcept {

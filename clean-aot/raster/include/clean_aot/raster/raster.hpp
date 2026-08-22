@@ -62,6 +62,26 @@ struct ReplacementTexture final {
   std::span<const std::uint8_t> rgba8{};
 };
 
+// Validated, projection-adjusted polygon vertex. The producer must supply a
+// current storage and origin generation; the rasterizer fails closed when a
+// triangle contains partial or invalid precise state.
+struct PreciseVertex final {
+  double x = 0.0;
+  double y = 0.0;
+  double z = 0.0;
+  double w = 1.0;
+  double u = 0.0;
+  double v = 0.0;
+  std::uint32_t color_rgba = 0U;
+  std::uint64_t storage_generation = 0U;
+  std::uint64_t origin_generation = 0U;
+};
+
+enum class PreciseCullingPolicy : std::uint8_t {
+  NativeHardware,
+  ProjectedBounds,
+};
+
 struct EventResult {
   EventStatus status = EventStatus::Rejected;
   RasterError error = RasterError::MalformedEvent;
@@ -221,6 +241,12 @@ public:
   [[nodiscard]] EventResult consume(
       const gpu::Event &event,
       const ReplacementTexture *replacement) noexcept;
+  [[nodiscard]] EventResult consume_precise_polygon(
+      const gpu::PolygonEvent &event,
+      std::span<const PreciseVertex> triangle_vertices,
+      const ReplacementTexture *replacement = nullptr,
+      PreciseCullingPolicy culling =
+          PreciseCullingPolicy::NativeHardware) noexcept;
   [[nodiscard]] EventResult consume(const gpu::Event &event,
                                     WorkBudget &budget) noexcept;
   [[nodiscard]] BatchResult

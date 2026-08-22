@@ -7,6 +7,7 @@
 #include "psx_render/replacement_manifest.h"
 
 #include <cstdint>
+#include <array>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -40,7 +41,21 @@ public:
     virtual void observe(const gpu::Event& event,
                          std::span<const raster::VramWord> vram,
                          std::uint64_t source_generation) noexcept = 0;
+    virtual void observe_precise_draw(raster::VramRect destination) noexcept = 0;
     [[nodiscard]] virtual std::uint64_t invalidation_serial() const noexcept = 0;
+};
+
+struct PolygonProvenanceView final {
+    std::span<const psx::render::VertexCandidate> candidates{};
+    const psx::render::ProvenanceState* state = nullptr;
+};
+
+class IPolygonProvenanceProvider {
+public:
+    virtual ~IPolygonProvenanceProvider() = default;
+    [[nodiscard]] virtual bool resolve(
+        const gpu::PolygonEvent& event,
+        PolygonProvenanceView& view) noexcept = 0;
 };
 
 enum class FontManifestPolicy : std::uint8_t {
@@ -81,6 +96,7 @@ public:
     void observe(const gpu::Event& event,
                  std::span<const raster::VramWord> vram,
                  std::uint64_t source_generation) noexcept override;
+    void observe_precise_draw(raster::VramRect destination) noexcept override;
 
     struct Stats final {
         std::uint64_t uploads_hashed = 0U;
@@ -116,6 +132,12 @@ struct GraphicsConfiguration final {
     FontManifestPolicy font_policy = FontManifestPolicy::ManifestOnly;
     ReplacementAssetRuntime* replacement_assets = nullptr;
     IReplacementKeyPolicy* replacement_policy = nullptr;
+    bool pgxp_enabled = false;
+    IPolygonProvenanceProvider* provenance_provider = nullptr;
+    psx::render::ProjectionPolicy projection =
+        psx::render::ProjectionPolicy::PreserveNative4x3;
+    psx::render::CullingPolicy culling =
+        psx::render::CullingPolicy::NativeHardware;
 };
 
 class IPngDecoder {
@@ -214,6 +236,9 @@ public:
     [[nodiscard]] std::uint64_t visual_digest() const noexcept;
     [[nodiscard]] std::uint64_t vram_generation() const noexcept;
     [[nodiscard]] VisualReceipt visual_receipt() const noexcept;
+    [[nodiscard]] std::uint64_t precise_primitives() const noexcept;
+    [[nodiscard]] std::uint64_t precise_fallbacks() const noexcept;
+    [[nodiscard]] std::uint64_t geometry_digest() const noexcept;
 
 private:
     GraphicsConfiguration configuration_{};
@@ -226,6 +251,10 @@ private:
     std::uint64_t replacement_hits_ = 0U;
     std::uint64_t native_fallbacks_ = 0U;
     std::uint64_t policy_invalidation_serial_ = 0U;
+    psx::render::ProjectionPlan projection_plan_{};
+    std::uint64_t precise_primitives_ = 0U;
+    std::uint64_t precise_fallbacks_ = 0U;
+    std::uint64_t geometry_digest_ = 0U;
 };
 
 } // namespace clean_aot::app

@@ -69,8 +69,168 @@ public:
     void observe(const clean_aot::gpu::Event&,
                  std::span<const clean_aot::raster::VramWord>,
                  std::uint64_t) noexcept override {}
+    void observe_precise_draw(clean_aot::raster::VramRect) noexcept override {}
     std::uint64_t invalidation_serial() const noexcept override { return 0U; }
 };
+
+class LiveProvenance final : public clean_aot::app::IPolygonProvenanceProvider {
+public:
+    bool resolve(const clean_aot::gpu::PolygonEvent& event,
+                 clean_aot::app::PolygonProvenanceView& view) noexcept override {
+        try {
+            if (event.vertex_count != 3U) return false;
+            for (std::size_t i = 0U; i < 3U; ++i) {
+                const psx::render::NativePosition native{
+                    event.vertices[i].x, event.vertices[i].y};
+                const auto gte = state.write_gte(
+                    static_cast<psx::render::GteRegister>(i), native,
+                    {static_cast<double>(native.x) + 0.25,
+                     static_cast<double>(native.y) + 0.5,
+                     2.0 + static_cast<double>(i), 1.0 + static_cast<double>(i)});
+                const std::uint32_t raw = static_cast<std::uint16_t>(native.x) |
+                    (static_cast<std::uint32_t>(static_cast<std::uint16_t>(native.y)) << 16U);
+                if (!state.store_memory(0x100U + static_cast<std::uint32_t>(i) * 4U,
+                                        raw, gte.candidate().enhancement)
+                         .carried_precise()) return false;
+                candidates[i] = state.load_memory(
+                    0x100U + static_cast<std::uint32_t>(i) * 4U)->candidate();
+            }
+            view = {candidates, &state};
+            return true;
+        } catch (...) { return false; }
+    }
+    psx::render::ProvenanceState state{};
+    std::array<psx::render::VertexCandidate, 3U> candidates{};
+};
+class RejectProvenance final : public clean_aot::app::IPolygonProvenanceProvider {
+public:
+    bool resolve(const clean_aot::gpu::PolygonEvent&,
+                 clean_aot::app::PolygonProvenanceView&) noexcept override {
+        return false;
+    }
+};
+
+void test_live_pgxp_projection_pipeline() {
+    using namespace clean_aot;
+    std::vector<std::uint8_t> bios(512U * 1024U, 0U);
+    runtime::Configuration runtime_config{}; runtime_config.bios = bios;
+    runtime::Runtime runtime(runtime_config);
+    auto& gpu = runtime.gpu();
+    expect(gpu.write_gp1(0x03000000U).accepted &&
+           gpu.write_gp1(0x05000000U).accepted &&
+           gpu.write_gp1(0x06c00200U).accepted &&
+           gpu.write_gp1(0x07040010U).accepted &&
+           gpu.write_gp1(0x08000001U).accepted,
+           "PGXP live display configures");
+    const auto send = [&](std::uint32_t word) {
+        expect(gpu.write_gp0(word).accepted, "PGXP live packet accepts");
+    };
+    send(0xe3000000U); send(0xe4000000U | (511U << 10U) | 1023U);
+    send(0x200000ffU);
+    send((20U << 16U) | 20U);
+    send((20U << 16U) | 220U);
+    send((180U << 16U) | 20U);
+
+    LiveProvenance provenance;
+    app::GraphicsConfiguration graphics_config{};
+    graphics_config.runtime_scanout = true;
+    graphics_config.output_width = 5120U;
+    graphics_config.output_height = 2160U;
+    graphics_config.presentation = raster::PresentationMode::Generic21x9;
+    graphics_config.custom_aspect_width = 21U;
+    graphics_config.custom_aspect_height = 9U;
+    graphics_config.pgxp_enabled = true;
+    graphics_config.provenance_provider = &provenance;
+    graphics_config.projection = psx::render::ProjectionPolicy::ExpandHorizontal;
+    graphics_config.culling = psx::render::CullingPolicy::MatchExpandedProjection;
+    app::RuntimeGraphics graphics(graphics_config);
+    host::HeadlessBackend host;
+    expect(graphics.configured() && graphics.present(runtime, host, 0U).success(),
+           "live PGXP ultrawide frame presents");
+    std::cout << "PGXP geometry digest: 0x" << std::hex
+              << graphics.geometry_digest() << std::dec << '\n';
+    expect(graphics.precise_primitives() == 1U &&
+           graphics.precise_fallbacks() == 0U &&
+           graphics.geometry_digest() == 0x44a1ecefa6185830ULL,
+           "GTE/RAM/GPU provenance drives deterministic projected geometry");
+    expect(graphics.visual_receipt().content_width == 5040U &&
+           graphics.visual_receipt().content_height == 2160U,
+           "projected geometry reaches the 5K ultrawide presentation plan");
+
+    const auto queue_native_frame = [](runtime::Runtime& target) {
+        auto& frontend = target.gpu();
+        (void)frontend.write_gp1(0x03000000U);
+        (void)frontend.write_gp1(0x05000000U);
+        (void)frontend.write_gp1(0x06c00200U);
+        (void)frontend.write_gp1(0x07040010U);
+        (void)frontend.write_gp1(0x08000001U);
+        (void)frontend.write_gp0(0xe3000000U);
+        (void)frontend.write_gp0(0xe4000000U | (511U << 10U) | 1023U);
+        (void)frontend.write_gp0(0x200000ffU);
+        (void)frontend.write_gp0((20U << 16U) | 20U);
+        (void)frontend.write_gp0((20U << 16U) | 220U);
+        (void)frontend.write_gp0((180U << 16U) | 20U);
+    };
+    runtime::Runtime rejected_runtime(runtime_config);
+    runtime::Runtime native_runtime(runtime_config);
+    queue_native_frame(rejected_runtime); queue_native_frame(native_runtime);
+    RejectProvenance reject;
+    app::GraphicsConfiguration fallback_config{};
+    fallback_config.runtime_scanout = true;
+    fallback_config.pgxp_enabled = true;
+    fallback_config.provenance_provider = &reject;
+    app::RuntimeGraphics fallback(fallback_config);
+    app::GraphicsConfiguration native_config{};
+    native_config.runtime_scanout = true;
+    app::RuntimeGraphics native(native_config);
+    host::HeadlessBackend fallback_host, native_host;
+    expect(fallback.present(rejected_runtime, fallback_host, 0U).success() &&
+           native.present(native_runtime, native_host, 0U).success() &&
+           fallback.precise_fallbacks() == 1U &&
+           fallback.visual_digest() == native.visual_digest(),
+           "missing provenance produces byte-exact native frame fallback");
+}
+
+void test_precise_raster_perspective_interpolation() {
+    using namespace clean_aot;
+    raster::ReferenceRasterizer raster;
+    gpu::PolygonEvent event{};
+    event.vertex_count = 3U;
+    event.gouraud = true;
+    event.vertices[0] = {0U, 0, 0};
+    event.vertices[1] = {0U, 20, 0};
+    event.vertices[2] = {0U, 0, 20};
+    event.state.draw_area.right = 1023U;
+    event.state.draw_area.bottom = 511U;
+    const std::array<raster::PreciseVertex, 3U> vertices{
+        raster::PreciseVertex{0.0, 0.0, 1.0, 1.0, 0.0, 0.0,
+                              0xff0000ffU, 1U, 1U},
+        raster::PreciseVertex{20.0, 0.0, 1.0, 2.0, 0.0, 0.0,
+                              0xff00ff00U, 2U, 2U},
+        raster::PreciseVertex{0.0, 20.0, 1.0, 4.0, 0.0, 0.0,
+                              0xffff0000U, 3U, 3U},
+    };
+    expect(raster.consume_precise_polygon(event, vertices).accepted() &&
+           raster.read_vram(5U, 5U) == 0x08b7U,
+           "precise raster uses clip-W perspective interpolation per pixel");
+    auto invalid = vertices;
+    invalid[1].w = -2.0;
+    const std::uint64_t digest = raster.digest();
+    expect(!raster.consume_precise_polygon(event, invalid).accepted() &&
+           raster.digest() == digest,
+           "mixed-sign clip-W fails closed without touching native VRAM");
+    raster.reset();
+    event.vertices[1] = {0U, 1024, 0};
+    expect(raster.consume_precise_polygon(event, vertices).status ==
+               raster::EventStatus::Ignored &&
+           raster.read_vram(5U, 5U) == 0U,
+           "native culling policy retains the hardware edge limit");
+    expect(raster.consume_precise_polygon(
+               event, vertices, nullptr,
+               raster::PreciseCullingPolicy::ProjectedBounds).accepted() &&
+           raster.read_vram(5U, 5U) == 0x08b7U,
+           "expanded culling policy evaluates projected precise bounds");
+}
 
 void test_beetle_upload_key_derivation_and_sampling() {
     using namespace clean_aot;
@@ -414,6 +574,8 @@ void test_native_png_decode() {
 }
 } // namespace
 int main() {
+    test_live_pgxp_projection_pipeline();
+    test_precise_raster_perspective_interpolation();
     test_beetle_upload_key_derivation_and_sampling();
     test_live_replacement_pipeline();
     test_runtime_scanout(); test_replacement_runtime(); test_native_png_decode();

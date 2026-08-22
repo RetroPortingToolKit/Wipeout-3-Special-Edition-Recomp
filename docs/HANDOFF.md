@@ -321,9 +321,12 @@ instruction and fails closed on every unknown PC or executable identity.
 - 100 Hz machine cadence exists and the GooseStation oracle supplies behavior
   evidence, but the product CPU multiplier, unique simulation-update proof,
   full-race timing, audio/media exactness and performance soak remain open.
-- Wide projection/culling, PGXP provenance through every vertex, texture/font
-  replacement, and independently justified game fixes are not integrated into
-  the clean shipping lane.
+- The live graphics drain now consumes generation-validated polygon provenance,
+  applies explicit native/expanded projection and culling, perspective-correct
+  UV/color interpolation, replacement sampling, and 4K/ultrawide scanout with
+  byte-exact native fallback. The CPU/GTE/RAM producer still must publish those
+  candidates for every shipping game polygon; incomplete provenance deliberately
+  remains on the native raster path.
 
 ## Recovery verification (2026-08-21)
 

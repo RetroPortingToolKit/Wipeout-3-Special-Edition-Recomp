@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -710,6 +711,128 @@ struct ReferenceRasterizer::Impl {
                     textured && texture_semi_transparent);
       }
     }
+  }
+
+  [[nodiscard]] EventResult consume_precise_polygon(
+      const gpu::PolygonEvent &event,
+      std::span<const PreciseVertex> vertices,
+      PreciseCullingPolicy culling,
+      WorkBudget &budget) noexcept {
+    const std::size_t expected = event.quad ? 6u : 3u;
+    const bool textured = event.textured && !event.state.draw_mode.texture_disable;
+    if (event.kind != gpu::EventKind::Polygon || vertices.size() != expected ||
+        !valid_common_state(event.state) ||
+        !valid_texture_state(event.state, textured, event.clut)) {
+      return reject(RasterError::MalformedEvent);
+    }
+    std::uint64_t work_units = 0U;
+    std::array<Bounds, 2> bounds{};
+    const std::array<std::array<std::size_t, 3U>, 2U> native_indices{{
+        {{0U, 1U, 2U}}, {{1U, 2U, 3U}}}};
+    for (std::size_t triangle = 0U; triangle < expected / 3U; ++triangle) {
+      const PreciseVertex* v = vertices.data() + triangle * 3U;
+      const bool sign = std::signbit(v[0].w);
+      for (std::size_t corner = 0U; corner < 3U; ++corner) {
+        if (!std::isfinite(v[corner].x) || !std::isfinite(v[corner].y) ||
+            !std::isfinite(v[corner].z) || !std::isfinite(v[corner].w) ||
+            !std::isfinite(v[corner].u) || !std::isfinite(v[corner].v) ||
+            v[corner].w == 0.0 || std::signbit(v[corner].w) != sign ||
+            v[corner].storage_generation == 0U ||
+            v[corner].origin_generation == 0U) {
+          return reject(RasterError::MalformedEvent);
+        }
+      }
+      if (culling == PreciseCullingPolicy::NativeHardware) {
+        const Triangle native = make_triangle(
+            event, native_indices[triangle], textured);
+        if (!valid_triangle_size(native.vertices)) continue;
+      }
+      const double min_x = std::min({v[0].x, v[1].x, v[2].x});
+      const double max_x = std::max({v[0].x, v[1].x, v[2].x});
+      const double min_y = std::min({v[0].y, v[1].y, v[2].y});
+      const double max_y = std::max({v[0].y, v[1].y, v[2].y});
+      if (min_x < static_cast<double>(std::numeric_limits<std::int32_t>::min()) ||
+          max_x > static_cast<double>(std::numeric_limits<std::int32_t>::max()) ||
+          min_y < static_cast<double>(std::numeric_limits<std::int32_t>::min()) ||
+          max_y > static_cast<double>(std::numeric_limits<std::int32_t>::max())) {
+        return reject(RasterError::MalformedEvent);
+      }
+      bounds[triangle] = clipped_bounds(
+          event.state, static_cast<std::int64_t>(std::floor(min_x)),
+          static_cast<std::int64_t>(std::floor(min_y)),
+          static_cast<std::int64_t>(std::ceil(max_x)) - 1,
+          static_cast<std::int64_t>(std::ceil(max_y)) - 1);
+      if (work_units > std::numeric_limits<std::uint64_t>::max() -
+                           bounds[triangle].work_units) {
+        return reject(RasterError::WorkLimitExceeded);
+      }
+      work_units += bounds[triangle].work_units;
+    }
+    EventResult result = accept(budget, work_units,
+        work_units == 0U ? EventStatus::Ignored : EventStatus::Applied);
+    if (!result.accepted()) return result;
+
+    const auto edge_d = [](const PreciseVertex& a, const PreciseVertex& b,
+                           double x, double y) noexcept {
+      return (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
+    };
+    for (std::size_t triangle = 0U; triangle < expected / 3U; ++triangle) {
+      std::array<PreciseVertex, 3> v{
+          vertices[triangle * 3U], vertices[triangle * 3U + 1U],
+          vertices[triangle * 3U + 2U]};
+      double area = edge_d(v[0], v[1], v[2].x, v[2].y);
+      if (area == 0.0 || bounds[triangle].empty) continue;
+      if (area < 0.0) { std::swap(v[1], v[2]); area = -area; }
+      for (std::int64_t y = bounds[triangle].top; y <= bounds[triangle].bottom; ++y) {
+        for (std::int64_t x = bounds[triangle].left; x <= bounds[triangle].right; ++x) {
+          const double a = edge_d(v[1], v[2], static_cast<double>(x),
+                                  static_cast<double>(y)) / area;
+          const double b = edge_d(v[2], v[0], static_cast<double>(x),
+                                  static_cast<double>(y)) / area;
+          const double c = 1.0 - a - b;
+          if (a < 0.0 || b < 0.0 || c < 0.0) continue;
+          const double denominator = a / v[0].w + b / v[1].w + c / v[2].w;
+          if (!std::isfinite(denominator) || denominator == 0.0) continue;
+          const double pa = (a / v[0].w) / denominator;
+          const double pb = (b / v[1].w) / denominator;
+          const double pc = (c / v[2].w) / denominator;
+          const auto channel = [&](unsigned shift) noexcept {
+            return static_cast<std::int64_t>(std::clamp(
+                pa * static_cast<double>((v[0].color_rgba >> shift) & 0xffU) +
+                pb * static_cast<double>((v[1].color_rgba >> shift) & 0xffU) +
+                pc * static_cast<double>((v[2].color_rgba >> shift) & 0xffU),
+                0.0, 255.0));
+          };
+          Color color{channel(0U), channel(8U), channel(16U)};
+          bool transparent = false;
+          bool texture_semi = false;
+          if (textured) {
+            const auto coordinate = [&](bool select_v) noexcept {
+              const double value = pa * (select_v ? v[0].v : v[0].u) +
+                  pb * (select_v ? v[1].v : v[1].u) +
+                  pc * (select_v ? v[2].v : v[2].u);
+              return static_cast<std::int64_t>(value * 255.0);
+            };
+            const TextureSample sample = sample_texture(
+                event.state, event.clut, coordinate(false), coordinate(true));
+            transparent = sample.transparent;
+            texture_semi = sample.semi_transparent;
+            color = event.raw_texture ? raw_texture_color(sample.color_5bit)
+                                      : modulate(sample.color_5bit, color);
+          }
+          const bool blend = event.semi_transparent && (!textured || texture_semi);
+          const bool dither = event.state.draw_mode.dither &&
+              ((event.gouraud && !textured) || (textured && !event.raw_texture));
+          write_pixel(event.state, x, y, color, transparent, blend, dither,
+                      textured && texture_semi);
+        }
+      }
+    }
+    if (result.status == EventStatus::Applied &&
+        vram_generation != std::numeric_limits<std::uint64_t>::max()) {
+      ++vram_generation;
+    }
+    return result;
   }
 
   [[nodiscard]] Triangle make_triangle(const gpu::PolygonEvent &event,
@@ -1466,6 +1589,19 @@ EventResult ReferenceRasterizer::consume(
   WorkBudget budget{};
   impl_->replacement = replacement;
   const EventResult result = impl_->consume(event, budget);
+  impl_->replacement = nullptr;
+  return result;
+}
+
+EventResult ReferenceRasterizer::consume_precise_polygon(
+    const gpu::PolygonEvent &event,
+    std::span<const PreciseVertex> triangle_vertices,
+    const ReplacementTexture *replacement,
+    PreciseCullingPolicy culling) noexcept {
+  WorkBudget budget{};
+  impl_->replacement = replacement;
+  const EventResult result =
+      impl_->consume_precise_polygon(event, triangle_vertices, culling, budget);
   impl_->replacement = nullptr;
   return result;
 }
