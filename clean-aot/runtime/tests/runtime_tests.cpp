@@ -193,6 +193,8 @@ void test_generated_spu_fifo_write_receipt(Runner& runner) {
                        DispatchStatus::Bound);
     EXPECT(runner, runtime->dispatch_bios() == DispatchStatus::Executed);
     const auto snapshot = runtime->bios_execution_snapshot();
+    EXPECT(runner, runtime->bios_register(0U) == 0U);
+    EXPECT(runner, runtime->bios_register(32U) == 0U);
     EXPECT(runner, snapshot.device_writes == 1U);
     EXPECT(runner, snapshot.spu_transfer_fifo_writes == 1U);
 }
@@ -700,6 +702,10 @@ void test_issue_cycle_and_mmio(Runner& runner) {
     const auto bad_gpu = runtime->write16(
         at_nine_hundred, 0x1f80'1810U, 0U);
     EXPECT(runner, bad_gpu.fault == AccessFault::BusError);
+    const auto empty_gpuread = runtime->read32(
+        at_nine_hundred, 0x1f80'1810U);
+    EXPECT(runner, empty_gpuread.ok());
+    EXPECT(runner, empty_gpuread.value == 0U);
     const auto unknown = runtime->read32(
         at_nine_hundred, 0x1f80'1900U);
     EXPECT(runner, unknown.fault == AccessFault::BusError);

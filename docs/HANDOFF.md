@@ -11,9 +11,13 @@
   was not ready, causing `BusErrorData` and the fatal path. Continuous calls are
   one intentional error cycle, not finite initialization.
 - A concurrent runtime owner already has the matching GPUREAD correction in the
-  worktree, so this tranche preserves it and contributes only independent
-  evidence. See `docs/A0_SERVICE40_ANALYSIS.md` and
-  `bios-a0-service40-audit.json`.
+  worktree. The corrected bounded probe proves the fatal cycle disappears,
+  Cause remains zero, and the live continuation returns through
+  `$ra=0x8004ED94` to the next exact fail-closed frontier `0x80050A7C` after
+  19,271,351 instructions / 1,787,466 dispatches. CD MMIO and raw-sector counts
+  remain zero. See `docs/A0_SERVICE40_ANALYSIS.md`,
+  `bios-a0-service40-audit.json`, and
+  `bios-shell-a0-service40-gpuread-fix-80050a7c.json`.
 
 ## Independent interrupt audit at PC 0x000005C4 (2026-08-22)
 

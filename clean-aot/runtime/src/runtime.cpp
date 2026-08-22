@@ -1361,7 +1361,12 @@ struct Runtime::Impl final {
             }
             if (address == kGpuBegin) {
                 const gpu::ReadResult result = gpu.read_gpuread();
-                return result.ready ? handled_read(result.word) : rejected_read();
+                // GPUREAD is a readable hardware latch even when no VRAM
+                // download or GP1 information response has populated it yet.
+                // `ready` gates transfer data (notably DMA), not CPU MMIO bus
+                // validity.  A cold/cleared latch therefore reads as zero
+                // instead of raising a data-bus exception.
+                return handled_read(result.word);
             }
             if (address == kGpuBegin + 4U) {
                 return handled_read(gpu.status());
@@ -2146,6 +2151,12 @@ DispatchStatus Runtime::bind_authenticated_copied_epoch(
 
 std::uint32_t Runtime::bios_pc() const noexcept {
     return impl_ != nullptr ? impl_->bios_cpu.pc : 0U;
+}
+
+std::uint32_t Runtime::bios_register(const std::uint8_t index) const noexcept {
+    return impl_ != nullptr && index < impl_->bios_cpu.gpr.size()
+               ? impl_->bios_cpu.gpr[index]
+               : 0U;
 }
 
 std::uint32_t Runtime::last_bios_instruction_count() const noexcept {

@@ -255,6 +255,7 @@ public:
     [[nodiscard]] DispatchStatus bind_authenticated_copied_epoch(
         const AuthenticatedCopiedEpochBinding& binding) noexcept;
     [[nodiscard]] std::uint32_t bios_pc() const noexcept;
+    [[nodiscard]] std::uint32_t bios_register(std::uint8_t index) const noexcept;
     [[nodiscard]] std::uint32_t last_bios_instruction_count() const noexcept;
     [[nodiscard]] GeneratedExecutionSnapshot bios_execution_snapshot() const noexcept;
     [[nodiscard]] DispatchStatus load_authenticated_executable(
