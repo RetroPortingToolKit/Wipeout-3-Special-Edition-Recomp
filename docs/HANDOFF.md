@@ -1,5 +1,20 @@
 # Handoff
 
+## A0 service 0x40 exact fatal-cycle analysis (2026-08-22)
+
+- Exact BIOS and RAM bytes prove service `0x40` is a non-returning fatal sink:
+  `BFC0D8E0 -> A0 -> 5C4 -> table[0x300] -> BFC0D8E0`. It has zero stack delta,
+  preserves `sp`/`ra`/arguments/saved registers, and has no return contract.
+- The caller is the general-exception handler fatal arm at `0x1B08`. The live
+  shell performed a legal GPUREAD synchronization load at `0x80051054`; the
+  traced baseline runtime incorrectly rejected GPUREAD when its transfer latch
+  was not ready, causing `BusErrorData` and the fatal path. Continuous calls are
+  one intentional error cycle, not finite initialization.
+- A concurrent runtime owner already has the matching GPUREAD correction in the
+  worktree, so this tranche preserves it and contributes only independent
+  evidence. See `docs/A0_SERVICE40_ANALYSIS.md` and
+  `bios-a0-service40-audit.json`.
+
 ## Independent interrupt audit at PC 0x000005C4 (2026-08-22)
 
 - The committed route terminal was mislabeled as a low-RAM interrupt handler.

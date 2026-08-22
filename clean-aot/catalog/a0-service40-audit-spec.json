@@ -1,0 +1,8 @@
+{
+  "schema": "clean-aot-a0-service40-audit-spec-v1",
+  "identities": {
+    "bios_sha256": "71af94d1e47a68c11e8fdb9f8368040601514a42a5a399cda48c7d3bff1e99d3",
+    "ram_epoch_sha256": "46ae27250e3346ea55d722f00b6cc8a9226fd785a32a246583510363fe12d52f",
+    "full_ram_sha256": "13400a9824a1b8e03c5c61225eaee462211dbd214fbc33fc727a38a3125f0bdb"
+  }
+}
