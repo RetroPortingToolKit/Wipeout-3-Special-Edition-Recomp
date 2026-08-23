@@ -47,6 +47,11 @@ def test_rejects_double_blocking_and_unbounded_debt():
     assert any("bounded 12-period" in item for item in errors)
 
 
+def test_requires_observed_zero_swap_interval_for_native_pal_x2():
+    errors, _ = validate(receipt(swap_interval=None))
+    assert any("reported effective swap_interval 0" in item for item in errors)
+
+
 def test_fmv_requires_50_hz_backend_swaps_but_100_hz_guest():
     errors, diagnosis = validate(receipt(fmv=True, backend_swaps=500))
     assert errors == []
