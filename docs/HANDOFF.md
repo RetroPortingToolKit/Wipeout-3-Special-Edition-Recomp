@@ -1,5 +1,27 @@
 # Handoff
 
+## Standard-runtime restart baseline (2026-08-23)
+
+- The restart uses `build-psx-standard` with the audited upstream runtime,
+  4:3 OpenGL, stock clocks, and every enhancement disabled. A clean boot was
+  driven into a live race: the countdown gantry, walls, ships, and track
+  geometry were intact, and the race timer advanced ten seconds over a
+  ten-second wall interval. The owner independently confirmed it runs
+  perfectly. Captures are retained outside the repository as
+  `cleanroom-stock-countdown.png` and `cleanroom-stock-race10s.png`.
+- PGXP, widescreen, HD textures, fast loading, PAL-x2, and save-state reuse are
+  excluded from the baseline. Return them one at a time and pass the same race
+  route before enabling the next feature.
+- Rejected: the historical Q16 `psx_advance_cycles` charge scaler from commit
+  `30652ac3`. An isolated 900% A/B printed the requested value but progressed
+  through boot more slowly than stock. It scales the shared cycle coordinate
+  and is not evidence of independent CPU retirement. It was reverted; do not
+  resurrect it or expose its percentage as a trustworthy counter.
+- The next timing implementation must maintain separate CPU-retirement and
+  native-device time (or exactly transform every device deadline), then prove
+  retired guest work, 100-Hz simulation updates, 44.1-kHz SPU output, native
+  CD timing, and the intact countdown/race scene in the same run.
+
 ## Epoch-qualified duplicate resolution through 0x80050DE0 (2026-08-22)
 
 - Dormant binding 207 and live binding 491 share exact destination
