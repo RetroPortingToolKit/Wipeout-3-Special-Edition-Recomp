@@ -4,7 +4,8 @@
 This is intentionally a verifier, not a patcher.  The title transformation is
 user-media-derived; the checks below pin the exact local PAL executable and the
 MIPS instructions recovered from its generated/recompiler data.  The runtime
-PAL-x2 hook remains a separate, opt-in mod.
+PAL-x2 hook is auto-selected for this authenticated target, but activation
+remains gated until the PAL game display mode is programmed.
 """
 
 from __future__ import annotations
@@ -92,7 +93,7 @@ def main() -> int:
         failures.append("PAL100 package executable hash does not match the authenticated local target")
     feature = next((item for item in manifest.get("feature", []) if item.get("id") == "framerate-pal100"), {})
     if feature.get("default_enabled") is not True:
-        failures.append("PAL100 feature is not default-on")
+        failures.append("PAL100 feature is not auto-enabled")
     plugins = {item.get("id") for item in manifest.get("plugin", [])}
     if "wipeout3.framerate.pal-x2" not in plugins:
         failures.append("PAL100 package does not select the PAL-x2 activation hook")

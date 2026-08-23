@@ -33,11 +33,15 @@ known_crc32 = [
 seeds = "seeds/ghidra_funcs.txt"
 out_dir = "generated"
 strict = true
-# SimVblankGate: framerate package forces gSimVblankSkip=2 on entry (AOT cadence).
+# PAL x2 is media-authenticated: selector 2 writes gSimVblankSkip=1 and the
+# PAL-x2 state flag. The active package supplies the host CRTC/pacer hook; it
+# does not approximate or rewrite the title patch.
 mod_function_entry_funcs = ["0x800EDFC8"]
 
 [runtime]
 window_title = "Wipeout 3 Special Edition Recompiled"
+# PAL x2/100 Hz is the release default for the authenticated PAL title. The
+# runtime hook still arms only after the game programs PAL display mode.
 memcard_dir = "saves"
 openbios = false
 bios_hle = true
@@ -52,13 +56,14 @@ cpu_overclock = 900
 geometry_correction = true
 perspective_texturing = true
 pgxp_depth = true
+pgxp_cpu_mode = true
 supersampling = 4
 hd_textures = true
 bezel = "random"
-auto_skip_fmv = false
-# Authentic 4:3 is the baseline. The Widescreen mod below activates WipEout
-# 3's game-specific native-wide hooks and chooses fixed/adaptive presentation.
-aspect_ratio = "4:3"
+auto_skip_fmv = true
+# Gameplay starts wide; the Widescreen mod owns the fixed/adaptive choice and
+# the runtime keeps BIOS/FMV/full-2D content on its authored 4:3 presentation.
+aspect_ratio = "16:9"
 
 [widescreen]
 # Widescreen is game-owned on the Mods page, not a generic Display setting.

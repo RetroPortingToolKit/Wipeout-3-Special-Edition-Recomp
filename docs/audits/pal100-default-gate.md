@@ -1,16 +1,15 @@
 # PAL x2 / 100 Hz default gate
 
 Date: 2026-08-22  
-Disposition: **not safe to enable by default**
+Disposition: **auto-enabled by release requirement; performance remains unproven**
 
 ## Decision
 
-The user requirement for default-on PAL x2/100 Hz cannot be safely satisfied
-by a config or verifier-only change in this checkout. The feature is wired and
-can be selected explicitly, but the retained runtime evidence still shows
-unresolved presentation/audio and equivalence failures. The release default
-must therefore remain opt-in until the gates below pass on the authenticated
-PAL title and a real release build.
+The release requirement is automatic PAL x2/100 Hz selection. This is a
+configuration and launch-policy decision, not a claim that every race sustains
+100 Hz. Retained runtime evidence still shows unresolved presentation/audio
+and equivalence failures, so the release must preserve the safety gates below
+and must not advertise proven race performance.
 
 This resolves the apparent contradiction by separating two meanings of
 “default”:
@@ -18,15 +17,12 @@ This resolves the apparent contradiction by separating two meanings of
 | Check | Meaning | Required value now |
 | --- | --- | --- |
 | `tools/verify_pal100_title.py` | The authenticated PAL media/package contains the title-side selector-2 contract needed by PAL x2 | `default_enabled = true` is required by this title-authentication check |
-| `tools/verify_static_release.ps1` | The experimental runtime activation is not silently applied to users before runtime proof exists | `default_enabled = false` is required |
+| `tools/verify_static_release.ps1` | The staged release carries the required automatic selection | Manifest `default_enabled = true` and PAL100 enabled in state |
 | `mods/state.toml` in a portable release | The launcher’s effective user selection | Must be recorded; it must not be inferred from source or the title verifier |
 
-The first check is not a request to turn the runtime feature on. It confirms
-that the package describes the authenticated title build. The second check is
-the safety boundary for shipping. The package currently violates its own
-description (`default-off`) by declaring `default_enabled = true`; that is the
-remaining source-level contradiction and is intentionally not papered over by
-weakening either verifier.
+The title verifier authenticates the media/title contract. The static verifier
+checks that the release actually carries the requested default in both package
+metadata and launcher state. Neither verifier proves sustained race timing.
 
 ## End-to-end trace
 
@@ -80,7 +76,7 @@ settings:
 Until every gate passes, the safe and internally consistent configuration is:
 
 ```toml
-default_enabled = false
+default_enabled = true
 ```
 
 The title verifier’s default-on assertion must remain unchanged because it

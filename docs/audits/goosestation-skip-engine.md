@@ -12,10 +12,11 @@ rule. A BIOS shell is governed by BIOS boot options, not by the skip engine.
 Game intro rules are not safe to enable from the current evidence, and FMV,
 CDDA, and XA activity are hard exclusions from load skipping.
 
-The default decision for this checkout is therefore **keep Fast Loading and
-Skip Engine default-off**. The existing startup-card result is encouraging,
-but it is not enough to enable default behavior: the paired race-load window,
-audio-resume behavior, and skip-specific predicate telemetry are incomplete.
+The release profile now selects Fast Loading as requested, but the Skip Engine
+semantics and WipEout equivalence remain unproven. The existing startup-card
+result is encouraging, but it is not enough to claim correctness: the paired
+race-load window, audio-resume behavior, and skip-specific predicate telemetry
+are incomplete.
 
 | Surface | Correct GooseStation shape | WipEout 3 SE decision now |
 | --- | --- | --- |
@@ -334,8 +335,8 @@ If the gate passes, the least-surprising WipEout policy is to enable the two
 generic surfaces independently (memory-card access and pure-data CD loads at
 niceness 1), keep FMV/CDDA/XA excluded, and add no custom BIOS or race YAML
 rule unless later trainer evidence proves one is needed. Until then, keep the
-existing Fast Loading selection default-off and treat this document as the
-acceptance contract rather than as evidence that the feature is ready.
+existing Fast Loading selection as release-default and treat this document as
+the acceptance contract rather than as evidence that the feature is ready.
 
 ## Reference files
 

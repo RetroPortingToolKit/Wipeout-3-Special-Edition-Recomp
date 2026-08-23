@@ -62,8 +62,35 @@ if (Test-Path -LiteralPath $fr120) {
 }
 $pal100 = Join-Path $build 'mods/packages/wipeout3.enhancement.framerate-pal100/1.0.0/manifest.toml'
 if (-not (Test-Path -LiteralPath $pal100)) { throw "Missing staged PAL x2 manifest: $pal100" }
-if ((Get-Content -Raw -LiteralPath $pal100) -notmatch '(?m)^default_enabled\s*=\s*false\r?$') {
-    throw 'Experimental PAL x2 / 100 Hz is enabled by default; it must remain opt-in until runtime timing is proven.'
+if ((Get-Content -Raw -LiteralPath $pal100) -notmatch '(?m)^default_enabled\s*=\s*true\r?$') {
+    throw 'PAL x2 / 100 Hz is not enabled by default; the release requirement is automatic 100 Hz for the authenticated PAL title.'
+}
+$allowedPackages = @{
+    'psx.enhancement.8mb-ram' = $true
+    'psx.enhancement.fast-loading' = $true
+    'psx.enhancement.pgxp' = $true
+    'psx.enhancement.skip-fmv' = $true
+    'wipeout3.enhancement.framerate-pal100' = $true
+    'wipeout3.enhancement.widescreen' = $true
+}
+$packageRoot = Join-Path $build 'mods/packages'
+if (-not (Test-Path -LiteralPath $packageRoot)) { throw "Missing staged package root: $packageRoot" }
+$stagedPackages = @(Get-ChildItem -LiteralPath $packageRoot -Directory | Select-Object -ExpandProperty Name)
+foreach ($package in $stagedPackages) {
+    if (-not $allowedPackages.ContainsKey($package)) {
+        throw "Retired, legacy, experimental, or duplicate package staged: $package"
+    }
+}
+foreach ($package in $allowedPackages.Keys) {
+    if ($stagedPackages -notcontains $package) { throw "Required active package is missing from staging: $package" }
+}
+$retiredRoot = Join-Path $build 'mods/retired-packages'
+if (Test-Path -LiteralPath $retiredRoot) { throw "Retired package payload staged: $retiredRoot" }
+$state = Join-Path $build 'mods/state.toml'
+if (-not (Test-Path -LiteralPath $state)) { throw "Missing staged mod state: $state" }
+$stateText = Get-Content -Raw -LiteralPath $state
+if ($stateText -notmatch '(?ms)\[\[feature\]\]\s*package_id\s*=\s*"wipeout3\.enhancement\.framerate-pal100".*?\benabled\s*=\s*true\b') {
+    throw 'PAL x2 / 100 Hz is not enabled in staged mods/state.toml.'
 }
 if ($cacheText -notmatch '(?m)^PSX_SETUP_WIZARD:BOOL=OFF\r?$') {
     throw 'Setup wizard is enabled or not explicitly disabled.'

@@ -63,10 +63,18 @@ Promote the continuation only if all of these hold:
 - the native build shows a material improvement over the target-interpreter control: at least a 10 percentage-point reduction in guest-budget pressure or enough reduction to cross the 99–101 Hz gate. A gain under roughly 5 Hz is not sufficient evidence that this continuation is the remaining bottleneck;
 - the generated delta remains target-sized and does not reintroduce the 192 MB broad static corpus as the proposed fix.
 
-If parity passes but the native A/B remains below 95 Hz or gains less than 5 Hz, stop attributing the deficit to `0x007814D0` and profile the next guest/render/PGXP consumer. Keep the PAL x2 package default-off until the race trace and soak gates pass.
+If parity passes but the native A/B remains below 95 Hz or gains less than 5 Hz, stop attributing the deficit to `0x007814D0` and profile the next guest/render/PGXP consumer. Keep the PAL x2 package selected by the release profile, but leave runtime readiness gated until the race trace and soak gates pass.
 
 ## Compiler and build constraints
 
 Use generic `-O3 -DNDEBUG` as the comparison baseline. The handoff records that bundled-compiler LTO was ruled out and `-march=native` measured about 71–74 Hz versus roughly 75–79 Hz for generic `-O3`; neither is a substitute for reducing interpreter/native dispatch work. The current canonical `build-release/CMakeCache.txt` still contains experimental LTO settings, so the next A/B must use a clean, explicitly recorded Release configuration rather than inheriting that cache.
 
 No isolated test was added under `tools/audits`: the missing proof is a target-specific generated artifact and runtime A/B, not a reusable parser defect.
+
+## Current validation status
+
+The bounded validation pass is currently blocked because the canonical parent
+points at a locally created `psxrecomp` commit that is not available from the
+configured remote, and the retained `build-release/overlay_captures-8078.json`
+input is absent from this checkout. Restore those exact inputs before running
+static/CPS generation; do not substitute the broad corpus or edit runtime core.

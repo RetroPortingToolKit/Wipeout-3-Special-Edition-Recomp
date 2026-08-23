@@ -20,8 +20,8 @@ set(PSX_NETPLAY OFF CACHE BOOL
     "Link recomp-net delay-sync (opt-in; needs recomp-net)" FORCE)
 set(PSX_REWIND OFF CACHE BOOL
     "Build and expose local rewind support (opt-in)" FORCE)
-set(PSX_ENABLE_LTO ON CACHE BOOL
-    "Enable LTO for the full-detail recompiled runtime" FORCE)
+option(PSX_ENABLE_LTO
+    "Enable LTO for the full-detail recompiled runtime" ON)
 set(PSX_SETUP_WIZARD OFF CACHE BOOL
     "Advertise first-run setup wizard + Generate & rebuild in recomp-ui" FORCE)
 # WipEout 3 is a retail-BIOS product: never link or stage OpenBIOS.
@@ -45,6 +45,12 @@ psxrecomp_add_game_runtime(psx-runtime
     APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/psxrecomp.ico"
     GEN_MARKER "generated/SCES_028.45_dispatch.c"
     GEN_FULL_GLOB "generated/SCES_028.45_full_*.c"
+    # The authenticated PAL x2/high-detail title relocates executable blocks
+    # into live RAM after the boot EXE is loaded.  This corpus is generated
+    # from those exact captured byte variants and supplies native dispatch for
+    # them; without it the runtime correctly rejects the original AOT image
+    # but falls through to the interpreter for every relocated call.
+    GAME_OVERLAY_STATIC_C "${CMAKE_CURRENT_SOURCE_DIR}/generated/overlays_static.c"
     CODEGEN_SETUP_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/codegen_setup.c"
         ${WIPEOUT3_MOD_PLUGIN_SOURCES}
@@ -72,5 +78,20 @@ if(EXISTS "${WIPEOUT3_PRELOADED_MODS}/packages")
             "${WIPEOUT3_PRELOADED_MODS}"
             "$<TARGET_FILE_DIR:psx-runtime>/mods"
         COMMENT "Preloading the WipEout 3 mod catalog"
+        VERBATIM)
+endif()
+
+# Ship the product's known-good enhancement selection with the executable.
+# The launcher may still edit this file, but a fresh copy starts with the
+# WipEout remaster profile instead of framework-faithful defaults that leave
+# 8 MB RAM, PGXP propagation, Fast Loading, or FMV skipping disabled.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/mods/state.toml")
+    add_custom_command(TARGET psx-runtime POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:psx-runtime>/mods"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/mods/state.toml"
+            "$<TARGET_FILE_DIR:psx-runtime>/mods/state.toml"
+        COMMENT "Staging the WipEout enhancement profile"
         VERBATIM)
 endif()

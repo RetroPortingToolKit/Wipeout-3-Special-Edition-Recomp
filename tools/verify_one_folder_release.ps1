@@ -69,11 +69,34 @@ if (Test-Path -LiteralPath $statePath) {
     }
     $packageDir = Join-Path $root 'mods/packages'
     if (Test-Path -LiteralPath $packageDir) {
-        Get-ChildItem -LiteralPath $packageDir -Directory | ForEach-Object {
+        $stagedPackages = @(Get-ChildItem -LiteralPath $packageDir -Directory)
+        foreach ($packageId in $expectedPackages.Keys) {
+            if (($stagedPackages | Where-Object Name -eq $packageId).Count -eq 0) {
+                $failures.Add("release is missing required active package: $packageId")
+            }
+        }
+        $stagedPackages | ForEach-Object {
             if (-not $expectedPackages.ContainsKey($_.Name)) {
                 $failures.Add("release contains an unconfigured mod package: $($_.Name)")
             }
         }
+        $nestedLegacy = Get-ChildItem -LiteralPath $packageDir -Recurse -Directory |
+            Where-Object { $_.Name -match '(?i)(ntsc|120|legacy|retired|duplicate)' }
+        foreach ($directory in $nestedLegacy) {
+            $failures.Add("release contains a retired/legacy package path: $($directory.FullName)")
+        }
+    }
+}
+
+# The high-detail profile must be explicit: a missing state file otherwise
+# silently falls back to retail 2 MB RAM even when the executable is present.
+$profileVerifier = Join-Path $PSScriptRoot 'verify_8mb_profile.py'
+if (-not (Test-Path -LiteralPath $profileVerifier)) {
+    $failures.Add("missing 8 MB profile verifier: $profileVerifier")
+} else {
+    & python $profileVerifier $root
+    if ($LASTEXITCODE -ne 0) {
+        $failures.Add('shipped 8 MB + 900% profile verification failed')
     }
 }
 

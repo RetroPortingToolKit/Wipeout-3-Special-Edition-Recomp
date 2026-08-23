@@ -9,8 +9,9 @@ integration with the GooseStation-style skip/pacing boundary documented in
 ## Executive result
 
 The design has the right separation of concerns, but PAL-100 is not proven by
-one FPS number and must remain experimental/default-off until the trace gate at
-the end passes. The required chain is:
+one FPS number and remains runtime-unproven until the trace gate at the end
+passes. The release profile nevertheless selects it by default as required.
+The required chain is:
 
 ```text
 authenticated PAL title selector
@@ -190,5 +191,5 @@ presentation is separated from guest cadence, and standalone title/race probes
 have reached approximately 100 Hz with 44.1 kHz guest production under
 reduced workload. The full normal route still has open proof obligations for
 long-run race stability, host audio health, and paired CD/card/state traces.
-Accordingly this audit recommends keeping PAL-100 experimental/default-off
-until the trace acceptance test passes on the full workload.
+Accordingly this audit records PAL-100 as release-selected but not runtime
+proven until the trace acceptance test passes on the full workload.

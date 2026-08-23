@@ -134,12 +134,11 @@ The durable handoff evidence is still a fail for a default-on decision:
 
 There is also a configuration inconsistency that must not be mistaken for
 validation: the current untracked `mods/state.toml` selects Fast Loading at 4×,
-while the handoff says the feature remains disabled by default, and this
+while the handoff and release state now select the feature by default, and this
 worktree's project-owned preloaded catalog contains only the two WipEout
-title-specific package directories. The framework builtin manifest was also
-changed in submodule commit `6bdb2eed` to `default_enabled = true`. Until the
-catalog, persisted state, and handoff all agree and the live gates pass, the
-safe product policy is default-off/explicit opt-in.
+title-specific package directories. Until the catalog, persisted state, and
+handoff all agree and the live gates pass, keep the release selected but treat
+runtime equivalence as unproven.
 
 ### Default-on gate
 
