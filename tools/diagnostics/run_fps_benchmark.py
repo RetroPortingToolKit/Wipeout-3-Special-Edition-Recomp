@@ -30,6 +30,7 @@ import summarize_fps_telemetry as telemetry
 
 RUNNER_SCHEMA = "psx-fps-benchmark-v2"
 DEFAULT_COMPLETION_GRACE_SECONDS = 0.25
+DEFAULT_MAX_HOST_BUSY_CORES = 2.5
 MINIMUM_DURATION_SECONDS = 3.0
 RESERVED_EXTRA_FLAGS = (
     "--bios",
@@ -343,7 +344,29 @@ def host_delta(start: dict[str, object], end: dict[str, object]) -> dict[str, ob
         total = end_times["total_ticks"] - start_times["total_ticks"]
         if total > 0:
             busy_percent = round(100.0 * (1.0 - idle / total), 6)
-    return {"system_cpu_busy_percent": busy_percent}
+    logical_processors = start.get("cpu", {}).get("logical_processors")
+    busy_cores: float | None = None
+    if busy_percent is not None and isinstance(logical_processors, int):
+        busy_cores = round(busy_percent * logical_processors / 100.0, 6)
+    return {
+        "system_cpu_busy_cores": busy_cores,
+        "system_cpu_busy_percent": busy_percent,
+    }
+
+
+def host_load_rejection(
+    delta: dict[str, object], maximum_busy_cores: float
+) -> str | None:
+    """Reject measurements whose total host load can mask single-thread speed."""
+    busy_cores = delta.get("system_cpu_busy_cores")
+    if not isinstance(busy_cores, (int, float)):
+        return "host CPU load unavailable; cannot prove an uncontaminated run"
+    if busy_cores > maximum_busy_cores:
+        return (
+            f"host CPU load averaged {busy_cores:.3f} logical cores; "
+            f"maximum accepted is {maximum_busy_cores:.3f}"
+        )
+    return None
 
 
 def _git_capture(root: Path, arguments: list[str]) -> str | None:
@@ -581,6 +604,15 @@ def run(argv: list[str]) -> int:
         type=int,
         help="raise (but never lower) the duration-derived minimum",
     )
+    parser.add_argument(
+        "--max-host-busy-cores",
+        type=float,
+        default=DEFAULT_MAX_HOST_BUSY_CORES,
+        help=(
+            "maximum average total logical-core load, including the benchmark "
+            "child, for an accepted run"
+        ),
+    )
     parser.add_argument("--extra-arg", action="append", default=[])
     args = parser.parse_args(argv)
 
@@ -596,6 +628,19 @@ def run(argv: list[str]) -> int:
             )
         if args.debug_port is not None and not 0 <= args.debug_port <= 65535:
             raise BenchmarkError("--debug-port must be in [0, 65535]")
+        logical_processors = os.cpu_count()
+        if (
+            not math.isfinite(args.max_host_busy_cores)
+            or args.max_host_busy_cores <= 0.0
+            or (
+                logical_processors is not None
+                and args.max_host_busy_cores > logical_processors
+            )
+        ):
+            raise BenchmarkError(
+                "--max-host-busy-cores must be finite, positive, and no greater "
+                "than the host logical-processor count"
+            )
         executable = _require_file(args.exe, "executable")
         bios = _require_file(args.bios, "BIOS")
         disc = _require_file(args.disc, "disc image")
@@ -699,6 +744,7 @@ def run(argv: list[str]) -> int:
         ended_wall = time.time()
         end_existing, end_guard = same_image_processes(executable.name)
         end_host = host_snapshot(executable.name, end_existing)
+        measured_host_delta = host_delta(start_host, end_host)
         end_cache = cache_identity(cache_root)
         cache_was_unchanged = cache_unchanged(start_cache, end_cache)
 
@@ -722,6 +768,11 @@ def run(argv: list[str]) -> int:
                 "overlay cache changed during measurement; precompile the exact "
                 "cache and rerun"
             )
+        host_rejection = host_load_rejection(
+            measured_host_delta, args.max_host_busy_cores
+        )
+        if host_rejection is not None:
+            rejection_reasons.append(host_rejection)
 
         run_receipt: dict[str, object] = {
             "artifacts": {
@@ -767,7 +818,10 @@ def run(argv: list[str]) -> int:
                 "telemetry_opt_in": True,
             },
             "host": {
-                "delta": host_delta(start_host, end_host),
+                "acceptance": {
+                    "maximum_system_cpu_busy_cores": args.max_host_busy_cores,
+                },
+                "delta": measured_host_delta,
                 "end": end_host,
                 "start": start_host,
             },

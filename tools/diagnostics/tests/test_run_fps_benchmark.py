@@ -137,6 +137,39 @@ class RunFpsBenchmarkTests(unittest.TestCase):
                 identity["cmake_selected"]["PSX_GAME_TIMING_RUNS"], "OFF"
             )
 
+    def test_host_delta_normalizes_busy_percent_to_logical_cores(self) -> None:
+        start = {
+            "cpu": {
+                "logical_processors": 16,
+                "system_times": {
+                    "idle_100ns": 0,
+                    "kernel_100ns": 0,
+                    "user_100ns": 0,
+                },
+            }
+        }
+        end = {
+            "cpu": {
+                "logical_processors": 16,
+                "system_times": {
+                    "idle_100ns": 1700,
+                    "kernel_100ns": 1700,
+                    "user_100ns": 300,
+                },
+            }
+        }
+        delta = MODULE.host_delta(start, end)
+        self.assertAlmostEqual(delta["system_cpu_busy_percent"], 15.0)
+        self.assertAlmostEqual(delta["system_cpu_busy_cores"], 2.4)
+        self.assertIsNone(MODULE.host_load_rejection(delta, 2.5))
+        self.assertIn("averaged 2.400", MODULE.host_load_rejection(delta, 2.0))
+
+    def test_host_load_rejects_unavailable_measurement(self) -> None:
+        reason = MODULE.host_load_rejection(
+            {"system_cpu_busy_cores": None}, 2.5
+        )
+        self.assertIn("unavailable", reason)
+
 
 if __name__ == "__main__":
     unittest.main()

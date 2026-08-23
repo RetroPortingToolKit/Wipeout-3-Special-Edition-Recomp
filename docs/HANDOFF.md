@@ -1873,7 +1873,7 @@ the default-OFF direct-only candidate, warm its exact cache, and take two clean
 45-second receipts. Only build the gate-ON sibling if the direct-only result
 needs an exact same-source comparison; do not promote v6.
 
-## Direct-only timing A/B verdict (2026-08-23 17:20 PDT)
+## Direct-only timing A/B preliminary result (2026-08-23 17:20 PDT)
 
 - Root `2c928b8` / submodule `a25cbacd` regenerated the game with codegen hash
   `b27d22c7` and built a fresh Release candidate with
@@ -1897,14 +1897,44 @@ needs an exact same-source comparison; do not promote v6.
   while the executable is 1.868x larger than v6's 63,522,621-byte compact-run
   binary. The higher second-run median does not compensate for the materially
   worse and more variable tail.
-- The A/B therefore succeeds as a diagnosis: compact timing runs materially
-  improve code locality/tail throughput and should remain enabled for the next
-  candidate. The OFF candidate is not promotable. The fresh product build does
-  not register CTest targets; this does not replace the already-recorded 44/44
-  integrated runtime/oracle result for the same submodule source.
+- This initially appeared to show that compact timing runs materially improve
+  code locality/tail throughput. A same-source ON control and host-load audit
+  below found that one OFF receipt and all new controls were contaminated by
+  unrelated whole-PC CPU load. Only direct-only-2 remains within the corrected
+  host-load envelope, so this is a preliminary direction, not a completed A/B
+  verdict. The OFF candidate remains non-promotable. The fresh product build
+  does not register CTest targets; this does not replace the already-recorded
+  44/44 integrated runtime/oracle result for the same submodule source.
 
-Next concrete step: build the gate-ON sibling from this exact source so its
-receipt records `PSX_GAME_TIMING_RUNS=ON`, then profile that accepted workload
-for the remaining branch/I-cache/memory-helper bottleneck. Keep the 63.5 MiB v6
-binary as evidence only; do not launch or promote either A/B candidate until a
-same-cache p05 reaches the 99.493634-Hz target.
+## Host-contamination correction and exact ON control (2026-08-23 17:35 PDT)
+
+- The exact gate-ON sibling records `PSX_GAME_TIMING_RUNS=ON` and applies
+  `PSX_GAME_GENERATED_TIMING_RUNS` to all 201 generated shards. It is
+  63,522,621 bytes, SHA-256
+  `E43BCB85234555A5227EEA2E5A0A5B844513B47ACFA53D3D9062823FCEA8D13F`.
+  Six overlays built 6/6 into exact namespace
+  `cg11_b27d22c7_gce5e5eff6_f0`, and its cache stayed unchanged.
+- PE section comparison proves v6 and this explicit-ON binary have identical
+  section sizes and unwind/function layout. Their 43,400,848-byte `.text`
+  sections differ in only 40 bytes across ten four-byte ranges: embedded copies
+  of codegen hash `88e034e5` changing to `b27d22c7`. There is no timing or
+  dispatch algorithm difference that can explain a large speed change.
+- Nevertheless, explicit-ON measurements fell to p05/median 67.530/84.45 and
+  62.575/69.9 Hz. A same-moment rerun of the old v6 binary also fell to
+  72.905/78.05 Hz. Average total host load was 2.568, 8.557, and 6.681 logical
+  cores respectively, versus 2.256/2.099 during the two original good v6 runs.
+- One bounded five-second process delta identified active unrelated work:
+  EasyAudioEncoder used 0.657 core, two Plex Transcoder processes used
+  0.554/0.511 core, Plex Media Server used 0.134 core, and ChatGPT processes
+  used about 0.28 core combined. No external process was stopped or modified.
+- The benchmark now defaults to rejecting total average host load above 2.5
+  logical cores, including the benchmark child, and rejects unavailable load
+  measurements. This threshold retains both original good v6 receipts but
+  rejects direct-only-1, both new ON receipts, and the same-moment v6 control.
+  All 22 diagnostics tests pass.
+
+Next concrete step: after unrelated Plex/transcode load naturally subsides,
+take an alternating OFF/ON/OFF/ON series under the new host-load gate. Until
+then, do static/binary profiling that cannot be biased by host load. Keep all
+A/B binaries as evidence only; do not promote or interactively launch either
+until a same-cache p05 reaches the 99.493634-Hz target.
