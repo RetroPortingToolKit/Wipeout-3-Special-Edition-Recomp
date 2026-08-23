@@ -36,6 +36,10 @@ seeds = "seeds/ghidra_funcs.txt"
 out_dir = "generated"
 strict = true
 
+[[recompiler.idle_countdown]]
+address = "0x8015FAA4"
+expected = "0x8FA20010"
+
 [runtime]
 window_title = "Wipeout 3 Special Edition Recompiled"
 memcard_dir = "saves"
@@ -43,10 +47,17 @@ memcard_dir = "saves"
 # backend. OpenBIOS remains a framework development option but is not the
 # supported product configuration for this title.
 openbios = false
+idle_skip = true
+# Streamed race/replay code is precompiled into the adjacent native overlay
+# cache. Without this gate the runtime silently interprets those RAM regions
+# even when fully built x64 shards are present.
+overlay_cache = true
 
 [video]
 renderer = "opengl"
 aspect_ratio = "4:3"
+cpu_overclock = 900
+pal_video_clock_multiplier = 2
 
 [controller]
 default_mode = "digital"

@@ -1205,6 +1205,52 @@ instruction and fails closed on every unknown PC or executable identity.
 
 ## Standard PSXRecomp product-path pivot (2026-08-22)
 
+### Independent clock-domain candidate (2026-08-23)
+
+- The protected, user-verified stock executable remains
+  `build-psx-standard/Wipeout_3_Special_Edition__Recompiled.exe`; it has not
+  been overwritten. The user verified its boot, FMV, memory-card, countdown,
+  geometry, and stock race behavior as flawless.
+- The current experimental implementation separates raw CPU retirement from
+  native device time. At the requested 900%, live release telemetry measures
+  `cpu_effective=9.001x`; the device clock remains 33.8688 MHz and SPU output
+  measures 44,100.0 frames/s relative to that native clock. Device-service
+  charges and proven idle skips do not receive CPU-overclock scaling.
+- Gameplay acceleration switches the CRTC/VBlank target to 100 Hz while the
+  sustained 3D gate is active. A debug-tools build was throughput-bound at
+  roughly 62-75 VBlanks/s. The Release configuration with debug tools and
+  rewind disabled sustains approximately 99.5-100.2 VBlanks/s, 9.001x CPU
+  retirement, a 33,868,800-cycle native device second, and 44,100.0 SPU
+  frames per native second. This proves clock delivery, not yet race-simulation
+  fidelity.
+- The original overlay divided delivered VBlanks by 59.94 even when the active
+  target was 100 Hz, falsely displaying about `1.67x`. The corrected candidate
+  divides by `interrupts_get_vblank_rate()`, so 100 delivered at a 100-Hz
+  target displays `1.00x`. It builds separately at
+  `build-psx-clock-rc/Wipeout_3_Special_Edition__Recompiled.exe`; the user's
+  live test process was not disturbed.
+- Focused existing machine, geometry, SPU, CD-audio, game-transition, and
+  memory-card tests all pass (6/6) after the clock-domain changes. These tests
+  are regression evidence only; they do not replace a controlled live race.
+- The user reports FMV and CD audio now play at correct speed and that gameplay
+  is high-framerate but feels too fast. Do not tune away the explicit 9x CPU
+  requirement based on the obsolete counter. Next obtain direct evidence from
+  a controlled 100-Hz race: compare the HUD race timer to wall time while the
+  same interval's telemetry proves 100-Hz VBlank, 9x retirement, native device
+  time, and 44.1-kHz SPU. Also verify that the current sustained-world-3D gate
+  does not accelerate non-race menus in a way that violates stock behavior.
+
+### Validation launch invariant (2026-08-23)
+
+- Never open the launcher during iterative runtime validation. Launch the
+  already-configured executable with `--no-launcher`; the retail BIOS, disc,
+  card, controller, and video selections are already persisted. Re-learning
+  this or attempting UI automation wastes the user's time and produces no
+  gameplay telemetry.
+- Protected stock executable remains
+  `build-psx-standard/Wipeout_3_Special_Edition__Recompiled.exe`. Timing work
+  builds and runs only from `build-psx-clock-exp` until fully verified.
+
 - The user explicitly retired the clean-AOT-only, genuine BIOS-shell boot, and
   no-interpreter/runtime-compiler boundaries. They were not product
   requirements. The shipping architecture is the established PSXRecomp model:
@@ -1268,3 +1314,176 @@ instruction and fails closed on every unknown PC or executable identity.
   `docs/REFACTOR_ACCEPTANCE.md`. Each requires normal-vs-accelerated
   byte/order/state equivalence and fail-closed fallback; generic speed claims
   or screenshots are insufficient.
+
+## Verified 100 Hz race and post-race replay (2026-08-23)
+
+- The user completed a full race with the current clean-room timing candidate
+  and reported no visual, timing, audio, geometry, countdown, or gameplay
+  issue: “seems flawless afaik.” The game remains running as PID 34412 at the
+  post-race replay; do not stop that exact process until the user finishes.
+- Live telemetry across the completed race/replay held approximately 100 Hz
+  guest VBlank and 44.1 kHz SPU output with no sustained audio underruns or
+  overflows. Exact clock receipts continue to report 9.001x CPU retirement
+  while device time remains native. One-second 93/107 Hz wall samples were
+  reciprocal scheduler jitter and returned to 100 Hz without accumulated
+  simulation drift.
+- The user wrote a new post-race replay state at
+  `saves/scph1001/state_80162474_slot02.pst` (2026-08-23 03:37:48). This is now
+  the authoritative replay acceptance state; slots 0 and 1 are older.
+- Runtime startup now prints a compact overlay cache audit. The coherent cache
+  tag is `cg10_f4a6ebf3_gc7399b41b_f0`; six DLLs are indexed with status `ok`.
+- Offline extraction of slot 2's zlib-compressed 2 MiB RAM proved that captures
+  at 0x80004000 and 0x8000D000 match byte-for-byte and are admitted natively.
+  The four large regions at 0x800C0000, 0x800CE000, 0x800D1000, and 0x800D4000
+  are distinct race/replay content variants (2.9-12.9% byte matches), so their
+  old DLLs are correctly rejected and those regions remain interpreted.
+- `build-psx-clock-perf/overlay_captures.slot2.json` is a derived 10-record
+  additive manifest: the original six records plus four exact slot-2 variants.
+  It was generated without touching the live process. Once the game is closed,
+  compile this manifest against the same runtime/recompiler identity, relaunch
+  slot 2 with `--no-launcher`, and require native non-BIOS PCs plus unchanged
+  100 Hz/9.001x/44.1 kHz telemetry and the same flawless replay behavior.
+- Regenerating static game C removes the title-specific call to
+  `psx_idle_batch_countdown` at 0x8015FAA4. It was restored locally in
+  `generated/SCES_028.45_full_139.c`; telemetry again reports idle skips.
+  Before final delivery, make this emission durable in the generator/config so
+  a clean regeneration cannot silently lose the compactor.
+
+## Deep review corrections -- authoritative current state (2026-08-23)
+
+This section supersedes the two earlier 2026-08-23 timing sections wherever
+they disagree. Those sections mixed valid user observations with claims that a
+fresh source/build/launch audit could not support.
+
+### Current verdict and protected baseline
+
+- The complete remaster goal is **NO-GO**. The timing foundation is materially
+  better and has a fresh bounded boot proof, but it has not yet passed a new
+  interactive FMV/menu/card/race/post-race/CDDA run. Actual 8 MiB RAM, full
+  GooseStation-equivalent PGXP, the complete aspect/resolution matrix, and the
+  licensed bezel/font/text payload are also not implemented.
+- The protected user-verified stock executable remains
+  `build-psx-standard/Wipeout_3_Special_Edition__Recompiled.exe`, SHA-256
+  `00f55955667df98653e2aa05903a8601a811bafaefa7d27d64c437ecd32b220d`.
+  It was not overwritten.
+- No old gameplay process remains active. PID 34412 and its instruction not to
+  stop it are historical. The latest post-race replay state remains useful test
+  data, not a condition that may halt engineering progress.
+- The current experimental executable is
+  `build-psx-clock-v2/Wipeout_3_Special_Edition__Recompiled.exe`, SHA-256
+  `d671b36c0c76492298b6c2f8dd6b48a3d91b16232c97577d3c49d168d3fd9807`,
+  size 43,961,150 bytes. It is a separate Release build with PGXP disabled.
+
+### Timing architecture that survived review
+
+- Raw CPU retirement and native device time are distinct domains. At 900%, an
+  exact reduced-rational converter advances one native tick for every nine raw
+  retired CPU cycles and carries the remainder. GTE and multiply/divide
+  completion remain on raw CPU time; CD-ROM, SPU, SIO, timers, DMA, MDEC and
+  VBlank remain on native 33.8688-MHz device time.
+- PALx2 uses the title CRTC ratio directly rather than a synthetic 100.000-Hz
+  integer clock: `53,203,425*2 / (3406*314) = 99.493634313370 Hz`. Fractional
+  phase is carried, producing alternating 340,411/340,412-native-cycle frames.
+  CD audio and SPU are not scaled with the VBlank multiplier or CPU overclock.
+- Driver VSync is accepted as the pacer only when the host display is within
+  0.2% of the requested rate; otherwise wall-clock pacing uses the exact CRTC
+  ratio. Headless mode intentionally runs unpaced, so its wall-throughput
+  `speed` field is not interactive pacing evidence.
+- Telemetry now reports requested CPU overclock, exact effective raw/native CPU
+  ratio, native device time, SPU rate, and independent CDDA sector rate. The
+  prior overlay divided VBlanks by a fixed 59.94-Hz constant and therefore
+  could not be trusted at PALx2.
+
+### Defects found and repaired by the review
+
+- `dirty_ram_interp.c` and memory-load cycle charges bypassed the CPU
+  raw-to-native converter by incrementing native `psx_cycle_count` directly.
+  Both production paths now use `psx_advance_cycles`; this was a real reason
+  earlier 900% claims were not reliable. All remaining direct native-clock
+  increments were audited and are intentional device/replay/helper paths.
+- The title region helper returned `"(Europe)"` for SCES, while the new clock
+  gate compared only against `"PAL"`. The launch path could therefore reject
+  PALx2 despite a successful compile. PAL/Europe/Australia labels and SCES/SLES
+  serials now select the PAL CRTC.
+- The generator source contained the WipEout countdown compactor but the
+  generator executable and generated C were stale. The generator was rebuilt,
+  its patch tests passed, and clean regeneration now emits the exact guarded
+  site at `0x8015FAA4`; no manual generated-C repair remains part of the plan.
+- The countdown compactor computed its wake distance from a device clock that
+  may lag CPU time on the deadline fast path. It could compact across an event
+  and delay the guest CPU's observation. It now uses the authoritative absolute
+  next-service deadline minus current CPU-native time. A regression proves a
+  CD event at native cycle 5 leaves the final countdown iteration unbatched.
+- Persisted overlay/data-shard durations and load-acceleration horizons are
+  native elapsed intervals and no longer pass through CPU-overclock scaling.
+  PDS1 data shards are conservatively disabled away from stock CPU ratio
+  because that format does not preserve raw execution cost.
+- Save creation now flushes pending batched CPU work before serializing CPU,
+  RAM, devices, and clocks, preventing a pre-device/post-clock mixed snapshot.
+  Save format v6 carries CPU/native clocks, rational remainder, CRTC phase, and
+  configuration identity; older v5 slot files are deliberately rejected.
+
+### Fresh verification receipts
+
+- The overlay compiler rebuilt all six exact shards: 6 built, 0 skipped, 0
+  failed. The current coherent cache tag is
+  `cg10_504c3ad7_gce5e5eff6_f0`. Startup's `indexed=6 candidates=0 status=ok`
+  means six DLL artifacts are indexed and zero function candidates are loaded
+  *yet*; candidates load lazily and this is not an empty-cache result.
+- All 39 enabled runtime tests pass. Three registered tests remain explicitly
+  disabled and are not evidence: `sio_dualshock_rumble`, `spu_fidelity`, and
+  `sio_card_protocol`. Focused Clang UBSan/Werror timing tests pass 3/3. A full
+  Clang runtime build remains blocked in third-party libchdr by a duplicate
+  `Byte` typedef under Werror, so there is no full-sanitizer claim.
+- A 15-second isolated headless boot of the exact current executable used the
+  external BIOS/disc, `--no-launcher`, software rendering, and a fresh temporary
+  card directory. It reached 1,274 VBlanks without a crash and reported:
+  `title_crtc=PALx2`, `effective=99.493634Hz`, `cpu=900%`, every interval at
+  exactly `cpu_effective=9.000x`, and SPU intervals at approximately 44,100 Hz.
+  No CDDA was active during this smoke, and headless mode was unpaced; therefore
+  this is a boot/config/accounting proof only, not a gameplay or CDDA proof.
+
+### Remaining correctness and product blockers
+
+- Runtime RAM is still hard-coded as 2 MiB in memory, boot-state, shard,
+  interpreter, cosim, and PGXP address paths. Any earlier implication that the
+  product already had actual 8 MiB RAM was false. Implement and adversarially
+  verify one coherent address/mirroring/save-state contract before claiming it.
+- Save loading is not transactional. Sections mutate the live machine as they
+  are read, so a late malformed section, clock-policy mismatch, or resume-PC
+  rejection can leave partially restored state. Reject duplicate sections,
+  require the full v6 section set including I-cache, validate the complete
+  timing policy before mutation, and load into staged state or provide exact
+  rollback before treating save-state failure as safe.
+- Full/max PGXP is not implemented and remains disabled in this candidate.
+  Missing pieces include unified capability gating, generic precise culling,
+  complete texture/color/depth correction, correct vertex-cache semantics,
+  provenance invalidation across AOT/overlay/interpreter/load-delay paths,
+  projection preservation, tolerance/2D/transparent-depth/threshold controls,
+  and PGXP save/runahead state. Compare behavior against pinned GooseStation
+  builder v0.6.9.11609 (`a233ec1f`) rather than marketing labels.
+- 4:3 is the current product aspect. Launcher support stops at 4:3/16:9/21:9
+  and scale 1-4; 32:9 and verified resolutions through 8K are unfinished.
+  The renderer also fuses display and projection decisions in places that must
+  be separated before claiming arbitrary aspect correctness.
+- `assets/provenance/hd-asset-permission.json` remains
+  `pending-details`; permission fields are null and no licensed payload is
+  present. Bezel, HD font, and HD text work cannot be claimed or shipped.
+- Next acceptance action is a fresh interactive `--no-launcher` run through
+  FMV, menu/card check, countdown, a complete PALx2 race, CDDA, and post-race
+  replay with telemetry captured. The replay state is a start/stop data source,
+  never a reason to pause the goal. After that, make save loading transactional
+  before beginning the separate 8-MiB and PGXP workstreams.
+
+### Ruled-out approaches
+
+- Do not scale the whole machine or multiply native device time to simulate CPU
+  overclock; that changes CD/SPU/SIO/timer behavior.
+- Do not use Q16 approximations where the hardware ratios are rational and can
+  carry an exact remainder.
+- Do not gate PALx2 from renderer heuristics or a sustained-3D detector; the
+  configured title CRTC owns the clock continuously.
+- Do not hand-edit ignored generated C. Rebuild the generator, test it, and
+  regenerate from `game.toml`.
+- Do not treat a v5 save as authoritative for a v6 runtime, or a headless
+  throughput counter as proof of interactive pacing.
