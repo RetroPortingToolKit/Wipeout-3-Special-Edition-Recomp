@@ -1872,3 +1872,39 @@ Next concrete step: commit the A/B gate, regenerate its new source hash, build
 the default-OFF direct-only candidate, warm its exact cache, and take two clean
 45-second receipts. Only build the gate-ON sibling if the direct-only result
 needs an exact same-source comparison; do not promote v6.
+
+## Direct-only timing A/B verdict (2026-08-23 17:20 PDT)
+
+- Root `2c928b8` / submodule `a25cbacd` regenerated the game with codegen hash
+  `b27d22c7` and built a fresh Release candidate with
+  `PSX_GAME_TIMING_RUNS=OFF`. Its build graph contains zero
+  `PSX_GAME_GENERATED_TIMING_RUNS` definitions. The binary is 118,657,120
+  bytes, SHA-256
+  `463F28675931D54FC18ABD7ED3A276F3F8DD75739CB69E4DC58FDFD25D3B7A7E`.
+- All six canonical overlays built successfully with pinned w64devkit GCC into
+  exact namespace `cg11_b27d22c7_gce5e5eff6_f0`: 6 built, 0 skipped, 0
+  failed. The warm-up was correctly rejected when startup created the ABI audit
+  marker. Both measured runs retained an identical 27-file cache manifest.
+- Two subsequent 45-second receipts were accepted with 44 windows each and
+  explicitly record `PSX_GAME_TIMING_RUNS=OFF`:
+  - direct-only-1: p05 73.035 Hz, median 95.1 Hz, raw p05 223.758M/s, raw
+    median 291.358M/s.
+  - direct-only-2: p05 81.875 Hz, median 99.85 Hz, raw p05 250.841M/s, raw
+    median 305.911M/s.
+- Both runs report zero watched-text writes and the same 815 startup exact
+  validations as v6. Direct dispatch validity churn is not the cause of the
+  lower tail. Both direct-only p05 results are below v6's 88.505/89.035 Hz,
+  while the executable is 1.868x larger than v6's 63,522,621-byte compact-run
+  binary. The higher second-run median does not compensate for the materially
+  worse and more variable tail.
+- The A/B therefore succeeds as a diagnosis: compact timing runs materially
+  improve code locality/tail throughput and should remain enabled for the next
+  candidate. The OFF candidate is not promotable. The fresh product build does
+  not register CTest targets; this does not replace the already-recorded 44/44
+  integrated runtime/oracle result for the same submodule source.
+
+Next concrete step: build the gate-ON sibling from this exact source so its
+receipt records `PSX_GAME_TIMING_RUNS=ON`, then profile that accepted workload
+for the remaining branch/I-cache/memory-helper bottleneck. Keep the 63.5 MiB v6
+binary as evidence only; do not launch or promote either A/B candidate until a
+same-cache p05 reaches the 99.493634-Hz target.
