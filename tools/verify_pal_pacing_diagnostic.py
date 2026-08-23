@@ -29,11 +29,11 @@ def validate(receipt):
 
     wall_pacer = receipt.get("wall_pacer") is True
     swap_interval = receipt.get("swap_interval")
-    if wall_pacer and swap_interval not in (0, None):
+    if wall_pacer and swap_interval != 0:
         errors.append("double-blocking: wall pacer and blocking swap interval are both active")
         diagnosis.append("double-blocking: use exactly one cadence owner")
-    if receipt.get("native_pal_x2") is True and swap_interval not in (0, None):
-        errors.append("native PAL x2 requires effective swap_interval 0")
+    if receipt.get("native_pal_x2") is True and swap_interval != 0:
+        errors.append("native PAL x2 requires reported effective swap_interval 0")
 
     debt = receipt.get("max_debt_periods")
     if isinstance(debt, (int, float)) and debt > 12:
