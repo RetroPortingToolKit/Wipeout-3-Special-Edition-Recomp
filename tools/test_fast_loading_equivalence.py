@@ -78,6 +78,37 @@ def test_compare_flags_audio_timing_change():
                for item in report["checks"])
 
 
+def test_compare_flags_endpoint_mismatch():
+    normal = entry_bundle()
+    accelerated = entry_bundle(end_frame=5)
+    report = MODULE.compare(normal, accelerated)
+    assert not report["pass"]
+    assert any(item["name"] == "endpoint" and not item["pass"]
+               for item in report["checks"])
+
+
+def test_compare_fails_closed_when_audio_ring_wraps():
+    normal = entry_bundle(
+        audio_events_before={"total": 0},
+        audio_events_after={"total": 9000, "events": [
+            {"seq": i, "smp": i, "frame": 4, "kind": "RENDER"}
+            for i in range(808, 9000)
+        ]},
+    )
+    accelerated = entry_bundle(
+        audio_events_before={"total": 0},
+        audio_events_after={"total": 9000, "events": [
+            {"seq": i, "smp": i, "frame": 4, "kind": "RENDER"}
+            for i in range(808, 9000)
+        ]},
+    )
+    report = MODULE.compare(normal, accelerated)
+    assert not report["pass"]
+    assert any(item["name"] == "audio_events" and not item["pass"]
+               and "wrapped" in item["difference"]
+               for item in report["checks"])
+
+
 def test_cli_compare_writes_report_and_exit_status(tmp_path):
     normal = tmp_path / "normal.json"
     accelerated = tmp_path / "accelerated.json"

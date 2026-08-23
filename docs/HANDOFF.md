@@ -348,8 +348,10 @@ unbounded build as a performance test; use focused targets and the bounded
 - `tools/fast_loading_equivalence.py` now compares only the two requested
   endpoints: startup memory-card loading and race loading. It checks committed
   save-state restores, card traffic, CD sectors/traces/IRQs, guest frame
-  fingerprints, and audio deltas/events. No live race-load equivalence receipt
-  exists yet.
+  fingerprints, and audio deltas/events. It now fails closed when the restored
+  anchors/endpoints do not cover the same guest-frame window or when the
+  post-anchor audio-event ring has wrapped, so an incomplete capture cannot
+  report a false PASS. No live race-load equivalence receipt exists yet.
 - `tools/verify_pgxp_runtime.py` reports PGXP configuration separately from
   runtime proof; it now reads the actual `pgxp_cpu_mode` setting rather than
   confusing it with the 900% CPU overclock. The PGXP save-state verifier covers

@@ -184,7 +184,7 @@ def _counter_delta(before: dict[str, int], after: dict[str, int]) -> dict[str, i
     return {key: int(after.get(key, 0)) - int(before.get(key, 0)) for key in keys}
 
 
-def _audio_events_since(bundle: dict[str, Any]) -> list[dict[str, Any]]:
+def _audio_events_since(bundle: dict[str, Any]) -> tuple[list[dict[str, Any]], bool]:
     """Return only events generated after the restored anchor.
 
     The audio event ring is always-on and has no reset verb.  Its sequence
@@ -199,14 +199,19 @@ def _audio_events_since(bundle: dict[str, Any]) -> list[dict[str, Any]]:
     before_total = before.get("total")
     events = after.get("events", []) if isinstance(after, dict) else []
     if not isinstance(events, list):
-        return []
+        return [], False
     if before_total is None:
-        return [e for e in events if isinstance(e, dict)]
+        return [e for e in events if isinstance(e, dict)], True
     start = int(before_total)
-    return [
+    selected = [
         e for e in events
         if isinstance(e, dict) and int(e.get("seq", -1)) >= start
     ]
+    end_total = int(after.get("total", start)) if isinstance(after, dict) else start
+    # audio_events returns the newest retained entries.  If more events were
+    # produced than the response can retain, the post-anchor stream is not a
+    # complete proof and must fail closed instead of comparing a suffix.
+    return selected, end_total - start <= len(selected)
 
 
 def capture(client: DebugClient, slot: int, frames: int, timeout: float) -> dict[str, Any]:
@@ -312,13 +317,16 @@ def _check(name: str, left: list[Any], right: list[Any], note: str = "") -> dict
 
 def compare(normal: dict[str, Any], accelerated: dict[str, Any]) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
-    if normal.get("anchor_frame") != accelerated.get("anchor_frame"):
-        checks.append(_check(
-            "anchor", [normal.get("anchor_frame")], [accelerated.get("anchor_frame")],
-            "the two restores did not resume at the same guest frame",
-        ))
-    else:
-        checks.append(_check("anchor", [normal.get("anchor_frame")], [accelerated.get("anchor_frame")]))
+    checks.append(_check(
+        "anchor", [normal.get("anchor_frame")], [accelerated.get("anchor_frame")],
+        "the two restores did not resume at the same guest frame",
+    ))
+    checks.append(_check(
+        "endpoint",
+        [normal.get("end_frame"), normal.get("requested_frames")],
+        [accelerated.get("end_frame"), accelerated.get("requested_frames")],
+        "the two captures did not cover the same guest-frame window",
+    ))
 
     # Sequence counters are local to each process.  Every other field is
     # guest-visible evidence and is intentionally strict.
@@ -344,10 +352,16 @@ def compare(normal: dict[str, Any], accelerated: dict[str, Any]) -> dict[str, An
     delta_a = _counter_delta(before_a, after_a)
     checks.append(_check("audio_timing", [delta_n], [delta_a]))
 
-    events_n = [_without(e, "seq") for e in _audio_events_since(normal)]
-    events_a = [_without(e, "seq") for e in _audio_events_since(accelerated)]
-    checks.append(_check("audio_events", events_n, events_a,
-                         "audio event ring is compared over its retained window"))
+    raw_events_n, complete_n = _audio_events_since(normal)
+    raw_events_a, complete_a = _audio_events_since(accelerated)
+    events_n = [_without(e, "seq") for e in raw_events_n]
+    events_a = [_without(e, "seq") for e in raw_events_a]
+    audio_check = _check("audio_events", events_n, events_a,
+                          "audio event ring is compared over its retained window")
+    if not complete_n or not complete_a:
+        audio_check["pass"] = False
+        audio_check["difference"] = "post-anchor audio event ring wrapped before capture"
+    checks.append(audio_check)
 
     passed = all(bool(item["pass"]) for item in checks)
     return {
