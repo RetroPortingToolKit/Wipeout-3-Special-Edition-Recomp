@@ -21,6 +21,15 @@
   native-device time (or exactly transform every device deadline), then prove
   retired guest work, 100-Hz simulation updates, 44.1-kHz SPU output, native
   CD timing, and the intact countdown/race scene in the same run.
+- A second isolated attempt combined the historical CPU scaler with the old
+  dynamic PAL CRTC work and deferred activation. It failed sooner: opening
+  FMV playback became visibly extremely slow; in the CPU-only leg, memory-card
+  and menu loading were also extremely slow and race presentation varied near
+  55 frames/s. The owner confirmed each symptom live. All timing changes and
+  the temporary package/plugin were removed, and the verified stock Release
+  executable was rebuilt and relaunched. Do not combine those historical
+  patches again: FMV/native-device scheduling needs a new boundary, not an
+  activation-order adjustment.
 
 ## Epoch-qualified duplicate resolution through 0x80050DE0 (2026-08-22)
 
