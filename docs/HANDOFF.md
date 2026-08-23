@@ -1938,3 +1938,52 @@ take an alternating OFF/ON/OFF/ON series under the new host-load gate. Until
 then, do static/binary profiling that cannot be biased by host load. Keep all
 A/B binaries as evidence only; do not promote or interactively launch either
 until a same-cache p05 reaches the 99.493634-Hz target.
+
+## Generated I-cache pilot and child-isolated host load (2026-08-23 18:15 PDT)
+
+- A bounded generated I-cache-hit pilot inlined the literal-address resident
+  tag check at every static fetch leader. Runtime/oracle correctness remained
+  green, but the resulting v9 executable grew from 63,522,621 to 77,303,482
+  bytes. `.text` grew from `0x02963e90` to `0x03687cd0` (about 13.8 MB). Its
+  exact overlays built 6/6 under `cg11_758cca07_gce5e5eff6_f0`. A rejected
+  diagnostic run reached only p05/median 66.385/78.1 Hz while unrelated host
+  work averaged 4.944 total cores. This whole-program form is ruled out because
+  its native instruction-footprint cost is architectural, irrespective of the
+  contaminated dynamic sample.
+- A selective v10 pilot then inlined only 55 fetch sites in the two profiled
+  leaves `0x801182F4` and `0x801647D8`; the other roughly 159,500 source sites
+  retained the shared wrapper. Its executable was 63,529,013 bytes, only 6,392
+  bytes above the explicit-ON control, with `.text` up only 6,192 bytes. All six
+  overlays built under `cg11_2453561e_gce5e5eff6_f0`. Receipt
+  `20260823-170836-430254900-hot-icache-external-load-2.receipt.json` was accepted:
+  p05 72.1 Hz, median 87.95 Hz, raw p05 220.893M/s, raw median 269.453M/s,
+  exact CPU ratio 9.0x, zero watched writes, 815 exact validations, and unchanged
+  cache. It still trails the established clean v6 p05/median 88.505/94.7 and
+  89.035/94.9 receipts. Host volatility prevented an accepted adjacent v8
+  control. Therefore no I-cache inline form is promoted; the submodule is
+  restored byte-for-byte to the parent of `de5406b8` for all owned files.
+- Review found that the host-contamination gate counted the benchmark child as
+  contamination. That creates selection bias: a candidate can improve work per
+  window yet fail merely because its owned process used more CPU. The runner
+  now reads the exact owned child CPU time (Windows `GetProcessTimes`, POSIX
+  waited-child usage), records total/child/external busy cores separately, and
+  gates only external work. The conservative default is 1.5 external cores,
+  replacing 2.5 total cores so the earlier clean/dirty classification remains
+  strict. The live Windows probe returned 0.34375 CPU-seconds for its owned
+  child, and all 11 runner unit tests pass.
+- The corrected accepted v10 receipt separated 2.406 total cores into 1.004
+  owned-child and 1.402 external cores. Rejected paired receipts now state the
+  external component explicitly; Plex/transcoding and ChatGPT are never stopped
+  or modified. A fresh compact-runtime/oracle rebuild passes all 44 enabled
+  tests; the same three hardware/protocol tests remain disabled and unclaimed.
+  Focused reachable-discovery and timing-codegen tests pass. A broader
+  direct-dispatch CTest invocation exposed four pre-existing source-policy
+  failures (`launcher_vulkan_option`, `mod_load_acceleration`, `release_zip`,
+  `vk_present_wait_stage`); its long overlay-discovery test was stopped after a
+  declared bound. None overlaps the reverted I-cache files or runner change.
+
+Submodule `4f0e42a2` is the pushed compact-codegen revert. The current generated
+game source is restored to hash `b27d22c7`. Next concrete step: resume the
+alternating timing ON/OFF measurements only during an external-load window at
+or below 1.5 cores. Do not reintroduce generated I-cache inlining without a new
+profile and an accepted paired receipt that beats the clean v6 lower tail.

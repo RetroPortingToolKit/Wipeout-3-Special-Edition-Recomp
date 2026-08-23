@@ -158,15 +158,19 @@ class RunFpsBenchmarkTests(unittest.TestCase):
                 },
             }
         }
-        delta = MODULE.host_delta(start, end)
+        delta = MODULE.host_delta(
+            start, end, owned_child_cpu_seconds=0.9, elapsed_seconds=1.0
+        )
         self.assertAlmostEqual(delta["system_cpu_busy_percent"], 15.0)
         self.assertAlmostEqual(delta["system_cpu_busy_cores"], 2.4)
-        self.assertIsNone(MODULE.host_load_rejection(delta, 2.5))
-        self.assertIn("averaged 2.400", MODULE.host_load_rejection(delta, 2.0))
+        self.assertAlmostEqual(delta["owned_child_cpu_busy_cores"], 0.9)
+        self.assertAlmostEqual(delta["external_cpu_busy_cores"], 1.5)
+        self.assertIsNone(MODULE.host_load_rejection(delta, 1.5))
+        self.assertIn("averaged 1.500", MODULE.host_load_rejection(delta, 1.4))
 
     def test_host_load_rejects_unavailable_measurement(self) -> None:
         reason = MODULE.host_load_rejection(
-            {"system_cpu_busy_cores": None}, 2.5
+            {"external_cpu_busy_cores": None}, 1.5
         )
         self.assertIn("unavailable", reason)
 

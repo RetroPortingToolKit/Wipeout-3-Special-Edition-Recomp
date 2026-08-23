@@ -30,7 +30,7 @@ import summarize_fps_telemetry as telemetry
 
 RUNNER_SCHEMA = "psx-fps-benchmark-v2"
 DEFAULT_COMPLETION_GRACE_SECONDS = 0.25
-DEFAULT_MAX_HOST_BUSY_CORES = 2.5
+DEFAULT_MAX_HOST_BUSY_CORES = 1.5
 MINIMUM_DURATION_SECONDS = 3.0
 RESERVED_EXTRA_FLAGS = (
     "--bios",
@@ -327,7 +327,62 @@ def host_snapshot(
     }
 
 
-def host_delta(start: dict[str, object], end: dict[str, object]) -> dict[str, object]:
+def _windows_process_cpu_seconds(process: subprocess.Popen[bytes]) -> float | None:
+    """Return kernel+user CPU seconds while the owned process handle is live."""
+    if os.name != "nt":
+        return None
+
+    class FileTime(ctypes.Structure):
+        _fields_ = (("low", ctypes.c_uint32), ("high", ctypes.c_uint32))
+
+    creation = FileTime()
+    exit_time = FileTime()
+    kernel = FileTime()
+    user = FileTime()
+    get_process_times = ctypes.windll.kernel32.GetProcessTimes
+    get_process_times.argtypes = (
+        ctypes.c_void_p,
+        ctypes.POINTER(FileTime),
+        ctypes.POINTER(FileTime),
+        ctypes.POINTER(FileTime),
+        ctypes.POINTER(FileTime),
+    )
+    get_process_times.restype = ctypes.c_int
+    handle = getattr(process, "_handle", None)
+    if handle is None or not get_process_times(
+        ctypes.c_void_p(int(handle)),
+        ctypes.byref(creation),
+        ctypes.byref(exit_time),
+        ctypes.byref(kernel),
+        ctypes.byref(user),
+    ):
+        return None
+
+    def ticks(value: FileTime) -> int:
+        return (value.high << 32) | value.low
+
+    return (ticks(kernel) + ticks(user)) / 10_000_000.0
+
+
+def _children_cpu_seconds() -> float | None:
+    """Cumulative waited-child CPU seconds for POSIX receipt isolation."""
+    if os.name == "nt":
+        return None
+    try:
+        import resource
+
+        usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+    except (ImportError, OSError, ValueError):
+        return None
+    return float(usage.ru_utime + usage.ru_stime)
+
+
+def host_delta(
+    start: dict[str, object],
+    end: dict[str, object],
+    owned_child_cpu_seconds: float | None = None,
+    elapsed_seconds: float | None = None,
+) -> dict[str, object]:
     start_times = start.get("cpu", {}).get("system_times", {})
     end_times = end.get("cpu", {}).get("system_times", {})
     busy_percent: float | None = None
@@ -348,7 +403,20 @@ def host_delta(start: dict[str, object], end: dict[str, object]) -> dict[str, ob
     busy_cores: float | None = None
     if busy_percent is not None and isinstance(logical_processors, int):
         busy_cores = round(busy_percent * logical_processors / 100.0, 6)
+    child_busy_cores: float | None = None
+    external_busy_cores: float | None = None
+    if (
+        isinstance(owned_child_cpu_seconds, (int, float))
+        and isinstance(elapsed_seconds, (int, float))
+        and elapsed_seconds > 0.0
+    ):
+        child_busy_cores = round(owned_child_cpu_seconds / elapsed_seconds, 6)
+        if busy_cores is not None:
+            external_busy_cores = round(max(0.0, busy_cores - child_busy_cores), 6)
     return {
+        "external_cpu_busy_cores": external_busy_cores,
+        "owned_child_cpu_busy_cores": child_busy_cores,
+        "owned_child_cpu_seconds": owned_child_cpu_seconds,
         "system_cpu_busy_cores": busy_cores,
         "system_cpu_busy_percent": busy_percent,
     }
@@ -357,13 +425,16 @@ def host_delta(start: dict[str, object], end: dict[str, object]) -> dict[str, ob
 def host_load_rejection(
     delta: dict[str, object], maximum_busy_cores: float
 ) -> str | None:
-    """Reject measurements whose total host load can mask single-thread speed."""
-    busy_cores = delta.get("system_cpu_busy_cores")
+    """Reject background load without penalizing the benchmarked child itself."""
+    busy_cores = delta.get("external_cpu_busy_cores")
     if not isinstance(busy_cores, (int, float)):
-        return "host CPU load unavailable; cannot prove an uncontaminated run"
+        return (
+            "external host CPU load unavailable; cannot isolate the owned "
+            "benchmark child"
+        )
     if busy_cores > maximum_busy_cores:
         return (
-            f"host CPU load averaged {busy_cores:.3f} logical cores; "
+            f"external host CPU load averaged {busy_cores:.3f} logical cores; "
             f"maximum accepted is {maximum_busy_cores:.3f}"
         )
     return None
@@ -609,8 +680,8 @@ def run(argv: list[str]) -> int:
         type=float,
         default=DEFAULT_MAX_HOST_BUSY_CORES,
         help=(
-            "maximum average total logical-core load, including the benchmark "
-            "child, for an accepted run"
+            "maximum average external logical-core load after subtracting the "
+            "owned benchmark child"
         ),
     )
     parser.add_argument("--extra-arg", action="append", default=[])
@@ -712,6 +783,8 @@ def run(argv: list[str]) -> int:
         child_pid: int | None = None
         child_started_wall: float | None = None
         child_elapsed = 0.0
+        owned_child_cpu_seconds: float | None = None
+        children_cpu_start = _children_cpu_seconds()
         try:
             with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
                 child = subprocess.Popen(
@@ -736,6 +809,14 @@ def run(argv: list[str]) -> int:
                     if child.poll() is None:
                         termination, exit_code = _owned_child_cleanup(child)
                     child_elapsed = time.perf_counter() - child_started_mono
+                    if os.name == "nt":
+                        owned_child_cpu_seconds = _windows_process_cpu_seconds(child)
+                    else:
+                        children_cpu_end = _children_cpu_seconds()
+                        if children_cpu_start is not None and children_cpu_end is not None:
+                            owned_child_cpu_seconds = max(
+                                0.0, children_cpu_end - children_cpu_start
+                            )
         except BaseException:
             if child is not None and child.poll() is None:
                 _owned_child_cleanup(child)
@@ -744,7 +825,12 @@ def run(argv: list[str]) -> int:
         ended_wall = time.time()
         end_existing, end_guard = same_image_processes(executable.name)
         end_host = host_snapshot(executable.name, end_existing)
-        measured_host_delta = host_delta(start_host, end_host)
+        measured_host_delta = host_delta(
+            start_host,
+            end_host,
+            owned_child_cpu_seconds,
+            child_elapsed,
+        )
         end_cache = cache_identity(cache_root)
         cache_was_unchanged = cache_unchanged(start_cache, end_cache)
 
@@ -819,7 +905,7 @@ def run(argv: list[str]) -> int:
             },
             "host": {
                 "acceptance": {
-                    "maximum_system_cpu_busy_cores": args.max_host_busy_cores,
+                    "maximum_external_cpu_busy_cores": args.max_host_busy_cores,
                 },
                 "delta": measured_host_delta,
                 "end": end_host,
