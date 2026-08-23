@@ -440,3 +440,41 @@ unbounded build as a performance test; use focused targets and the bounded
   HD font/texture replacement coverage, launcher Play behavior with user BIOS
   and disc paths, and Vulkan renderer parity. Packaging/static gates are no
   longer the blocker.
+
+## Session closeout: race performance remains a hard failure (2026-08-22)
+
+- The fresh debug race-state probe was run from
+  `build-debug-tools/diag-race-run-2/scph1001/state_80162474_slot00.pst`,
+  using the patched-header copy only. The original user state was not
+  modified.
+- With the PAL-x2/100 Hz path and the configured 900% CPU overclock, the
+  race continuation did not run at playable speed. Recent windows fell from
+  roughly 25 Hz toward 13--20 Hz while the guest worker consumed about
+  990--995 ms/s; audio underruns increased continuously. This is the user-
+  visible "about one-tenth speed" failure and is not a monitor-refresh or
+  launcher-only problem.
+- The high-RAM dispatcher is active and correct on its guarded identities:
+  `highram_checks == highram_hits`, with zero variant misses. It materially
+  reduces the debug race frame cost from approximately 60 ms to 34--35 ms,
+  but it is not sufficient for the 10 ms / 100 Hz target.
+- A live diagnostic A/B at 100% overclock rose to approximately 64 Hz on the
+  same continuation, confirming that the 900% path is multiplying the amount
+  of guest work the current host implementation must execute. It is not a
+  valid product workaround because the requested Hueponik/GooseStation mode
+  requires the 900% timing contract.
+- Clean static-phase sampling identified `0x8015FA7C` as the dominant stable
+  remaining hotspot (about 56--58% of static samples), followed by the
+  `0x8017...` helper chain. `0x8015FA7C` is a short generated polling/syscall
+  function whose loop repeatedly charges cycle timing and crosses BIOS/syscall
+  edges; it must be optimized with an exact timing/IRQ-preserving path, not
+  bypassed. Function tracing was used only diagnostically and is not a
+  performance receipt.
+- The current performance work is therefore intentionally not marked done.
+  The next session should start with a clean Release race probe and an
+  exact A/B optimization of `0x8015FA7C`/its callees, retaining PGXP, device
+  deadlines, BIOS behavior, and the 900% overclock. Do not ship the current
+  race result as a remaster-quality build.
+- The debug-only `dispatch_stats` high-RAM counters and the
+  `PSX_DISABLE_OVERLAY_EXTRA_DISPATCH=1` control switch are committed in the
+  psxrecomp submodule to make the next A/B reproducible. No probe process is
+  left running at session close.
