@@ -33,6 +33,16 @@ if [[ -f "${ROOT}/framework_pins.txt" ]]; then
   EXTRA_PROJECT+=(--project-file framework_pins.txt)
 fi
 
+# Keep the wrapper zero-configuration for the checkout layout used by this
+# project. Older generated wrappers default to build-recompiler, while a
+# normal local checkout keeps the already-built emitters in the framework
+# submodule.
+if [[ "${RECOMPILER_BUILD}" == "build-recompiler" &&
+      ! -d "${ROOT}/${RECOMPILER_BUILD}" &&
+      -d "${ROOT}/psxrecomp/recompiler/build" ]]; then
+  RECOMPILER_BUILD="psxrecomp/recompiler/build"
+fi
+
 cd "${ROOT}"
 exec bash "${PACKAGER}" \
   --root "${ROOT}" \
