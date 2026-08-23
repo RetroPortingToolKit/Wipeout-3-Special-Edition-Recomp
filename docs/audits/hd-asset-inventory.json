@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "title": "WipEout 3 SE HD replacement inventory",
+  "source": {
+    "audit": "docs/audits/hd-assets.md",
+    "upstream_commit": "039a0690448047401cef251594327a25fcc73fad",
+    "hashes_ini_sha256": "9cfb23b92d72bc1233a76958621ddae7ab049493a7d2651fdd1a12e1455e5c71",
+    "mapping_manifest_status": "valid-partial-pack",
+    "upstream_mapping_count": 390,
+    "upstream_missing_mapping_count": 98
+  },
+  "runtime": {
+    "config": "game.toml",
+    "renderer_required": "opengl",
+    "hd_textures": true,
+    "pack_filename": "<disc-stem>-texture-replacements/<texhash>-<palhash>.png",
+    "explicit_override": "PSX_HD_TEXTURE_PACK",
+    "lookup_evidence": "docs/audits/hd-assets.md:Discovery and replacement-key contract"
+  },
+  "font_keys": [
+    "3dc173e1-3da5d410", "4cb2ec4e-3da5d410", "4cb2ec4e-7205c45b", "4cb2ec4e-94f476b1",
+    "75f5e38b-3da5d410", "75f5e38b-7205c45b", "75f5e38b-94f476b1",
+    "6b411011-273d3b40", "861ad9f1-273d3b40", "861ad9f1-5888b400",
+    "d20dee94-273d3b40", "d20dee94-5888b400", "3dc173e1-7205c45b",
+    "3dc173e1-8ec51178", "3dc173e1-94f476b1", "3dc173e1-41e26c01",
+    "4cb2ec4e-b6e6caeb", "75f5e38b-b6e6caeb", "4cb2ec4e-8ec51178",
+    "75f5e38b-8ec51178"
+  ],
+  "title_keys": {
+    "psygnosis": {
+      "2a5e8698-cd57d48a": "Main Menu/Title Screen/Psygnosis Logo Text.png",
+      "bfd5825a-712aa77d": "Main Menu/Title Screen/Psygnosis Logo.png"
+    },
+    "other_title_text": [
+      "e8a8dde-322b5399", "8cb24699-7859d502", "421fdb44-7859d502",
+      "eb59bd18-cd57d48a", "415f3330-cd57d48a", "a154479a-cd57d48a",
+      "c2eb1e8b-cd57d48a", "5fe9e228-cd57d48a", "bd7f89fa-cd57d48a",
+      "65827f71-cd57d48a"
+    ]
+  },
+  "expected_external_pack": {
+    "indexed_pngs": 445,
+    "font_keys_present": true,
+    "title_keys_present": true,
+    "missing_upstream_keys_present": 0,
+    "commented_exclude_hashes": ["d20dee94", "861ad9f1"],
+    "active_font_exclusion_in_repo": false
+  },
+  "hueponik": {
+    "source": "https://codeberg.org/hueponik/wip3out-patches",
+    "repo_reference": "mods/preloaded/README.md",
+    "runtime_relationship": "framerate package only; it does not provide HD texture/font/FMV payloads"
+  }
+}
