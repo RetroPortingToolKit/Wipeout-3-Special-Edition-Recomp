@@ -4,5 +4,5 @@
 	branch = master
 [submodule "recomp-ui"]
 	path = recomp-ui
-	url = https://github.com/mstan/recomp-ui.git
+	url = https://github.com/tetrisgm/recomp-ui.git
 	branch = master

@@ -2046,3 +2046,10 @@ without disturbing PID 33668, commit/push the root submodule pointers and
 8 MiB configuration, then collect the user's complete stock acceptance. In
 parallel, finish the three disjoint PGXP continuity, rendering, and settings
 tranches before launching the separate PGXP executable.
+
+Push receipt: psxrecomp `8ddd3843` is published on
+`mstan/psxrecomp:codex/wipeout3-upstream-audit`. Upstream recomp-ui rejected the
+authenticated `tetrisgm` account with HTTP 403, so the required fork
+`tetrisgm/recomp-ui` was created and `b81fcf8` was published on
+`codex/wipeout3-remaster-controls-assets`; root `.gitmodules` now names that
+reachable fork rather than leaving an uncloneable submodule pointer.
