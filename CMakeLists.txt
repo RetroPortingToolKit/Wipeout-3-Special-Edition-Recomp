@@ -22,6 +22,7 @@ psxrecomp_add_game_runtime(psx-runtime
     NETPLAY_LOBBY_URL "ws://netplay.retcomm.net:8765"
     WINDOW_TITLE "Wipeout 3 Special Edition  Recompiled"
     DEFAULT_GAME_CONFIG_PATH "game.toml"
+    MAIN_RAM_MIB 8
     MAX_PLAYERS 2
     LAUNCHER_BOXART "${CMAKE_CURRENT_SOURCE_DIR}/launcher_assets/img/boxart.tga"
     APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/psxrecomp.ico"

@@ -1987,3 +1987,62 @@ game source is restored to hash `b27d22c7`. Next concrete step: resume the
 alternating timing ON/OFF measurements only during an external-load window at
 or below 1.5 cores. Do not reintroduce generated I-cache inlining without a new
 profile and an accepted paired receipt that beats the clean v6 lower tail.
+
+## Coherent 8 MiB product build and first remaster integration (2026-08-23 10:46 PDT)
+
+- The previous `d1bfb6f0` "8mb support" implication was rejected after a full
+  address-path audit. The replacement contract is now explicit and coherent:
+  one fixed 8 MiB backing allocation, a build/session-immutable 2 or 8 MiB
+  decode geometry, retail four-way 2 MiB folding, unique expanded addresses,
+  and the same geometry across CPU loads/stores, DMA, dirty-RAM execution,
+  overlay capture/loading, boot state, savestate bounds, debug hashing,
+  generated dispatch, PGXP provenance, and startup configuration validation.
+  Unsupported expanded netplay/cosim combinations fail closed.
+- `game.toml` and the product CMake target both select 8 MiB. Regenerated
+  `SCES_028.45_dispatch.c` rejects `phys >= 0x800000`; its exhaustive lookup
+  verifier passed with 23,336 entries, 172 populated pages, three aliases per
+  entry, and 2,073,816 expected full-range misses. The recompiler parser and
+  generated map enforce the same 2/8 MiB choice.
+- All 46 enabled runtime tests passed. Retail and expanded memory-geometry
+  tests, DMA aperture tests, capture/overlay structural guards, interpreter
+  hot-path guards, four focused recompiler/dispatch tests, and the exhaustive
+  generated lookup all passed. The same three disabled hardware/protocol tests
+  remain unclaimed.
+- The first full Release product build completed for both stock and PGXP with
+  `PSX_MAIN_RAM_BYTES=0x00800000u`, `cpu_overclock=900`, and
+  `pal_video_clock_multiplier=2`. The stock binary is 63,544,819 bytes with
+  SHA-256 `B746DF630477B6BEFC4FC72A72B24F09E88371B18457EE3F636B20DB3D411573`;
+  the PGXP sibling is 72,482,208 bytes with SHA-256
+  `87E67077FE24B37088F7B4DC4D299B781B0087FC24A23586B9558D164214457B`.
+  These hashes identify the first integration build, not the final accepted
+  release.
+- The stock integration binary was launched with `--no-launcher` and the
+  authenticated retail BIOS as PID 33668. It was deliberately left running.
+  The heartbeat advanced beyond 3,600 VBlanks with no fatal record and sampled
+  close to the configured PALx2 rate. This is a live boot/progress smoke only;
+  the user still owns FMV/card/countdown/race/CDDA/geometry acceptance.
+- The first PGXP correctness tranche now has target-sized 2/8 MiB provenance,
+  symmetric tolerance, UB-safe signed coordinate conversion, reference-like
+  defaults, external-write invalidation primitives, and exact MTC2/LWC2 SXY
+  FIFO propagation. Retail and expanded PGXP tests pass, but **FULL/MAX PGXP is
+  still open**: raw-writer/DMA continuity, savestate/rewind continuity, precise
+  NCLIP, broader propagation, lines/polylines, perspective color/depth, 2D and
+  transparent-depth policy, full settings, and live visual proof remain.
+- The live WipEout launcher now owns 4:3, 16:9, 21:9, and 32:9; 24 curated
+  resolutions; and 44 valid 60/100 Hz resolution pairs. 8K-class modes are
+  capped at 60 Hz, refresh remains presentation-only, and selected dimensions
+  reach SDL windowed/exclusive-fullscreen creation. Focused parser/catalog and
+  title-ownership tests pass. Hardware/visual validation remains open.
+- The shared launcher stages its existing licensed fonts and records their
+  notices. A strict user-supplied HD-pack validator/receipt was prototyped in
+  historical `clean-aot`, but the shipping PSX runtime does not yet consume it.
+  No old bezel or HD texture/font payload was bundled because
+  `assets/provenance/hd-asset-permission.json` still lacks a license grant.
+  Do not claim live replacement hits or shipped bezels/HD text yet.
+
+Durable commits for this tranche are psxrecomp `8ddd3843` and recomp-ui
+`b81fcf8`. The next concrete step is to finish the alternate-directory relink
+without disturbing PID 33668, commit/push the root submodule pointers and
+8 MiB configuration, then collect the user's complete stock acceptance. In
+parallel, finish the three disjoint PGXP continuity, rendering, and settings
+tranches before launching the separate PGXP executable.

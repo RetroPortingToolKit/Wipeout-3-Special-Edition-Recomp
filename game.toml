@@ -42,6 +42,7 @@ expected = "0x8FA20010"
 
 [runtime]
 window_title = "Wipeout 3 Special Edition Recompiled"
+main_ram_mib = 8
 memcard_dir = "saves"
 # The player supplies the retail BIOS that matches the linked SCPH-1001
 # backend. OpenBIOS remains a framework development option but is not the
