@@ -363,6 +363,14 @@ unbounded build as a performance test; use focused targets and the bounded
   PAL100 plugin without source errors, then stalled in the ccache/toolchain
   handoff during the final remaining work. It was terminated cleanly; the EXE
   timestamp and hash did not change, so the stale-artifact gate still fails.
+- A follow-up `build-release --target psx-runtime -j1` attempt reached the
+  final linker after compiling the full static overlay and all UI/runtime
+  objects. The existing build-tree Release flag cache still injected
+  `-flto=full` despite `PSX_ENABLE_LTO=OFF`, and `ld.lld` grew to roughly 9 GB
+  without producing a new EXE during the bounded window; it was terminated
+  cleanly. The next release attempt must use a fresh build directory or clear
+  `CMAKE_C_FLAGS_RELEASE`/`CMAKE_CXX_FLAGS_RELEASE` before measuring the
+  non-LTO path.
 - The launcher audit found no safe parent-repo fix for “Play does nothing”:
   its pinned launcher/runtime submodule revision is unavailable from the
   configured remote, so the current path-normalization and sidecar contract
