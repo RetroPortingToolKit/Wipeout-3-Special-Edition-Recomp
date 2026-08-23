@@ -82,6 +82,14 @@ foreach(_PSX_RUNTIME_CONFIG game.toml game_options.toml)
     endif()
 endforeach()
 
+# POST_BUILD staging only runs when the executable links. Make profile edits a
+# link dependency so changing a runtime default or the seeded mod selection
+# cannot leave an apparently fresh executable beside stale configuration.
+set_property(TARGET psx-runtime APPEND PROPERTY LINK_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/game.toml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/state.toml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/psxrecomp/mods/builtin/packages/psx.enhancement.pgxp/1.0.0/manifest.toml")
+
 # Keep the presentation asset in the one-folder release. The renderer treats
 # the directory as user-replaceable artwork, while `bezel = "random"` selects
 # one of the shipped PNGs automatically.

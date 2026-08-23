@@ -33,9 +33,9 @@ if ($configText -notmatch '(?m)^hd_textures\s*=\s*true\r?$') {
 if ($configText -notmatch '(?m)^cpu_overclock\s*=\s*900\r?$') {
     throw 'The release does not carry the required 900% CPU overclock.'
 }
-foreach ($setting in @('geometry_correction', 'perspective_texturing', 'pgxp_depth')) {
-    if ($configText -notmatch ('(?m)^' + [regex]::Escape($setting) + '\s*=\s*true\r?$')) {
-        throw "Full PGXP setting is not enabled in the staged game config: $setting"
+foreach ($setting in @('geometry_correction', 'perspective_texturing', 'pgxp_depth', 'pgxp_cpu_mode')) {
+    if ($configText -notmatch ('(?m)^' + [regex]::Escape($setting) + '\s*=\s*false\r?$')) {
+        throw "PGXP must remain disabled for WipEout 3 SE: $setting"
     }
 }
 if ($configText -notmatch '(?m)^offer_ultrawide\s*=\s*true\r?$') {
@@ -51,8 +51,8 @@ if ((Get-Content -Raw -LiteralPath $skipManifest) -notmatch '(?m)^default_enable
 }
 $pgxpManifest = Join-Path $build 'mods/packages/psx.enhancement.pgxp/1.0.0/manifest.toml'
 if (-not (Test-Path -LiteralPath $pgxpManifest)) { throw "Missing staged PGXP manifest: $pgxpManifest" }
-if ((Get-Content -Raw -LiteralPath $pgxpManifest) -notmatch '(?m)^default_enabled\s*=\s*true\r?$') {
-    throw 'PGXP precision is not enabled by default in the remaster build.'
+if ((Get-Content -Raw -LiteralPath $pgxpManifest) -notmatch '(?m)^default_enabled\s*=\s*false\r?$') {
+    throw 'PGXP precision is enabled by default despite the title-specific visual failure.'
 }
 $fr120 = Join-Path $build 'mods/packages/wipeout3.enhancement.framerate-120/1.0.0/manifest.toml'
 if (Test-Path -LiteralPath $fr120) {
@@ -91,6 +91,9 @@ if (-not (Test-Path -LiteralPath $state)) { throw "Missing staged mod state: $st
 $stateText = Get-Content -Raw -LiteralPath $state
 if ($stateText -notmatch '(?ms)\[\[feature\]\]\s*package_id\s*=\s*"wipeout3\.enhancement\.framerate-pal100".*?\benabled\s*=\s*true\b') {
     throw 'PAL x2 / 100 Hz is not enabled in staged mods/state.toml.'
+}
+if ($stateText -notmatch '(?ms)\[\[feature\]\]\s*package_id\s*=\s*"psx\.enhancement\.pgxp".*?\benabled\s*=\s*false\b') {
+    throw 'PGXP is not disabled in staged mods/state.toml.'
 }
 if ($cacheText -notmatch '(?m)^PSX_SETUP_WIZARD:BOOL=OFF\r?$') {
     throw 'Setup wizard is enabled or not explicitly disabled.'

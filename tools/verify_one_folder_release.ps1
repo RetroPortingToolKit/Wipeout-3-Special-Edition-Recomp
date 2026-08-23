@@ -53,11 +53,15 @@ if (Test-Path -LiteralPath $statePath) {
     @(
         'psx.enhancement.8mb-ram'
         'psx.enhancement.fast-loading'
-        'psx.enhancement.pgxp'
         'psx.enhancement.skip-fmv'
         'wipeout3.enhancement.framerate-pal100'
         'wipeout3.enhancement.widescreen'
     ) | ForEach-Object { Require-EnabledPackage $_ }
+
+    $pgxpPattern = '(?ms)\[\[feature\]\]\s*package_id\s*=\s*"psx\.enhancement\.pgxp".*?\benabled\s*=\s*false\b'
+    if ((Get-Content -LiteralPath $statePath -Raw) -notmatch $pgxpPattern) {
+        $failures.Add('PGXP must be disabled in mods/state.toml for WipEout 3 SE')
+    }
 
     $expectedPackages = @{
         'psx.enhancement.8mb-ram' = $true
