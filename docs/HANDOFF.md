@@ -1842,3 +1842,33 @@ Next concrete step: commit and push this reviewed measurement/dispatch/timing
 foundation, regenerate WipEout from that exact submodule commit, build a fresh
 product directory and precompile its exact overlay cache, then require two
 accepted 45-second fresh-boot receipts before any interactive promotion.
+
+## Source-matched v6 verdict and timing A/B gate (2026-08-23 16:50 PDT)
+
+- Committed foundation `010975f` / submodule `45461852` regenerated 201 game
+  shards and 23,336 direct entries with codegen hash `88e034e5`. The fresh
+  self-contained binary is 63,522,621 bytes, SHA-256
+  `5CA5DABBC774E601F4EFCB253DA24E056E5D4485636E77323B866A6A84230161`.
+- All six captured overlay regions compiled with the absolute pinned
+  w64devkit GCC into the exact `cg11_88e034e5_gce5e5eff6_f0` namespace.
+  A first run was correctly rejected because startup added the zero-byte
+  cache audit marker. After that deliberate warm-up, the cache remained
+  content-identical for both accepted measurements.
+- Two accepted 45-second fresh-boot receipts contain 44 windows each:
+  - source-matched-2: p05 88.505 Hz, median 94.7 Hz, raw p05 271.153M/s.
+  - source-matched-3: p05 89.035 Hz, median 94.9 Hz, raw p05 272.777M/s.
+- Both runs report zero watched-text writes and 815 exact validations, almost
+  entirely the one-time startup admission wave. Global epoch churn therefore
+  does not explain the miss. The result reproduces v5 rather than improving
+  it and is not promotable.
+- Timing-run aggregation now has its own `PSX_GAME_TIMING_RUNS` CMake gate,
+  conservative default OFF. The same generated source can therefore measure
+  direct dispatch with ordinary forced-inline per-instruction timing versus
+  the shared run helper without changing device semantics or other runtime
+  code. All 44 enabled integrated tests and the focused timing codegen test
+  pass with the gate.
+
+Next concrete step: commit the A/B gate, regenerate its new source hash, build
+the default-OFF direct-only candidate, warm its exact cache, and take two clean
+45-second receipts. Only build the gate-ON sibling if the direct-only result
+needs an exact same-source comparison; do not promote v6.
