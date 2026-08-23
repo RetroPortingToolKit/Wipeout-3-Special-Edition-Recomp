@@ -341,6 +341,10 @@ unbounded build as a performance test; use focused targets and the bounded
   8 MB RAM, Fast Loading, PGXP, Skip FMV, PAL x2/100 Hz, and widescreen. The
   static and one-folder verifiers reject unknown, retired, NTSC/120 Hz, legacy,
   duplicate, and nested retired package paths.
+- `tools/verify_release_freshness.py` separately checks that an EXE or ZIP is
+  newer than the relevant source/config and contains the exact six enabled
+  packages plus the current 900%/PGXP/ultrawide/HD defaults. It correctly
+  rejects the current stale `build-release` artifact.
 - `tools/fast_loading_equivalence.py` now compares only the two requested
   endpoints: startup memory-card loading and race loading. It checks committed
   save-state restores, card traffic, CD sectors/traces/IRQs, guest frame
