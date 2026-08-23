@@ -1,20 +1,35 @@
 # Native performance audit: PAL x2 continuation at `0x007814D0`
 
-Status: audit only. No runtime, generated C, compiler, build, game, or mod files were changed.
+Status: bounded target-generation proof complete locally. Runtime race parity
+and performance evidence remain open.
 
 ## Conclusion
 
-The remaining performance hypothesis is credible, but the exact native continuation is not yet proven. The physical address `0x007814D0` canonicalizes to the high-RAM address `0x807814D0`. Existing capture data shows that this address is real and hot; the current generated static dispatch does not actually own it.
+The remaining performance hypothesis is credible, and the exact native
+continuation is now structurally proven for the retained capture rows. The
+physical address `0x007814D0` canonicalizes to the high-RAM address
+`0x807814D0`. The local target-only bundle owns the exact range/CRC identities
+and is wired through a separate static dispatcher. Runtime race execution has
+not yet reached the target in a fresh title/menu probe, so this remains a
+build-and-structural proof rather than a performance receipt.
 
 Evidence from the canonical ignored artifacts:
 
 - `build-release/overlay_captures-8078.json` contains 644 high-RAM captures, all loading at `0x80780000` with `0x2004` bytes. `0x807814D0` was executed in 103 captures and promoted as a dispatch seed in 96; seven captures observed it without promoting it. There are 632 distinct byte images, so the address is variant-sensitive.
 - The target word is stable across the 103 target captures: `0x27BDFFC0` at `0x807814D0`, followed by a normal stack-frame prologue. This is a reproducible code entry, not an address-only artifact.
-- `overlay-8078-gen.log` reports the target as `DISPATCH_ENTRY`, but `generated/overlays_static.c` has no `case 0x807814D0u`, `func_807814D0`, or `block_807814D0`. Its 84 target references are CPS transfers *to* the address, not an owning native dispatch case.
+- `overlay-8078-gen.log` reports the target as `DISPATCH_ENTRY`, while the
+  established `generated/overlays_static.c` still has no target case. The
+  bounded `generated/overlays_highram.c` now supplies the target function,
+  exact range guards, CPS block, and separate dispatcher; it is intentionally
+  kept out of the broad corpus.
 - The combined capture input has 1,701 records across many RAM regions. The generated static C is 192,151,662 bytes and reaches range index `41967`; this is a broad corpus, not a bounded proof of this one continuation.
 - `build-release/psx_last_run_report.json` records a neighboring high-RAM interpreter guard at `0x80781474` (`0x1420FFDC`) and a nearby high-RAM store at `0x80780AF8`. It does not record a fallback at `0x807814D0`; `midblock_count` is zero. The same report has `overlay_loader.active=0`, `disp_native=0`, and `disp_interp=0`, so it cannot supply a fallback percentage.
 
-The practical diagnosis is: the capture/generator discovery phase knows about `0x807814D0`, but the final static artifact does not provide the exact function or CPS resume route. With static dispatch first and the dynamic loader inactive, that address falls through to the dirty-RAM interpreter. The current artifacts establish a strong lead, not a measured percentage or a safety result.
+The practical diagnosis is: the capture/generator discovery phase knew about
+`0x807814D0`, but the established static artifact did not provide the exact
+function or CPS resume route. The new local extra dispatcher closes that
+static-coverage gap. It has not yet established target dispatch frequency,
+native/interpreter parity, or a measured race-speed gain.
 
 ## Relevant implementation behavior
 
@@ -73,8 +88,8 @@ No isolated test was added under `tools/audits`: the missing proof is a target-s
 
 ## Current validation status
 
-The bounded validation pass is currently blocked because the canonical parent
-points at a locally created `psxrecomp` commit that is not available from the
-configured remote, and the retained `build-release/overlay_captures-8078.json`
-input is absent from this checkout. Restore those exact inputs before running
-static/CPS generation; do not substitute the broad corpus or edit runtime core.
+The bounded validation pass is no longer blocked: the retained capture and
+populated submodule were available locally, and the target-only bundle was
+generated and linked. The remaining block is runtime evidence: load the race
+anchor, prove native/interpreter parity, and measure three native/control PAL
+x2 race windows before claiming a performance fix.
