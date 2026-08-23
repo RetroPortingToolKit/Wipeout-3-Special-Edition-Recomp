@@ -30,6 +30,20 @@ if ($configText -notmatch '(?m)^supersampling\s*=\s*4\r?$') {
 if ($configText -notmatch '(?m)^hd_textures\s*=\s*true\r?$') {
     throw 'HD texture replacement is not enabled in the remaster configuration.'
 }
+if ($configText -notmatch '(?m)^cpu_overclock\s*=\s*900\r?$') {
+    throw 'The release does not carry the required 900% CPU overclock.'
+}
+foreach ($setting in @('geometry_correction', 'perspective_texturing', 'pgxp_depth')) {
+    if ($configText -notmatch ('(?m)^' + [regex]::Escape($setting) + '\s*=\s*true\r?$')) {
+        throw "Full PGXP setting is not enabled in the staged game config: $setting"
+    }
+}
+if ($configText -notmatch '(?m)^offer_ultrawide\s*=\s*true\r?$') {
+    throw 'Widescreen configuration does not offer ultrawide output.'
+}
+if ($configText -notmatch '(?m)^auto_skip_fmv\s*=\s*false\r?$') {
+    throw 'FMV skipping is not explicitly opt-in in the staged game config.'
+}
 $skipManifest = Join-Path $build 'mods/packages/psx.enhancement.skip-fmv/1.0.0/manifest.toml'
 if (-not (Test-Path -LiteralPath $skipManifest)) { throw "Missing staged skip-opening manifest: $skipManifest" }
 if ((Get-Content -Raw -LiteralPath $skipManifest) -notmatch '(?m)^default_enabled\s*=\s*false\r?$') {
@@ -45,6 +59,11 @@ if (Test-Path -LiteralPath $fr120) {
     if ((Get-Content -Raw -LiteralPath $fr120) -match '(?m)^default_enabled\s*=\s*true\r?$') {
         throw 'Experimental NTSC-120 package is enabled by default for a PAL release.'
     }
+}
+$pal100 = Join-Path $build 'mods/packages/wipeout3.enhancement.framerate-pal100/1.0.0/manifest.toml'
+if (-not (Test-Path -LiteralPath $pal100)) { throw "Missing staged PAL x2 manifest: $pal100" }
+if ((Get-Content -Raw -LiteralPath $pal100) -notmatch '(?m)^default_enabled\s*=\s*false\r?$') {
+    throw 'Experimental PAL x2 / 100 Hz is enabled by default; it must remain opt-in until runtime timing is proven.'
 }
 if ($cacheText -notmatch '(?m)^PSX_SETUP_WIZARD:BOOL=OFF\r?$') {
     throw 'Setup wizard is enabled or not explicitly disabled.'
