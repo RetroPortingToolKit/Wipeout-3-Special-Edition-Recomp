@@ -1602,3 +1602,50 @@ goal. Fresh boot reproduces the FMV bottleneck without loading the old state.
 3. Prove instruction-boundary/event equivalence in focused tests, regenerate
    all game C, build a separate v4 candidate, and require fresh FMV throughput
    near the 99.493634-Hz target before any interactive launch or promotion.
+
+## Second-pass architecture audit correction (2026-08-23 06:25 PDT)
+
+The post-review v3 profile identified real hot code, but its comparison against
+v2 was not controlled: v2 starts with six codegen-10 overlay DLLs indexed, while
+v3's codegen-11/ABI identity invalidated that cache and starts with zero. Do not
+attribute the v2/v3 delta to one runtime change until both candidates use the
+same cache state and workload. This does not explain the whole deficit: v2's
+own live log shows its opening FMV and many replay intervals at about 50-57 Hz.
+
+The live v2 process remains PID 4316 and was not disturbed. It currently
+saturates one logical CPU (100% of one core) while total machine CPU is about
+9% and total idle is about 90%. Across 3,653 telemetry intervals, 2,828 were
+below 60 Hz and 676 were at least 95 Hz. Exact 99.5-Hz stretches correlate with
+the guarded title idle compactor firing; heavy stretches with zero idle skips
+fall to roughly 50-57 Hz. This independently proves a single-thread guest-host
+throughput ceiling, not a system-wide load or CD/SPU clock-domain drift.
+
+The flat CPS trampoline remains a correctness requirement: restoring recursive
+native guest calls would revive the proven unbounded host-stack failure. The
+performance defect is the generic routing wrapped around that flat model:
+
+- a normal clean game transfer can miss-search the 13,015-entry BIOS table,
+  enter `dirty_ram_dispatch`, then binary-search the 23,336-entry game table;
+- every successful game dispatch re-validates its exact emitted instruction
+  ranges with `memcmp`, even when no executable write occurred since the last
+  validation;
+- `fntrace_record` unconditionally writes a dispatch-tail record and performs
+  other diagnostics on every trampoline iteration; Release also emits a
+  volatile function-entry stamp and updates the last-store PC at every store;
+- the Release build is `-O3` but has no whole-program LTO or native-CPU tuning,
+  leaving cross-translation-unit interrupt/dispatch fast paths out of line.
+
+The next performance work must therefore be a controlled product-hot-path
+tranche, not another timing shortcut: same codegen/cache/workload A/B; early
+game-text routing before BIOS search; generation-qualified cached code validity
+instead of per-call `memcmp`; a direct/static dispatch index rather than two
+binary searches; and compile-time removal of post-mortem rings/stamps from the
+shipping profile. Preserve CPS flattening, exact raw/native clock conversion,
+and architectural IRQ/event boundaries. Use low-overhead counters and a
+separate v4 build; do not launch over or stop PID 4316.
+
+Other goal boundaries remain unchanged: transactional v6 state loading is a
+real correctness improvement (old v5 slot 2 is intentionally incompatible),
+the PGXP work is only a provenance-correctness tranche and is not full PGXP,
+actual 8 MiB RAM is still unimplemented, wide aspect/resolution acceptance is
+unfinished, and licensed bezel/font/text assets are still absent.
