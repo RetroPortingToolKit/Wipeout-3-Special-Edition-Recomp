@@ -1649,3 +1649,108 @@ real correctness improvement (old v5 slot 2 is intentionally incompatible),
 the PGXP work is only a provenance-correctness tranche and is not full PGXP,
 actual 8 MiB RAM is still unimplemented, wide aspect/resolution acceptance is
 unfinished, and licensed bezel/font/text assets are still absent.
+
+## Deep performance review and corrected A/B (2026-08-23 07:45 PDT)
+
+This review supersedes the earlier v4 performance attribution. It does not
+promote a new binary and it does not advance to 8 MiB, full PGXP, widescreen,
+or asset work. The current tranche remains CPU/runtime architecture.
+
+### What was actually wrong
+
+- The 900% setting was not fake. Every controlled v3/v4/v5 interval reports an
+  exact `cpu_effective=9.000x`, while SPU remains independently near 44.1 kHz.
+  The title was slow because the single host execution thread could not retire
+  the required raw guest work before each PALx2 VBlank.
+- v3's controlled fresh-boot/FMV receipt has 36 samples and a steady
+  idle-active median of 51.7 FPS, 158.39 million raw guest cycles/s, and 17.60
+  million native-equivalent cycles/s. This is a throughput ceiling, not a bad
+  on-screen counter.
+- The v4 dispatch tranche was valid and material: clean compiled-game routing
+  precedes the BIOS-table/generic dirty fallback; positive text admission is
+  qualified by exact watched-page generations; and product Release removes
+  unconditional post-mortem dispatch/function-entry bookkeeping while
+  retaining mods, translation, game-start, armed traces/parity, and crash
+  freeze behavior. Exact byte validation still fails closed after relevant
+  writes and after restore/image epoch changes.
+- Twelve bounded v4 GDB samples during steady FMV all landed in statically
+  generated game code rather than the overlay loader. The sampled hot functions
+  repeatedly paid an outlined `psx_cyc_step` call per retired non-load guest
+  instruction. The generated tree contains about 491,800 such source call sites.
+  In `func_801647D8`, v4 emitted 36 timing-step calls. This per-instruction native
+  call boundary was the next general architectural bottleneck.
+
+### v5 timing-inline experiment
+
+- Release generated game bodies only were compiled with a force-inlined
+  constant-mask pipeline step. BIOS, ordinary runtime/debug/oracle/cosim TUs,
+  and non-Release configurations retain the compact generic path; overlays opt
+  in separately. Replay, conservative stepping, device service, local timing,
+  overflow, IRQ/MMIO publication, restore, boot, rollback, and long-jump paths
+  retain exact slow behavior.
+- Final measured v5 machine code contains no call to `psx_cyc_step` in
+  `func_801647D8`. Its exceptional branches retain calls to a TU-local slow
+  fallback. The function grew from 0x1130 (4,400 bytes) to 0x3D10 (15,632
+  bytes), and the PE grew from 43,930,799 bytes (41.90 MiB) to 118,253,359 bytes
+  (112.78 MiB). v5 SHA-256 is
+  `8DEBAF630F8E792180E6E065F8EBC623821FD317159BAD88D065D3D3E004121A`.
+- Six canonical overlay shards built successfully under measured cache identity
+  `cg11_0d67212f_gce5e5eff6_f0`: 6 built, 0 skipped, 0 failed. The current
+  source hash is now `e655f7bf` after the integration-test fix below, so the
+  measured `0d67212f` binary/cache are evidence only and must not be promoted.
+
+### Corrected controlled results
+
+- An agent-created v4 `--help` probe had been ignored by the executable and left
+  PID 13928 displaying the launcher since 06:51. It averaged modest but real CPU
+  use and contaminated the first v4 A/B. That exact stale help-launcher PID was
+  stopped; no gameplay/replay process was touched. The previously protected v2
+  PID 4316 disappeared independently before this review and was not stopped by
+  the agent.
+- The contaminated v4 run reported 75.6 FPS steady median. A clean-host repeat
+  instead reports 82.0 FPS, p05 76.9, p95 87.5, and 251.22 million raw guest
+  cycles/s. Its log SHA-256 is
+  `1F230457690352ACF8EEC40A7D16C18C85418E4031006472D4701315CD3AB62F`.
+- Two clean v5 repeats are stable: steady medians 94.2 and 94.6 FPS, p05
+  89.5/88.9, p95 98.3/98.9, raw medians 288.60/289.83 million cycles/s, exact
+  9.000x CPU, and 44,100 Hz SPU median. Log SHA-256 values are
+  `B9C4C86E081A15BA6EB4C1575E9863DD0D638A16E1F9F4EE543EFCA056D15DCA`
+  and `DB011265107E29738668AFEA016ACED45584F48A083DFF8F398E7C2696CF1BAB`.
+- Therefore the fair v5-over-v4 improvement is 15.4%, not the initially claimed
+  25.1%. It is real and reproducible, but 39-40 of 44 v5 samples remain below
+  the 99.493634-Hz target. A 2.69x PE-size increase for 15.4% while still missing
+  full speed is an architectural proof, not a finished solution.
+
+### Review-found integration defect and verification
+
+- The first full test build exposed that the TU-local slow timing fallback was
+  defined in the public header even for ordinary non-generated test/runtime TUs.
+  At `-O0`, the unused static body still pulled the complete timing globals into
+  intentionally narrow fntrace harnesses. The fallback is now emitted only for
+  `PSX_GAME_GENERATED_FAST_CYC`; ordinary TUs call the compact generic helper.
+  The timing harness is explicitly compiled with the generated-fast define so
+  it continues to exercise the real product fast branch.
+- Runtime and oracle now build successfully. All 43 enabled runtime tests pass;
+  the same three hardware/protocol tests remain explicitly disabled and
+  unclaimed. Six focused recompiler/codegen tests pass, and all six telemetry
+  parser tests pass. The owned submodule diff passes `git diff --check`; the root
+  check still reports an unrelated pre-existing blank line in root
+  `CMakeLists.txt`, which was preserved.
+
+### Review verdict and next concrete step
+
+- Preserve the v4 dispatch/generation-cache/shipping-diagnostic work. It is
+  fail-closed, independently useful, and accounts for a large clean improvement
+  over v3 without changing CPU/device semantics.
+- Do not promote v5 as the final timing architecture. Keep it as proof that the
+  per-instruction outlined pipeline call is real overhead. The next iteration
+  must retain the call-boundary win while sharply reducing duplicated cold
+  paths and text growth—prefer emitter-level straight-line/basic-block timing
+  aggregation or a provably safe function-scope fast/slow specialization over
+  another global clock shortcut. Re-profile the clean v5 workload first so the
+  remaining samples distinguish pipeline bookkeeping, I-cache pressure,
+  instruction fetch checks, interrupt polling, and memory helpers.
+- Require a same-host/same-cache 45-second fresh-boot receipt with steady p05 at
+  or above the 99.493634-Hz target before interactive promotion. Then use the
+  latest replay state only as an additional start/stop workload for race/CDDA
+  validation; it is never a goal blocker.
