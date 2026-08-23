@@ -122,6 +122,21 @@ class RunFpsBenchmarkTests(unittest.TestCase):
             self.assertEqual(before, after)
             self.assertTrue(MODULE.cache_unchanged(before, after))
 
+    def test_build_identity_records_timing_run_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            executable = root / "Game.exe"
+            executable.write_bytes(b"binary")
+            (root / "CMakeCache.txt").write_text(
+                "CMAKE_BUILD_TYPE:STRING=Release\n"
+                "PSX_GAME_TIMING_RUNS:BOOL=OFF\n",
+                encoding="utf-8",
+            )
+            identity = MODULE.build_identity(executable)
+            self.assertEqual(
+                identity["cmake_selected"]["PSX_GAME_TIMING_RUNS"], "OFF"
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -431,6 +431,7 @@ def build_identity(executable: Path) -> dict[str, object]:
             "CMAKE_GENERATOR",
             "CMAKE_PROJECT_VERSION",
             "PSX_GAME_VERSION",
+            "PSX_GAME_TIMING_RUNS",
         }
         for line in cache_file.read_text(encoding="utf-8", errors="replace").splitlines():
             if "=" not in line or ":" not in line.split("=", 1)[0]:
