@@ -1487,3 +1487,118 @@ fresh source/build/launch audit could not support.
   regenerate from `game.toml`.
 - Do not treat a v5 save as authoritative for a v6 runtime, or a headless
   throughput counter as proof of interactive pacing.
+
+## Post-review implementation checkpoint (2026-08-23 06:00 PDT)
+
+This section supersedes the prior "next acceptance action" ordering. The
+post-race replay is a reusable start/stop workload only; it must never pause the
+goal. Fresh boot reproduces the FMV bottleneck without loading the old state.
+
+### Preserved live and binary state
+
+- The protected stock binary is unchanged at
+  `build-psx-standard/Wipeout_3_Special_Edition__Recompiled.exe`, SHA-256
+  `00F55955667DF98653E2AA05903A8601A811BAFAEFA7D27D64C437ECD32B220D`.
+- The user-tested v2 binary remains
+  `build-psx-clock-v2/Wipeout_3_Special_Edition__Recompiled.exe`, SHA-256
+  `D671B36C0C76492298B6C2F8DD6B48A3D91B16232C97577D3C49D168D3FD9807`.
+  Its current user process is PID 4316 and must not be stopped by diagnostics.
+- The unpromoted v3 binary is SHA-256
+  `5AF234C839629FC9D67763BFF79FAE957421D8A4BAC25E54F7156194EAB873C9`,
+  cache identity `cg11_6ce69608_gce5e5eff6_f0`. It is a failed performance
+  candidate, not a release or interactive-test candidate.
+
+### v3 FMV evidence and architectural diagnosis
+
+- The raw/native rational clock is exact at `cpu_effective=9.000x`, but steady
+  FMV headless throughput is only about 48-58 VBlanks/s (`0.49-0.59x`) against
+  the PALx2 target. SPU remains near 44.1 kHz; MDEC completes about 12-15
+  decodes/s. The host retires roughly 150-177 million raw guest cycles/s, only
+  16.7-19.7 million native-equivalent cycles/s versus the required 33.8688
+  million. This is host execution throughput, not a CD/SPU clock error.
+- Allowing the exact guarded title countdown compactor during MDEC is correct
+  and event-bounded, but saves only about 0.85-3.95 million native cycles/s in
+  the steady movie. It is a partial optimization and does not explain the
+  remaining factor-of-two deficit.
+- Twenty all-thread GDB samples put the main thread in `psx_dispatch_impl`
+  20/20, scheduler 19/20, dirty/static dispatch 18/20. Guest functions
+  `801182F4` (8 samples) and `801647D8` (4 samples) repeatedly cross tiny AOT
+  blocks, calls, memory helpers, I-cache checks, and full interrupt checks.
+  The next performance change must reduce this structural overhead while
+  preserving instruction-boundary IRQ delivery; do not add another timing
+  shortcut or scale native devices.
+
+### Transactional v6 state loading
+
+- The entire section stream is decoded and inflated before apply. Unknown,
+  duplicate, trailing, missing, wrong-sized, configuration-mismatched, and
+  unsafe-resume states reject before mutation. ICACHE and exact dirty-bitmap
+  geometry are mandatory.
+- A full rollback image covers CPU, RAM/scratch, IRQ/CRTC phase, timers, clock
+  carry, GPU/VRAM and its host mirror/dirty metadata, SPU/RAM, CD, DMA, SIO,
+  MDEC, dirty-code bitmap, and I-cache. Late mutating subsystem failure and a
+  commit-time resume-PC rejection restore the pre-load machine.
+- GTE/PGXP canonicalization, RAM blessing, and overlay invalidation happen only
+  after every rejection gate. Tests require zero precision invalidations on a
+  rejected load and exactly one on success.
+- The review found and fixed a save-side ordering defect: deferred device work
+  was serviced only when the later clock section was written, after RAM/IRQ had
+  already been serialized. Saves now publish CPU work and service due devices
+  before the first section, so a due DMA is included in RAM. A regression makes
+  that ordering observable.
+- The latest slot-2 replay is v5 (8-byte clock, 12-byte IRQ) and intentionally
+  cannot migrate to the v6 timing contract. Keep using v2 to inspect it; new
+  candidates boot fresh and create v6 states.
+
+### PGXP correctness tranche and remaining boundary
+
+- Codegen identity is now 11. A codegen-hash guarded `gpr_written` callback
+  invalidates provenance for architectural/synthetic writes even when the
+  integer value is unchanged. AOT, full-function BIOS, strict/overlay emitters,
+  dirty-RAM and standalone interpreters cover link writes, COP0/CFC2 writes,
+  synthetic widescreen writes, and the BIOS jump stub.
+- Destructive AND/XOR/NOR/SLT(U) and immediate forms now replace stale
+  destination provenance instead of relying on value validation. Focused PGXP,
+  emitter, structural, and patch tests pass.
+- This is not full PGXP. Bitwise/comparison provenance is still conservative
+  invalidation rather than GooseStation's richer half-wise propagation;
+  same-value DMA/host memcpy writers can retain stale memory provenance; full
+  culling, texture/color/depth correction, vertex cache, projection, settings,
+  and save/runahead support remain open.
+
+### Real 8 MiB contract (audited, not implemented)
+
+- The old `d1bfb6f0` “8mb support” commit did not implement RAM expansion and
+  must not be reused. The coherent target is a fixed 8 MiB backing with a
+  session-immutable live geometry: retail aliases physical RAM through
+  `phys & 0x001FFFFF`; expanded mode uniquely decodes `0x00000000..0x007FFFFF`.
+  KSEG aliases and the `0x00F00000` DMA aperture keep precedence.
+- CPU, DMA, dirty-code, overlay, cosim/digest, PGXP, state, rewind, netplay and
+  cache identity must adopt that one contract together. Start fail-closed for
+  unsupported netplay/Beetle/cosim combinations; do not ship a hybrid map.
+
+### Verification receipts and harness finding
+
+- Current runtime and oracle build successfully. All 40 enabled runtime tests
+  pass; the three upstream-disabled tests remain unclaimed:
+  `sio_dualshock_rumble`, `spu_fidelity`, and `sio_card_protocol`.
+- Focused full-function emitter, all 240 structural forms, recompiler patch,
+  PGXP, transactional-state, and event-boundary tests pass.
+- The overlay shim ABI compile passes with the bundled w64devkit GCC. Two test
+  scripts previously forced `C:\msys64\mingw64\bin\gcc.exe`, which hangs in
+  cc1 on this PC despite consuming no CPU. They now honor `CC`/PATH before that
+  fallback. The much larger `aot_overlay_discovery` fixture still deadlocked in
+  a bounded Windows process/lock case and was stopped by exact test PID; do not
+  represent the entire 53-test recompiler suite as passing.
+
+### Next concrete step
+
+1. Produce a graceful-exit instrumented profile of fresh-boot FMV with the
+   exact v3 Release feature set and a unique debug port; leave v2 PID 4316 alone.
+2. Use the profile to introduce a cheap, explicit generated-branch poll gate
+   (or an equally general AOT call/dispatch optimization), while the full IRQ
+   path remains mandatory whenever a device/software IRQ, host request, or
+   periodic maintenance boundary can be observable.
+3. Prove instruction-boundary/event equivalence in focused tests, regenerate
+   all game C, build a separate v4 candidate, and require fresh FMV throughput
+   near the 99.493634-Hz target before any interactive launch or promotion.
