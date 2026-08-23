@@ -17,7 +17,7 @@ The requested features are represented in two different control planes:
 | Full PGXP | `geometry_correction`, `perspective_texturing`, `pgxp_depth`, `PGXP` CMake surface, and PGXP package | Staged config plus PGXP manifest | Static gate now requires all three booleans |
 | Widescreen / ultrawide | `[widescreen]` and WipEout package choices (`16:9`, `21:9`, `adaptive`) | Config, package manifest, and launcher state | Wired; ultrawide content safety remains unproven |
 | HD assets | `[video].hd_textures = true` plus user-supplied external pack | Staged config and runtime pack telemetry | Enabled, but replacement coverage is not universal |
-| Skip-FMV | `auto_skip_fmv = false` plus skip-FMV package | Staged config and package state | Must remain user-controlled; no automatic runtime claim |
+| Skip-FMV | `auto_skip_fmv = true` plus skip-FMV package | Staged config and package state | Enabled in the release profile; the launcher can still turn it off, and no automatic runtime claim is made |
 
 ## Silent fallback and contradiction findings
 
@@ -39,10 +39,10 @@ The requested features are represented in two different control planes:
    not prove that the runtime selects the PAL path, maintains 100 Hz through
    FMV, or completes a race without audio underruns. The handoff records those
    gates as open.
-5. `auto_skip_fmv = false` is a deliberate source-level default, but the
-   one-folder state can still enable the package. Both values must be reported
-   when auditing a release; neither one alone proves the user's effective
-   setting.
+5. `auto_skip_fmv = true` is the release source-level default, and the
+   one-folder state also enables the package. The launcher can disable it, so
+   both values must still be reported; neither one alone proves the user's
+   effective setting.
 6. HD texture enablement proves only that the replacement subsystem is on.
    Existing telemetry (299 matched entries, 300 decoded images, 47,919 hits,
    zero decode failures in the measured run) is runtime evidence for that pack,
@@ -77,7 +77,7 @@ this audit does not add that runtime instrumentation.
 - exactly `cpu_overclock = 900`;
 - all three full-PGXP booleans;
 - `offer_ultrawide = true`;
-- explicit `auto_skip_fmv = false`; and
+- explicit `auto_skip_fmv = true`; and
 - a PAL x2 manifest whose `default_enabled` is true, matching `mods/state.toml`.
 
 These are narrow release-boundary checks. They do not change runtime behavior,

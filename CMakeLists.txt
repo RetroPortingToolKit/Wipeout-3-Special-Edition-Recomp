@@ -29,6 +29,11 @@ set(PSXRECOMP_BIOS_STEMS "SCPH1001" CACHE STRING
     "Retail BIOS backend required for WipEout 3" FORCE)
 set(PSXRECOMP_BIOS_STEM "SCPH1001" CACHE STRING
     "Retail BIOS backend used by WipEout 3" FORCE)
+# This title ships a deliberately closed remaster catalog. Keep framework
+# packages that are not part of that catalog (for example CD-speed, NTSC, or
+# duplicate experimental variants) out of the one-folder release entirely.
+set(PSX_BUILTIN_MOD_ALLOWLIST
+    "psx.enhancement.8mb-ram;psx.enhancement.fast-loading;psx.enhancement.pgxp;psx.enhancement.skip-fmv")
 include("${PSXRECOMP_ROOT}/runtime/runtime.cmake")
 
 file(GLOB WIPEOUT3_MOD_PLUGIN_SOURCES CONFIGURE_DEPENDS
@@ -68,6 +73,19 @@ foreach(_PSX_RUNTIME_CONFIG game.toml game_options.toml)
             VERBATIM)
     endif()
 endforeach()
+
+# Keep the presentation asset in the one-folder release. The renderer treats
+# the directory as user-replaceable artwork, while `bezel = "random"` selects
+# one of the shipped PNGs automatically.
+set(WIPEOUT3_BEZELS "${CMAKE_CURRENT_SOURCE_DIR}/bezels")
+if(EXISTS "${WIPEOUT3_BEZELS}")
+    add_custom_command(TARGET psx-runtime POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${WIPEOUT3_BEZELS}"
+            "$<TARGET_FILE_DIR:psx-runtime>/bezels"
+        COMMENT "Staging WipEout bezel artwork"
+        VERBATIM)
+endif()
 
 # Ship WipEout 3's trusted, game-owned mod catalog beside the runtime. Every
 # feature remains disabled until selected on the launcher's Mods page.

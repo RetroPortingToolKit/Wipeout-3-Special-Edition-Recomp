@@ -88,13 +88,13 @@
   skipped pacing as well as presentation and falsely reached ~200 Hz; that
   was corrected so skipped FMV frames still receive the 10 ms guest wait.
   Root CMake now keeps netplay/rewind opt-in for this single-player product.
-- With a temporary build-tree-only `auto_skip_fmv=true` probe, the title path
+- With `auto_skip_fmv=true`, the title path
   reached generated game dispatch after PAL x2 and held approximately 99.9–
   105.4 Hz with approximately 44.1 kHz SPU production and zero underruns.
   This validates the title/menu-side workload, but no automated controller
   input has yet selected and completed a race, so race stability and full
-  content coverage remain open. The shipped config was restored to
-  `auto_skip_fmv=false`.
+  content coverage remain open. The release profile retains
+  `auto_skip_fmv=true` as requested; the launcher can disable the feature.
 - A corrected deterministic input route now reaches an actual on-track race:
   title → memory-card UI → main menu → vehicle class → ship → race track. The
   final capture is `race_probe.png` (disposable, not shipped). With FPS
@@ -105,8 +105,8 @@
   `render` value is display-area flips, not swap cadence, and is not used as a
   presentation-FPS claim. FMV, race stability, and normal-vs-accelerated load
   equivalence therefore remain gated rather than declared complete. The
-  temporary probe harness is being removed and the production build restored
-  with debug tools off, `auto_skip_fmv=false`, netplay off, and rewind off.
+  temporary probe harness is being removed and the production build retains
+  debug tools off, `auto_skip_fmv=true`, netplay off, and rewind off.
 - The restored production executable passes the static Release boundary,
   `guest_clock_test`, and the authenticated PAL-title verifier. The build emits
   only existing third-party `stb_image` overflow warnings; no build or test
@@ -375,3 +375,33 @@ unbounded build as a performance test; use focused targets and the bounded
   its pinned launcher/runtime submodule revision is unavailable from the
   configured remote, so the current path-normalization and sidecar contract
   must be repaired against a reachable matching revision before changing it.
+
+## Fresh release artifact checkpoint (2026-08-22)
+
+- A clean product build now succeeds in `build-release-clang-nolto` using the
+  bundled Clang toolchain, Release `-O3 -DNDEBUG`, and
+  `PSX_ENABLE_LTO=OFF`. The resulting
+  `Wipeout_3_Special_Edition__Recompiled.exe` is newer than all relevant source
+  and configuration inputs.
+- The fresh artifact passes `tools/verify_release_freshness.py`,
+  `tools/verify_static_release.ps1`, and
+  `tools/verify_one_folder_release.ps1`. The static boundary now intentionally
+  accepts release `auto_skip_fmv=true`; the launcher may still disable that
+  option for users who want the original FMV flow.
+- The framework staging policy is now title-scoped: the one-folder release
+  contains exactly the six intended packages—8 MB RAM, Fast Loading, PGXP,
+  Skip FMV, PAL x2/100 Hz, and widescreen. Retired CD Speed, NTSC/120 Hz, and
+  duplicate/experimental packages are not staged.
+- The release now stages `bezels/wipeout3-neon.png`, a native one-folder bezel
+  asset, and the one-folder verifier confirms its presence alongside the HD
+  asset/font payloads.
+- A fresh GCC non-LTO attempt reached the generated static overlay but grew to
+  approximately 11.6 GB before it was stopped cleanly. The successful Clang
+  build is therefore the current bounded release-build route; this is a build
+  resource constraint, not a runtime-performance result.
+- Remaining acceptance work is runtime evidence from the fresh executable:
+  sustained PAL-100 race timing, visible PGXP geometry/depth correction,
+  normal-versus-fast loading equivalence at both requested endpoints, actual
+  HD font/texture replacement coverage, launcher Play behavior with user BIOS
+  and disc paths, and Vulkan renderer parity. Packaging/static gates are no
+  longer the blocker.
