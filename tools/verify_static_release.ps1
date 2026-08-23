@@ -41,8 +41,8 @@ foreach ($setting in @('geometry_correction', 'perspective_texturing', 'pgxp_dep
 if ($configText -notmatch '(?m)^offer_ultrawide\s*=\s*true\r?$') {
     throw 'Widescreen configuration does not offer ultrawide output.'
 }
-if ($configText -notmatch '(?m)^auto_skip_fmv\s*=\s*false\r?$') {
-    throw 'FMV skipping is not explicitly opt-in in the staged game config.'
+if ($configText -notmatch '(?m)^auto_skip_fmv\s*=\s*true\r?$') {
+    throw 'FMV skipping is not enabled in the remaster configuration.'
 }
 $skipManifest = Join-Path $build 'mods/packages/psx.enhancement.skip-fmv/1.0.0/manifest.toml'
 if (-not (Test-Path -LiteralPath $skipManifest)) { throw "Missing staged skip-opening manifest: $skipManifest" }
