@@ -68,6 +68,47 @@ INTEGER_FIELDS = (
     "idle_native",
 )
 RENDER_FIELDS = ("render_fps", "render", "display_fps", "display")
+EXPLICIT_AUDIO_INTEGER_FIELDS = (
+    "audio_output",
+    "audio_host_frames",
+    "audio_pumps",
+    "audio_backpressure",
+    "audio_underruns",
+    "audio_overflows",
+    "audio_callback_calls",
+    "audio_callback_starved",
+)
+EXPLICIT_AUDIO_NONNEGATIVE_FLOAT_FIELDS = (
+    "spu_wall_hz",
+    "cdda_wall_sectors_s",
+    "audio_host_wall_hz",
+    "audio_fill_ms",
+    "audio_target_ms",
+    "audio_callback_uncovered_max_ms",
+)
+EXPLICIT_AUDIO_SIGNED_FLOAT_FIELDS = (
+    "audio_correction",
+    "av_sim_drift_ms",
+    "audio_host_wall_drift_ms",
+)
+EXPLICIT_AUDIO_TOKEN_FIELDS = (
+    "spu_effective_domain",
+    "cdda_effective_domain",
+    "audio_host_domain",
+    "audio_host_content",
+)
+EXPLICIT_AUDIO_FIELDS = (
+    EXPLICIT_AUDIO_INTEGER_FIELDS
+    + EXPLICIT_AUDIO_NONNEGATIVE_FLOAT_FIELDS
+    + EXPLICIT_AUDIO_SIGNED_FLOAT_FIELDS
+    + EXPLICIT_AUDIO_TOKEN_FIELDS
+)
+DISPATCH_VALIDITY_FIELDS = (
+    "text_watched_writes",
+    "text_exact_revalidations",
+)
+
+Sample = dict[str, int | float | str]
 
 
 class TelemetryError(ValueError):
@@ -108,7 +149,19 @@ def _parse_float(value: str, field: str, location: str) -> float:
     return number
 
 
-def parse_clock_line(line: str, location: str) -> dict[str, int | float]:
+def _parse_signed_float(value: str, field: str, location: str) -> float:
+    try:
+        number = float(value)
+    except ValueError as exc:
+        raise TelemetryError(
+            f"{location}: {field} must be numeric, got {value!r}"
+        ) from exc
+    if not math.isfinite(number):
+        raise TelemetryError(f"{location}: {field} must be finite")
+    return number
+
+
+def parse_clock_line(line: str, location: str) -> Sample:
     """Parse one current runtime ``[CLOCK]`` record.
 
     Units printed after values (``fps``, ``x``, ``Hz``, ``%``) are deliberately
@@ -119,11 +172,16 @@ def parse_clock_line(line: str, location: str) -> dict[str, int | float]:
     marker = line.find(CLOCK_MARKER)
     if marker < 0:
         raise TelemetryError(f"{location}: missing {CLOCK_MARKER} marker")
+    tokens: dict[str, str] = {}
+    for match in TOKEN_RE.finditer(line[marker + len(CLOCK_MARKER):]):
+        name, value = match.groups()
+        if name in tokens:
+            raise TelemetryError(f"{location}: duplicate field {name!r}")
+        tokens[name] = value
+
     values: dict[str, str] = {}
     for match in FIELD_RE.finditer(line[marker + len(CLOCK_MARKER):]):
         name, value = match.groups()
-        if name in values:
-            raise TelemetryError(f"{location}: duplicate field {name!r}")
         values[name] = value
 
     missing = [name for name in REQUIRED_FIELDS if name not in values]
@@ -133,7 +191,7 @@ def parse_clock_line(line: str, location: str) -> dict[str, int | float]:
             + ", ".join(missing)
         )
 
-    sample: dict[str, int | float] = {}
+    sample: Sample = {}
     for name in REQUIRED_FIELDS:
         if name in INTEGER_FIELDS:
             sample[name] = _parse_int(values[name], name, location)
@@ -149,6 +207,67 @@ def parse_clock_line(line: str, location: str) -> dict[str, int | float]:
         sample["render_fps"] = _parse_float(
             values[render_names[0]], render_names[0], location
         )
+
+    explicit_present = [name for name in EXPLICIT_AUDIO_FIELDS if name in tokens]
+    if explicit_present:
+        explicit_missing = [
+            name for name in EXPLICIT_AUDIO_FIELDS if name not in tokens
+        ]
+        if explicit_missing:
+            raise TelemetryError(
+                f"{location}: incomplete explicit wall-audio record; missing fields: "
+                + ", ".join(explicit_missing)
+            )
+        for name in EXPLICIT_AUDIO_INTEGER_FIELDS:
+            sample[name] = _parse_int(tokens[name], name, location)
+        for name in EXPLICIT_AUDIO_NONNEGATIVE_FLOAT_FIELDS:
+            sample[name] = _parse_float(tokens[name], name, location)
+        for name in EXPLICIT_AUDIO_SIGNED_FLOAT_FIELDS:
+            sample[name] = _parse_signed_float(tokens[name], name, location)
+        for name in EXPLICIT_AUDIO_TOKEN_FIELDS:
+            sample[name] = tokens[name]
+
+        if sample["audio_output"] not in (0, 1):
+            raise TelemetryError(f"{location}: audio_output must be 0 or 1")
+        if sample["spu_effective_domain"] != "sim_cycles":
+            raise TelemetryError(
+                f"{location}: unsupported spu_effective_domain="
+                f"{sample['spu_effective_domain']!r}"
+            )
+        if sample["cdda_effective_domain"] != "sim_cycles":
+            raise TelemetryError(
+                f"{location}: unsupported cdda_effective_domain="
+                f"{sample['cdda_effective_domain']!r}"
+            )
+        if sample["audio_host_content"] != "including_silence":
+            raise TelemetryError(
+                f"{location}: unsupported audio_host_content="
+                f"{sample['audio_host_content']!r}"
+            )
+        host_domain = sample["audio_host_domain"]
+        if host_domain not in ("none", "callback_consumed", "enqueue_produced"):
+            raise TelemetryError(
+                f"{location}: unsupported audio_host_domain={host_domain!r}"
+            )
+        if (sample["audio_output"] == 0) != (host_domain == "none"):
+            raise TelemetryError(
+                f"{location}: audio_output and audio_host_domain disagree"
+            )
+
+    dispatch_present = [
+        name for name in DISPATCH_VALIDITY_FIELDS if name in tokens
+    ]
+    if dispatch_present:
+        dispatch_missing = [
+            name for name in DISPATCH_VALIDITY_FIELDS if name not in tokens
+        ]
+        if dispatch_missing:
+            raise TelemetryError(
+                f"{location}: incomplete dispatch-validity record; missing fields: "
+                + ", ".join(dispatch_missing)
+            )
+        for name in DISPATCH_VALIDITY_FIELDS:
+            sample[name] = _parse_int(tokens[name], name, location)
 
     if sample["device_clock"] == 0:
         raise TelemetryError(f"{location}: device_clock must be greater than zero")
@@ -192,14 +311,14 @@ def parse_clock_config(line: str, location: str) -> None:
             )
 
 
-def read_source(path: Path) -> tuple[list[dict[str, int | float]], dict[str, object]]:
+def read_source(path: Path) -> tuple[list[Sample], dict[str, object]]:
     try:
         data = path.read_bytes()
         text = data.decode("utf-8-sig")
     except (OSError, UnicodeError) as exc:
         raise TelemetryError(f"{_display_path(path)}: cannot read UTF-8 log: {exc}") from exc
 
-    samples: list[dict[str, int | float]] = []
+    samples: list[Sample] = []
     configuration_records = 0
     for line_number, line in enumerate(text.splitlines(), 1):
         if CLOCK_MARKER not in line:
@@ -280,7 +399,7 @@ def summarize(values: Iterable[float | int]) -> dict[str, int | float]:
 
 
 def _throughput(
-    sample: dict[str, int | float], target_fps: float
+    sample: Sample, target_fps: float
 ) -> dict[str, float]:
     # device_clock is native simulated time for this reporting window.  The
     # measured VBlank rate converts that interval to wall time without assuming
@@ -294,8 +413,42 @@ def _throughput(
     }
 
 
+def _wall_audio(
+    sample: Sample, target_fps: float
+) -> dict[str, float | str]:
+    """Convert simulated-domain device rates to generated-per-wall-second.
+
+    Runtime ``spu_effective`` and ``cdda_effective`` are normalized against
+    simulated native device cycles. Multiplying them by measured VBlank speed
+    (game FPS / target FPS) gives the amount generated per host wall second.
+    This deliberately does not claim physical audio-device callback delivery.
+    """
+
+    wall_speed = float(sample["game"]) / target_fps
+    explicit = "spu_wall_hz" in sample
+    return {
+        "cdda_pcm_frames": (
+            float(sample["cdda_wall_sectors_s"]) * 588.0
+            if explicit
+            else float(sample["cdda_effective"]) * 588.0 * wall_speed
+        ),
+        "cdda_sectors": (
+            float(sample["cdda_wall_sectors_s"])
+            if explicit
+            else float(sample["cdda_effective"]) * wall_speed
+        ),
+        "source": "runtime_explicit" if explicit else "legacy_derived",
+        "spu_frames": (
+            float(sample["spu_wall_hz"])
+            if explicit
+            else float(sample["spu_effective"]) * wall_speed
+        ),
+        "vblank_speed": wall_speed,
+    }
+
+
 def _stratum(
-    samples: list[dict[str, int | float]],
+    samples: list[Sample],
     throughput: list[dict[str, float]],
 ) -> dict[str, object]:
     return {
@@ -307,8 +460,102 @@ def _stratum(
     }
 
 
+def _host_audio_domain(
+    samples: list[Sample], domain: str, boundary: str
+) -> dict[str, object]:
+    selected = [sample for sample in samples if sample.get("audio_host_domain") == domain]
+    return {
+        "boundary": boundary,
+        "callback": {
+            "calls": sum(int(sample["audio_callback_calls"]) for sample in selected),
+            "starvation_events": sum(
+                int(sample["audio_callback_starved"]) for sample in selected
+            ),
+            "uncovered_max_ms": summarize(
+                float(sample["audio_callback_uncovered_max_ms"])
+                for sample in selected
+            ),
+        },
+        "content": (
+            sorted({str(sample["audio_host_content"]) for sample in selected})
+        ),
+        "drift_ms": summarize(
+            float(sample["audio_host_wall_drift_ms"]) for sample in selected
+        ),
+        "events": {
+            "backpressure": sum(
+                int(sample["audio_backpressure"]) for sample in selected
+            ),
+            "overflow_drops": sum(
+                int(sample["audio_overflows"]) for sample in selected
+            ),
+            "pump_calls": sum(int(sample["audio_pumps"]) for sample in selected),
+            "underruns": sum(
+                int(sample["audio_underruns"]) for sample in selected
+            ),
+        },
+        "host_frame_hz": summarize(
+            float(sample["audio_host_wall_hz"]) for sample in selected
+        ),
+        "host_frames": sum(int(sample["audio_host_frames"]) for sample in selected),
+        "output_control": {
+            "correction": summarize(
+                float(sample["audio_correction"]) for sample in selected
+            ),
+            "fill_ms": summarize(
+                float(sample["audio_fill_ms"]) for sample in selected
+            ),
+            "target_ms": summarize(
+                float(sample["audio_target_ms"]) for sample in selected
+            ),
+        },
+        "physical_device_delivery_proven": False,
+        "samples": len(selected),
+    }
+
+
+def _dispatch_validity(samples: list[Sample]) -> dict[str, object]:
+    selected = [
+        sample for sample in samples if "text_watched_writes" in sample
+    ]
+    watched_total = sum(int(sample["text_watched_writes"]) for sample in selected)
+    revalidation_total = sum(
+        int(sample["text_exact_revalidations"]) for sample in selected
+    )
+    if not selected:
+        ratio = None
+        ratio_status = "not_reported"
+    elif watched_total == 0:
+        ratio = None
+        ratio_status = "zero_watched_writes"
+    else:
+        ratio = _rounded(revalidation_total / watched_total)
+        ratio_status = "computed"
+    return {
+        "exact_revalidations_per_watched_write": ratio,
+        "interpretation": (
+            "instrumentation activity counters only; they do not by themselves "
+            "prove dispatch correctness or speed"
+        ),
+        "per_window": {
+            "exact_revalidations": summarize(
+                int(sample["text_exact_revalidations"]) for sample in selected
+            ),
+            "watched_writes": summarize(
+                int(sample["text_watched_writes"]) for sample in selected
+            ),
+        },
+        "ratio_status": ratio_status,
+        "samples": len(selected),
+        "totals": {
+            "exact_revalidations": revalidation_total,
+            "watched_writes": watched_total,
+        },
+    }
+
+
 def build_receipt(
-    samples: list[dict[str, int | float]],
+    samples: list[Sample],
     sources: list[dict[str, object]],
     target_fps: float = DEFAULT_TARGET_FPS,
 ) -> dict[str, object]:
@@ -320,6 +567,7 @@ def build_receipt(
         )
 
     throughputs = [_throughput(sample, target_fps) for sample in samples]
+    wall_audio = [_wall_audio(sample, target_fps) for sample in samples]
     active_indexes = [
         index for index, sample in enumerate(samples) if sample["idle_skips"] > 0
     ]
@@ -327,7 +575,7 @@ def build_receipt(
         index for index, sample in enumerate(samples) if sample["idle_skips"] == 0
     ]
 
-    def indexed(indexes: list[int]) -> tuple[list[dict[str, int | float]], list[dict[str, float]]]:
+    def indexed(indexes: list[int]) -> tuple[list[Sample], list[dict[str, float]]]:
         return (
             [samples[index] for index in indexes],
             [throughputs[index] for index in indexes],
@@ -341,12 +589,87 @@ def build_receipt(
         for sample in samples
         if sample["cdda_playing"] != 0
     ]
+    cdda_wall = [
+        wall_audio[index]
+        for index, sample in enumerate(samples)
+        if sample["cdda_playing"] != 0
+    ]
+    explicit_audio = [
+        sample for sample in samples if "audio_host_domain" in sample
+    ]
+    wall_sources = {
+        "legacy_derived": sum(
+            item["source"] == "legacy_derived" for item in wall_audio
+        ),
+        "runtime_explicit": sum(
+            item["source"] == "runtime_explicit" for item in wall_audio
+        ),
+    }
 
     return {
+        "audio_domains": {
+            "simulated_time": {
+                "domain": "simulated PSX device cycles",
+                "cdda_active_sector_hz": summarize(cdda_rates),
+                "spu_frame_hz": summarize(
+                    sample["spu_effective"] for sample in samples
+                ),
+            },
+            "wall_generated": {
+                "cdda_active_pcm_frame_hz": summarize(
+                    item["cdda_pcm_frames"] for item in cdda_wall
+                ),
+                "cdda_active_sector_hz": summarize(
+                    item["cdda_sectors"] for item in cdda_wall
+                ),
+                "derivation": (
+                    "runtime wall-counter rates when present; older logs fall "
+                    "back to simulated-domain rate * game_fps / target_fps"
+                ),
+                "measurement_sources": wall_sources,
+                "physical_device_delivery_proven": False,
+                "spu_frame_hz": summarize(
+                    item["spu_frames"] for item in wall_audio
+                ),
+                "vblank_speed_ratio": summarize(
+                    item["vblank_speed"] for item in wall_audio
+                ),
+            },
+            "callback_consumed": _host_audio_domain(
+                explicit_audio,
+                "callback_consumed",
+                "frames requested/consumed at the software host callback boundary; "
+                "content includes silence; not proof of physical DAC delivery",
+            ),
+            "enqueue_produced": _host_audio_domain(
+                explicit_audio,
+                "enqueue_produced",
+                "frames handed to the legacy software enqueue boundary; not callback "
+                "consumption and not proof of physical DAC delivery",
+            ),
+            "inactive_output": _host_audio_domain(
+                explicit_audio,
+                "none",
+                "runtime reports no active host output boundary; zero/nonzero "
+                "health counters are retained but cannot prove delivery",
+            ),
+            "explicit_output_health": {
+                "inactive_samples": sum(
+                    sample["audio_host_domain"] == "none"
+                    for sample in explicit_audio
+                ),
+                "samples": len(explicit_audio),
+                "simulated_av_drift_ms": summarize(
+                    float(sample["av_sim_drift_ms"])
+                    for sample in explicit_audio
+                ),
+            },
+        },
         "cdda_active": {
             "effective_hz": summarize(cdda_rates),
             "samples": len(cdda_rates),
         },
+        "dispatch_validity": _dispatch_validity(samples),
         "cpu_effective_ratio": summarize(
             sample["cpu_effective"] for sample in samples
         ),
@@ -361,7 +684,7 @@ def build_receipt(
             sample["render_fps"] for sample in samples if "render_fps" in sample
         ),
         "samples": len(samples),
-        "schema": "psx-fps-telemetry-v1",
+        "schema": "psx-fps-telemetry-v2",
         "sources": sources,
         "spu_effective_hz": summarize(
             sample["spu_effective"] for sample in samples
@@ -414,7 +737,7 @@ def run(argv: list[str]) -> int:
         paths = resolve_inputs(args.logs)
         if args.output and args.output.resolve() in paths:
             raise TelemetryError("output path must not overwrite an input log")
-        samples: list[dict[str, int | float]] = []
+        samples: list[Sample] = []
         sources: list[dict[str, object]] = []
         for path in paths:
             source_samples, source = read_source(path)

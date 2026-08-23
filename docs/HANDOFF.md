@@ -1786,3 +1786,59 @@ Next implementation order: finish the isolated benchmark/audio contract;
 measure a source-matching baseline; implement and prove O(1) direct dispatch;
 then isolate branch/I-cache/compact-timing work as needed before 8 MiB, PGXP,
 wide presentation, assets, and final integrated acceptance.
+
+## Post-retrospective integration receipts (2026-08-23 15:30 PDT)
+
+- The contamination-proof benchmark runner now rejects short/natural failures,
+  guards the exact image immediately before launch, owns and stops only its
+  child, uses fresh cards, and records binary/source/cache/host identities. Its
+  guarded three-second v4 smoke was accepted with 2/2 required windows and an
+  unchanged cache. All 15 diagnostics tests pass.
+- Runtime telemetry now separates simulated SPU/CDDA cadence, wall generation,
+  callback-consumed versus enqueue-produced host frames, queue health,
+  underruns/overflows, callback starvation, and drift. Receipts explicitly do
+  not claim software callback consumption proves physical DAC delivery.
+- The unpromoted direct-dispatch experiment emits a bounded two-level O(1) map.
+  WipEout regeneration contains 23,336 entries on 172 pages; exhaustive checks
+  cover all 524,288 aligned retail-RAM words and all three segment aliases. The
+  unchanged validity hit is one epoch comparison. Hot mutable data sharing an
+  armed code page can still cause global invalidation; exported churn counters
+  are not yet wired into benchmark receipts, so no performance claim exists.
+- The current integrated runtime/oracle tree builds with pinned w64devkit. All
+  44 enabled CTests pass; `sio_dualshock_rumble`, `spu_fidelity`, and
+  `sio_card_protocol` remain disabled and unclaimed.
+- The owner reported a `cc1.exe` modal for missing `libisl-23.dll`. Current
+  build caches and all three active work lanes used w64devkit/Clang, not MSYS.
+  Two legacy test-only hard-coded MSYS GCC fallbacks could produce exactly that
+  failure when MSYS `bin` was absent from `PATH`; those fallbacks were removed.
+  The overlay shim compile passes with explicitly pinned w64devkit. Never add
+  MSYS to `PATH` as a workaround or use its compiler in this lane.
+
+The authoritative retrospective verdict is unchanged: none of these focused
+receipts is a source-matching product benchmark or a promotable game binary.
+
+## Reviewed foundation ready for source-matched measurement (2026-08-23 16:05 PDT)
+
+- Direct-dispatch churn is now emitted in every clock record as reset-safe
+  `text_watched_writes` and `text_exact_revalidations` deltas, and the receipt
+  reports their totals, distributions, and ratio without treating activity as
+  proof of either speed or correctness.
+- The benchmark rejects any overlay-cache content or namespace change during
+  the timed interval. This closes the remaining shader-compilation-like
+  contamination hole: the exact cache must be precompiled and stable.
+- Review found and fixed the compact timing emitter's address-zero sentinel;
+  valid KUSEG code at physical zero now starts a run through explicit state.
+- The prior blank `0xC000001D` invalid-config failure was an uncaught C++
+  exception hitting w64devkit's trap terminate handler. `psxrecomp-game` now
+  has a top-level exception boundary and returns 2 with the loader diagnostic.
+  This is separate from the removed legacy MSYS GCC fallback that caused the
+  owner's earlier missing-`libisl-23.dll` modal.
+- The integrated pinned-w64devkit runtime/oracle build succeeds. All 44 enabled
+  CTests pass; the same three named hardware/protocol tests remain disabled and
+  unclaimed. The reachable/direct-map/timing-run/overlay-shim/dirty-text focused
+  checks pass, as do all 19 root diagnostic tests.
+
+Next concrete step: commit and push this reviewed measurement/dispatch/timing
+foundation, regenerate WipEout from that exact submodule commit, build a fresh
+product directory and precompile its exact overlay cache, then require two
+accepted 45-second fresh-boot receipts before any interactive promotion.
