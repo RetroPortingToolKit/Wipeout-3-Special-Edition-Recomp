@@ -35,14 +35,15 @@ timing evidence without proving the title’s exact simulation update count
 (`docs/HANDOFF.md:22-28`); optimized windowed runs fell to roughly 74–79 Hz
 with audio underruns (`docs/HANDOFF.md:43-50`), and the FMV fix still leaves
 long-run audio/race verification open (`docs/HANDOFF.md:59-64`). The same handoff
-also says to keep PAL100 default-off until simulation, media-load, and race
-traces exist (`docs/HANDOFF.md:145-149`), which conflicts with the current
-manifest/state default.
+also records the still-open simulation, media-load, and race traces
+(`docs/HANDOFF.md:145-149`). The release policy now selects PAL100 by default,
+but that selection must not be confused with a passed runtime receipt.
 
 Required closure: PAL x2 from BIOS through title, every race entry path, FMV,
 CD/XA, SPU production, input cadence, and sustained presentation must be
 captured with zero underruns and a stable 100 Hz gameplay rate. The default
-selection should remain experimental until that receipt exists.
+selection is now required by the release profile; the runtime receipt remains
+a separate shipping-readiness gate.
 
 ### P0 — 4× Fast Loading is selected before its equivalence gate is complete
 
@@ -59,7 +60,8 @@ byte-for-byte paired traces remain open (`docs/HANDOFF.md:183-194`); the
 Required closure: run normal and 4× branches from the same post-load savestate,
 with PAL100 off, and compare card writes, CD command/sector/IRQ/DMA ordering,
 guest fingerprints, SPU timing, and a short post-race continuation. Keep the
-feature disabled by default until both `startup-card` and `race-load` pass.
+feature selected by the release profile, but equivalence unproven until both
+`startup-card` and `race-load` pass.
 
 ### P1 — Ultrawide is exposed, but WipEout’s visible-world path is not content-safe
 

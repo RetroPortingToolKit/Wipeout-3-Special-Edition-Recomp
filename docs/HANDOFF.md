@@ -72,7 +72,8 @@
   observed. A 14-second boot probe records CRTC x1, guest ~60 Hz, SPU ~44.1
   kHz, and zero underruns. The subsequent PAL/FM V transition still falls to
   about 50 Hz with severe audio underruns, so gameplay/audio behavior remains
-  unverified and the feature must stay default-off.
+  unverified; the release profile now auto-selects it, but the runtime receipt
+  still must prove sustained 100 Hz race behavior before shipping the EXE.
 - FMV pacing was then corrected so PAL x2 no longer waits 20 ms on every guest
   tick. Depth-24/MDEC presentation now skips alternate PAL x2 presents while
   the guest remains on the 10 ms cadence. This raises the observed FMV-window
@@ -109,7 +110,8 @@
 - The restored production executable passes the static Release boundary,
   `guest_clock_test`, and the authenticated PAL-title verifier. The build emits
   only existing third-party `stb_image` overflow warnings; no build or test
-  failure occurred. PAL100 remains opt-in/default-off.
+  failure occurred. PAL100 is now auto-enabled by the release profile as
+  requested, while sustained gameplay timing remains an explicit open receipt.
 - Focused FMV evidence is now available for both paths. Stock PAL remains
   PAL x1 at a 20 ms wall-clock cadence; opt-in PAL x2 remains a 10 ms guest
   cadence while the `gl_present_ring` shows movie swaps approximately every
@@ -117,14 +119,42 @@
   the movie bounds, confirming the corrected crop/clipping path. This is a
   cadence/crop pass, not a full content soak.
 
+- Savestate/Hueponik-menu diagnosis: the Hueponik overlay is guest-side and is
+  toggled by the guest Start+Select chord (keyboard Right Shift+Enter). The
+  live host pad button word is not serialized in the guest snapshot, however,
+  so a pre-load Start+Select latch could survive the restore boundary and
+  reopen the overlay even when the saved race frame had it hidden. The runtime
+  now clears every live pad word immediately after a successful savestate
+  restore, before the existing input-release guard hands input back to the
+  game. This preserves guest RAM/VRAM and timing while preventing host load
+  input from becoming guest input. The same guard is now armed when submitting
+  a save: Shift+Enter is the save-menu commit gesture, but it is also the
+  guest's Select+Start chord, so the save path must consume it until both keys
+  are released. Controlled debug-server save/load passes remain stable; the
+  former report of a menu reappearing after a save is explained by this input
+  collision rather than a savestate file corruption.
+
+- Performance overlay integration is currently diagnostic, not yet a shipping
+  decision. Linking the generated static PAL/high-detail corpus proved that
+  exact relocated variants match (no variant or CRC misses), but the binary is
+  very large and the hot interpreter fallback remains at physical PC
+  0x007814D0, a CPS split continuation absent from the current static dispatch.
+  The next performance pass must generate/dispatch that exact live block and
+  then remeasure optimized Release at PAL x2/100 Hz; do not ship the broad
+  corpus merely because it links.
+
 - PAL100 title timing is now authenticated for the supplied PAL target: the
   title selector/state path at 0x8017BB8C–0x8017BBAC maps selector 2 to
   gSimVblankSkip=1 and PAL-x2 state=1. The opt-in PAL-x2 hook and target-only
   package are present, with `tools/verify_pal100_title.py` covering the exact
   local bytes and hashes. End-to-end PAL-x2 simulation, SPU/CDDA, timeout,
-  media-load, and race traces remain open; keep the feature default-off.
+  media-load, and race traces remain open; keep the feature selected by the
+  release profile but do not claim the runtime is proven until those traces
+  pass.
 - Normal-vs-accelerated memory-card and race-load equivalence is not proven;
-  the framework's Fast Loading host-pacing mod remains disabled by default.
+  the framework's Fast Loading host-pacing mod is selected by default in the
+  release state, while the two-gate equivalence harness remains fail-closed
+  for proof purposes.
   The implementation is explicitly guest-observable-equivalent by design, but
   a paired normal/accelerated trace (CD sector/IRQ order, card writes, state
   fingerprint, and audio timing) is still required before treating that claim
@@ -142,8 +172,8 @@
   host taps at 44.1 kHz, and reduces overflow drops to zero. It still reports
   substantially higher cumulative output underruns (and 54 SPU trace
   underruns) than the normal route, and the paired card/CD summaries have not
-  yet been captured. Fast Loading therefore remains disabled and equivalence
-  is not declared.
+  yet been captured. Fast Loading remains enabled in the requested profile,
+  but equivalence is not declared.
 - A runtime probe of host-only DRC priming showed that it did not solve the
   accelerated transition: the bounded version reached zero overflow drops but
   still produced substantially worse bridge underruns. That experiment was
@@ -265,5 +295,66 @@ audio deltas.
 - Treating HD-pack discovery as proof of replacement: live substitution was
   separately measured and is now confirmed only for the observed 299 entries.
 - Repeating an unbounded PAL-100 search without stronger runtime traces: the
-  title-side candidate is now authenticated, but PAL x2 remains default-off
-  until simulation/SPU/CDDA/media comparisons exist.
+  title-side candidate is now authenticated and selected by the release
+  profile; simulation/SPU/CDDA/media comparisons remain required before the
+  executable is treated as shipping-ready.
+
+## Parallel GooseStation and remaster audits
+
+The following scoped audits are now part of the canonical handoff:
+
+- `docs/audits/goosestation-parity.md`: GooseStation/DuckStation-derived
+  feature comparison. The current release has authenticated PAL x2, PGXP,
+  900% overclock, HD replacement, BIOS skip, and save-state surfaces, but
+  sustained PAL-100 proof, fast-loading equivalence, 21:9 native-frustum
+  coverage, and Vulkan runtime parity remain open.
+- `docs/audits/pacing.md`: PAL x2 produces 100 guest VBlank edges per second
+  without doubling the CPU clock. The authenticated title selector must be
+  selector 2 (`gSimVblankSkip=1`, PAL-x2 state 1) for 100 Hz simulation;
+  FMV presentation remains approximately 50 Hz.
+- `docs/audits/goosestation-skip-engine.md` and `docs/audits/boot-cd.md`:
+  BIOS shell skip is structurally safe, but title equivalence is not yet
+  proven. Generic card and pure-data CD skipping must remain separate, with
+  CDDA/XA/MDEC/FMVs hard-excluded and race-load endpoints proven before
+  default-on acceleration is claimed.
+- `docs/audits/fmv-presentation.md`: FMV cadence and 4:3 bounded composition
+  are separate from the 100 Hz gameplay path; remaining acceptance work is a
+  full-window soak, not a gameplay-rate change.
+- `docs/audits/hardware-parity.md`: 8 MB RAM and 900% CPU are applied in the
+  observed runtime, but the resolver does not yet enforce them as an atomic
+  title-hack pairing.
+- `docs/audits/renderer-quality.md` and `docs/audits/hd-assets.md`: the
+  OpenGL replacement path is live, but 98 expected HD keys have no PNG
+  payload and the external pack is not yet release-gate validated.
+
+The root CMake policy now defaults `PSX_ENABLE_LTO` to ON while honoring an
+explicit OFF for toolchains without IPO support. A full UI-enabled product
+build with LTO OFF compiled the runtime, PGXP, launcher, generated game code,
+and plugins, then was stopped at the generated BIOS/static-overlay translation
+units after excessive memory growth (approximately 11 GB). Do not repeat that
+unbounded build as a performance test; use focused targets and the bounded
+  native-continuation audit instead.
+
+## Current release and agent findings
+
+- The active release catalog is now intended to contain exactly six packages:
+  8 MB RAM, Fast Loading, PGXP, Skip FMV, PAL x2/100 Hz, and widescreen. The
+  static and one-folder verifiers reject unknown, retired, NTSC/120 Hz, legacy,
+  duplicate, and nested retired package paths.
+- `tools/fast_loading_equivalence.py` now compares only the two requested
+  endpoints: startup memory-card loading and race loading. It checks committed
+  save-state restores, card traffic, CD sectors/traces/IRQs, guest frame
+  fingerprints, and audio deltas/events. No live race-load equivalence receipt
+  exists yet.
+- `tools/verify_pgxp_runtime.py` reports PGXP configuration separately from
+  runtime proof; it now reads the actual `pgxp_cpu_mode` setting rather than
+  confusing it with the 900% CPU overclock. The PGXP save-state verifier covers
+  reset, exact restore generation, and 4:3/16:9/21:9 continuation comparisons.
+- The last shipped EXE and ZIP predate the latest native/PGXP/PAL100 changes;
+  `build-main-pgxp` has no top-level EXE. A fresh bounded Release build remains
+  required, but the generated static overlay is too large for an unbounded
+  UI-enabled build in the current memory budget.
+- The launcher audit found no safe parent-repo fix for “Play does nothing”:
+  its pinned launcher/runtime submodule revision is unavailable from the
+  configured remote, so the current path-normalization and sidecar contract
+  must be repaired against a reachable matching revision before changing it.

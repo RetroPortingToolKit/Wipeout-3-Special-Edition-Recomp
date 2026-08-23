@@ -12,7 +12,7 @@ The requested features are represented in two different control planes:
 | Feature | Release source of truth | What is actually observable | Release disposition |
 | --- | --- | --- | --- |
 | 900% overclock | `game.toml` `[video].cpu_overclock = 900` | Staged `game.toml`; framework applies the scalar through its video config | Static gate now requires the exact value |
-| PAL x2 / 100 Hz | PAL target manifest + `wipeout3.framerate.pal-x2` plugin + title-side authenticated bytes | Manifest and `verify_pal100_title.py`; no proof of sustained simulation/audio/race timing | Experimental and must be default-off |
+| PAL x2 / 100 Hz | PAL target manifest + `wipeout3.framerate.pal-x2` plugin + title-side authenticated bytes | Manifest and `verify_pal100_title.py`; no proof of sustained simulation/audio/race timing | Auto-selected by release policy; runtime proof remains open |
 | 8 MB RAM | Framework built-in package, selected by launcher state in a release | `mods/state.toml` and staged built-in package; source checkout has no built-in submodule payload | Verify from the staged artifact, not this checkout alone |
 | Full PGXP | `geometry_correction`, `perspective_texturing`, `pgxp_depth`, `PGXP` CMake surface, and PGXP package | Staged config plus PGXP manifest | Static gate now requires all three booleans |
 | Widescreen / ultrawide | `[widescreen]` and WipEout package choices (`16:9`, `21:9`, `adaptive`) | Config, package manifest, and launcher state | Wired; ultrawide content safety remains unproven |
@@ -30,11 +30,10 @@ The requested features are represented in two different control planes:
 2. `CMakeLists.txt` stages only `game.toml` and optional `game_options.toml`,
    then copies `mods/preloaded`; it does not author a state file. State is
    launcher-owned. Any release receipt must include the staged `mods/state.toml`.
-3. The PAL manifest description says “default-off” but currently declares
-   `default_enabled = true`. This is a real semantic contradiction, not a
-   cosmetic label. The static verifier now rejects a staged PAL manifest that
-   is default-on. The package should be corrected in the release-producing
-   change before shipping.
+3. The PAL manifest and release state are now explicitly default-on by policy.
+   That selection is intentionally separate from runtime proof: the static
+   verifier accepts only the exact active catalog, while the PAL title and
+   gameplay receipt still must prove sustained 100 Hz behavior before shipping.
 4. The PAL title verifier authenticates the media hash, executable hash, and
    selector words (`selector 2 -> gSimVblankSkip=1, pal_x2_state=1`). It does
    not prove that the runtime selects the PAL path, maintains 100 Hz through
@@ -79,7 +78,7 @@ this audit does not add that runtime instrumentation.
 - all three full-PGXP booleans;
 - `offer_ultrawide = true`;
 - explicit `auto_skip_fmv = false`; and
-- a PAL x2 manifest whose `default_enabled` is false.
+- a PAL x2 manifest whose `default_enabled` is true, matching `mods/state.toml`.
 
 These are narrow release-boundary checks. They do not change runtime behavior,
 package state, launcher defaults, generated code, or shared framework config.
