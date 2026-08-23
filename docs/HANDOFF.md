@@ -1754,3 +1754,35 @@ or asset work. The current tranche remains CPU/runtime architecture.
   or above the 99.493634-Hz target before interactive promotion. Then use the
   latest replay state only as an additional start/stop workload for race/CDDA
   validation; it is never a goal blocker.
+
+## Authoritative deep retrospective (2026-08-23)
+
+The owner requested a stop-and-review before further product work. The full
+review is preserved in `docs/DEEP_RETROSPECTIVE_2026-08-23.md` and supersedes
+the optimistic next-step ordering above.
+
+- There is no promotable remaster binary. Measured v5 is older codegen
+  `0d67212f`; committed source is `e655f7bf`. v5 misses target in 39-40/44
+  windows and expands `.text` 3.244x.
+- `Game FPS` is real wall-time VBlank throughput. `cpu_effective=9.000x` is an
+  accounting ratio, while SPU/CDDA effective rates are simulated-time rates;
+  current telemetry cannot prove audible wall speed or underrun freedom.
+- The strongest next performance experiment is O(1), epoch-qualified direct
+  clean dispatch. The current "cached" path still binary-searches 23,336
+  entries and rescans covered pages on every dispatch; that family accounts for
+  at least 18.35% of stable v5 stack samples.
+- A bounded uncommitted compact timing-run prototype passes focused tests and
+  bounds shared helper `.text` to 2,304 bytes plus at most 1.97 MiB of mask
+  data. It is a later isolated A/B candidate, not the first next change.
+- Current PGXP is neither FULL nor MAX and has concrete tolerance, signed-shift,
+  FIFO, NCLIP, external-write provenance, cache/default, 2D, and feature gaps.
+  Keep it disabled until the clean-room correctness sequence in the review.
+- Coherent 8 MiB, wide-resolution acceptance, licensed bezel/font/text assets,
+  wall-audio telemetry, and integrated current-source verification remain open.
+- The replay is a reusable workload only. It must never pause or block the
+  active goal.
+
+Next implementation order: finish the isolated benchmark/audio contract;
+measure a source-matching baseline; implement and prove O(1) direct dispatch;
+then isolate branch/I-cache/compact-timing work as needed before 8 MiB, PGXP,
+wide presentation, assets, and final integrated acceptance.
