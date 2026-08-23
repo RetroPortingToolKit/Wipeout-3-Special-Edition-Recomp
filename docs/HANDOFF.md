@@ -354,6 +354,11 @@ unbounded build as a performance test; use focused targets and the bounded
   `build-main-pgxp` has no top-level EXE. A fresh bounded Release build remains
   required, but the generated static overlay is too large for an unbounded
   UI-enabled build in the current memory budget.
+- A bounded incremental `build-release --target psx-runtime -j4` attempt
+  recompiled the runtime, PGXP, BIOS, 64 generated game translation units, and
+  PAL100 plugin without source errors, then stalled in the ccache/toolchain
+  handoff during the final remaining work. It was terminated cleanly; the EXE
+  timestamp and hash did not change, so the stale-artifact gate still fails.
 - The launcher audit found no safe parent-repo fix for “Play does nothing”:
   its pinned launcher/runtime submodule revision is unavailable from the
   configured remote, so the current path-normalization and sidecar contract
