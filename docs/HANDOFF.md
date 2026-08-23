@@ -478,3 +478,35 @@ unbounded build as a performance test; use focused targets and the bounded
   `PSX_DISABLE_OVERLAY_EXTRA_DISPATCH=1` control switch are committed in the
   psxrecomp submodule to make the next A/B reproducible. No probe process is
   left running at session close.
+
+## PGXP disabled and 900% idle-loop work (2026-08-23)
+
+- The race-state title bar was rejected as an acceptance metric. Live RAM on
+  the compatible race state proved `gSimVblankSkip=1` at `0x8017F02C` and the
+  PAL-x2 state `=1` at `0x80175064`; this is not the false 100-VBlank/50-update
+  divider case. The remaining failure is host throughput.
+- A timing-preserving stack-countdown idle-loop recognizer now skips the
+  `0x8015FAA4` poll across its syscall boundary while respecting the 900% Q16
+  overclock carry and the next device deadline. The old `0x8015FA7C` hotspot
+  fell from roughly 56--58% to 2.7% of static samples, but the race still does
+  not reach 100 updates/s.
+- Release diagnostics localized additional cost but not a complete solution:
+  HD replacement off improved the same continuation from roughly 31 to 41
+  displayed guest updates/s; disabling all PGXP-related paths added only about
+  two more. Core translated geometry/render submission remains the dominant
+  unresolved performance work. These rates are diagnostic only, not gameplay
+  acceptance.
+- PGXP output was visibly wrong in the user's race. It is now disabled in the
+  game config, seeded mod state, framework package default, and release gates:
+  geometry correction, perspective texturing, depth, and CPU propagation are
+  all false. The package stays staged as an optional component. The freshly
+  rebuilt Clang non-LTO portable release starts at 900% and PAL x2 without a
+  PGXP activation message, and freshness/static/one-folder gates pass.
+- Profile/config inputs are link dependencies now, preventing a successful
+  executable build from leaving stale staged defaults. Two user-state files
+  found in the release folder were preserved under `artifacts/` before the
+  portable-layout verification.
+- Performance is still not complete. Next work is a correctness-preserving
+  optimization of the hot `0x801700F0`, `0x801704F0`, and `0x80171D0C`
+  geometry path and the per-replacement GL submission path, followed by a
+  wall-clock race-progress/audio receipt rather than title-bar telemetry.

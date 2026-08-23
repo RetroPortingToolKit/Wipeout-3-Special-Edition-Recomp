@@ -12,17 +12,16 @@ from pathlib import Path
 REQUIRED_PACKAGES = frozenset({
     "psx.enhancement.8mb-ram",
     "psx.enhancement.fast-loading",
-    "psx.enhancement.pgxp",
     "psx.enhancement.skip-fmv",
     "wipeout3.enhancement.framerate-pal100",
     "wipeout3.enhancement.widescreen",
 })
 REQUIRED_CONFIG = {
     "cpu_overclock": "900",
-    "geometry_correction": "true",
-    "perspective_texturing": "true",
-    "pgxp_depth": "true",
-    "pgxp_cpu_mode": "true",
+    "geometry_correction": "false",
+    "perspective_texturing": "false",
+    "pgxp_depth": "false",
+    "pgxp_cpu_mode": "false",
     "offer_ultrawide": "true",
     "hd_textures": "true",
     "supersampling": "4",
@@ -54,7 +53,7 @@ def _check_texts(files: dict[str, str]) -> list[str]:
     else:
         actual = _enabled_packages(state)
         if actual != REQUIRED_PACKAGES:
-            errors.append("enabled package catalog is not exactly the required six-package catalog")
+            errors.append("enabled package catalog does not match the required WipEout profile")
     return errors
 
 
@@ -115,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
         print("FAIL release freshness")
         print("\n".join(f"- {error}" for error in errors))
         return 1
-    print("PASS release freshness: current source/config and six required defaults verified")
+    print("PASS release freshness: current source/config and required defaults verified")
     return 0
 
 
