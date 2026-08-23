@@ -378,6 +378,39 @@ unbounded build as a performance test; use focused targets and the bounded
   configured remote, so the current path-normalization and sidecar contract
   must be repaired against a reachable matching revision before changing it.
 
+## Latest bounded high-RAM performance pass (2026-08-22)
+
+- The recompiler was rebuilt before regeneration; its baked code-generation
+  hash matches the runtime headers. The retained high-RAM capture corpus has
+  103 rows that executed `0x807814D0`: 96 exact native identities compiled,
+  seven were safely skipped, and zero failed. The proof includes the exact
+  prologue/range guard, `block_807814D0`, and a static dispatcher case.
+- The target-only generated bundle is integrated as an optional extra static
+  dispatcher, so the established 192 MB overlay translation unit remains
+  unchanged. The runtime tries the established dispatcher and then the
+  high-RAM dispatcher before interpreting dirty RAM. Duplicate exact static
+  recipes are now removed fail-closed by `compile_overlays.py`; isolated
+  fragment symbols in the local high-RAM bundle are separately namespaced to
+  avoid collisions with the established corpus.
+- The Clang Release `-O3 -DNDEBUG`, LTO-off build now links successfully. The
+  current executable is 124,124,672 bytes with SHA-256
+  `5BC2098F7E35F44F5BEEAA5062CF584B28644BB7B0CE5CC788FBE653AC9802E7` and
+  contains `psx_overlay_dispatch_highram` plus the target entry symbols.
+  Static release, one-folder release, freshness, PAL-100 title, and 900%
+  timing-boundary gates pass. The one-folder gate was run after moving two
+  stale user-state files out of the build directory; they remain preserved in
+  `artifacts/` and are not release payloads.
+- A fresh direct PAL probe reaches PAL-x2/100 Hz and confirms 8 MB RAM,
+  PGXP-depth configuration, HD texture indexing, bezel staging, FMV skip, and
+  the 10 ms gameplay pacer. This menu/title probe did not execute the high-RAM
+  race continuation (`dispatch/s=0`), and its sustained guest cadence was
+  approximately 93–95 Hz with substantial audio underruns. It is therefore
+  evidence that the binary is wired and runnable, not a race-performance pass.
+- The high-RAM native-versus-interpreter race A/B, 32-pass parity proof, and
+  sustained 99–101 Hz race receipt remain open. Do not claim the performance
+  target complete until a race save-state or equivalent deterministic route
+  reaches `0x807814D0` and produces those measurements.
+
 ## Fresh release artifact checkpoint (2026-08-22)
 
 - A clean product build now succeeds in `build-release-clang-nolto` using the

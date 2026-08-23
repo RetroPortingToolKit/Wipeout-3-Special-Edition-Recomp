@@ -63,6 +63,7 @@ psxrecomp_add_game_runtime(psx-runtime
     # them; without it the runtime correctly rejects the original AOT image
     # but falls through to the interpreter for every relocated call.
     GAME_OVERLAY_STATIC_C "${CMAKE_CURRENT_SOURCE_DIR}/generated/overlays_static.c"
+    GAME_OVERLAY_EXTRA_STATIC_C "${CMAKE_CURRENT_SOURCE_DIR}/generated/overlays_highram.c"
     CODEGEN_SETUP_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/codegen_setup.c"
         ${WIPEOUT3_MOD_PLUGIN_SOURCES}
