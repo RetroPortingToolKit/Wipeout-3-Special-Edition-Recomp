@@ -2804,3 +2804,16 @@ do not reuse the rejected pre-A/B state or start a second process.
   `dirty_ram_reset_for_boot()`. The guard now anchors its terminator after the
   reset implementation (`psxrecomp` commit `3e81ca00`). All five structural
   guards and eight focused runtime tests pass.
+
+## PAL8 attract capture publication (2026-08-24 13:00)
+
+- Graceful shutdown of the idle PAL8 attract run flushed a 12-region capture,
+  including the previously uncovered `0x800C5000`/`0x800C76AC` path.
+- The normal B24/f0 compiler published all 12 shards successfully:
+  `PSX_SHARD_RESULT ok=12 failed=0 skipped=0`. No observed-only PCs were
+  promoted as entries; the classifier retained its dispatch-root boundary.
+- Relaunching slot 0 against that cache produced steady-state
+  `interp=0`, zero loader invalidations/revalidations, zero audio underruns or
+  overflows, and 58 one-second cadence samples at `98.87--100.29 Hz`
+  (average `99.51 Hz`). This is stronger PAL8 attract evidence, but it still
+  does not replace fresh PAL8 race-start/replay states.
