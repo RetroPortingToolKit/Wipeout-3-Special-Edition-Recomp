@@ -1510,6 +1510,11 @@ unbounded build as a performance test; use focused targets and the bounded
   delimited strings, skips low control bytes, stops at `#`, and returns the
   compacted byte requirement. Five entry callers feed the adjacent 347-string
   table initializer's maximum-allocation pass.
+- `EmitWorldSpaceRadialGlow` logically owns `0x80148E94..0x801493E7` across
+  six false generated splits. It projects an eight-point world-space shape,
+  emits four `0x1C`-byte semitransparent `POLY_G3` packets fading scaled RGB to
+  black, and links two pairs by projected depth. Four unique entry callers
+  produce five generated emissions because `0x8011FCD8` is duplicated.
 - `ComputeObjectUpVectorQ12` owns `0x800EA870..0x800EA9AF`. Six unique callers
   (five base-region owners and one overlay owner) target only the entry. It
   reads signed object Euler angles at `+0x11E/+0x120/+0x122`, evaluates six
