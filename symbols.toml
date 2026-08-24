@@ -1448,6 +1448,13 @@ status = "confirmed"
 note = "Exact 0x10-byte canonical BIOS B0:0A WaitEvent trampoline: preserve incoming event handle in a0 and caller ra, select service t1=0x0A in the B0-vector jump delay slot, and propagate the BIOS result unchanged; six unique entry callers, final NOP unreachable padding"
 
 [[func]]
+pc = 0x800EEAD0
+name = "SetGlobalPrimitiveRgb"
+emit = false
+status = "confirmed"
+note = "Exact 0x1C-byte five-caller leaf: truncate incoming a0/a1/a2 to bytes and store them as RGB at 0x80173308..0x8017330A; the sole reader copies these bytes into generated primitive color fields, with no validation or other state effects"
+
+[[func]]
 pc = 0x80120988
 name = "CopyAndNormalizeControllerPacket"
 emit = false
@@ -1725,3 +1732,17 @@ name = "QueueOrientedQuadSourceRecord"
 emit = false
 status = "confirmed"
 note = "Exact 0x19C-byte five-caller scene-record producer: unless disabled by mode byte 0x801D1B3E, advance past queued 28-byte records flagged bit 2 within a 64-entry window, append position plus four halfword attributes and four bytes, force active bit 0x8000, advance the tail index, and leave rendering to BuildVisibleObjectQuadPackets"
+
+[[func]]
+pc = 0x8016B5AC
+name = "NormalizeAndRegisterSpuAddress"
+emit = false
+status = "confirmed"
+note = "Exact 0xA4-byte leaf SPU address helper: optionally round address a1 upward by the configured alignment, derive its configured right-shifted 16-bit SPU unit, return that unit for selector a0=-2, return the normalized byte address for a0=-1, or store the unit in the halfword address table at selector a0 and return the normalized byte address; three unique entry-only callers"
+
+[[func]]
+pc = 0x80105940
+name = "DrawDecimalValueWithTwoDigitFraction"
+emit = false
+status = "confirmed"
+note = "Exact 0x238-byte five-caller font renderer: decompose a whole-number component into up to five decimal digits, zero-pad it to caller width, emit glyph 0x25 as separator, then emit a second component zero-padded to two digits, threading the X pen through EmitFontGlyphPacket and returning the final pen"
