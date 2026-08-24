@@ -20,6 +20,13 @@ status = "known"
 note = "Non-returning CRT continuation entered by the expansion-RAM loader: clear BSS, derive stack and heap bounds from linker words, set gp/fp, call BIOS A0/39 InitHeap, then call RunRaceSession with a break trap as its nominal return site"
 
 [[func]]
+pc = 0x8016C86C
+name = "PollMultitapControllerSlots"
+emit = false
+status = "known"
+note = "Address-taken final SIO/pad-driver stage: consume a multitap response through the private descriptor in a0, poll/configure as many as four 0xF0-byte slot records, append the final received byte, and return 0, a propagated transfer error, or -3 on timeout; the callable code ends at 0x8016CC00"
+
+[[func]]
 pc = 0x80116128
 name = "RunRaceSession"
 emit = false
@@ -82,6 +89,13 @@ status = "known"
 note = "Internal continuation of 0x801700C4: reject shared outcodes, route near-depth quads to 0x80170B5C, or OT-link one 40-byte POLY_FT4"
 
 [[func]]
+pc = 0x801701B4
+name = "SetupAndProjectPackedVertexPairs"
+emit = false
+status = "known"
+note = "Three-caller renderer-private entry: derive the indexed 64-byte face and active render/template context, initialize clip workspace and packet/OT cursors, then fall through to ProjectPackedVertexPairs at 0x80170254 and return its aggregate clip mask"
+
+[[func]]
 pc = 0x80170254
 name = "ProjectPackedVertexPairs"
 emit = false
@@ -101,6 +115,20 @@ name = "ClipAndSubmitNearTexturedQuad"
 emit = false
 status = "known"
 note = "Shared renderer-private tail-call function: marshal four projected vertices plus texture/material state into the 0x801E25D0 clipping workspace, call ClipAndEmitSceneryPrimitive, restore the inherited register context, and return through the original caller's ra"
+
+[[func]]
+pc = 0x80170D3C
+name = "InitializeSceneryClipScratchpad"
+emit = false
+status = "known"
+note = "No-argument renderer setup leaf: copy 17 template words from 0x801762E0/0x80176300 into scratchpad 0x1F800078..0x1F8000B8, then initialize the 0x801E25D0 clipping workspace mode/count fields"
+
+[[func]]
+pc = 0x801719DC
+name = "CallSceneryClipperPreservingRendererContext"
+emit = false
+status = "known"
+note = "Four-call-site renderer-private context trampoline: save the caller's live register file in scratchpad, publish the packet cursor at 0x80198620, call ClipAndEmitSceneryPrimitive, then restore the pre-call registers and discard the clipper's scalar return"
 
 [[func]]
 pc = 0x80171AFC
@@ -155,6 +183,13 @@ name = "InitializeRaceRuntimeResources"
 emit = false
 status = "known"
 note = "Argument-free startup initializer called once from 0x80116128: create/configure the shared 80-byte transform object, allocate and publish race-owned work buffers, initialize dependent race subsystems, create a 38-byte display/resource descriptor through 0x80141D6C, and publish that returned handle"
+
+[[func]]
+pc = 0x80141D6C
+name = "InitializeShadowTextureAtlas"
+emit = false
+status = "known"
+note = "Single-caller shadow-texture initializer: ignores the legacy source-path a0, allocates a 38-byte halfword descriptor, derives its flags from a1, initializes the fixed 800,256 / 32x224 VRAM atlas layout, uploads embedded pixels from 0x8003484C through LoadImage, and returns the descriptor"
 
 [[func]]
 pc = 0x80133B64
@@ -257,6 +292,12 @@ addr = 0x8017F118
 name = "gSimVblankCounter"
 status = "confirmed"
 note = "SimVblankGate increments; reset on full sim (sw 0)"
+
+[[object]]
+addr = 0x8016CC0C
+name = "kAutopilotJumpSpeedValues"
+status = "confirmed"
+note = "Four little-endian uint16 data values {150, 250, 300, 350} immediately before the 'Autopilot jump speed [%d]' diagnostic; this is the non-code start of the erroneous R 8016CC0C 2574 seed"
 
 [[object]]
 addr = 0x8017F02C
