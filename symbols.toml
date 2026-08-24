@@ -1602,6 +1602,19 @@ status = "confirmed"
 note = "Exact 0x24-byte six-caller leaf: for a nonzero unsigned count, write the low byte of the fill value to consecutive destination bytes; zero count performs no access, all paths leave v0=-1, and callers treat the routine as void rather than standard-returning memset"
 
 [[func]]
+pc = 0x8015B5D8
+name = "NextRacerRandom15"
+emit = false
+status = "confirmed"
+note = "Exact argument-free 0x24-byte racer/gameplay PRNG leaf: advance private state at 0x80173A98 with arithmetic_shift_right(state,1) XOR (state << 3), store the full 32-bit result, and return its low 15 bits; three unique callers are each emitted twice by overlapping translations"
+
+[[object]]
+addr = 0x80173A98
+name = "gRacerRandom15State"
+status = "confirmed"
+note = "Private 32-bit state for NextRacerRandom15, initialized in the PS-X EXE to 0x12345678; independent from adjacent gRandom15State at 0x80173A94"
+
+[[func]]
 pc = 0x8015FD7C
 name = "Exit"
 emit = false
