@@ -1420,6 +1420,20 @@ status = "confirmed"
 note = "Exact 0x10-byte canonical BIOS B0:0C EnableEvent trampoline: preserve incoming event handle in a0 and caller ra, select service t1=0x0C in the B0-vector jump delay slot, and propagate the BIOS result unchanged; six entry callers, final NOP unreachable padding"
 
 [[func]]
+pc = 0x80168D18
+name = "FlushCache"
+emit = false
+status = "confirmed"
+note = "Exact 0x10-byte canonical BIOS A0:44 FlushCache trampoline: preserve caller ra, select service t1=0x44 in the A0-vector jump delay slot, and return directly through BIOS; six unique entry callers, final NOP unreachable padding"
+
+[[func]]
+pc = 0x80168D28
+name = "SysDeqIntRP"
+emit = false
+status = "confirmed"
+note = "Exact 0x10-byte canonical BIOS C0:03 SysDeqIntRP trampoline: preserve incoming priority/index and interrupt-record pointer in a0/a1 plus caller ra, select service t1=3 in the C0-vector jump delay slot, and propagate the BIOS result; six entry callers, final NOP unreachable padding"
+
+[[func]]
 pc = 0x80120988
 name = "CopyAndNormalizeControllerPacket"
 emit = false
