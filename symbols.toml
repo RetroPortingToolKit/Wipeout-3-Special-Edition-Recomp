@@ -1385,6 +1385,13 @@ status = "confirmed"
 note = "Exact 0x14-byte two-caller callback exchange leaf: return the previous CD interrupt callback from 0x801792C8 and replace it with incoming a0 in the jr delay slot; null clears dispatch, and CdInit directly installs internal callback 0x80160E44 in the same word"
 
 [[func]]
+pc = 0x8015CF28
+name = "Strncmp"
+emit = false
+status = "confirmed"
+note = "Exact 0x10-byte canonical BIOS A0:18 strncmp trampoline: preserve caller a0/a1/a2 and ra, select service t1=0x18 in the vector-jump delay slot, and propagate the signed comparison result unchanged; seven unique call sites across eight generated instances, with final NOP unreachable padding"
+
+[[func]]
 pc = 0x80120988
 name = "CopyAndNormalizeControllerPacket"
 emit = false
@@ -1399,8 +1406,22 @@ status = "confirmed"
 note = "Exact 0x3C-byte seven-caller leaf: return the MATRIX pointer, write caller coefficients m00/m01/m02/m10 into rotation halfwords +0/+2/+4/+6, zero the other five rotation halfwords and +0x12 padding, and leave translation words +0x14/+0x18/+0x1C untouched"
 
 [[func]]
+pc = 0x8015FBDC
+name = "VectorNormal"
+emit = false
+status = "confirmed"
+note = "Exact 0x30-byte canonical Psy-Q VECTOR normalizer wrapper: load three signed 32-bit components from a0, delegate through the private GTE Q12 normalization core at 0x8015FC3C, store the normalized three-word vector to a1, and return without other memory effects; nine generated call instances represent six unique entry callers"
+
+[[func]]
 pc = 0x80169D30
 name = "WaitForJoyAckAndClearIrq"
 emit = false
 status = "confirmed"
 note = "Exact 0x90-byte seven-caller JOY/SIO0 handshake helper: acknowledge only SIO interrupt bit 7 through I_STAT, poll JOY_STAT ACK bit 7 until clear under the already-armed Timer 2 timeout, return 0 on expiry, or set JOY_CTRL ACK/IRQ-reset bit 0x10 and return 1"
+
+[[func]]
+pc = 0x801203F0
+name = "ApplyAnalogControllerCalibration"
+emit = false
+status = "confirmed"
+note = "True 0x3B4-byte frameless owner spanning six false generated splits: resolve logical pad 0..7 through two ports/four multitap slots, accept 0x7300 analog-pad and 0x2300 NegCon-class packets, apply per-pad deadzone/scale calibration with clamping and history updates, mutate axis/pressure bytes in place, and return the packet pointer or null"

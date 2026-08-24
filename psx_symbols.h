@@ -160,6 +160,10 @@
 #define PSX_FN_TrySpawnRandomGeometryParticle 0x8011E69Cu
 #define func_8011E69C TrySpawnRandomGeometryParticle  /* alias */
 
+/* confirmed: True 0x3B4-byte frameless owner spanning six false generated splits: resolve logical pad 0..7 through two ports/four multitap slots, accept 0x7300 analog-pad and 0x2300 NegCon-class packets, apply per-pad deadzone/scale calibration with clamping and history updates, mutate axis/pressure bytes in place, and return the packet pointer or null */
+#define PSX_FN_ApplyAnalogControllerCalibration 0x801203F0u
+#define func_801203F0 ApplyAnalogControllerCalibration  /* alias */
+
 /* confirmed: Exact 0x100-byte seven-caller controller-response sanitizer: copy eight bytes from a nonnull source or clear them, preserve the raw header at destination +8, accept 0x2300/0x4100/0x7300, otherwise force released buttons and centered axes, and canonicalize recognized 0x23FF/0x41FF/0x73FF error headers to 0x4100 */
 #define PSX_FN_CopyAndNormalizeControllerPacket 0x80120988u
 #define func_80120988 CopyAndNormalizeControllerPacket  /* alias */
@@ -416,6 +420,10 @@
 #define PSX_FN_FormatString 0x8015C698u
 #define func_8015C698 FormatString  /* alias */
 
+/* confirmed: Exact 0x10-byte canonical BIOS A0:18 strncmp trampoline: preserve caller a0/a1/a2 and ra, select service t1=0x18 in the vector-jump delay slot, and propagate the signed comparison result unchanged; seven unique call sites across eight generated instances, with final NOP unreachable padding */
+#define PSX_FN_Strncmp 0x8015CF28u
+#define func_8015CF28 Strncmp  /* alias */
+
 /* confirmed: Exact 0x10-byte 34-caller BIOS A0/2A memcpy trampoline: preserve destination/source/length arguments, load t1=0x2A, jump to BIOS vector 0xA0, and return the BIOS destination result unchanged */
 #define PSX_FN_Memcpy 0x8015CF38u
 #define func_8015CF38 Memcpy  /* alias */
@@ -467,6 +475,10 @@
 /* confirmed: Exact 0x3C-byte seven-caller leaf: return the MATRIX pointer, write caller coefficients m00/m01/m02/m10 into rotation halfwords +0/+2/+4/+6, zero the other five rotation halfwords and +0x12 padding, and leave translation words +0x14/+0x18/+0x1C untouched */
 #define PSX_FN_InitializeMatrixRotationFromFourCoefficients 0x8015FB14u
 #define func_8015FB14 InitializeMatrixRotationFromFourCoefficients  /* alias */
+
+/* confirmed: Exact 0x30-byte canonical Psy-Q VECTOR normalizer wrapper: load three signed 32-bit components from a0, delegate through the private GTE Q12 normalization core at 0x8015FC3C, store the normalized three-word vector to a1, and return without other memory effects; nine generated call instances represent six unique entry callers */
+#define PSX_FN_VectorNormal 0x8015FBDCu
+#define func_8015FBDC VectorNormal  /* alias */
 
 /* confirmed: Exact 0x28-byte 57-caller Psy-Q packet helper: set bit 1 of primitive code byte packet+7 when enable is nonzero, clear it when zero, preserve every other bit, and return with no other memory or hardware effects */
 #define PSX_FN_SetSemiTrans 0x8015FD4Cu
