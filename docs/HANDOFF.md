@@ -1333,6 +1333,11 @@ unbounded build as a performance test; use focused targets and the bounded
   `0x800EEAD0..0x800EEAEB`. It truncates three arguments to RGB bytes at
   `0x80173308..0x8017330A`; the sole reader copies them into primitive color
   fields. Five unique callers all target the true entry.
+- `RotateQuadCoordinatesCounterclockwise` is the exact sibling at
+  `0x80110390..0x801103FB`. With the shared eight-pointer, row-major corner
+  topology it maps destination `[0,1;2,3]` from source `[1,3;0,2]`, the inverse
+  quarter-turn of `RotateQuadCoordinatesClockwise`. Three callers target the
+  entry and the full snapshot makes aliases safe.
 - `CopyAndNormalizeControllerPacket` owns `0x80120988..0x80120A87` with seven
   entry callers. It copies/clears eight raw controller bytes, saves their
   original header at destination `+8`, accepts headers `2300/4100/7300`, and
@@ -1562,6 +1567,10 @@ unbounded build as a performance test; use focused targets and the bounded
   entry-only callers and no duplicate body. It pops one 12-byte archive record,
   optionally rolls the temp-arena prefix back to its stored offset (or null on
   the final record), and clears the rollback-suppression flag when empty.
+- `InitializeParticleTilePacketPool` owns `0x8011FE94..0x8011FF03`, with the
+  sole entry call at `0x80133B8C`. It preconfigures three 12-byte GPU TILE_1
+  packets in each of 32 records at `0x801D4EDC`, then resets the shared pool
+  allocation count at `0x80175D40`; there is no duplicate or interior entry.
 - `SpawnRandomizedParticleRecords` owns `0x8011FE6C..0x8011FE93` and discards
   original `a0` while forwarding `(a1 count, a2 origin, a3 spread)` to private
   `EnqueueRandomizedParticleRecords` (`0x80140F9C..0x801410C7`). Four unique
@@ -1573,3 +1582,19 @@ unbounded build as a performance test; use focused targets and the bounded
   entry-only callers. Its eight-pointer snapshot permutation preserves all X
   halfwords and exchanges the Y rows (`y0<->y2`, `y1<->y3`), complementing
   `MirrorQuadHorizontalCoordinates`; it is call-free and has no duplicate.
+- `InitializeDefaultHighScoreBank` is the runtime-overlay owner at
+  `0x800DF694..0x800DF8A3`; the base EXE slot is zero-filled, while a retained
+  resident snapshot proves the exact 0x210-byte implementation. For `a1=-1`
+  it fills the `a2`-selected 0xDC0-byte bank with 22 groups of four paired
+  race/lap records using default time tables, 17 developer names, and cycling
+  rank bytes. Five entry-only calls initialize banks 1 and 0, then exercise
+  three deliberate sentinel-gated no-ops; no interior target or duplicate.
+- `RotateQuadCoordinatesClockwise` owns `0x80110324..0x8011038F`, with two
+  entry-only callers. It snapshots four `(x,y)` pairs and permutes their 2x2
+  corner grid from `[0,1;2,3]` to `[2,0;3,1]`, a clockwise quarter-turn; it is
+  call-free with no duplicate or interior target.
+- `LoadQuadTextureCoordinates` owns `0x80110198..0x8011024B`, with two
+  entry-only callers. It sign-extends the low-16 texture index, dereferences
+  `0x801CE96C[index]`, and copies descriptor halfwords `+0x16..+0x24` into
+  eight `(u0,v0,...,u3,v3)` output pointers before the adjacent orientation
+  permutations; it is frameless, call-free, and has no interior target.

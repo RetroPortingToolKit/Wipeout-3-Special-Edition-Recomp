@@ -1455,6 +1455,13 @@ status = "confirmed"
 note = "Exact 0x1C-byte five-caller leaf: truncate incoming a0/a1/a2 to bytes and store them as RGB at 0x80173308..0x8017330A; the sole reader copies these bytes into generated primitive color fields, with no validation or other state effects"
 
 [[func]]
+pc = 0x80110390
+name = "RotateQuadCoordinatesCounterclockwise"
+emit = false
+status = "confirmed"
+note = "Exact 0x6C-byte three-caller snapshot permutation with the shared eight-pointer quad ABI: map row-major destination corners [0,1;2,3] from source [1,3;0,2], a counterclockwise quarter-turn; preserves exact 16-bit patterns and is alias-safe"
+
+[[func]]
 pc = 0x80120988
 name = "CopyAndNormalizeControllerPacket"
 emit = false
@@ -1790,8 +1797,36 @@ status = "confirmed"
 note = "Exact 0x9C-byte no-argument five-caller temp-heap tracker pop: return on an empty -1 top, otherwise decrement the 12-byte archive-record stack, roll the arena prefix back to the popped offset when deallocation is enabled, use null for the final rollback, and clear the suppression flag when the stack becomes empty; no external interior target or duplicate body"
 
 [[func]]
+pc = 0x8011FE94
+name = "InitializeParticleTilePacketPool"
+emit = false
+status = "confirmed"
+note = "Exact 0x70-byte no-argument one-caller initializer: configure three 12-byte GPU TILE_1 packets in each of 32 records at 0x801D4EDC by setting tag word count byte +3 to 2 and GP0 command byte +7 to 0x68, then call the adjacent leaf that resets the pool allocation count at 0x80175D40; no duplicate or interior entry"
+
+[[func]]
 pc = 0x801102B8
 name = "MirrorQuadVerticalCoordinates"
 emit = false
 status = "confirmed"
 note = "Exact 0x6C-byte four-caller eight-pointer quad-coordinate permutation: snapshot signed halfwords x0,y0,x1,y1,x2,y2,x3,y3, preserve all X values, swap y0 with y2 and y1 with y3, and write all eight results back; call-free with no overlay duplicate or interior target"
+
+[[func]]
+pc = 0x800DF694
+name = "InitializeDefaultHighScoreBank"
+emit = false
+status = "confirmed"
+note = "Exact runtime-overlay 0x210-byte high-score initializer: only when a1=-1, fill the a2-selected 0xDC0-byte bank with 22 groups of four race-time and four lap-time records, cycling 17 developer names and rank bytes while copying paired default times; five unique entry-only calls, three deliberate no-ops"
+
+[[func]]
+pc = 0x80110324
+name = "RotateQuadCoordinatesClockwise"
+emit = false
+status = "confirmed"
+note = "Exact 0x6C-byte two-caller eight-pointer quad-coordinate permutation: snapshot four signed-halfword coordinate pairs and rotate their 2x2 corner assignment clockwise from [0,1;2,3] to [2,0;3,1]; call-free with no overlay duplicate or interior target"
+
+[[func]]
+pc = 0x80110198
+name = "LoadQuadTextureCoordinates"
+emit = false
+status = "confirmed"
+note = "Exact 0xB4-byte two-caller leaf: sign-extend the low 16 bits of texture index a0, dereference its entry in the pointer table at 0x801CE96C, and copy eight consecutive descriptor halfwords +0x16..+0x24 into the caller's u0,v0,u1,v1,u2,v2,u3,v3 pointers; source loader for the adjacent quad-coordinate permutation family"
