@@ -663,7 +663,7 @@ pc = 0x80105CDC
 name = "EmitFontGlyphPacket"
 emit = false
 status = "confirmed"
-note = "Exact 0x260-byte 47-caller glyph renderer: select one of four six-byte glyph-metric bands from style, reserve and OT-link a neutral-gray 40-byte POLY_FT4 using style-selected CLUT/TPAGE state, and return x + 2*glyph_width + 2"
+note = "Exact 0x260-byte 47-caller glyph renderer: select one of four six-byte glyph-metric bands from style, reserve and OT-link a fixed-neutral-gray 40-byte POLY_FT4 with style-selected semitransparency/CLUT/TPAGE, and return x + 2*glyph_width + 2; 49 emissions duplicate two calls through overlapping translations"
 
 [[func]]
 pc = 0x8010F3CC
