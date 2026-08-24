@@ -843,3 +843,10 @@ unbounded build as a performance test; use focused targets and the bounded
   a byte value, the wrapper binds global bytes `0x80175E71/+72/+70`, and calls
   `0x801220AC`. Generated `0x80122654` is a live-`a3` fallthrough block, not an
   ABI entry.
+- The false zero-tail callable at `0x8017BF1C` required two analyzer fixes.
+  `16e1fea7` rejects untrusted pointer aliases into eight-word zero runs;
+  `b939445a` applies the same guard to mid-function branch splitting, where
+  packed data word `0x11D011D2` at `0x801777D0` had fabricated the actual
+  target. Exact base regeneration now has zero matches in ranges, declarations,
+  dispatch, or bodies. Codegen hash `cb7b7863` high-RAM output was republished
+  and independently reproduced from the pinned 644-row corpus.
