@@ -980,6 +980,9 @@ unbounded build as a performance test; use focused targets and the bounded
 - `AbsoluteValue32` owns `0x8014B3D4..0x8014B3EB`. It is a 21-caller signed
   integer absolute-value leaf with ordinary two's-complement wrap at
   `INT32_MIN`; no call targets either internal branch/return block.
+- `SetPolyFT4` owns `0x8015F7A4..0x8015F7B7`. It initializes only the length
+  (`9`) and opcode (`0x2C`) bytes of a 40-byte opaque `POLY_FT4`; all 20 direct
+  calls target the single entry.
 - `EmitLocalizedFontGlyphPacket` owns `0x8010EAC4..0x8010F247`: it selects
   six-byte glyph metrics and font texture state for height modes 8/9/16/18 and
   extended banks, builds and OT-links one 40-byte `POLY_FT4`, increments the
@@ -1023,6 +1026,11 @@ unbounded build as a performance test; use focused targets and the bounded
   is an internal positive return suffix with zero direct callers. The real
   entry has 53 executable callers (plus two opcode-shaped data words) and
   semantic extent through `0x8014B6BF`.
+- `WrapAngle4096Signed` at `0x8014B6C0` masks to 12 bits and returns the signed
+  representative in `[-2047,2048]`. Its semantic extent includes generated
+  `F/R 8014B6D8 8`, an internal nonnegative return suffix with zero callers.
+  There are 17 unique guest call sites; 26 generated instances reflect four
+  mutually exclusive copies of three overlay call addresses.
 - `AccumulateOneIndexedVertexWeight` is its single-step companion at
   `0x8014F814..0x8014F91F`: it performs the same flagged-record lookup and
   fixed 250/200/200 indexed accumulator update once, then decrements positive
@@ -1060,6 +1068,11 @@ unbounded build as a performance test; use focused targets and the bounded
   with stack-only state; adjacent SPU-library callers use it around control,
   transfer-port, and status accesses. It has no direct MMIO/global mutation or
   semantic return, and no historical private-library spelling is claimed.
+- `ArmTimer2Timeout` owns `0x8016C51C..0x8016C53B`, is an eight-instruction
+  leaf with 12 direct callers and no interior targets. It records the caller's
+  threshold at `0x801EEBC4` and a 16-bit Timer 2 counter snapshot from
+  `0x1F801120` at `0x801EEBC8`; the adjacent poller handles wrap, timer mode,
+  and expiry. The arming leaf does not configure hardware or return a value.
 - `SpawnTrackSectionSurfaceEffects` logically owns
   `0x8014FA4C..0x80150577` despite generated splits at FAE0/FDE0/FF4C/50548.
   Its sole real caller passes a track section and effect flags; it selects a

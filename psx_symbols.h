@@ -276,6 +276,10 @@
 #define PSX_FN_DivideSignedByPowerOfTwoTowardZero 0x8014B6A4u
 #define func_8014B6A4 DivideSignedByPowerOfTwoTowardZero  /* alias */
 
+/* confirmed: Exact 17-unique-caller angle-normalization leaf: mask a0 to 12 bits, preserve 0..2048, and map 2049..4095 to -2047..-1; generated R 8014B6C0 18 is the unique prefix while internal zero-direct-caller suffix 0x8014B6D8..DF returns the nonnegative path */
+#define PSX_FN_WrapAngle4096Signed 0x8014B6C0u
+#define func_8014B6C0 WrapAngle4096Signed  /* alias */
+
 /* known: 23-site 316-byte resource accessor: select the 12-byte current entry through index 0x801E9808 and table 0x801E97FC, return null for index -1, otherwise return an archive pointer directly or allocate and materialize the entry by decode/copy according to a0; allocation failures report through the common diagnostic */
 #define PSX_FN_AcquireCurrentArchiveEntry 0x8014B830u
 #define func_8014B830 AcquireCurrentArchiveEntry  /* alias */
@@ -348,6 +352,10 @@
 #define PSX_FN_PutDrawEnv 0x8015D68Cu
 #define func_8015D68C PutDrawEnv  /* alias */
 
+/* confirmed: Exact 0x14-byte 20-caller Psy-Q packet initializer: set packet tag length byte +3 to 9 and primitive code byte +7 to 0x2C for an opaque flat-textured quadrilateral, preserving the 24-bit OT link and all caller-owned color, UV, CLUT, TPAGE, and XY fields */
+#define PSX_FN_SetPolyFT4 0x8015F7A4u
+#define func_8015F7A4 SetPolyFT4  /* alias */
+
 /* confirmed: Exact 0xB4-byte PsyQ-compatible DRAWENV initializer with 20 direct callers: write clip=(x,y,w,h), ofs=(x,y), zero the texture window/background RGB and flags, set tpage=10 and dtd=1, derive dfe from GetVideoMode and the PAL/NTSC height limit, and return the input environment pointer */
 #define PSX_FN_SetDefDrawEnv 0x8015F844u
 #define func_8015F844 SetDefDrawEnv  /* alias */
@@ -407,6 +415,10 @@
 /* confirmed: Exact 0x5C-byte 14-caller SPU-library timing delay: ignore all arguments, keep counter and accumulator on an 8-byte stack frame, execute 60 iterations of accumulator *= 13 with 32-bit wraparound, and return without MMIO/global mutation or semantic value; callers place it around SPU control/status/data-port accesses */
 #define PSX_FN_DelaySpuRegisterAccess 0x8016B6F8u
 #define func_8016B6F8 DelaySpuRegisterAccess  /* alias */
+
+/* confirmed: Exact 0x20-byte 12-caller library leaf: snapshot the 16-bit Timer 2 counter at 0x1F801120, store caller threshold to 0x801EEBC4 and the counter snapshot to 0x801EEBC8, and return without configuring hardware or producing a semantic value; paired timeout polling handles wrap and timer mode */
+#define PSX_FN_ArmTimer2Timeout 0x8016C51Cu
+#define func_8016C51C ArmTimer2Timeout  /* alias */
 
 /* known: Address-taken final SIO/pad-driver stage: consume a multitap response through the private descriptor in a0, poll/configure as many as four 0xF0-byte slot records, append the final received byte, and return 0, a propagated transfer error, or -3 on timeout; the callable code ends at 0x8016CC00 */
 #define PSX_FN_PollMultitapControllerSlots 0x8016C86Cu
