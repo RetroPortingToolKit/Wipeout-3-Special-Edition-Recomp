@@ -740,3 +740,10 @@ unbounded build as a performance test; use focused targets and the bounded
   `CallSceneryClipperPreservingRendererContext`, the four-caller ABI bridge
   that checkpoints renderer-private registers, calls the shared scenery
   clipper, then restores context while retaining the updated packet cursor.
+- `0x80112048` is the confirmed seven-instruction `SwapRgb24RedBlue` leaf;
+  `0x80112064` is the adjacent `ByteSwapTwoU16Values` leaf. Together they
+  normalize packed material colors/halfwords at the conversion sites around
+  `0x80110C4C..0x80110CFC`, with mirrored expansion-RAM callers.
+- `0x80141E5C` is `CreateTextureDescriptorFromImageData`, a four-caller public
+  adapter that sign-normalizes its mode argument and delegates unchanged image
+  data to the full descriptor/parser/uploader at `0x8014195C`.
