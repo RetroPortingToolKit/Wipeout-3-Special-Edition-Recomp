@@ -60,6 +60,10 @@
 #define PSX_FN_ApplySceneObjectGroupProperty 0x800FA364u
 #define func_800FA364 ApplySceneObjectGroupProperty  /* alias */
 
+/* confirmed: Exact 0x26C-byte scene-object relation pass: when global gates permit, scan 0xCC-byte records at 0x8018811C/count 0x80187CE8, filter inactive keyed records with eligible linked metadata, test bounded forward/reverse pointer-chain reachability against context+8, and issue group-property updates through 0x800FA364; six generated calls collapse to five unique guest sites because 0x801598E8 is emitted in two overlay images, with no interior callers */
+#define PSX_FN_UpdateRelatedSceneObjectGroups 0x800FA490u
+#define func_800FA490 UpdateRelatedSceneObjectGroups  /* alias */
+
 /* confirmed: Exact 0xB8-byte six-caller mapper: for each of nine source bytes at a0, linearly find its zero-based index in the byte lookup selected by globals 0x80173A30/0x80173A38 and write that index or zero to a1; then clear eight bytes at 0x8018AE44, record output[0] at +0x24, clear +0x28, and return output[0] */
 #define PSX_FN_BuildNineByteLookupIndexMap 0x801027CCu
 #define func_801027CC BuildNineByteLookupIndexMap  /* alias */
@@ -520,6 +524,10 @@
 #define PSX_FN_CheckAndRecoverGpuTimeout 0x8015F360u
 #define func_8015F360 CheckAndRecoverGpuTimeout  /* alias */
 
+/* confirmed: Exact 0x24-byte six-caller leaf: for a nonzero unsigned count, write the low byte of the fill value to consecutive destination bytes; zero count performs no access, all paths leave v0=-1, and callers treat the routine as void rather than standard-returning memset */
+#define PSX_FN_FillBytes 0x8015F56Cu
+#define func_8015F56C FillBytes  /* alias */
+
 /* confirmed: Exact 0x10-byte canonical BIOS B0:0C EnableEvent trampoline: preserve incoming event handle in a0 and caller ra, select service t1=0x0C in the B0-vector jump delay slot, and propagate the BIOS result unchanged; six entry callers, final NOP unreachable padding */
 #define PSX_FN_EnableEvent 0x8015F594u
 #define func_8015F594 EnableEvent  /* alias */
@@ -619,6 +627,10 @@
 /* confirmed: Exact 0x90-byte seven-caller canonical LibCD initializer: retry the low-level CD interrupt/hardware initializer at 0x80160DB8 up to five times, return 0 after printing the retained failure diagnostic, or install three internal CD callbacks and clear their companion state before returning 1 */
 #define PSX_FN_CdInit 0x80160D28u
 #define func_80160D28 CdInit  /* alias */
+
+/* confirmed: Exact 0x10-byte canonical BIOS B0:0A WaitEvent trampoline: preserve incoming event handle in a0 and caller ra, select service t1=0x0A in the B0-vector jump delay slot, and propagate the BIOS result unchanged; six unique entry callers, final NOP unreachable padding */
+#define PSX_FN_WaitEvent 0x80160E78u
+#define func_80160E78 WaitEvent  /* alias */
 
 /* confirmed: Exact 0x14-byte 12-caller canonical LibCD callback exchange leaf: load and return the previous CD sync callback from 0x8017B124, then store the incoming callback in the jr delay slot; null suppresses dispatch, no validation or synchronization is performed */
 #define PSX_FN_CdSyncCallback 0x80160EF4u
