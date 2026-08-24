@@ -244,6 +244,10 @@
 #define PSX_FN_TrySpawnRandomGeometryParticle 0x8011E69Cu
 #define func_8011E69C TrySpawnRandomGeometryParticle  /* alias */
 
+/* confirmed: Exact 0x28-byte adapter with four unique callers: ignore original a0 and forward (a1 count, a2 origin, a3 spread) to EnqueueRandomizedParticleRecords; five generated call instances include one duplicated overlay call */
+#define PSX_FN_SpawnRandomizedParticleRecords 0x8011FE6Cu
+#define func_8011FE6C SpawnRandomizedParticleRecords  /* alias */
+
 /* confirmed: True 0x3B4-byte frameless owner spanning six false generated splits: resolve logical pad 0..7 through two ports/four multitap slots, accept 0x7300 analog-pad and 0x2300 NegCon-class packets, apply per-pad deadzone/scale calibration with clamping and history updates, mutate axis/pressure bytes in place, and return the packet pointer or null */
 #define PSX_FN_ApplyAnalogControllerCalibration 0x801203F0u
 #define func_801203F0 ApplyAnalogControllerCalibration  /* alias */
@@ -399,6 +403,10 @@
 /* confirmed: Exact 0x70-byte four-caller pure renderer predicate: select the 0x3A4-byte racer record, derive the racer-type-specific low view bit (1 for type byte +2 == 1, otherwise 2), ignore the opposite bit in the object's mask, and require exact equality with the current scene mask at 0x801762CC plus that selected bit */
 #define PSX_FN_DoesObjectMaskMatchRacerView 0x80140E00u
 #define func_80140E00 DoesObjectMaskMatchRacerView  /* alias */
+
+/* confirmed: Exact 0x12C-byte private particle producer: for positive count, advance the masked 48-byte ring at 0x801E1B10, copy a three-word origin, generate three independent spread-axis offsets from NextRandom15 low six bits plus component-32, clear six state bytes, and set fixed fields +40=8/+44=1/+45=8/+46=2; called only by SpawnRandomizedParticleRecords */
+#define PSX_FN_EnqueueRandomizedParticleRecords 0x80140F9Cu
+#define func_80140F9C EnqueueRandomizedParticleRecords  /* alias */
 
 /* confirmed: Exact 0x19C-byte five-caller scene-record producer: unless disabled by mode byte 0x801D1B3E, advance past queued 28-byte records flagged bit 2 within a 64-entry window, append position plus four halfword attributes and four bytes, force active bit 0x8000, advance the tail index, and leave rendering to BuildVisibleObjectQuadPackets */
 #define PSX_FN_QueueOrientedQuadSourceRecord 0x80141458u
