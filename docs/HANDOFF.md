@@ -850,3 +850,13 @@ unbounded build as a performance test; use focused targets and the bounded
   target. Exact base regeneration now has zero matches in ranges, declarations,
   dispatch, or bodies. Codegen hash `cb7b7863` high-RAM output was republished
   and independently reproduced from the pinned 644-row corpus.
+- `DrainQueuedRenderObjects` at `0x80141F68` drains the queue/count at
+  `0x801E2624/0x801762D0` in two passes, activates each transform, maps modes
+  0/1/2 to the three wrappers entering `TransformAndSubmitMeshPrimitives`, and
+  unconditionally clears the count; 23 callers.
+- `ApproximateSqrtNonnegative32` owns `0x8015C488..0x8015C50B`; generated
+  `0x8015C504` is its zero-return block. GTE leading-zero normalization indexes
+  the 192-entry `floor(512*sqrt(n))` table at `0x8017AF5C`, then rescales.
+- `Atan2Q12` at `0x8015C518` is the 35-caller signed fixed-point atan2 leaf:
+  full turn `0x1000`, output `[-0x800,+0x800]`, using the 1025-entry table at
+  `0x801786D8` with exact quadrant/axis folding.
