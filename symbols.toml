@@ -13,6 +13,13 @@ status = "confirmed"
 note = "Exact PS-X EXE header entry; two-instruction non-returning trampoline to the expansion-RAM startup loader at 0x800D03B8, not the CRT initialization body"
 
 [[func]]
+pc = 0x8016247C
+name = "PsxCrtStartup"
+emit = false
+status = "known"
+note = "Non-returning CRT continuation entered by the expansion-RAM loader: clear BSS, derive stack and heap bounds from linker words, set gp/fp, call BIOS A0/39 InitHeap, then call RunRaceSession with a break trap as its nominal return site"
+
+[[func]]
 pc = 0x80116128
 name = "RunRaceSession"
 emit = false
@@ -147,7 +154,7 @@ pc = 0x8012482C
 name = "InitializeRaceRuntimeResources"
 emit = false
 status = "known"
-note = "Argument-free startup initializer called once from 0x80116128: create/configure the shared 80-byte transform object, allocate and publish race-owned work buffers of 5460/736/2880 bytes, initialize dependent race subsystems, register the 0x8016E170 callback, and publish its returned handle"
+note = "Argument-free startup initializer called once from 0x80116128: create/configure the shared 80-byte transform object, allocate and publish race-owned work buffers, initialize dependent race subsystems, create a 38-byte display/resource descriptor through 0x80141D6C, and publish that returned handle"
 
 [[func]]
 pc = 0x80133B64
@@ -188,6 +195,13 @@ name = "InstallLinkedRenderTransform"
 emit = false
 status = "known"
 note = "Two-caller projection/GTE setup: set H from 0x801E14F0, follow +0x44 links to the terminal transform, build MATRIX scratch at 0x1F800010 with its middle rotation row scaled by 0x801E14EC/256 and translation {0,0,0x801E14F4/2}, then install TR and rotation"
+
+[[func]]
+pc = 0x80140770
+name = "SubmitRaceSceneLayers"
+emit = false
+status = "known"
+note = "Single-caller argument-free scene-pass orchestrator: unless globally suppressed, optionally submit one of two view-mode-specific layers, then always submit three ordered race-scene layers before returning"
 
 [[func]]
 pc = 0x801415F4
@@ -273,3 +287,9 @@ addr = 0x801E25CC
 name = "gSceneryClipAxisCoefficient"
 status = "known"
 note = "Shared side-plane axis coefficient B-C; SceneryFrustumClip multiplies it by x for left/right planes and y for top/bottom planes"
+
+[[object]]
+addr = 0x8016E170
+name = "kShadsBt4SourcePath"
+status = "confirmed"
+note = "29-byte NUL-terminated string `c:\\wipeout3\\common\\shads.bt4`; materialized only at 0x80124928..0x8012492C and passed as the unused a0 argument to 0x80141D6C, not executable code or a callback"
