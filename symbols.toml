@@ -1462,6 +1462,13 @@ status = "confirmed"
 note = "Logical 0xAC-byte four-unique-call-site record converter across the generated split at 0x80111C38: for pointed record types 4 or 8 swap two-byte pair +8/+9 with +A/+B and pair +C/+D with +E/+F, reordering quad UV pairs 0<->1 and 2<->3; leave every other type unchanged"
 
 [[func]]
+pc = 0x80104750
+name = "RecordRacerEliminationCredit"
+emit = false
+status = "confirmed"
+note = "Exact 0x108-byte six-caller elimination-stat updater: after the shared suppression predicate, require victim state 100 for a vacant slot or 15 for an occupied slot, increment the credited racer's word counter at 0x8017C484, and increment mode-7 or mode-6 per-racer byte counters"
+
+[[func]]
 pc = 0x801203F0
 name = "ApplyAnalogControllerCalibration"
 emit = false

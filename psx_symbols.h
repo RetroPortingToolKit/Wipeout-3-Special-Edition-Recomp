@@ -52,6 +52,10 @@
 #define PSX_FN_DecodePackedRacerControls 0x80102E70u
 #define func_80102E70 DecodePackedRacerControls  /* alias */
 
+/* confirmed: Exact 0x108-byte six-caller elimination-stat updater: after the shared suppression predicate, require victim state 100 for a vacant slot or 15 for an occupied slot, increment the credited racer's word counter at 0x8017C484, and increment mode-7 or mode-6 per-racer byte counters */
+#define PSX_FN_RecordRacerEliminationCredit 0x80104750u
+#define func_80104750 RecordRacerEliminationCredit  /* alias */
+
 /* confirmed: Exact 0x2C-byte 13-caller pure race-random sampler: add the selected-racer seed at 0x80173A8C to the race-frame counter at 0x80173AEC modulo 32 bits, XOR arithmetic-right-by-1 with left-by-3, and return the low 15 bits without updating either input */
 #define PSX_FN_ComputeRaceFrameRandom15 0x80104A1Cu
 #define func_80104A1C ComputeRaceFrameRandom15  /* alias */
