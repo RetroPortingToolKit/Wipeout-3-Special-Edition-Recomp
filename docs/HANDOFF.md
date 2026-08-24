@@ -1131,6 +1131,11 @@ unbounded build as a performance test; use focused targets and the bounded
   previous callback from `0x8017B124`, then stores the incoming pointer in the
   return delay slot. Null suppresses callback dispatch; the exchange performs
   no validation, locking, interrupt masking, or nested-state management.
+- `CdReadyCallback` owns `0x80160F08..0x80160F1B`, is the adjacent
+  five-instruction LibCD exchange with nine direct callers and no interior
+  targets. It returns the previous ready callback from `0x8017B128` and stores
+  the incoming pointer in the return delay slot. Ready-event dispatch is
+  independent from sync word `0x8017B124`; null suppresses it without locking.
 - `SpawnTrackSectionSurfaceEffects` logically owns
   `0x8014FA4C..0x80150577` despite generated splits at FAE0/FDE0/FF4C/50548.
   Its sole real caller passes a track section and effect flags; it selects a
@@ -1180,3 +1185,12 @@ unbounded build as a performance test; use focused targets and the bounded
   at `0x80104A74..0x80104A9F`. It applies the same pure 15-bit mix to
   `selected_racer_seed + race_frame_counter + 0xF00`; it takes no arguments,
   writes no state, and has no interior entry targets.
+- `EnterCriticalSection` is the exact 0x10-byte syscall-1 thunk at
+  `0x801671D0..0x801671DF`: it clears COP0 Status IEc and returns its previous
+  bit value (zero or one). Sixteen unique executable callers produce nineteen
+  generated instances because three SIO1 sites occur in two overlay variants.
+- `SubmitRumbleDecayRequest` owns `0x80134CE8..0x80134D23` with 12 entry-only
+  callers. It replaces rumble-state words `+0x0C/+0x10/+0x14` with Q8 motor
+  amplitude, signed priority, and Q8 decay only when both the new amplitude
+  and priority are at least the active values. The adjacent updater emits the
+  amplitude byte to controller actuator state and applies the decay each tick.
