@@ -1636,6 +1636,13 @@ status = "confirmed"
 note = "Exact 0x104-byte resource-language preprocessor with five entry callers: selector 0..5 chooses a fixed source block, replace semicolon or control-byte string terminators with NUL, skip remaining control bytes, stop at '#', and return the byte count required by the adjacent compacting string-table initializer"
 
 [[func]]
+pc = 0x80148E94
+name = "EmitWorldSpaceRadialGlow"
+emit = false
+status = "confirmed"
+note = "True 0x554-byte leaf renderer across six false generated splits: transform an eight-point glow around caller world XYZ, cull invalid/behind-camera projections, reserve four semitransparent POLY_G3 packets, fade caller RGB*intensity/256 to black at outer vertices, and link two triangle pairs into depth-selected ordering-table buckets"
+
+[[func]]
 pc = 0x8015FD7C
 name = "Exit"
 emit = false

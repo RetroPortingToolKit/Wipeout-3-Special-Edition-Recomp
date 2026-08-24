@@ -428,6 +428,10 @@
 #define PSX_FN_ClipAndEmitSceneryPrimitive 0x80142634u
 #define func_80142634 ClipAndEmitSceneryPrimitive  /* alias */
 
+/* confirmed: True 0x554-byte leaf renderer across six false generated splits: transform an eight-point glow around caller world XYZ, cull invalid/behind-camera projections, reserve four semitransparent POLY_G3 packets, fade caller RGB*intensity/256 to black at outer vertices, and link two triangle pairs into depth-selected ordering-table buckets */
+#define PSX_FN_EmitWorldSpaceRadialGlow 0x80148E94u
+#define func_80148E94 EmitWorldSpaceRadialGlow  /* alias */
+
 /* confirmed: Exact 0x18-byte 21-caller frameless integer absolute-value leaf: return a0 unchanged when signed nonnegative, otherwise return two's-complement 0-a0; INT32_MIN consequently remains 0x80000000, with no memory or hardware effects */
 #define PSX_FN_AbsoluteValue32 0x8014B3D4u
 #define func_8014B3D4 AbsoluteValue32  /* alias */
