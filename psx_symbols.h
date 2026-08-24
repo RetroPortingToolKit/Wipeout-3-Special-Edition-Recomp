@@ -140,6 +140,10 @@
 #define PSX_FN_DrawLocalizedFontString 0x8010F3CCu
 #define func_8010F3CC DrawLocalizedFontString  /* alias */
 
+/* confirmed: Logical 0x104-byte ASCII-to-font adapter with three main-EXE and three unique overlay call PCs: NUL advances zero, space advances eight, otherwise map letters/digits/13 punctuation characters to glyph IDs, call EmitFontGlyphPacket, and return horizontal advance; 15 generated emissions reflect four duplicate overlay translations and 14 internal jump-table alias entries */
+#define PSX_FN_DrawAsciiFontCharacter 0x80110094u
+#define func_80110094 DrawAsciiFontCharacter  /* alias */
+
 /* confirmed: Exact 0xB4-byte two-caller leaf: sign-extend the low 16 bits of texture index a0, dereference its entry in the pointer table at 0x801CE96C, and copy eight consecutive descriptor halfwords +0x16..+0x24 into the caller's u0,v0,u1,v1,u2,v2,u3,v3 pointers; source loader for the adjacent quad-coordinate permutation family */
 #define PSX_FN_LoadQuadTextureCoordinates 0x80110198u
 #define func_80110198 LoadQuadTextureCoordinates  /* alias */

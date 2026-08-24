@@ -1846,6 +1846,13 @@ status = "confirmed"
 note = "Exact 0x11C-byte four-caller frontend POLY_F4 allocator: reserve 24 bytes from gPrimCursor, initialize SetPolyF4 and caller-selected semitransparency, store four signed-halfword XY pairs and RGB bytes, and return the unlinked packet pointer; no interior target or duplicate"
 
 [[func]]
+pc = 0x80110094
+name = "DrawAsciiFontCharacter"
+emit = false
+status = "confirmed"
+note = "Logical 0x104-byte ASCII-to-font adapter with three main-EXE and three unique overlay call PCs: NUL advances zero, space advances eight, otherwise map letters/digits/13 punctuation characters to glyph IDs, call EmitFontGlyphPacket, and return horizontal advance; 15 generated emissions reflect four duplicate overlay translations and 14 internal jump-table alias entries"
+
+[[func]]
 pc = 0x80110198
 name = "LoadQuadTextureCoordinates"
 emit = false
