@@ -630,8 +630,12 @@ unbounded build as a performance test; use focused targets and the bounded
   immediately after `Static duplicate recipes removed: 5`: the unresolved
   matcher still built an index for every aggregate variant before querying the
   small demand set. The index now admits only the union of requested dispatch
-  addresses (`083d73cd`). A fresh exact run uses durable unbuffered logs under
+  addresses (`083d73cd`). That exact attempt used durable unbuffered logs under
   `artifacts/highram-background-check-demanded.*.log`.
+- Demand-only indexing still materialized every matching identity for a
+  demanded address. Exact closure now short-circuits on the first guard-valid
+  identity and emits flushed phase markers (`dfcdefdd`); the current detached
+  receipt is `artifacts/highram-background-check-shortcircuit.*.log`.
 - `0x8012268C` is the sole-called `RenderRaceFrame` owner. Its generated output
   is split, but semantic control continues through `0x8012482B`; it owns race
   scene, vehicles, effects, HUD, and display synchronization.
@@ -694,3 +698,14 @@ unbounded build as a performance test; use focused targets and the bounded
 - `0x80133B64` is `InitializeRaceViewportState`; generated entries at
   `0x80133D3C` and `0x80133F60` are internal continuation/epilogue blocks, not
   callable functions. Its logical span continues through `0x80134013`.
+- `0x8016247C` is the non-returning `PsxCrtStartup`: BSS clear, stack/heap
+  derivation, GP/FP setup, BIOS `InitHeap`, then transfer to `RunRaceSession`.
+- `0x80140770` is `SubmitRaceSceneLayers`, the no-argument scene-pass
+  orchestrator called from `RenderRaceFrame`; it conditionally dispatches the
+  mode-specific pass and then invokes three ordered common passes.
+- `0x8016E170` is confirmed data, not a callback: the NUL-terminated source
+  path `c:\wipeout3\common\shads.bt4`. The broad generated range beginning at
+  `0x8016CC0C` crosses embedded strings/tables and therefore overstates code
+  coverage for this island. `InitializeRaceRuntimeResources` passes the path to
+  `0x80141D6C` and actually publishes four allocations, including the allocator
+  delay-slot result previously missed.

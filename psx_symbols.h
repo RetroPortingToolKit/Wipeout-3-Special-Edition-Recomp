@@ -20,7 +20,7 @@
 #define PSX_FN_RenderRaceFrame 0x8012268Cu
 #define func_8012268C RenderRaceFrame  /* alias */
 
-/* known: Argument-free startup initializer called once from 0x80116128: create/configure the shared 80-byte transform object, allocate and publish race-owned work buffers of 5460/736/2880 bytes, initialize dependent race subsystems, register the 0x8016E170 callback, and publish its returned handle */
+/* known: Argument-free startup initializer called once from 0x80116128: create/configure the shared 80-byte transform object, allocate and publish race-owned work buffers, initialize dependent race subsystems, create a 38-byte display/resource descriptor through 0x80141D6C, and publish that returned handle */
 #define PSX_FN_InitializeRaceRuntimeResources 0x8012482Cu
 #define func_8012482C InitializeRaceRuntimeResources  /* alias */
 
@@ -40,6 +40,10 @@
 #define PSX_FN_InstallLinkedRenderTransform 0x80136078u
 #define func_80136078 InstallLinkedRenderTransform  /* alias */
 
+/* known: Single-caller argument-free scene-pass orchestrator: unless globally suppressed, optionally submit one of two view-mode-specific layers, then always submit three ordered race-scene layers before returning */
+#define PSX_FN_SubmitRaceSceneLayers 0x80140770u
+#define func_80140770 SubmitRaceSceneLayers  /* alias */
+
 /* known: Single-caller non-leaf: updates active bits on 28-byte object records, prepares the GTE view transform, compacts visible oriented quads through 0x80172E3C, and emits 40-byte GPU POLY_FT4 packets into the current OT */
 #define PSX_FN_BuildVisibleObjectQuadPackets 0x801415F4u
 #define func_801415F4 BuildVisibleObjectQuadPackets  /* alias */
@@ -55,6 +59,10 @@
 /* confirmed: Exact PS-X EXE header entry; two-instruction non-returning trampoline to the expansion-RAM startup loader at 0x800D03B8, not the CRT initialization body */
 #define PSX_FN_PsxExeEntryTrampoline 0x80162474u
 #define func_80162474 PsxExeEntryTrampoline  /* alias */
+
+/* known: Non-returning CRT continuation entered by the expansion-RAM loader: clear BSS, derive stack and heap bounds from linker words, set gp/fp, call BIOS A0/39 InitHeap, then call RunRaceSession with a break trap as its nominal return site */
+#define PSX_FN_PsxCrtStartup 0x8016247Cu
+#define func_8016247C PsxCrtStartup  /* alias */
 
 /* known: Renderer-private tail target of 0x8016FC28: for 1..8 consecutive 64-byte face records, project packed vertex pairs through 0x80170254, reject a shared-outcode group, then invoke the scratchpad-selected primitive callback for each 24-byte subrecord and preserve the updated renderer cursors */
 #define PSX_FN_ProjectAndSubmitPackedFaceGroups 0x8016F94Cu

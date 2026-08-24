@@ -6,8 +6,9 @@
 `InitializeRaceRuntimeResources` with `status = "known"`.
 
 It is an argument-free, one-time startup initializer. It constructs a shared
-transform-like object, allocates three race-owned work buffers, invokes several
-dependent subsystem initializers, and registers one callback. The evidence does
+transform-like object, allocates four race-owned work buffers, invokes several
+dependent subsystem initializers, and constructs a 38-byte display/resource
+descriptor. The evidence does
 not yet justify narrower gameplay names for every allocated buffer, so the
 symbol deliberately describes the proven orchestration role.
 
@@ -49,17 +50,22 @@ In execution order, the routine:
    second consumes those signed components to update the object's transform
    fields. A second `0x801354F4` result is linked through the first object's
    `+0x44` field before those calls.
-3. Allocates `0x1554` (5460), `0x02E0` (736), and `0x0B40` (2880) bytes from
-   the same arena using `0x8011686C`, publishing the results at `0x801D7038`,
-   `0x801D74B4`, and `0x801D7344` respectively.
-4. Calls `0x8015B7E4` and publishes its result at `0x801D4B08`.
+3. Allocates `0x1554` (5460), `0x0800` (2048), `0x02E0` (736), and `0x0B40`
+   (2880) bytes from the same arena using `0x8011686C`. Because each store is
+   in the next call's delay slot, the results are published respectively at
+   `0x801D7038`, `0x801D74B4`, `0x801D7344`, and `0x801D4B08`.
+4. Calls `0x8015B7E4` with the shared transform object. Its return value is not
+   retained by this routine.
 5. Calls the argument-free initializers at `0x80126BB8`, `0x8011C910`,
    `0x800F0428`, and `0x800F4C40`.
-6. Calls `0x80141D6C(0x8016E170, 1)` and publishes the returned handle at
-   `0x801879E0` in the epilogue.
+6. Calls `0x80141D6C(0x8016E170, 1)` and publishes the returned 38-byte
+   descriptor at `0x801879E0` in the epilogue. `0x8016E170` is the literal
+   string `c:\\wipeout3\\common\\shads.bt4`, not a callback. The callee
+   overwrites `$a0` without consuming it, so that path argument is unused in
+   the retained build; `$a1 = 1` does contribute to initialized flag fields.
 
 The mixture of persistent global allocations, an initialized shared transform,
-dependent subsystem setup, and callback registration establishes a race-runtime
+dependent subsystem setup, and descriptor construction establishes a race-runtime
 initialization role. It is not a per-frame renderer: its sole call is on the
 startup path before the later race loop, and repeated calls would replace
 persistent global allocations.
@@ -69,7 +75,7 @@ persistent global allocations.
 The callable boundary, sole call site, no-argument ABI, allocation sizes,
 global destinations, and sequencing are instruction-level facts. `known` is
 appropriate because the orchestration role is clear, but `confirmed` would be
-premature: the exact domain types of the three buffers and the callback service
+premature: the exact domain types of the four buffers and the descriptor service
 at `0x80141D6C` remain unnamed. Future audits of those callees can refine this
 to a product-specific subsystem name without changing the boundary.
 
