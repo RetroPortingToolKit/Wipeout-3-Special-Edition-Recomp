@@ -67,6 +67,13 @@ status = "confirmed"
 note = "High-fanout 456-byte GPU packet builder: reserve 40 bytes from gPrimCursor, emit a neutral-gray POLY_FT4 with caller rectangle coordinates and descriptor CLUT/TPAGE/UV fields, optionally select semitransparency and a one-texel UV footprint, then return the packet pointer"
 
 [[func]]
+pc = 0x80105B78
+name = "DrawFontString"
+emit = false
+status = "known"
+note = "Four-argument text renderer spanning 0x80105B78..0x80105CDB: walk the NUL-terminated byte string in a0, map ASCII letters/digits and eleven punctuation marks to font glyph indices, advance spaces by eight pixels, emit every other byte through the POLY_FT4 glyph helper at 0x80105CDC using x=a1, y=a2, style=a3, and return total horizontal advance"
+
+[[func]]
 pc = 0x80104AA0
 name = "NextRandom15"
 emit = false
@@ -457,10 +464,10 @@ status = "confirmed"
 note = "Sim every N vblanks (stock 2); lw/sw -4052 off 0x8018; framerate plugin"
 
 [[object]]
-addr = 0x801A8620
+addr = 0x80198620
 name = "gPrimCursor"
 status = "confirmed"
-note = "GPU packet bump pointer (lw/sw -31200 off 0x801A); clipper +40 per emit"
+note = "GPU packet bump pointer at exact effective address 0x801A0000-0x79E0; renderers advance it by their emitted packet size"
 
 [[object]]
 addr = 0x801E2480
@@ -541,3 +548,10 @@ name = "AllocateAndQueueSoundVoice"
 emit = false
 status = "confirmed"
 note = "Exact 0x2C0-byte shared audio sink with three direct callers: gate on two audio-enable bytes, allocate one of 24 sound slots, snapshot volume/pan/pitch and Q8 pitch scale, resolve or reserve one/two of 24 voices, initialize 36-byte voice state from a 20-byte resource descriptor, then submit the slot to the active audio backend"
+
+[[func]]
+pc = 0x80105CDC
+name = "EmitFontGlyphPacket"
+emit = false
+status = "confirmed"
+note = "Exact 0x260-byte 47-caller glyph renderer: select one of four six-byte glyph-metric bands from style, reserve and OT-link a neutral-gray 40-byte POLY_FT4 using style-selected CLUT/TPAGE state, and return x + 2*glyph_width + 2"

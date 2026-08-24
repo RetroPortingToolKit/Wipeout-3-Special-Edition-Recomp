@@ -16,6 +16,14 @@
 #define PSX_FN_NextRandom15 0x80104AA0u
 #define func_80104AA0 NextRandom15  /* alias */
 
+/* known: Four-argument text renderer spanning 0x80105B78..0x80105CDB: walk the NUL-terminated byte string in a0, map ASCII letters/digits and eleven punctuation marks to font glyph indices, advance spaces by eight pixels, emit every other byte through the POLY_FT4 glyph helper at 0x80105CDC using x=a1, y=a2, style=a3, and return total horizontal advance */
+#define PSX_FN_DrawFontString 0x80105B78u
+#define func_80105B78 DrawFontString  /* alias */
+
+/* confirmed: Exact 0x260-byte 47-caller glyph renderer: select one of four six-byte glyph-metric bands from style, reserve and OT-link a neutral-gray 40-byte POLY_FT4 using style-selected CLUT/TPAGE state, and return x + 2*glyph_width + 2 */
+#define PSX_FN_EmitFontGlyphPacket 0x80105CDCu
+#define func_80105CDC EmitFontGlyphPacket  /* alias */
+
 /* confirmed: High-fanout 456-byte GPU packet builder: reserve 40 bytes from gPrimCursor, emit a neutral-gray POLY_FT4 with caller rectangle coordinates and descriptor CLUT/TPAGE/UV fields, optionally select semitransparency and a one-texel UV footprint, then return the packet pointer */
 #define PSX_FN_EmitTexturedQuadPacket 0x80106350u
 #define func_80106350 EmitTexturedQuadPacket  /* alias */

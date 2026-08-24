@@ -808,3 +808,13 @@ unbounded build as a performance test; use focused targets and the bounded
   24 sound slots and 24 voice records (ordinary 0..20, reserved 21..23), can
   allocate a second voice from class bit 8, applies Q8 pitch scaling, and
   submits initialized voices to the backend.
+- `0x8017B90C..0x8017BBCF` is the sole-called
+  `UpdatePerformanceTuningMenu`, owning the FRAME RATE/SHIP LOD/SHIP DIST/BIRDS
+  developer menu and PAL-x2 publication. Generated entries `0x8017B920` and
+  `0x8017BBA4` are interior instructions; their apparent overlay JALs are words
+  in relocation-pair data, not executable callers.
+- The text path is now joined: `DrawFontString` at `0x80105B78` maps letters,
+  digits, punctuation and spaces across 69 callers, then delegates glyphs to
+  `EmitFontGlyphPacket` at `0x80105CDC`. The latter selects one of four metric
+  bands, emits/OT-links a 40-byte `POLY_FT4`, and advances the exact primitive
+  cursor at `0x80198620` (correcting the prior catalog typo `0x801A8620`).
