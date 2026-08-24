@@ -124,6 +124,10 @@
 #define PSX_FN_DrawFontString 0x80105B78u
 #define func_80105B78 DrawFontString  /* alias */
 
+/* confirmed: Logical 0x164-byte uppercase-ASCII string renderer with 72 unique runtime call PCs: remap letters/digits/11 punctuation characters, advance spaces by eight, thread X through fixed-neutral-gray EmitFontGlyphPacket, and return total width; 12 generated case aliases and 104 call emissions include overlay/overlap duplicates */
+#define PSX_FN_DrawAsciiTextString 0x80105B78u
+#define func_80105B78 DrawAsciiTextString  /* alias */
+
 /* confirmed: Exact 0x260-byte 47-caller glyph renderer: select one of four six-byte glyph-metric bands from style, reserve and OT-link a fixed-neutral-gray 40-byte POLY_FT4 with style-selected semitransparency/CLUT/TPAGE, and return x + 2*glyph_width + 2; 49 emissions duplicate two calls through overlapping translations */
 #define PSX_FN_EmitFontGlyphPacket 0x80105CDCu
 #define func_80105CDC EmitFontGlyphPacket  /* alias */
@@ -308,6 +312,10 @@
 #define PSX_FN_SpawnRacerType1ParticleBurst 0x8011FF78u
 #define func_8011FF78 SpawnRacerType1ParticleBurst  /* alias */
 
+/* confirmed: Exact 0x358-byte no-argument particle queue drain: reentrancy-guarded transfer of up to two pending 40-byte effect records into the current 80-byte slot of a 16-entry ring, with per-record state/sentinel handling, helper-derived fields, cursor advancement, optional callback dispatch, and no semantic return; no direct or interior callers */
+#define PSX_FN_DrainParticleEffectQueue 0x8011FF98u
+#define func_8011FF98 DrainParticleEffectQueue  /* alias */
+
 /* confirmed: True 0x3B4-byte frameless owner spanning six false generated splits: resolve logical pad 0..7 through two ports/four multitap slots, accept 0x7300 analog-pad and 0x2300 NegCon-class packets, apply per-pad deadzone/scale calibration with clamping and history updates, mutate axis/pressure bytes in place, and return the packet pointer or null */
 #define PSX_FN_ApplyAnalogControllerCalibration 0x801203F0u
 #define func_801203F0 ApplyAnalogControllerCalibration  /* alias */
@@ -359,6 +367,10 @@
 /* confirmed: Exact 0x2A4-byte one-caller frontend image-table builder: convert a 64x8 RGB24 source to a transposed 0x38-prefixed GPU color-word table at 0x801DE670, conditionally round/publish its first color by mode, snapshot three layout halfwords, and build 26 trigonometric 80-byte warp rows at 0x801DDE50 using Q12 sine/cosine; a1/a3 ignored, no semantic return */
 #define PSX_FN_PrepareFrontendImageWarpTables 0x8012DA10u
 #define func_8012DA10 PrepareFrontendImageWarpTables  /* alias */
+
+/* confirmed: Exact 0x1F0-byte one-caller packet-pool initializer: build and sequentially link 175 36-byte POLY_G4 packets followed by 64 40-byte POLY_FT4 packets in the caller workspace, configure each textured strip's neutral RGB, atlas-mode UVs and descriptor CLUT/TPAGE, and publish first/last textured-packet pointers in the footer; a2/a3 ignored, no semantic return */
+#define PSX_FN_InitializeFrontendImageWarpPacketChains 0x8012DCB4u
+#define func_8012DCB4 InitializeFrontendImageWarpPacketChains  /* alias */
 
 /* confirmed: Exact 0x3C-byte six-caller resource-loader adapter: sign-extend the low halfword of index a0, call the private resource core 0x8012CD44 as (0,0,0,NULL,index,size_out), and return its resource pointer unchanged; all six unique calls target the entry and the sole interior row is only the nested-call continuation */
 #define PSX_FN_LoadResourceBySignedIndex 0x8012E2D4u
