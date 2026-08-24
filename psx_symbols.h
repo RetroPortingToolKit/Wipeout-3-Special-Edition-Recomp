@@ -160,6 +160,10 @@
 #define PSX_FN_RotateQuadCoordinatesCounterclockwise 0x80110390u
 #define func_80110390 RotateQuadCoordinatesCounterclockwise  /* alias */
 
+/* confirmed: Logical 0x164-byte null-terminated text renderer across 12 false generated case-entry translations: map uppercase letters, digits and supported punctuation to glyph indices, advance spaces by 8, emit other bytes through the 40-byte font-packet helper with mode-2 style remapping and caller grayscale, and return horizontal width; no direct executable caller or external interior target */
+#define PSX_FN_DrawMappedTextString 0x801103FCu
+#define func_801103FC DrawMappedTextString  /* alias */
+
 /* confirmed: Exact 0x170-byte 10-caller signed decimal renderer: optionally emit a minus glyph, decompose the magnitude into at most five low decimal digits, zero-pad to the caller's stack-supplied minimum width, emit digits through EmitFontGlyphPacket with a mode-2 style-bank remap, and return the final X pen */
 #define PSX_FN_DrawSignedDecimalInteger 0x80110560u
 #define func_80110560 DrawSignedDecimalInteger  /* alias */
@@ -171,6 +175,10 @@
 /* confirmed: Exact 0xA8-byte eight-caller GPU-state emitter: reserve a 12-byte DR_MODE at gPrimCursor, compute TPAGE from caller ABR with tp/x/y zero, build mode with DFE=1 and caller DTD, then prepend the packet to the active ordering-table bucket at signed depth>>6 */
 #define PSX_FN_EmitDrawModePacketToOrderingTable 0x801107ECu
 #define func_801107EC EmitDrawModePacketToOrderingTable  /* alias */
+
+/* confirmed: Exact 0x128-byte one-caller frontend image pipeline: ignore a0-a2, retain a3 option record, acquire the current archive image, decode its selected RGB5 halfword into three rounded 8-bit tint globals, build a texture descriptor, invoke the two private frontend image-layout builders with option byte +5, and release all tracked temporary heap blocks; no semantic return */
+#define PSX_FN_PrepareFrontendImageResource 0x80110894u
+#define func_80110894 PrepareFrontendImageResource  /* alias */
 
 /* confirmed: Exact 0x8B0-byte two-caller frontend-overlay TIM texture builder retaining the diagnostic name LoadTexture: accept 4-bit or 8-bit TIM data, allocate a 0x26-byte descriptor, auto-place supported CLUT/image rectangles, derive TPAGE/CLUT and UV bounds, upload CLUT and pixel rectangles, optionally transform source pixels or CLUT flags, and return the descriptor; unsupported modes return null */
 #define PSX_FN_LoadFrontendTexture 0x80110DF0u
@@ -275,6 +283,10 @@
 /* confirmed: Exact 0x70-byte no-argument one-caller initializer: configure three 12-byte GPU TILE_1 packets in each of 32 records at 0x801D4EDC by setting tag word count byte +3 to 2 and GP0 command byte +7 to 0x68, then call the adjacent leaf that resets the pool allocation count at 0x80175D40; no duplicate or interior entry */
 #define PSX_FN_InitializeParticleTilePacketPool 0x8011FE94u
 #define func_8011FE94 InitializeParticleTilePacketPool  /* alias */
+
+/* confirmed: Exact 0x0C-byte three-caller leaf: clear the allocation count at 0x80175D40 for the proven 32-record particle TILE_1 packet pool at 0x801D4EDC; store executes in the jr delay slot, no arguments or other effects */
+#define PSX_FN_ResetParticleTilePacketPool 0x8011FF04u
+#define func_8011FF04 ResetParticleTilePacketPool  /* alias */
 
 /* confirmed: True 0x3B4-byte frameless owner spanning six false generated splits: resolve logical pad 0..7 through two ports/four multitap slots, accept 0x7300 analog-pad and 0x2300 NegCon-class packets, apply per-pad deadzone/scale calibration with clamping and history updates, mutate axis/pressure bytes in place, and return the packet pointer or null */
 #define PSX_FN_ApplyAnalogControllerCalibration 0x801203F0u
