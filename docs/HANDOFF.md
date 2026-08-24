@@ -2053,3 +2053,196 @@ authenticated `tetrisgm` account with HTTP 403, so the required fork
 `tetrisgm/recomp-ui` was created and `b81fcf8` was published on
 `codex/wipeout3-remaster-controls-assets`; root `.gitmodules` now names that
 reachable fork rather than leaving an uncloneable submodule pointer.
+
+## Windows invalid-overlay probe UI correction (2026-08-23)
+
+- The reported `python.exe - Bad Image` dialog naming a temporary
+  `00010000_DEADBEEF.dll` was traced exactly to the overlay-discovery regression
+  test. Its publication-race case deliberately writes `OLD-DLL`/`NEW-DLL`
+  placeholders and then verifies that runtime-style coverage rejects the
+  malformed winner. The rejection is expected and is not a game-process crash.
+- `tools/compile_overlays.py` now wraps all candidate `ctypes.CDLL` validation
+  mappings in the thread-local Windows
+  `SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX` mode and immediately restores
+  the prior mode. Invalid/stale cache candidates still fail closed, but no
+  system-modal loader dialog can stall the bounded Python test or compilation
+  tool. Python compilation and a direct malformed-DLL rejection probe pass.
+
+## Live 50/100-Hz transition and replay fixtures (2026-08-23 11:49 PDT)
+
+- The owner changed the running accepted stock process from the game's 50-Hz
+  patch mode (which ran too fast under the runtime's PALx2 cadence) back to its
+  100-Hz patch mode; the latter then ran very slowly during post-race replay.
+  This is a useful discriminator: the 50-Hz content path is not a valid PALx2
+  acceptance route, while the 100-Hz path exercises the required throughput.
+- PID 33668 is still the stock executable
+  `Wipeout_3_Special_Edition__Recompiled.exe`, not the `_pgxp.exe` variant.
+  Therefore its current visuals cannot validate or invalidate the new FULL/MAX
+  PGXP implementation, regardless of launcher/config PGXP selections.
+- Three new retail-BIOS fixtures were preserved without touching the process:
+  slot 0 at race start/post-race boundary, SHA-256
+  `004E163C683B301E026FCD5022D832F3168B0DD3870C09046F9E0C1337E3B329`;
+  slot 1 post-race, `75CCE1345186D697981F2F9DC4E861231CEE242E634E22A87227AD8C803F79DA`;
+  slot 3 post-race, `771400741A93CB7E98680379FDD643ADE2D28C3DE6721945B4C80FBDDF369516`.
+- Two stale Codex-owned read-only diagnostics were stopped; the game and all
+  unrelated processes were left alone. A subsequent three-second sample showed
+  the game using 1.099 CPU cores, total host CPU 15.4% of 16 logical processors,
+  and a responsive window. All local build/sanitizer work was held while the
+  owner observed the replay. The fixtures, not the live loop, are the durable
+  reproduction route for the isolated candidate.
+
+## PGXP visual-profile correction and HD save-state continuity (2026-08-23 14:22 PDT)
+
+- The first visible PGXP/HD candidate was not a valid HD-pack visual test. It
+  auto-loaded legacy slot 3, while this runtime discarded its Beetle-style
+  texture-upload tracker on every full VRAM restore. The external pack was
+  active and indexed all 292 keys, but no replacement could match until the
+  scene uploaded the relevant source texture again.
+- The HD tracker now has a bounded, versioned, little-endian state wire and is
+  an optional boot/save-state section. The loader preflights counts, sizes,
+  fragment geometry, overlap, serial uniqueness, and truncation before a
+  transactional swap. Old states remain loadable; they explicitly restart the
+  tracker from subsequent uploads. New states preserve partial-upload holes and
+  surviving fragments, matching Beetle's continuity model.
+- Focused `boot_state_transaction_test`, `hd_texture_pack_test`,
+  `overlay_static_cmake_contract_test`, and
+  `static_overlay_entry_index_test` passed 4/4. The HD test also passed against
+  the real cue-sibling 292-key pack, including corrupt/truncated rejection and
+  failed-load rollback behavior.
+- The original `FULL/MAX` preset was too aggressive. DuckStation's official
+  SCES-02845 database requires CPU propagation and exclusion of 2D polygons,
+  but does not require vertex cache or preserve-projection. DuckStation leaves
+  both latter options off by default and warns that unnecessary cache/CPU
+  overrides can cause rendering errors. WipEout genuinely requires CPU mode;
+  the cache does not. The corrected product profile therefore keeps geometry,
+  texture correction, CPU mode, precise culling, and exclude-2D enabled; turns
+  vertex cache and preserve-projection off; and continues to keep host
+  color/depth/transparent-depth off after their observed flying/missing polygon
+  failures.
+- The isolated corrected executable is
+  `build-remaster-pgxp-hdstate-20260823/Wipeout_3_Special_Edition__Recompiled_pgxp.exe`,
+  SHA-256 `47AE915A08BE067EFD070C82BD4FFDF5C4B9543F98025523D50FCB73CB5FE153`.
+  It is staged with the corrected `game.toml`, bezel, copied input bindings,
+  isolated cards, and the existing validated overlay cache. It has not been
+  launched because PID 28888 is still the owner's visible older candidate and
+  must not be stopped or doubled up without an explicit handoff.
+
+Next concrete step: once the owner has finished with or closed PID 28888,
+launch the isolated corrected executable with `--no-launcher`, the retail BIOS,
+and its own `candidate-saves`. A legacy state can prove PGXP geometry but not an
+immediate HD hit; enter/restart a race so textures upload, confirm a first-hit
+receipt, save a new state, reload it, and confirm a nonzero restored tracker and
+the same replacement. If geometry still looks worse, run only the bounded
+tolerance A/B (`-1.0` versus `0.5`) before considering preserve-projection; do
+not re-enable vertex cache, color correction, or depth for this title.
+
+## Corrected candidate live status and native shard repair (2026-08-23 14:37 PDT)
+
+- The older visible candidate exited, so the corrected executable was launched
+  as PID 4056 from `build-remaster-pgxp-hdstate-20260823` with isolated cards
+  and the retail BIOS. It is responding. Startup telemetry proves CPU 900%,
+  PAL×2 effective 99.493634 Hz at nominal 100 Hz, SPU 44.1 kHz, OpenGL, PGXP
+  CPU on, vertex cache off, preserve-projection off, exclude-2D on, and host
+  color/depth/transparent-depth off. The pack reports 292 unique keys and the
+  bezel reports loaded.
+- The copied old overlay cache was correctly rejected at startup: it carried
+  `cg11_98645701_gc3d97ace3_f2`, while this executable expects
+  `cg11_4e941aa0_gc3d97ace3_f2`. This mismatch explains the live title's
+  interpreter-like 0.8x rate and must not be mistaken for a PGXP verdict.
+- The prior capture manifest was copied only as compile input. A current
+  `compile_overlays.py --check` rebuilt all five native-capable shards in a
+  throwaway directory with the current recompiler and headers (3 data-only
+  captures skipped, 0 failures). The five matching GCC DLLs and range files
+  were then published into the corrected cache namespace. The running process
+  scanned before those files existed, so it needs a clean restart to load them;
+  it was left running to avoid another unexpected close.
+
+Next concrete step: when the owner is ready to restart PID 4056, relaunch with
+the same isolated directory (and a correctly quoted window-title argument),
+confirm the startup audit reports `indexed=5` and no hash mismatch, then perform
+the visual PGXP/HD race check. Do not judge the current 0.85x title as the
+native-cache result.
+
+## Replay miss-cache invalidation and single-instance launch guard (2026-08-24)
+
+- The two-instance comparison ruled out host contention: one and two copies
+  showed the same replay cadence. The bottleneck is guest emulation work.
+- The replay hot path was an unresolved dynamic-overlay PC (`0x00780688`).
+  `memory.c` previously advanced the overlay code epoch for every write to a
+  watched 4 KiB page, including replay data writes sharing that page. That
+  invalidated the lazy negative-dispatch cache continuously and repeatedly
+  rescanned the manifest/range index.
+- `memory.c` now keeps a second-level 4-byte instruction-word bitmap. Page
+  generations and lazy-miss invalidation advance only when a write overlaps a
+  registered instruction word; unrelated data writes remain on the cheap path.
+  The existing direct negative cache then stays effective (`miss_cached=1`,
+  `watched_gen=2` across the controlled replay sample).
+- The old title counter reported simulated VBlank callbacks as “Game FPS”. The
+  runtime now labels separate `Guest Hz`, `Present FPS`, and optional
+  `Display FPS`; OpenGL present counting includes interpolation swaps.
+- A guarded launcher helper, `tools/run_candidate_single.ps1`, kills only an
+  existing process whose exact executable path matches the candidate, verifies
+  zero remain, then launches one PID. It now passes launch-time environment
+  variables explicitly. The correct save-state variable is `PSX_LOAD_SLOT`.
+- Focused verification: `test_fps_telemetry_opt_in.py` passes; the PGXP
+  candidate relinks successfully. Controlled slot-3 replay loaded successfully
+  (`pc=0x80136B00`). The prior replay sample averaged 45.6 guest Hz; the fixed
+  sample averaged 66.5 guest Hz (range 55.9–84.7 Hz) with the miss cache stable.
+- Current intentional test process is one exact-path PID only. Kill it with the
+  helper before any rebuild/relaunch; do not start a second candidate instance.
+
+Next step: keep the single guarded slot-3 replay running long enough for a
+visual check. If it still drops below the user's acceptable threshold, profile
+the remaining emulation work (not host CPU contention) rather than adding more
+one-off overlay fragments. A new user save state is useful only after reaching
+the target race/replay with this build; the existing state remains loadable.
+
+## Unified high-RAM CPS pilot (2026-08-24)
+
+- The remaining replay defect is not the host: the high-RAM capture at
+  `0x80780000` had dispatch evidence but no callable seed, so the compiler
+  emitted isolated 14-byte interior DLLs. The hot interpreter PC remained
+  `0x00780688`.
+- `compile_overlays.py` now permits a narrowly gated orphan-promotion pass for
+  a no-root capture that has explicit `dispatch_entry_pcs`. It promotes only
+  those dispatch-proven PCs (never generic `executed_pcs`) into one CPS region
+  bundle; established rooted/data regions keep the old conservative behavior.
+- The cache gate treats this as a unified-capture demand: supplemental/orphan
+  fragments cannot suppress creation of the canonical `<region>_<crc>.dll` and
+  `.ranges` pair. A valid canonical pair alone can satisfy the demand.
+- Offline pilots built successfully with the current recompiler and GCC:
+  `0x80780000/0x326CD0D1` produced one validated CPS DLL with 2 functions,
+  0 unknown targets, and 0 unsupported instructions; the richer `0x63E194BA`
+  capture produced one 12-function bundle. The 326CD0D1 pair is staged in the
+  guarded candidate cache.
+- The current restored state resumes directly at the still-uncovered interior
+  `0x00780688`, so it cannot exercise the new region entry before the next
+  capture. A fresh user state saved while the replay is visibly slow will
+  capture that exact dispatch demand; then compile it into the same canonical
+  CPS bundle. No user state is required for the compiler pilot itself.
+
+## Bounded hot-page promotion and gameplay-speed interpretation (2026-08-24)
+
+- Runtime capture now bridges resumed interior dispatches without promoting
+  arbitrary executed data: it promotes the hot PC plus a bounded set of
+  dispatch-table roots from the same page, and can promote one contiguous
+  execution run of at most 256 instruction words. Disconnected execution
+  islands remain excluded.
+- Capture history is merged by exact `(load_addr, size, bytes)` image before
+  compilation, so repeated save-state runs contribute roots to the same
+  canonical RAM image instead of producing an unbounded pile of fragments.
+- The F5 pilot (`0x800F5000`, CRC `0x8C411A77`) compiled to 104 native
+  functions with zero unsupported instructions and zero unknown targets. The
+  780 pilot (`0x80780000`, CRC `0x8B293C32`) compiled to 8 native functions
+  with the same zero-error audit and is installed alongside the historical
+  780 bundles.
+- A clean single-instance verification confirmed the candidate starts with
+  `CPU overclock 900%` / `cpu_effective=9.000x`. Its restored replay still
+  reports variable guest cadence because the diagnostic counter measures
+  simulated VBlank work, not the player's perceived motion; the user reports
+  the race itself feels close to full speed when CDAudio and that counter are
+  ignored. This is not a claim that every dynamic block is now native or that
+  a 900% gameplay result is fully proven.
+- The exact candidate process was closed after the run and verified at zero
+  matching processes. Future tests must use the guarded launcher and preserve
+  this single-instance invariant.
