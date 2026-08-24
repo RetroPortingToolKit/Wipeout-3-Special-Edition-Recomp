@@ -48,6 +48,10 @@
 #define PSX_FN_LeaveNestedInterruptCriticalSection 0x800EEE64u
 #define func_800EEE64 LeaveNestedInterruptCriticalSection  /* alias */
 
+/* confirmed: Exact 0x2BC-byte four-caller geometry helper: measure AB/BC/AC, form the retained signed Q12 ratio from the negated sum of their modulo-32-bit squares over 2*AB*BC, apply table arccos then cosine at one-quarter angle, and write B minus normalized BC times the resulting AB-scaled distance; zero AB/BC leaves output untouched */
+#define PSX_FN_ComputeThreePointTrigonometricOffset 0x800F2278u
+#define func_800F2278 ComputeThreePointTrigonometricOffset  /* alias */
+
 /* confirmed: Exact 0xAC-byte seven-unique-call-site geometry helper: select endpoint a2 from packed 12-byte vertex-pair records at owner+0x18, reconstruct its three signed 16-bit components, transform/translate it through the GTE RotTrans-shaped leaf into a0, and propagate the GTE FLAG word */
 #define PSX_FN_TransformIndexedPairedVertex 0x800F2F48u
 #define func_800F2F48 TransformIndexedPairedVertex  /* alias */
@@ -259,6 +263,10 @@
 /* confirmed: Logical 0x28-byte argument-free test-and-clear accessor including generated zero-return tail 0x8012C1C4: return 0 without writing when word 0x80175F90 is zero; otherwise clear that word and return 1; seven generated instances are four unique entry callers */
 #define PSX_FN_ConsumeOneShotFlag80175F90 0x8012C1A4u
 #define func_8012C1A4 ConsumeOneShotFlag80175F90  /* alias */
+
+/* confirmed: Exact 0x3C-byte six-caller resource-loader adapter: sign-extend the low halfword of index a0, call the private resource core 0x8012CD44 as (0,0,0,NULL,index,size_out), and return its resource pointer unchanged; all six unique calls target the entry and the sole interior row is only the nested-call continuation */
+#define PSX_FN_LoadResourceBySignedIndex 0x8012E2D4u
+#define func_8012E2D4 LoadResourceBySignedIndex  /* alias */
 
 /* confirmed: Exact 0x14-byte 25-caller frameless in-place byte-pair swap: exchange bytes at pointer offsets 0 and 1, touch no other memory or state, and expose only an incidental original-byte-1 value in v0 */
 #define PSX_FN_SwapAdjacentBytes 0x8012E310u
@@ -527,6 +535,10 @@
 /* confirmed: Exact 0xC0-byte PsyQ-compatible 20-caller DRAWENV installer: optionally log PutDrawEnv, compile the input environment into its embedded DR_ENV packet at +0x1C, terminate the packet tag, submit 0x40 bytes through the active GPU driver, cache the full 0x5C-byte DRAWENV, and return the input pointer */
 #define PSX_FN_PutDrawEnv 0x8015D68Cu
 #define func_8015D68C PutDrawEnv  /* alias */
+
+/* confirmed: Exact argument-free 0x34-byte GPU-library helper with five entry-only callers: sample VSync(-1), store the returned vblank count plus 240 at watchdog deadline 0x80179084, clear watchdog counter 0x80179088, and return with the deadline only as ignored register residue */
+#define PSX_FN_ArmGpuTimeoutWatchdog 0x8015F32Cu
+#define func_8015F32C ArmGpuTimeoutWatchdog  /* alias */
 
 /* confirmed: Exact 0x144-byte seven-caller argument-free PsyQ GPU watchdog: sample VSync(-1), return 0 while the deadline/call-count guard remains healthy, otherwise print retained GPU diagnostics, mask interrupts, reset tracked GPU/DMA state and GP1, restore the prior interrupt mask, and return -1 */
 #define PSX_FN_CheckAndRecoverGpuTimeout 0x8015F360u

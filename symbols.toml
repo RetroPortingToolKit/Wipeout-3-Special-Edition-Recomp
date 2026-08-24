@@ -1615,6 +1615,13 @@ status = "confirmed"
 note = "Private 32-bit state for NextRacerRandom15, initialized in the PS-X EXE to 0x12345678; independent from adjacent gRandom15State at 0x80173A94"
 
 [[func]]
+pc = 0x8015F32C
+name = "ArmGpuTimeoutWatchdog"
+emit = false
+status = "confirmed"
+note = "Exact argument-free 0x34-byte GPU-library helper with five entry-only callers: sample VSync(-1), store the returned vblank count plus 240 at watchdog deadline 0x80179084, clear watchdog counter 0x80179088, and return with the deadline only as ignored register residue"
+
+[[func]]
 pc = 0x8015FD7C
 name = "Exit"
 emit = false
@@ -1657,6 +1664,13 @@ status = "confirmed"
 note = "Exact 0x26C-byte scene-object relation pass: when global gates permit, scan 0xCC-byte records at 0x8018811C/count 0x80187CE8, filter inactive keyed records with eligible linked metadata, test bounded forward/reverse pointer-chain reachability against context+8, and issue group-property updates through 0x800FA364; six generated calls collapse to five unique guest sites because 0x801598E8 is emitted in two overlay images, with no interior callers"
 
 [[func]]
+pc = 0x8012E2D4
+name = "LoadResourceBySignedIndex"
+emit = false
+status = "confirmed"
+note = "Exact 0x3C-byte six-caller resource-loader adapter: sign-extend the low halfword of index a0, call the private resource core 0x8012CD44 as (0,0,0,NULL,index,size_out), and return its resource pointer unchanged; all six unique calls target the entry and the sole interior row is only the nested-call continuation"
+
+[[func]]
 pc = 0x8015D3C4
 name = "ClearImage"
 emit = false
@@ -1669,3 +1683,10 @@ name = "UpdateRacerContactResponseHandler"
 emit = false
 status = "confirmed"
 note = "Exact 0x160-byte three-caller contact-state dispatcher: resolve a racer and its 0x1AC-byte craft/object, require contact flag 0x1000 and eligible racer/global state, then select callback 0x800E913C, 0x800E8E14, or 0x800EA760 at racer +0x39C while synchronizing object flag bits 0x4/0x10000; no overlay duplicate"
+
+[[func]]
+pc = 0x800F2278
+name = "ComputeThreePointTrigonometricOffset"
+emit = false
+status = "confirmed"
+note = "Exact 0x2BC-byte four-caller geometry helper: measure AB/BC/AC, form the retained signed Q12 ratio from the negated sum of their modulo-32-bit squares over 2*AB*BC, apply table arccos then cosine at one-quarter angle, and write B minus normalized BC times the resulting AB-scaled distance; zero AB/BC leaves output untouched"

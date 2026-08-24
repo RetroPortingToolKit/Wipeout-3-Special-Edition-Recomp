@@ -1446,6 +1446,11 @@ unbounded build as a performance test; use focused targets and the bounded
   eligibility gates, it installs one of `0x800E913C`, `0x800E8E14`, or
   `0x800EA760` at racer `+0x39C` and synchronizes craft/object flags `0x4` and
   `0x10000`; existing response `0x800E9510` is left untouched.
+- `ComputeThreePointTrigonometricOffset` owns `0x800F2278..0x800F2533`,
+  with four unique entry callers and no overlay duplicate. It recovers angle B
+  from a retained negated-square-sum Q12 ratio through arccos and quarter-angle
+  cosine, then writes B extended opposite normalized BC by the resulting
+  AB-scaled distance; zero AB/BC leaves output untouched.
 - `ApplyRgbToPrimitiveRecordStream` owns `0x800E8350..0x800E8513`; its six
   generated interior entries are the type 1..8 jump-table cases. Four unique
   callers supply an owner (`count +0x12`, stream `+0x1C`) and RGB bytes. It
@@ -1476,6 +1481,10 @@ unbounded build as a performance test; use focused targets and the bounded
   `(sra(state,1) ^ (state << 3))`, stores the full word, and returns its low 15
   bits. Three unique racer/gameplay callers are each emitted twice by
   overlapping translations.
+- `ArmGpuTimeoutWatchdog` owns exactly `0x8015F32C..0x8015F35F`. Its five
+  entry-only GPU-library callers ignore return residue. It stores
+  `VSync(-1)+240` at deadline `0x80179084` and clears counter `0x80179088`, the
+  two guards consumed by adjacent `CheckAndRecoverGpuTimeout`.
 - `ComputeObjectUpVectorQ12` owns `0x800EA870..0x800EA9AF`. Six unique callers
   (five base-region owners and one overlay owner) target only the entry. It
   reads signed object Euler angles at `+0x11E/+0x120/+0x122`, evaluates six
@@ -1487,3 +1496,8 @@ unbounded build as a performance test; use focused targets and the bounded
   applies linked group state/randomization via `ApplySceneObjectGroupProperty`.
   Six generated calls are five unique entry-only sites because `0x801598E8`
   appears in two overlay images; no interior row is called.
+- `LoadResourceBySignedIndex` owns `0x8012E2D4..0x8012E30F`, with six unique
+  entry-only callers. It truncates/sign-extends `a0`, invokes private resource
+  core `0x8012CD44` as `(0,0,0,NULL,index,size_out)`, and returns the core's
+  nullable resource pointer unchanged; `0x8012E300` is only its call-return
+  continuation and has no direct caller.
