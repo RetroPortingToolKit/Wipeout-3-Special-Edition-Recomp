@@ -1390,3 +1390,17 @@ name = "CopyAndNormalizeControllerPacket"
 emit = false
 status = "confirmed"
 note = "Exact 0x100-byte seven-caller controller-response sanitizer: copy eight bytes from a nonnull source or clear them, preserve the raw header at destination +8, accept 0x2300/0x4100/0x7300, otherwise force released buttons and centered axes, and canonicalize recognized 0x23FF/0x41FF/0x73FF error headers to 0x4100"
+
+[[func]]
+pc = 0x8015FB14
+name = "InitializeMatrixRotationFromFourCoefficients"
+emit = false
+status = "confirmed"
+note = "Exact 0x3C-byte seven-caller leaf: return the MATRIX pointer, write caller coefficients m00/m01/m02/m10 into rotation halfwords +0/+2/+4/+6, zero the other five rotation halfwords and +0x12 padding, and leave translation words +0x14/+0x18/+0x1C untouched"
+
+[[func]]
+pc = 0x80169D30
+name = "WaitForJoyAckAndClearIrq"
+emit = false
+status = "confirmed"
+note = "Exact 0x90-byte seven-caller JOY/SIO0 handshake helper: acknowledge only SIO interrupt bit 7 through I_STAT, poll JOY_STAT ACK bit 7 until clear under the already-armed Timer 2 timeout, return 0 on expiry, or set JOY_CTRL ACK/IRQ-reset bit 0x10 and return 1"

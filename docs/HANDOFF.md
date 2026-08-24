@@ -1304,3 +1304,13 @@ unbounded build as a performance test; use focused targets and the bounded
   original header at destination `+8`, accepts headers `2300/4100/7300`, and
   otherwise forces buttons `FFFF` plus four centered `80` axes. Recognized
   `23FF/41FF/73FF` error headers are additionally canonicalized to `4100`.
+- `InitializeMatrixRotationFromFourCoefficients` is the exact straight-line
+  leaf at `0x8015FB14..0x8015FB4F`. Its seven unique entry callers supply four
+  rotation halfwords; it zeros the other five rotation terms and `+0x12`
+  padding, preserves MATRIX translation at `+0x14/+0x18/+0x1C`, and returns
+  the input pointer. There are no calls or interior targets.
+- `WaitForJoyAckAndClearIrq` owns `0x80169D30..0x80169DBF` with seven callers.
+  It acknowledges SIO interrupt bit 7 in `I_STAT`, waits for JOY_STAT ACK bit
+  7 to clear under the caller-armed Timer 2 deadline, returns zero on timeout,
+  or sets JOY_CTRL bit `0x10` and returns one. All callers test the boolean and
+  convert failure into their controller/SIO timeout paths.
