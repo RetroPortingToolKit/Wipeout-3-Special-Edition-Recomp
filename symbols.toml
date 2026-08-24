@@ -612,6 +612,13 @@ status = "confirmed"
 note = "Exact 0x200-byte 13-caller Euler builder adjacent to SetTransformTranslation: sign-extend three 4096-unit angles, compute a row-major Q12 Rx(a1)*Ry(-a2)*Rz(a3) matrix into the destination's first nine halfwords, set destination+0x40 to one, and leave translation untouched"
 
 [[func]]
+pc = 0x80135CDC
+name = "CopyTransformMatrix"
+emit = false
+status = "confirmed"
+note = "Exact frameless 0x74-byte PSX MATRIX copy leaf with 19 generated call instances at 15 distinct guest PCs: copy all nine rotation halfwords and three 32-bit translation words from a0 to a1, skip padding at +0x12, leave containing-transform state such as +0x40 untouched, and establish no scalar return"
+
+[[func]]
 pc = 0x80122650
 name = "ApplyGlobalRgbWithAlpha"
 emit = false
@@ -760,6 +767,20 @@ status = "confirmed"
 note = "Exact 0xC0-byte PsyQ-compatible 20-caller DRAWENV installer: optionally log PutDrawEnv, compile the input environment into its embedded DR_ENV packet at +0x1C, terminate the packet tag, submit 0x40 bytes through the active GPU driver, cache the full 0x5C-byte DRAWENV, and return the input pointer"
 
 [[func]]
+pc = 0x80116D1C
+name = "ReleaseHeapPrefixToMarker"
+emit = false
+status = "confirmed"
+note = "Exact 0xA0-byte four-caller arena-prefix release wrapper used by temp-heap rollback: null releases the arena's initial payload and clears gHeapPrefixMarker; a sufficiently lower marker synthesizes a 20-byte allocated block over the newly released prefix, links and frees it through FreeHeapBlock, then publishes the new marker"
+
+[[func]]
+pc = 0x80116DBC
+name = "FreeHeapBlock"
+emit = false
+status = "confirmed"
+note = "Exact 0x104-byte 15-caller custom-arena free/coalescer: find a block by exact payload pointer, restore its payload bytes to arena free accounting, merge an adjacent free successor and predecessor while restoring each 20-byte header, or print the retained DFree block-not-found diagnostic"
+
+[[func]]
 pc = 0x800EEE64
 name = "LeaveNestedInterruptCriticalSection"
 emit = false
@@ -772,6 +793,13 @@ name = "ResolveModeDependentIndex"
 emit = false
 status = "confirmed"
 note = "Exact 0x5C-byte 23-caller leaf: snapshot the eight-byte permutation at 0x8016DD60, then return table[index] for mode 1, index+14 for mode 0, index+8 for mode 2, or 1 for every other mode; a2/a3 unused and mode-1 bounds are a caller invariant"
+
+[[func]]
+pc = 0x801224B4
+name = "SetSoundSlotVolume"
+emit = false
+status = "confirmed"
+note = "Exact 0x64-byte 20-caller audio adapter: truncate a1 to u8, reject disabled audio, slot -1, slot >=24, and inactive slot records; otherwise write volume byte +0x1A in the selected 32-byte record at 0x801D674C and call 0x8012257C to dispatch that slot to the active backend"
 
 [[object]]
 addr = 0x8016DD60
