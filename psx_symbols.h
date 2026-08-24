@@ -12,6 +12,10 @@
 #define PSX_FN_SetSimVblankSkip 0x800EED58u
 #define func_800EED58 SetSimVblankSkip  /* alias */
 
+/* confirmed: High-fanout 456-byte GPU packet builder: reserve 40 bytes from gPrimCursor, emit a neutral-gray POLY_FT4 with caller rectangle coordinates and descriptor CLUT/TPAGE/UV fields, optionally select semitransparency and a one-texel UV footprint, then return the packet pointer */
+#define PSX_FN_EmitTexturedQuadPacket 0x80106350u
+#define func_80106350 EmitTexturedQuadPacket  /* alias */
+
 /* confirmed: Seven-instruction leaf: swap bytes 0 and 2 of the three-byte color at a0 while preserving byte 1; called by four packet/material conversion sites at 0x80110C4C/74/AC/D4, with four mirrored expansion-RAM copies */
 #define PSX_FN_SwapRgb24RedBlue 0x80112048u
 #define func_80112048 SwapRgb24RedBlue  /* alias */
@@ -27,6 +31,10 @@
 /* confirmed: Exact 0x1E8-byte custom main/temp heap allocator: align requested bytes upward to four, prefer a free block large enough to split off a 20-byte allocation header plus payload from its tail, otherwise warn and consume an unsplittable free block large enough for the payload; update arena remaining bytes and main-heap low-water mark, return payload at header+12, or null when no block fits; 85 direct JAL sites */
 #define PSX_FN_AllocateHeapBlock 0x8011686Cu
 #define func_8011686C AllocateHeapBlock  /* alias */
+
+/* confirmed: Exact 0x50C-byte menu-input classifier: accept action 0..11, recognize actions 0..3 from a selected 0x73 analog-pad record when the left-stick axis is at least 93 counts from center, otherwise sum the action's PSX button mask across eligible 0x3A4-byte racer/controller records; 49 direct JAL sites */
+#define PSX_FN_GetMenuActionState 0x8011BDD0u
+#define func_8011BDD0 GetMenuActionState  /* alias */
 
 /* known: Callable race-view renderer: owns the 376-byte frame at 0x8012268C, runs scene/vehicle/effects/HUD submission and display synchronization, then returns through the split epilogue at 0x801247FC; a0 is the view/player descriptor and a1/a2 are caller-supplied render context values */
 #define PSX_FN_RenderRaceFrame 0x8012268Cu
@@ -59,6 +67,10 @@
 /* known: Two-caller projection/GTE setup: set H from 0x801E14F0, follow +0x44 links to the terminal transform, build MATRIX scratch at 0x1F800010 with its middle rotation row scaled by 0x801E14EC/256 and translation {0,0,0x801E14F4/2}, then install TR and rotation */
 #define PSX_FN_InstallLinkedRenderTransform 0x80136078u
 #define func_80136078 InstallLinkedRenderTransform  /* alias */
+
+/* confirmed: Exact 0x24C-byte spatial sound adapter with 34 direct JAL callers: midpoint an explicit XYZ and context-linked XYZ, distance-attenuate from radius 16384, wrap relative heading into [-1024,1024], derive/clamp stereo volume and 0..30 pan, then call 0x80121534 using the sound resource table at 0x801E178C; a2 and stack +0x18 are ignored */
+#define PSX_FN_PlaySpatialSoundAtSegmentMidpoint 0x80136D0Cu
+#define func_80136D0C PlaySpatialSoundAtSegmentMidpoint  /* alias */
 
 /* confirmed: Exact 0xDC-byte sound-effect wrapper: reject id -1, clamp signed volume above 230, truncate volume/pan/pitch to bytes, remap ids 29/37/28 to sink selectors 23/22/21, route id 7 through the dedicated resource at 0x801E17A8 with class 18, route other ids through the 0x801E178C pointer table with class 2, then call 0x80121534; 81 direct JAL callers */
 #define PSX_FN_PlaySoundEffectById 0x80137DFCu

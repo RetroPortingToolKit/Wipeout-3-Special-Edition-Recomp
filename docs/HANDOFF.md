@@ -777,3 +777,14 @@ unbounded build as a performance test; use focused targets and the bounded
   negative indices. `IsRacerSlotVacant` at `0x8013491C` tests byte `+0 == 0`
   across 81 callers; `IsRaceRecordStatusZeroTypeOne` at `0x80134964` further
   requires byte `+3 == 1` across 61 callers.
+- `0x80106350` is the confirmed 44-caller `EmitTexturedQuadPacket`: reserve 40
+  bytes at `gPrimCursor`, emit a neutral-gray `POLY_FT4` with descriptor
+  CLUT/TPAGE/UVs and caller rectangle, optionally select semitransparency or a
+  one-texel UV footprint, and return the unlinked packet.
+- `0x8011BDD0` is `GetMenuActionState`, the 49-caller input classifier for 12
+  menu actions. It combines per-racer digital masks with validated `0x7300`
+  analog records and a 93-count centered-axis threshold.
+- `0x80136D0C` is `PlaySpatialSoundAtSegmentMidpoint`: 34 callers feed segment
+  endpoints and listener context; it computes midpoint distance, wrapped
+  heading-based left/right attenuation, clamps volume to 230 and pan to 0..30,
+  then calls the shared voice allocator.

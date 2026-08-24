@@ -34,11 +34,25 @@ status = "confirmed"
 note = "Seven-instruction leaf: swap bytes 0 and 2 of the three-byte color at a0 while preserving byte 1; called by four packet/material conversion sites at 0x80110C4C/74/AC/D4, with four mirrored expansion-RAM copies"
 
 [[func]]
+pc = 0x80106350
+name = "EmitTexturedQuadPacket"
+emit = false
+status = "confirmed"
+note = "High-fanout 456-byte GPU packet builder: reserve 40 bytes from gPrimCursor, emit a neutral-gray POLY_FT4 with caller rectangle coordinates and descriptor CLUT/TPAGE/UV fields, optionally select semitransparency and a one-texel UV footprint, then return the packet pointer"
+
+[[func]]
 pc = 0x80112064
 name = "ByteSwapTwoU16Values"
 emit = false
 status = "confirmed"
 note = "Nine-instruction leaf: byte-swap each of the two consecutive 16-bit values at a0 in place; called from four packet/material conversion branches at 0x80110C60/90/C0/FC, which pass fields at record offsets 4 or 16"
+
+[[func]]
+pc = 0x8011BDD0
+name = "GetMenuActionState"
+emit = false
+status = "confirmed"
+note = "Exact 0x50C-byte menu-input classifier: accept action 0..11, recognize actions 0..3 from a selected 0x73 analog-pad record when the left-stick axis is at least 93 counts from center, otherwise sum the action's PSX button mask across eligible 0x3A4-byte racer/controller records; 49 direct JAL sites"
 
 [[func]]
 pc = 0x80116128
@@ -414,6 +428,13 @@ addr = 0x8016E170
 name = "kShadsBt4SourcePath"
 status = "confirmed"
 note = "29-byte NUL-terminated string `c:\\wipeout3\\common\\shads.bt4`; materialized only at 0x80124928..0x8012492C and passed as the unused a0 argument to 0x80141D6C, not executable code or a callback"
+
+[[func]]
+pc = 0x80136D0C
+name = "PlaySpatialSoundAtSegmentMidpoint"
+emit = false
+status = "confirmed"
+note = "Exact 0x24C-byte spatial sound adapter with 34 direct JAL callers: midpoint an explicit XYZ and context-linked XYZ, distance-attenuate from radius 16384, wrap relative heading into [-1024,1024], derive/clamp stereo volume and 0..30 pan, then call 0x80121534 using the sound resource table at 0x801E178C; a2 and stack +0x18 are ignored"
 
 [[func]]
 pc = 0x80137DFC
