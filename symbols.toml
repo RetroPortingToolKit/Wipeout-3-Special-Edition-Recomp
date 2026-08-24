@@ -1399,6 +1399,13 @@ status = "confirmed"
 note = "Exact 0x10-byte canonical BIOS C0:0A ChangeClearPad trampoline: preserve incoming mode in a0 and caller ra, select service t1=0x0A in the C0-vector jump delay slot, and propagate the BIOS result unchanged; seven unique entry callers, final NOP is unreachable padding"
 
 [[func]]
+pc = 0x8015F5E4
+name = "Strcmp"
+emit = false
+status = "confirmed"
+note = "Exact 0x10-byte canonical BIOS A0:17 strcmp trampoline: preserve the two string pointers in a0/a1 and caller ra, select service t1=0x17 in the vector-jump delay slot, and propagate the signed comparison result unchanged; seven unique entry callers, final NOP is unreachable padding"
+
+[[func]]
 pc = 0x80120988
 name = "CopyAndNormalizeControllerPacket"
 emit = false
@@ -1427,6 +1434,13 @@ status = "confirmed"
 note = "Logical 0x9C-byte four-caller packed-record converter across generated tails 0x801120B4/0x801120EC: dereference the pointer slot at a0, swap the complete two-byte fields at +8 and +12 when type byte +0 is 2, swap fields +4 and +8 when it is 6, and otherwise leave the record unchanged"
 
 [[func]]
+pc = 0x8012C1A4
+name = "ConsumeOneShotFlag80175F90"
+emit = false
+status = "confirmed"
+note = "Logical 0x28-byte argument-free test-and-clear accessor including generated zero-return tail 0x8012C1C4: return 0 without writing when word 0x80175F90 is zero; otherwise clear that word and return 1; seven generated instances are four unique entry callers"
+
+[[func]]
 pc = 0x80169D30
 name = "WaitForJoyAckAndClearIrq"
 emit = false
@@ -1439,6 +1453,13 @@ name = "TransformIndexedPairedVertex"
 emit = false
 status = "confirmed"
 note = "Exact 0xAC-byte seven-unique-call-site geometry helper: select endpoint a2 from packed 12-byte vertex-pair records at owner+0x18, reconstruct its three signed 16-bit components, transform/translate it through the GTE RotTrans-shaped leaf into a0, and propagate the GTE FLAG word"
+
+[[func]]
+pc = 0x80111C0C
+name = "SwapType4Or8QuadUvPairs"
+emit = false
+status = "confirmed"
+note = "Logical 0xAC-byte four-unique-call-site record converter across the generated split at 0x80111C38: for pointed record types 4 or 8 swap two-byte pair +8/+9 with +A/+B and pair +C/+D with +E/+F, reordering quad UV pairs 0<->1 and 2<->3; leave every other type unchanged"
 
 [[func]]
 pc = 0x801203F0

@@ -1308,6 +1308,10 @@ unbounded build as a performance test; use focused targets and the bounded
   `0x801671C0..0x801671CF`. It forwards the incoming mode and BIOS result
   unchanged; the fourth word is unreachable padding. All seven direct callers
   target the entry, with no overlay duplicates or interior targets.
+- `Strcmp` is the canonical BIOS A0:17 trampoline at
+  `0x8015F5E4..0x8015F5F3`. It forwards both string pointers and the signed
+  BIOS comparison result unchanged; the fourth word is unreachable padding.
+  All seven direct callers target the true entry.
 - `CopyAndNormalizeControllerPacket` owns `0x80120988..0x80120A87` with seven
   entry callers. It copies/clears eight raw controller bytes, saves their
   original header at destination `+8`, accepts headers `2300/4100/7300`, and
@@ -1328,6 +1332,11 @@ unbounded build as a performance test; use focused targets and the bounded
   `0x801120EC`. Through a pointer slot it swaps U16 fields `+8/+12` for type 2
   or `+4/+8` for type 6 and otherwise does nothing. Eight generated instances
   are four unique entry callers; neither tail has an independent caller.
+- `ConsumeOneShotFlag80175F90` logically owns `0x8012C1A4..0x8012C1CB`,
+  including its generated zero-return tail at `0x8012C1C4`. It returns zero
+  without writing when the flag is clear; otherwise it clears the word and
+  returns one. Seven generated instances are four unique entry callers, with
+  no interior calls; the sole observed producer sets the word at `0x8012B9E8`.
 - `WaitForJoyAckAndClearIrq` owns `0x80169D30..0x80169DBF` with seven callers.
   It acknowledges SIO interrupt bit 7 in `I_STAT`, waits for JOY_STAT ACK bit
   7 to clear under the caller-armed Timer 2 deadline, returns zero on timeout,
@@ -1338,6 +1347,11 @@ unbounded build as a performance test; use focused targets and the bounded
   even `{+0,+2,+4}` or odd `{+8,+A,+6}` signed components, transforms them
   through the GTE into the caller's `VECTOR`, and propagates FLAG. There are
   seven unique executable calls but ten generated occurrences from overlap.
+- `SwapType4Or8QuadUvPairs` owns `0x80111C0C..0x80111CB7`, crossing the
+  generated split at `0x80111C38`. Through a pointer-to-record argument it
+  accepts only type bytes 4/8, then swaps UV pairs `0<->1` and `2<->3` over
+  record bytes `+8..+F`; other types and all other bytes are unchanged. Four
+  executable JAL PCs become eight generated occurrences through mirroring.
 - `ApplyAnalogControllerCalibration` is the true frameless owner of
   `0x801203F0..0x801207A3`; five later generated entries are only internal
   blocks. Its seven entry-only callers select logical pads zero/four. It

@@ -112,6 +112,10 @@
 #define PSX_FN_LoadPackedResourceBundle 0x80111AF8u
 #define func_80111AF8 LoadPackedResourceBundle  /* alias */
 
+/* confirmed: Logical 0xAC-byte four-unique-call-site record converter across the generated split at 0x80111C38: for pointed record types 4 or 8 swap two-byte pair +8/+9 with +A/+B and pair +C/+D with +E/+F, reordering quad UV pairs 0<->1 and 2<->3; leave every other type unchanged */
+#define PSX_FN_SwapType4Or8QuadUvPairs 0x80111C0Cu
+#define func_80111C0C SwapType4Or8QuadUvPairs  /* alias */
+
 /* confirmed: Exact pre-prologue 0xE4-byte owner with 24 direct callers: read the signed entry count before framing, convert each relocated bundle pointer through the texture-resource builder at 0x80110DF0 with flags (1,0), append non-null descriptors to the global texture table/count, then release the bundle allocation through 0x80116DBC */
 #define PSX_FN_RegisterTextureBundleEntries 0x80111DA0u
 #define func_80111DA0 RegisterTextureBundleEntries  /* alias */
@@ -211,6 +215,10 @@
 /* known: Argument-free startup initializer called once from 0x80116128: create/configure the shared 80-byte transform object, allocate and publish race-owned work buffers, initialize dependent race subsystems, create a 38-byte display/resource descriptor through 0x80141D6C, and publish that returned handle */
 #define PSX_FN_InitializeRaceRuntimeResources 0x8012482Cu
 #define func_8012482C InitializeRaceRuntimeResources  /* alias */
+
+/* confirmed: Logical 0x28-byte argument-free test-and-clear accessor including generated zero-return tail 0x8012C1C4: return 0 without writing when word 0x80175F90 is zero; otherwise clear that word and return 1; seven generated instances are four unique entry callers */
+#define PSX_FN_ConsumeOneShotFlag80175F90 0x8012C1A4u
+#define func_8012C1A4 ConsumeOneShotFlag80175F90  /* alias */
 
 /* confirmed: Exact 0x14-byte 25-caller frameless in-place byte-pair swap: exchange bytes at pointer offsets 0 and 1, touch no other memory or state, and expose only an incidental original-byte-1 value in v0 */
 #define PSX_FN_SwapAdjacentBytes 0x8012E310u
@@ -463,6 +471,10 @@
 /* confirmed: Exact 0x10-byte eight-caller BIOS A0/1B strlen trampoline: preserve the string pointer in a0 and caller ra, select service t1=0x1B in the vector-jump delay slot, and propagate the BIOS unsigned byte count unchanged; final word is unreachable padding */
 #define PSX_FN_Strlen 0x8015F5D4u
 #define func_8015F5D4 Strlen  /* alias */
+
+/* confirmed: Exact 0x10-byte canonical BIOS A0:17 strcmp trampoline: preserve the two string pointers in a0/a1 and caller ra, select service t1=0x17 in the vector-jump delay slot, and propagate the signed comparison result unchanged; seven unique entry callers, final NOP is unreachable padding */
+#define PSX_FN_Strcmp 0x8015F5E4u
+#define func_8015F5E4 Strcmp  /* alias */
 
 /* confirmed: Exact 0x10-byte 20-caller BIOS A0/19 strcpy trampoline: preserve destination/source arguments, load service selector t1=0x19, jump to BIOS vector 0xA0 without changing ra, and return the BIOS destination pointer unchanged; copy/NUL/fault behavior belongs to BIOS */
 #define PSX_FN_Strcpy 0x8015F614u
