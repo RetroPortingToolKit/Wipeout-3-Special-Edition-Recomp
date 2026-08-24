@@ -906,6 +906,13 @@ status = "confirmed"
 note = "Exact 0x18-byte 21-caller frameless integer absolute-value leaf: return a0 unchanged when signed nonnegative, otherwise return two's-complement 0-a0; INT32_MIN consequently remains 0x80000000, with no memory or hardware effects"
 
 [[func]]
+pc = 0x8015F7A4
+name = "SetPolyFT4"
+emit = false
+status = "confirmed"
+note = "Exact 0x14-byte 20-caller Psy-Q packet initializer: set packet tag length byte +3 to 9 and primitive code byte +7 to 0x2C for an opaque flat-textured quadrilateral, preserving the 24-bit OT link and all caller-owned color, UV, CLUT, TPAGE, and XY fields"
+
+[[func]]
 pc = 0x8010EAC4
 name = "EmitLocalizedFontGlyphPacket"
 emit = false
@@ -975,6 +982,19 @@ status = "confirmed"
 note = "Internal positive-input return suffix of DivideSignedByPowerOfTwoTowardZero; reached only by branch from 0x8014B6A4 and has zero direct JAL callers despite generated F/R 8014B6B8 8"
 
 [[func]]
+pc = 0x8014B6C0
+name = "WrapAngle4096Signed"
+emit = false
+status = "confirmed"
+note = "Exact 17-unique-caller angle-normalization leaf: mask a0 to 12 bits, preserve 0..2048, and map 2049..4095 to -2047..-1; generated R 8014B6C0 18 is the unique prefix while internal zero-direct-caller suffix 0x8014B6D8..DF returns the nonnegative path"
+
+[[block]]
+pc = 0x8014B6D8
+name = "WrapAngle4096NonnegativeSuffix"
+status = "confirmed"
+note = "Internal return suffix of WrapAngle4096Signed for masked inputs <=2048; reached only from the entry branch and has zero direct JAL callers despite generated F/R 8014B6D8 8"
+
+[[func]]
 pc = 0x8014F814
 name = "AccumulateOneIndexedVertexWeight"
 emit = false
@@ -1028,6 +1048,13 @@ name = "DelaySpuRegisterAccess"
 emit = false
 status = "confirmed"
 note = "Exact 0x5C-byte 14-caller SPU-library timing delay: ignore all arguments, keep counter and accumulator on an 8-byte stack frame, execute 60 iterations of accumulator *= 13 with 32-bit wraparound, and return without MMIO/global mutation or semantic value; callers place it around SPU control/status/data-port accesses"
+
+[[func]]
+pc = 0x8016C51C
+name = "ArmTimer2Timeout"
+emit = false
+status = "confirmed"
+note = "Exact 0x20-byte 12-caller library leaf: snapshot the 16-bit Timer 2 counter at 0x1F801120, store caller threshold to 0x801EEBC4 and the counter snapshot to 0x801EEBC8, and return without configuring hardware or producing a semantic value; paired timeout polling handles wrap and timer mode"
 
 [[func]]
 pc = 0x8014FA4C
