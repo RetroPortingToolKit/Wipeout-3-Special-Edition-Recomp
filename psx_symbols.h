@@ -172,6 +172,10 @@
 #define PSX_FN_SwapPackedRecordU16FieldsByType 0x80112088u
 #define func_80112088 SwapPackedRecordU16FieldsByType  /* alias */
 
+/* confirmed: Exact 0x104-byte resource-language preprocessor with five entry callers: selector 0..5 chooses a fixed source block, replace semicolon or control-byte string terminators with NUL, skip remaining control bytes, stop at '#', and return the byte count required by the adjacent compacting string-table initializer */
+#define PSX_FN_TokenizeAndMeasureResourceStringBlock 0x80113914u
+#define func_80113914 TokenizeAndMeasureResourceStringBlock  /* alias */
+
 /* confirmed: Exact 0x34-byte 41-caller adapter: replace resource-string index a0 with gResourceStringTable[a0], forward x/y/style unchanged to DrawFontString, and return its total horizontal advance unchanged */
 #define PSX_FN_DrawResourceString 0x80113BECu
 #define func_80113BEC DrawResourceString  /* alias */
