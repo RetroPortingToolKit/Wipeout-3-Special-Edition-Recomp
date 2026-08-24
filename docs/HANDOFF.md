@@ -1299,6 +1299,11 @@ unbounded build as a performance test; use focused targets and the bounded
   `0x80160D14..0x80160D27`. It returns the prior callback word at `0x801792C8`
   and replaces it with incoming `a0` in the return delay slot. Its two callers
   pass null; `CdInit` directly installs internal callback `0x80160E44` there.
+- `Strncmp` is the canonical BIOS A0:18 trampoline at
+  `0x8015CF28..0x8015CF37`: three executable words forward two strings and a
+  length bound unchanged and propagate the signed comparison result; its last
+  NOP is unreachable padding. Seven unique callers produce eight generated
+  instances because `0x800E5E28` is present in two overlay variants.
 - `CopyAndNormalizeControllerPacket` owns `0x80120988..0x80120A87` with seven
   entry callers. It copies/clears eight raw controller bytes, saves their
   original header at destination `+8`, accepts headers `2300/4100/7300`, and
@@ -1309,8 +1314,19 @@ unbounded build as a performance test; use focused targets and the bounded
   rotation halfwords; it zeros the other five rotation terms and `+0x12`
   padding, preserves MATRIX translation at `+0x14/+0x18/+0x1C`, and returns
   the input pointer. There are no calls or interior targets.
+- `VectorNormal` owns `0x8015FBDC..0x8015FC0B`: it loads a three-word source
+  VECTOR, delegates to the GTE Q12 normalization core at `0x8015FC3C`, and
+  stores three normalized words to the destination. Nine generated instances
+  are six unique entry callers; `0x8015FBF4` is only the post-call continuation,
+  with no external interior target.
 - `WaitForJoyAckAndClearIrq` owns `0x80169D30..0x80169DBF` with seven callers.
   It acknowledges SIO interrupt bit 7 in `I_STAT`, waits for JOY_STAT ACK bit
   7 to clear under the caller-armed Timer 2 deadline, returns zero on timeout,
   or sets JOY_CTRL bit `0x10` and returns one. All callers test the boolean and
   convert failure into their controller/SIO timeout paths.
+- `ApplyAnalogControllerCalibration` is the true frameless owner of
+  `0x801203F0..0x801207A3`; five later generated entries are only internal
+  blocks. Its seven entry-only callers select logical pads zero/four. It
+  resolves two-port/four-slot multitap packets, calibrates `7300` four-axis or
+  `2300` steering/pressure payloads with deadzones, fixed-point scale, clamps,
+  and history, then returns the mutated packet pointer or null.
