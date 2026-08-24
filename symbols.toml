@@ -1,6 +1,8 @@
 # Wipeout 3 Special Edition — progressive symbol map (partial decomp)
 # Discover → label here → manipulate via PSX_FN_* (tools/sync_symbols.py).
 # Gate emit=true only when the entry is safe to own for AOT / host hooks.
+# Use [[block]] for internal control-flow labels that are not ABI-callable;
+# sync_symbols intentionally emits only [[func]] entries into psx_symbols.h.
 # See psxrecomp/docs/SYMBOLS.md.
 
 [[func]]
@@ -11,32 +13,44 @@ status = "guessed"
 note = "SYSTEM.CNF / EXE entry PC (probe seed)"
 
 [[func]]
-pc = 0x80170254
-name = "ProjectPackClipCodes"
+pc = 0x801700C4
+name = "SubmitTexturedQuad"
 emit = false
-status = "guessed"
-note = "RTPS then pack LEFT/RIGHT/TOP/BOTTOM clip codes; widescreen keeps LEFT/RIGHT"
+status = "known"
+note = "Callable leaf with a renderer-private register ABI: trivial-reject four projected vertices, emit/OT-link a POLY_FT4 when all depths >= 125, otherwise tail-transfer to the shared near clipper at 0x80170B5C"
+
+[[block]]
+pc = 0x801700F0
+name = "EmitTexturedQuadFastPath"
+status = "known"
+note = "Internal continuation of 0x801700C4: reject shared outcodes, route near-depth quads to 0x80170B5C, or OT-link one 40-byte POLY_FT4"
+
+[[func]]
+pc = 0x80170254
+name = "ProjectPackedVertexPairs"
+emit = false
+status = "known"
+note = "Callable renderer-private register ABI: expand packed vertex-index pairs into 32-byte projected pair records and return the AND of their RIGHT|LEFT|BOTTOM|TOP clip codes"
 
 [[func]]
 pc = 0x801704F0
-name = "ProjectPackClipCodesAlt"
+name = "BuildProjectQuadMidpoints"
 emit = false
-status = "guessed"
-note = "Sibling RTPS clip-code packer (same LEFT/RIGHT keep family)"
+status = "known"
+note = "In-place four edge midpoints + quad center; RTPS five vertices and store SXY/SZ/RIGHT|LEFT|BOTTOM|TOP clip fields"
 
 [[func]]
 pc = 0x80171AFC
-name = "ProjectPackClipCodesTri"
+name = "TransformAndSubmitMeshPrimitives"
 emit = false
-status = "guessed"
-note = "Triangle RTPS clip-code packer feeding SceneryPolySubmit"
+status = "known"
+note = "Shared body tail-entered by 0x80171AD8/AE4/AF4: transform mesh vertices, pack clip codes, reject/cull primitives, emit GPU packets, and OT-link by depth; v0 is an extra OT selector"
 
-[[func]]
+[[block]]
 pc = 0x80171D0C
-name = "SceneryPolySubmit"
-emit = false
-status = "guessed"
-note = "AND clip flags then slt sx,$s6; keep sites force packet builder while wide"
+name = "SceneryPrimitivePacketBuildLoop"
+status = "known"
+note = "Internal loop within 0x80171AFC, not standalone ABI: trivial-reject/NCLIP/AVSZ, build GPU packets and link OT"
 
 [[func]]
 pc = 0x801727EC
