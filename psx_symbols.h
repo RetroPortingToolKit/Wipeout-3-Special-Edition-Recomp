@@ -20,6 +20,10 @@
 #define PSX_FN_EnterNestedInterruptCriticalSection 0x800EEE18u
 #define func_800EEE18 EnterNestedInterruptCriticalSection  /* alias */
 
+/* confirmed: Exact 0x3C-byte 22-caller paired leave adapter: its load/branch prelude reads gInterruptCriticalNesting before framing; a nonzero count is decremented, while zero calls the low-level helper that sets COP0 Status IEc and interrupt-mask bit 10; no arguments or semantic return */
+#define PSX_FN_LeaveNestedInterruptCriticalSection 0x800EEE64u
+#define func_800EEE64 LeaveNestedInterruptCriticalSection  /* alias */
+
 /* confirmed: Exact argument-free 0x24-byte PRNG leaf: load gRandom15State, replace it with (arithmetic_shift_right(state,1) XOR (state << 3)) modulo 32 bits, and return the new state's low 15 bits; private state begins at 0x12345678; 254 direct JAL callers */
 #define PSX_FN_NextRandom15 0x80104AA0u
 #define func_80104AA0 NextRandom15  /* alias */
@@ -211,6 +215,14 @@
 /* confirmed: Real 57-caller variadic sprintf-equivalent owner spanning 0x8015C698..0x8015CF1B: spill a1-a3 into ABI vararg slots, fall through into the generated 0x8015C6A4 parser body, format into a0, NUL-terminate, and return the character count; no caller targets the split body */
 #define PSX_FN_FormatString 0x8015C698u
 #define func_8015C698 FormatString  /* alias */
+
+/* confirmed: Exact 0xC0-byte PsyQ-compatible 20-caller DRAWENV installer: optionally log PutDrawEnv, compile the input environment into its embedded DR_ENV packet at +0x1C, terminate the packet tag, submit 0x40 bytes through the active GPU driver, cache the full 0x5C-byte DRAWENV, and return the input pointer */
+#define PSX_FN_PutDrawEnv 0x8015D68Cu
+#define func_8015D68C PutDrawEnv  /* alias */
+
+/* confirmed: Exact 0xB4-byte PsyQ-compatible DRAWENV initializer with 20 direct callers: write clip=(x,y,w,h), ofs=(x,y), zero the texture window/background RGB and flags, set tpage=10 and dtd=1, derive dfe from GetVideoMode and the PAL/NTSC height limit, and return the input environment pointer */
+#define PSX_FN_SetDefDrawEnv 0x8015F844u
+#define func_8015F844 SetDefDrawEnv  /* alias */
 
 /* known: PsyQ-compatible VBlank/timer synchronizer spanning 0x8015F904..0x8015FA7B: mode<0 returns the software VBlank counter, mode 1 returns Timer1 ticks since the saved baseline without waiting, and mode 0 or >=2 waits through 0x8015FA7C, synchronizes GPU field state when required, refreshes the frame/timer baselines, and returns the pre-wait Timer1 delta */
 #define PSX_FN_VSync 0x8015F904u

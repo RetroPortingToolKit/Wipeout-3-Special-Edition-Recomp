@@ -679,6 +679,13 @@ status = "confirmed"
 note = "Exact 0x34-byte 41-caller adapter: replace resource-string index a0 with gResourceStringTable[a0], forward x/y/style unchanged to DrawFontString, and return its total horizontal advance unchanged"
 
 [[func]]
+pc = 0x8015F844
+name = "SetDefDrawEnv"
+emit = false
+status = "confirmed"
+note = "Exact 0xB4-byte PsyQ-compatible DRAWENV initializer with 20 direct callers: write clip=(x,y,w,h), ofs=(x,y), zero the texture window/background RGB and flags, set tpage=10 and dtd=1, derive dfe from GetVideoMode and the PAL/NTSC height limit, and return the input environment pointer"
+
+[[func]]
 pc = 0x8015F904
 name = "VSync"
 emit = false
@@ -744,6 +751,20 @@ name = "EnterNestedInterruptCriticalSection"
 emit = false
 status = "confirmed"
 note = "Exact 0x4C-byte 22-caller nesting adapter: inspect COP0 Status IEc, increment gInterruptCriticalNesting when interrupts are already disabled, otherwise reset nesting to zero and call the low-level helper that clears Status bits 0 and 10; paired leave routine begins at 0x800EEE64"
+
+[[func]]
+pc = 0x8015D68C
+name = "PutDrawEnv"
+emit = false
+status = "confirmed"
+note = "Exact 0xC0-byte PsyQ-compatible 20-caller DRAWENV installer: optionally log PutDrawEnv, compile the input environment into its embedded DR_ENV packet at +0x1C, terminate the packet tag, submit 0x40 bytes through the active GPU driver, cache the full 0x5C-byte DRAWENV, and return the input pointer"
+
+[[func]]
+pc = 0x800EEE64
+name = "LeaveNestedInterruptCriticalSection"
+emit = false
+status = "confirmed"
+note = "Exact 0x3C-byte 22-caller paired leave adapter: its load/branch prelude reads gInterruptCriticalNesting before framing; a nonzero count is decremented, while zero calls the low-level helper that sets COP0 Status IEc and interrupt-mask bit 10; no arguments or semantic return"
 
 [[func]]
 pc = 0x80117C08

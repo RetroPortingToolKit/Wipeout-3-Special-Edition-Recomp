@@ -897,6 +897,13 @@ unbounded build as a performance test; use focused targets and the bounded
 - `ProjectPointDeltaOntoNormalQ12` at `0x800ED8AC` is a frameless by-value o32
   aggregate leaf returning `dot(B-A,N) / sum((N_i*N_i)>>12)`, with GTE `SQR`
   component squares and denominator zero forced to one; 18 unique guest calls.
+- `LeaveNestedInterruptCriticalSection` at `0x800EEE64` is the 22-caller pair
+  of the recovered entry routine: its pre-frame load decrements nonzero nesting,
+  otherwise the low-level leaf restores COP0 Status bits `0x401`.
+- PsyQ-compatible graphics owners are now named: `PutDrawEnv` at `0x8015D68C`
+  compiles/submits `DR_ENV`, caches the 0x5C-byte environment and returns it;
+  `SetDefDrawEnv` at `0x8015F844` initializes clip/offset/texture/background
+  fields with PAL/NTSC-dependent `dfe`. Both have 20 direct callers.
 - `ReleaseAllTrackedTempHeapBlocks` owns `0x8014B96C..0x8014BA3F`. With a
   nonempty top index it releases the pending internal free-list block, pops
   all 12-byte offset records in reverse order, and frees their temp-heap
@@ -907,3 +914,8 @@ unbounded build as a performance test; use focused targets and the bounded
   Status IEc plus the nesting word at `0x80173334`; the outer entry calls
   `0x8015F7F4` to clear Status bits 0/10, while nested entries only increment.
   The independent leave half begins at `0x800EEE64`.
+- `PutDrawEnv` owns `0x8015D68C..0x8015D74B`: it optionally emits the retained
+  `PutDrawEnv(%08x)...` diagnostic, compiles a 0x5C-byte DRAWENV into its
+  embedded packet at `+0x1C`, submits 0x40 bytes through the active GPU driver,
+  caches the environment at `0x80178F58`, and returns the input pointer. All 20
+  direct calls are in the system graphics initializer at `0x800EDD68..DE44`.
