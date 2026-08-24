@@ -108,6 +108,10 @@
 #define PSX_FN_NextRandom15 0x80104AA0u
 #define func_80104AA0 NextRandom15  /* alias */
 
+/* confirmed: Exact 0x204-byte private glyph renderer: reserve and OT-link one always-semitransparent 40-byte POLY_FT4 using style-selected metrics/texture state, copy caller grayscale to RGB, and return x plus twice glyph width plus two; one unique caller, emitted twice through DrawMappedTextString overlap, no interior target */
+#define PSX_FN_EmitGrayscaleFontGlyphPacket 0x80105354u
+#define func_80105354 EmitGrayscaleFontGlyphPacket  /* alias */
+
 /* confirmed: Exact 0x3E8-byte 16-caller race-time formatter: render nonnegative centiseconds as M:SS with optional .hh using EmitFontGlyphPacket, render negative values as style-dependent placeholder glyph runs, remap low style banks by +14 when global mode 0x8018AE94 equals 2, and return the final X pen */
 #define PSX_FN_DrawRaceTimeCentiseconds 0x80105558u
 #define func_80105558 DrawRaceTimeCentiseconds  /* alias */
@@ -183,6 +187,10 @@
 /* confirmed: Exact 0x128-byte one-caller frontend image pipeline: ignore a0-a2, retain a3 option record, acquire the current archive image, decode its selected RGB5 halfword into three rounded 8-bit tint globals, build a texture descriptor, invoke the two private frontend image-layout builders with option byte +5, and release all tracked temporary heap blocks; no semantic return */
 #define PSX_FN_PrepareFrontendImageResource 0x80110894u
 #define func_80110894 PrepareFrontendImageResource  /* alias */
+
+/* confirmed: Logical 0x434-byte one-caller frontend model/resource loader across 20 false generated record-type case translations: register the current texture bundle, append a resource pointer to the caller array, attach linked nodes to a shared initialized context, build model state from the next archive entry, optionally mirror X geometry and convert variable packed primitive records, and return the caller-selected array entry */
+#define PSX_FN_LoadFrontendModelResource 0x801109BCu
+#define func_801109BC LoadFrontendModelResource  /* alias */
 
 /* confirmed: Exact 0x8B0-byte two-caller frontend-overlay TIM texture builder retaining the diagnostic name LoadTexture: accept 4-bit or 8-bit TIM data, allocate a 0x26-byte descriptor, auto-place supported CLUT/image rectangles, derive TPAGE/CLUT and UV bounds, upload CLUT and pixel rectangles, optionally transform source pixels or CLUT flags, and return the descriptor; unsupported modes return null */
 #define PSX_FN_LoadFrontendTexture 0x80110DF0u
