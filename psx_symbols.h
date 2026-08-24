@@ -4,6 +4,10 @@
  */
 #pragma once
 
+/* confirmed: Exact 0x5C-byte leaf with six unique callers: select a 0x16C-byte runtime racer by index, set halfword +0x132 to min(9 * signed halfword +0x146, floor(5 * unsigned halfword +0x14A / 4)), and clear halfwords +0x14C and +0x12A */
+#define PSX_FN_InitializeIndexedRacerSpeedState 0x800E5480u
+#define func_800E5480 InitializeIndexedRacerSpeedState  /* alias */
+
 /* confirmed: True 0xF8-byte six-caller owner across the false 0x800E7324 split: sign-extend the caller's 16-bit byte offset into an animation command stream, return the opcode byte at that offset, decode the following 16 unaligned little-endian bytes into four output words, and touch no global state */
 #define PSX_FN_DecodeAnimationCommandRecord 0x800E7264u
 #define func_800E7264 DecodeAnimationCommandRecord  /* alias */
@@ -452,6 +456,10 @@
 #define PSX_FN_DispatchRacerEffectSpawn 0x8015B3CCu
 #define func_8015B3CC DispatchRacerEffectSpawn  /* alias */
 
+/* confirmed: Exact 0x188-byte three-caller POLY_FT4 builder: reserve 40 bytes from gPrimCursor, write four signed XY pairs, RGB, texture UV/CLUT state, choose opaque 0x2C or semitransparent 0x2E with ABR-1 GetTPage, then prepend the packet to the active ordering-table bucket at signed depth>>6; no overlay duplicate */
+#define PSX_FN_EmitTexturedQuadPacket 0x8015B65Cu
+#define func_8015B65C EmitTexturedQuadPacket  /* alias */
+
 /* confirmed: Exact 0x3C-byte signed-angle wrapper: reduce the absolute input modulo 4096, call the private quarter-wave sine lookup, and restore odd symmetry; returns a signed Q12 value in [-4096,4096] and has 91 direct callers */
 #define PSX_FN_SinQ12FromSignedAngle 0x8015C318u
 #define func_8015C318 SinQ12FromSignedAngle  /* alias */
@@ -547,6 +555,10 @@
 /* confirmed: Exact 0x30-byte canonical Psy-Q VECTOR normalizer wrapper: load three signed 32-bit components from a0, delegate through the private GTE Q12 normalization core at 0x8015FC3C, store the normalized three-word vector to a1, and return without other memory effects; nine generated call instances represent six unique entry callers */
 #define PSX_FN_VectorNormal 0x8015FBDCu
 #define func_8015FBDC VectorNormal  /* alias */
+
+/* confirmed: Exact 0x14-byte six-caller Psy-Q primitive initializer: set packet tag length byte +3 to 6 and GPU command byte +7 to 0x30 (POLY_G3), leaving every color/coordinate/link byte untouched; returns through jr delay-slot command store */
+#define PSX_FN_SetPolyG3 0x8015FD2Cu
+#define func_8015FD2C SetPolyG3  /* alias */
 
 /* confirmed: Exact 0x28-byte 57-caller Psy-Q packet helper: set bit 1 of primitive code byte packet+7 when enable is nonzero, clear it when zero, preserve every other bit, and return with no other memory or hardware effects */
 #define PSX_FN_SetSemiTrans 0x8015FD4Cu

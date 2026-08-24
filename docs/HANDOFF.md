@@ -1321,6 +1321,10 @@ unbounded build as a performance test; use focused targets and the bounded
   trampolines at `0x80168D18..0x80168D27` and
   `0x80168D28..0x80168D37`. Each has six entry-only callers, three executable
   vector-jump words, and one unreachable padding NOP.
+- `SetPolyG3` is the exact five-instruction Psy-Q initializer at
+  `0x8015FD2C..0x8015FD3F`. It writes packet length 6 to byte `+3` and GPU
+  command `0x30` to byte `+7`, leaving all payload/link fields untouched. All
+  six callers target the true entry.
 - `CopyAndNormalizeControllerPacket` owns `0x80120988..0x80120A87` with seven
   entry callers. It copies/clears eight raw controller bytes, saves their
   original header at destination `+8`, accepts headers `2300/4100/7300`, and
@@ -1424,6 +1428,11 @@ unbounded build as a performance test; use focused targets and the bounded
   indices, selects `0x801910E0 + index*0x3A4`, and returns true only for byte
   `+0 == 0` and byte `+3 != 0`; unlike the nearby stricter predicate, values
   other than one also satisfy the second test.
+- `EmitTexturedQuadPacket` owns `0x8015B65C..0x8015B7E3`; three calls in one
+  UI renderer target the entry, with no interior target or overlay duplicate.
+  It reserves and OT-links a 40-byte `POLY_FT4`, writes four XY/UV pairs and
+  RGB/CLUT state, selects opcode `2C` or semitransparent `2E`, and on the latter
+  path derives ABR-1 TPAGE through canonical `GetTPage`.
 - `ApplyRgbToPrimitiveRecordStream` owns `0x800E8350..0x800E8513`; its six
   generated interior entries are the type 1..8 jump-table cases. Four unique
   callers supply an owner (`count +0x12`, stream `+0x1C`) and RGB bytes. It
@@ -1434,3 +1443,8 @@ unbounded build as a performance test; use focused targets and the bounded
   adjacent asynchronous `CdRead`: mode zero waits, nonzero polls, it enforces
   60/1200-vblank recovery deadlines, services optional status output, and
   returns progress/completion or `-1` on timeout/error.
+- `InitializeIndexedRacerSpeedState` is the exact leaf at
+  `0x800E5480..0x800E54DB`. Its six unique callers select a `0x16C`-byte
+  runtime racer; it stores `min(9 * s16[+0x146], floor(5 * u16[+0x14A] / 4))`
+  at `+0x132` and clears `+0x14C/+0x12A`. Seven generated calls include one
+  duplicate emission of the `0x8014EC5C` instruction.
