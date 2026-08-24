@@ -1456,6 +1456,11 @@ unbounded build as a performance test; use focused targets and the bounded
   initializes state zero or refreshes state three, binds source geometry,
   applies mode-1..4 randomized position/motion setup, and on fresh creation
   publishes three lifecycle callbacks at `+0xC0/+0xC4/+0xC8`.
+- `QueueOrientedQuadSourceRecord` owns `0x80141458..0x801415F3`, with five
+  entry-only callers and no overlay duplicate. It appends a position and
+  attributes to the 28-byte record array consumed by the visible oriented-quad
+  renderer, skips bit-2 records within a 64-entry head/tail window, forces
+  active bit `0x8000`, and advances the tail; global mode byte 1 disables it.
 - `ApplyRgbToPrimitiveRecordStream` owns `0x800E8350..0x800E8513`; its six
   generated interior entries are the type 1..8 jump-table cases. Four unique
   callers supply an owner (`count +0x12`, stream `+0x1C`) and RGB bytes. It
@@ -1518,3 +1523,9 @@ unbounded build as a performance test; use focused targets and the bounded
   mode 9, scales embedded signed-halfword sources by exact division through
   100, and populates the six `0x801CDA88..0x801CE698` glyph metric bands used
   by `EmitFontGlyphPacket`.
+- `AllocateArenaBlockBestFit` owns `0x80116A54..0x80116C3F`, with five unique
+  entry-only callers. It four-byte aligns requests, chooses the smallest free
+  `arena+0x10` chain block fitting payload plus a 20-byte header, prints two
+  diagnostics and returns null on exhaustion, or splits/links the block,
+  debits arena `+8`, updates minimum-free word `0x801749AC`, and returns the
+  header's `+0x0C` payload pointer.

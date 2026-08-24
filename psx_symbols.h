@@ -188,6 +188,10 @@
 #define PSX_FN_AllocateHeapBlock 0x8011686Cu
 #define func_8011686C AllocateHeapBlock  /* alias */
 
+/* confirmed: Exact 0x1EC-byte five-caller arena allocator: align requested bytes to four, scan the arena's +0x10 block chain for the smallest free block fitting payload plus the 20-byte header, diagnose and return null on failure, otherwise split/link the selected block, debit arena +8, update the global minimum-free watermark, and return header +0x0C payload pointer */
+#define PSX_FN_AllocateArenaBlockBestFit 0x80116A54u
+#define func_80116A54 AllocateArenaBlockBestFit  /* alias */
+
 /* confirmed: Exact 0xA0-byte four-caller arena-prefix release wrapper used by temp-heap rollback: null releases the arena's initial payload and clears gHeapPrefixMarker; a sufficiently lower marker synthesizes a 20-byte allocated block over the newly released prefix, links and frees it through FreeHeapBlock, then publishes the new marker */
 #define PSX_FN_ReleaseHeapPrefixToMarker 0x80116D1Cu
 #define func_80116D1C ReleaseHeapPrefixToMarker  /* alias */
@@ -383,6 +387,10 @@
 /* confirmed: Exact 0x70-byte four-caller pure renderer predicate: select the 0x3A4-byte racer record, derive the racer-type-specific low view bit (1 for type byte +2 == 1, otherwise 2), ignore the opposite bit in the object's mask, and require exact equality with the current scene mask at 0x801762CC plus that selected bit */
 #define PSX_FN_DoesObjectMaskMatchRacerView 0x80140E00u
 #define func_80140E00 DoesObjectMaskMatchRacerView  /* alias */
+
+/* confirmed: Exact 0x19C-byte five-caller scene-record producer: unless disabled by mode byte 0x801D1B3E, advance past queued 28-byte records flagged bit 2 within a 64-entry window, append position plus four halfword attributes and four bytes, force active bit 0x8000, advance the tail index, and leave rendering to BuildVisibleObjectQuadPackets */
+#define PSX_FN_QueueOrientedQuadSourceRecord 0x80141458u
+#define func_80141458 QueueOrientedQuadSourceRecord  /* alias */
 
 /* known: Single-caller non-leaf: updates active bits on 28-byte object records, prepares the GTE view transform, compacts visible oriented quads through 0x80172E3C, and emits 40-byte GPU POLY_FT4 packets into the current OT */
 #define PSX_FN_BuildVisibleObjectQuadPackets 0x801415F4u
