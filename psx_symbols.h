@@ -316,6 +316,10 @@
 #define PSX_FN_SubmitRaceSceneLayers 0x80140770u
 #define func_80140770 SubmitRaceSceneLayers  /* alias */
 
+/* confirmed: Exact 0x70-byte four-caller pure renderer predicate: select the 0x3A4-byte racer record, derive the racer-type-specific low view bit (1 for type byte +2 == 1, otherwise 2), ignore the opposite bit in the object's mask, and require exact equality with the current scene mask at 0x801762CC plus that selected bit */
+#define PSX_FN_DoesObjectMaskMatchRacerView 0x80140E00u
+#define func_80140E00 DoesObjectMaskMatchRacerView  /* alias */
+
 /* known: Single-caller non-leaf: updates active bits on 28-byte object records, prepares the GTE view transform, compacts visible oriented quads through 0x80172E3C, and emits 40-byte GPU POLY_FT4 packets into the current OT */
 #define PSX_FN_BuildVisibleObjectQuadPackets 0x801415F4u
 #define func_801415F4 BuildVisibleObjectQuadPackets  /* alias */
