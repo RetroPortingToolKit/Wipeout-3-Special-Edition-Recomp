@@ -40,6 +40,10 @@
 #define PSX_FN_GetMenuActionState 0x8011BDD0u
 #define func_8011BDD0 GetMenuActionState  /* alias */
 
+/* confirmed: Exact 0x2C0-byte shared audio sink with three direct callers: gate on two audio-enable bytes, allocate one of 24 sound slots, snapshot volume/pan/pitch and Q8 pitch scale, resolve or reserve one/two of 24 voices, initialize 36-byte voice state from a 20-byte resource descriptor, then submit the slot to the active audio backend */
+#define PSX_FN_AllocateAndQueueSoundVoice 0x80121534u
+#define func_80121534 AllocateAndQueueSoundVoice  /* alias */
+
 /* known: Callable race-view renderer: owns the 376-byte frame at 0x8012268C, runs scene/vehicle/effects/HUD submission and display synchronization, then returns through the split epilogue at 0x801247FC; a0 is the view/player descriptor and a1/a2 are caller-supplied render context values */
 #define PSX_FN_RenderRaceFrame 0x8012268Cu
 #define func_8012268C RenderRaceFrame  /* alias */
@@ -215,3 +219,7 @@
 /* known: Project and screen-clip a strided array of oriented world-space quads into 20-byte scratchpad records; returns visible count, 0, or -1 on the 48-record overflow sentinel */
 #define PSX_FN_BuildVisibleOrientedQuadList 0x80172E3Cu
 #define func_80172E3C BuildVisibleOrientedQuadList  /* alias */
+
+/* confirmed: Exact argument-free 0x2C4-byte runtime tuning-menu owner: aggregate controller bits across up to 16 racer records, toggle and navigate four FRAME RATE/SHIP LOD/SHIP DIST/BIRDS rows, apply selected patch-table halfwords, draw the menu, call the display update, and publish gSimVblankSkip plus gPalX2TitleState; sole real JAL caller at 0x80123EF8 */
+#define PSX_FN_UpdatePerformanceTuningMenu 0x8017B90Cu
+#define func_8017B90C UpdatePerformanceTuningMenu  /* alias */

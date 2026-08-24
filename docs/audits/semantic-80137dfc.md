@@ -24,9 +24,9 @@ ID `-1` is an explicit no-op. The wrapper clamps signed `a1` only on the upper
 side (`a1 >= 231` becomes 230), then truncates `a1`, `a2`, and `a3` to eight
 bits before calling `0x80121534`. It returns no meaningful value.
 
-For ordinary IDs, `a0` selects a resource pointer from the word table at
+For ordinary IDs, `a0` selects an integer resource handle from the word table at
 `0x801E178C + id*4`; the wrapper passes sink class `2` at stack `+0x14` and
-selector `0` at stack `+0x18`. ID 7 instead loads the dedicated resource pointer
+selector `0` at stack `+0x18`. ID 7 instead loads the dedicated resource handle
 at `0x801E17A8`, passes class `18`, and still uses selector zero.
 
 Three IDs retain their ordinary table lookup but set a special sink selector:
@@ -38,7 +38,7 @@ Three IDs retain their ordinary table lookup but set a special sink selector:
 | 28 | 21 |
 
 Thus the complete downstream call is conceptually
-`0x80121534(resource, u8(volume), u8(pan), u8(pitch), control, class, selector)`.
+`0x80121534(handle, u8(volume), u8(pan), u8(pitch), control, class, selector)`.
 The sink is a larger audio-voice allocator/initializer: it rejects unavailable
 audio state, obtains a free slot through `0x801225F8`, and initializes a
 `0x20`-byte voice record before driving lower audio helpers. The wrapper is
