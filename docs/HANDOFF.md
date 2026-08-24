@@ -2848,3 +2848,26 @@ do not reuse the rejected pre-A/B state or start a second process.
   left untouched while the user was testing.
 - Do not compare a 50 Hz patch against a PALx2 counter. Validate the matching
   50 Hz profile first, then separately test the 100 Hz patch/profile pair.
+
+## Unified Hueponik 100 Hz patch selected (2026-08-24)
+
+- The current `prepared_disc` is already the target of the newer Hueponik
+  `dev` patch (`ac46a5dc500a9581ea55b8efb5c1a0d4be944aba`). That patch is a
+  unified `pal_track01.xdelta3` with selectable 25/50/100 fps modes; the
+  older `.hueponik-readonly/pal8_track01.xdelta3` image is a fixed 50 Hz
+  variant and must not be paired with PALx2.
+- The correct 100 Hz-capable candidate is
+  `build-remaster-pgxp-off-20260824/Wipeout_3_Special_Edition__Recompiled_pgxp.exe`
+  with its sibling `game.toml`: 8 MiB RAM, 400% CPU, PALx2, and the active
+  B24/f2 cache. It was launched through `tools/run_candidate_single.ps1`
+  with `--no-launcher`, `PSX_LOAD_SLOT=1`, and `PSX_REWIND=0`; only one exact
+  WipEout process was admitted.
+- Live telemetry held approximately `99.5--99.9 Hz` guest/present cadence,
+  `44.1 kHz` SPU, `74--76` CDDA sectors/s, and zero audio underruns or
+  overflows after warm-up. This is the correct clock pairing for 100 Hz
+  gameplay. Do not replace it with the generated `game-50hz.toml` profile or
+  the old `prepared_disc-pal8-20240824` hardcoded-50 Hz image.
+- User visual testing reports the unified candidate is currently smooth. UI,
+  FMV, and fresh race/replay coverage remain acceptance checks, but any new
+  performance comparison must start from this exact executable/media/config
+  tuple and keep automatic rewind disabled.
