@@ -1451,6 +1451,11 @@ unbounded build as a performance test; use focused targets and the bounded
   from a retained negated-square-sum Q12 ratio through arccos and quarter-angle
   cosine, then writes B extended opposite normalized BC by the resulting
   AB-scaled distance; zero AB/BC leaves output untouched.
+- `InitializeOrRefreshEffectSlot` owns `0x800F901C..0x800F96CF`, with six
+  unique callers and no overlay duplicate. It indexes a 0xCC-byte effect slot,
+  initializes state zero or refreshes state three, binds source geometry,
+  applies mode-1..4 randomized position/motion setup, and on fresh creation
+  publishes three lifecycle callbacks at `+0xC0/+0xC4/+0xC8`.
 - `ApplyRgbToPrimitiveRecordStream` owns `0x800E8350..0x800E8513`; its six
   generated interior entries are the type 1..8 jump-table cases. Four unique
   callers supply an owner (`count +0x12`, stream `+0x1C`) and RGB bytes. It
@@ -1501,3 +1506,9 @@ unbounded build as a performance test; use focused targets and the bounded
   core `0x8012CD44` as `(0,0,0,NULL,index,size_out)`, and returns the core's
   nullable resource pointer unchanged; `0x8012E300` is only its call-return
   continuation and has no direct caller.
+- `InitializeFontGlyphMetricTables` owns `0x80105F3C..0x8010634F`. Six
+  consecutive setup calls in `0x80104AC4` are unique and entry-only. The
+  call-free owner byte-normalizes selector/variant, clamps selectors >=10 to
+  mode 9, scales embedded signed-halfword sources by exact division through
+  100, and populates the six `0x801CDA88..0x801CE698` glyph metric bands used
+  by `EmitFontGlyphPacket`.

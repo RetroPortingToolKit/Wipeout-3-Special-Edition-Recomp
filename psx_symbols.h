@@ -60,6 +60,10 @@
 #define PSX_FN_HandleErrorSeverity 0x800F82ECu
 #define func_800F82EC HandleErrorSeverity  /* alias */
 
+/* confirmed: Exact 0x6B4-byte six-caller effect-pool initializer: index a 0xCC-byte slot, initialize only state 0 or refresh state 3, bind owner/source geometry, apply mode-1..4 RNG/geometry-specific position and motion fields, publish three caller callbacks at +0xC0/+0xC4/+0xC8, and activate through 0x800F96D0; no overlay duplicate */
+#define PSX_FN_InitializeOrRefreshEffectSlot 0x800F901Cu
+#define func_800F901C InitializeOrRefreshEffectSlot  /* alias */
+
 /* confirmed: Exact 0x12C-byte eight-caller scene-object group mutator: scan all 0xCC-byte records at 0x8018811C/count 0x80187CE8, match full key a0 against signed halfword +8 or byte +1, then selector low8 0/1/2/3 writes linked-object byte +4, randomized halfword +0xA2, record byte +2, or record byte +3 respectively; no semantic return */
 #define PSX_FN_ApplySceneObjectGroupProperty 0x800FA364u
 #define func_800FA364 ApplySceneObjectGroupProperty  /* alias */
@@ -107,6 +111,10 @@
 /* confirmed: Exact 0x260-byte 47-caller glyph renderer: select one of four six-byte glyph-metric bands from style, reserve and OT-link a neutral-gray 40-byte POLY_FT4 using style-selected CLUT/TPAGE state, and return x + 2*glyph_width + 2 */
 #define PSX_FN_EmitFontGlyphPacket 0x80105CDCu
 #define func_80105CDC EmitFontGlyphPacket  /* alias */
+
+/* confirmed: Exact 0x414-byte call-free font-metric initializer: truncate selector/variant to bytes, clamp selector >=10 to 9, choose one of the embedded signed-halfword metric sources and a 64/100-entry extent, scale values with exact signed division by 100, and populate six global glyph metric bands at 0x801CDA88..0x801CE69C; six consecutive calls in owner 0x80104AC4 are six unique entry sites with no overlay or interior calls */
+#define PSX_FN_InitializeFontGlyphMetricTables 0x80105F3Cu
+#define func_80105F3C InitializeFontGlyphMetricTables  /* alias */
 
 /* confirmed: High-fanout 456-byte GPU packet builder: reserve 40 bytes from gPrimCursor, emit a neutral-gray POLY_FT4 with caller rectangle coordinates and descriptor CLUT/TPAGE/UV fields, optionally select semitransparency and a one-texel UV footprint, then return the packet pointer */
 #define PSX_FN_EmitTexturedQuadPacket 0x80106350u
