@@ -1853,6 +1853,13 @@ status = "confirmed"
 note = "Logical 0x104-byte ASCII-to-font adapter with three main-EXE and three unique overlay call PCs: NUL advances zero, space advances eight, otherwise map letters/digits/13 punctuation characters to glyph IDs, call EmitFontGlyphPacket, and return horizontal advance; 15 generated emissions reflect four duplicate overlay translations and 14 internal jump-table alias entries"
 
 [[func]]
+pc = 0x80105354
+name = "EmitGrayscaleFontGlyphPacket"
+emit = false
+status = "confirmed"
+note = "Exact 0x204-byte private glyph renderer: reserve and OT-link one always-semitransparent 40-byte POLY_FT4 using style-selected metrics/texture state, copy caller grayscale to RGB, and return x plus twice glyph width plus two; one unique caller, emitted twice through DrawMappedTextString overlap, no interior target"
+
+[[func]]
 pc = 0x80110198
 name = "LoadQuadTextureCoordinates"
 emit = false
@@ -1865,6 +1872,13 @@ name = "PrepareFrontendImageResource"
 emit = false
 status = "confirmed"
 note = "Exact 0x128-byte one-caller frontend image pipeline: ignore a0-a2, retain a3 option record, acquire the current archive image, decode its selected RGB5 halfword into three rounded 8-bit tint globals, build a texture descriptor, invoke the two private frontend image-layout builders with option byte +5, and release all tracked temporary heap blocks; no semantic return"
+
+[[func]]
+pc = 0x801109BC
+name = "LoadFrontendModelResource"
+emit = false
+status = "confirmed"
+note = "Logical 0x434-byte one-caller frontend model/resource loader across 20 false generated record-type case translations: register the current texture bundle, append a resource pointer to the caller array, attach linked nodes to a shared initialized context, build model state from the next archive entry, optionally mirror X geometry and convert variable packed primitive records, and return the caller-selected array entry"
 
 [[func]]
 pc = 0x8011FF10

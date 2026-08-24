@@ -1580,6 +1580,11 @@ unbounded build as a performance test; use focused targets and the bounded
   translations, not functions. It maps uppercase ASCII, digits, punctuation
   and spaces to font output, returns rendered width, and has no direct or
   literal-pointer caller and no external interior target in the retained EXE.
+- `LoadFrontendModelResource` logically owns `0x801109BC..0x80110DEF`; twenty
+  repeated generated rows are internal packed-record switch translations. Its
+  sole caller is `0x801228C0`; it registers a texture bundle, appends and binds
+  linked model resources, builds archive-backed model state, optionally mirrors
+  X geometry/converts primitive records, and returns a selected array entry.
 - `SpawnRandomizedParticleRecords` owns `0x8011FE6C..0x8011FE93` and discards
   original `a0` while forwarding `(a1 count, a2 origin, a3 spread)` to private
   `EnqueueRandomizedParticleRecords` (`0x80140F9C..0x801410C7`). Four unique
@@ -1611,6 +1616,13 @@ unbounded build as a performance test; use focused targets and the bounded
   returns horizontal advance. Three main and three unique overlay call PCs
   become 15 generated emissions because four overlay images repeat the latter
   translations; no external target enters the owner interior.
+- `EmitGrayscaleFontGlyphPacket` owns `0x80105354..0x80105557`. Its one unique
+  caller (`DrawMappedTextString` at `0x80110524`) is emitted twice through an
+  overlapping punctuation-case translation. It advances `gPrimCursor` by 40,
+  builds and OT-links an always-semitransparent `POLY_FT4` from style-selected
+  glyph metrics, copies caller grayscale to RGB, and returns the next X pen.
+  `DrawAsciiFontCharacter` instead calls the fixed-neutral-gray sibling at
+  `0x80105CDC`; there is no external interior target.
 - `RotateQuadCoordinatesClockwise` owns `0x80110324..0x8011038F`, with two
   entry-only callers. It snapshots four `(x,y)` pairs and permutes their 2x2
   corner grid from `[0,1;2,3]` to `[2,0;3,1]`, a clockwise quarter-turn; it is
