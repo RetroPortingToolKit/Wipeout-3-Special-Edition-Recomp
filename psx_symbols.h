@@ -44,6 +44,10 @@
 #define PSX_FN_EmitTexturedQuadPacket 0x80106350u
 #define func_80106350 EmitTexturedQuadPacket  /* alias */
 
+/* confirmed: Exact 0x784-byte seven-argument localized glyph packet builder with 15 direct callers: accept modes/heights 8, 9, 16, or 18, select bank-sensitive six-byte glyph metrics and texture state, populate and OT-link one 40-byte POLY_FT4, increment the packet count, and return x plus the mode-scaled glyph width and one/two-pixel gap; fifth argument unused */
+#define PSX_FN_EmitLocalizedFontGlyphPacket 0x8010EAC4u
+#define func_8010EAC4 EmitLocalizedFontGlyphPacket  /* alias */
+
 /* confirmed: Exact 0x5BC-byte five-argument localized byte-string renderer with 24 direct callers: map ASCII/punctuation and an ISO-8859-1 accented-byte table to glyph indices, select language-sensitive extended glyph banks, emit each non-space glyph through 0x8010EAC4, apply mode-sensitive space advances, and return final x minus the sign-extended starting x */
 #define PSX_FN_DrawLocalizedFontString 0x8010F3CCu
 #define func_8010F3CC DrawLocalizedFontString  /* alias */
@@ -100,6 +104,10 @@
 #define PSX_FN_AllocateAndQueueSoundVoice 0x80121534u
 #define func_80121534 AllocateAndQueueSoundVoice  /* alias */
 
+/* confirmed: Exact 0x264-byte nine-caller persistent-sound creator: gate on audio enables, allocate one of 24 flag-3 slots, snapshot resource/volume/pan/pitch/scale/class state, allocate and initialize one or optional two ordinary queued voices, dispatch the slot to the selected backend, and return its retained handle (or -1 on slot/primary-voice exhaustion) */
+#define PSX_FN_CreatePersistentSoundSlot 0x801217F4u
+#define func_801217F4 CreatePersistentSoundSlot  /* alias */
+
 /* confirmed: Exact 0x64-byte 20-caller audio adapter: truncate a1 to u8, reject disabled audio, slot -1, slot >=24, and inactive slot records; otherwise write volume byte +0x1A in the selected 32-byte record at 0x801D674C and call 0x8012257C to dispatch that slot to the active backend */
 #define PSX_FN_SetSoundSlotVolume 0x801224B4u
 #define func_801224B4 SetSoundSlotVolume  /* alias */
@@ -119,6 +127,10 @@
 /* known: Argument-free startup initializer called once from 0x80116128: create/configure the shared 80-byte transform object, allocate and publish race-owned work buffers, initialize dependent race subsystems, create a 38-byte display/resource descriptor through 0x80141D6C, and publish that returned handle */
 #define PSX_FN_InitializeRaceRuntimeResources 0x8012482Cu
 #define func_8012482C InitializeRaceRuntimeResources  /* alias */
+
+/* confirmed: Exact 0x12C-byte twelve-call-site deep-copy constructor: allocate a 40-byte instance from the shared arena, copy its 16-byte name and scalar fields, allocate and memcpy its owned 80-byte payload, reset the runtime field at +0x24, report allocation failures through the retained New Instance diagnostic, and return the new instance */
+#define PSX_FN_CreateObjectInstance 0x8012E408u
+#define func_8012E408 CreateObjectInstance  /* alias */
 
 /* known: Argument-free race/view initializer spanning 0x80133B64..0x80134013: initialize each 0x3A4-byte viewport record, publish the active record, rebuild global clip coefficients, assign racer-to-viewport state, and finish through the split epilogue at 0x80133F60 */
 #define PSX_FN_InitializeRaceViewportState 0x80133B64u
@@ -219,6 +231,10 @@
 /* known: Exact 0x594-byte owner of the 0x8014EE6C coverage address: scan 30 96-byte effect slots for free records and initialize callback, lifetime, racer index, kind, and state fields through a 15-way kind jump table; called only at 0x8015B3F8/0x8015B40C/0x8015B424 */
 #define PSX_FN_SpawnRacerEffectRecords 0x8014EA88u
 #define func_8014EA88 SpawnRacerEffectRecords  /* alias */
+
+/* confirmed: Exact 0x8D4-byte 12-caller racer damage/energy updater: gate inactive or protected sessions, map supported event codes through a 132-entry dispatch table or accept an explicit delta, apply racer/mode scaling, clamp the per-racer Q8 damage accumulator, update percent/timers, and trigger the 100-percent disabled-state transition and threshold effect */
+#define PSX_FN_ApplyRacerDamageEvent 0x801562B8u
+#define func_801562B8 ApplyRacerDamageEvent  /* alias */
 
 /* confirmed: Exact 0x3C-byte signed-angle wrapper: reduce the absolute input modulo 4096, call the private quarter-wave sine lookup, and restore odd symmetry; returns a signed Q12 value in [-4096,4096] and has 91 direct callers */
 #define PSX_FN_SinQ12FromSignedAngle 0x8015C318u

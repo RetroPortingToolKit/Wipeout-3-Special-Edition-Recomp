@@ -639,6 +639,13 @@ status = "confirmed"
 note = "Exact 0x2C0-byte shared audio sink with three direct callers: gate on two audio-enable bytes, allocate one of 24 sound slots, snapshot volume/pan/pitch and Q8 pitch scale, resolve or reserve one/two of 24 voices, initialize 36-byte voice state from a 20-byte resource descriptor, then submit the slot to the active audio backend"
 
 [[func]]
+pc = 0x801217F4
+name = "CreatePersistentSoundSlot"
+emit = false
+status = "confirmed"
+note = "Exact 0x264-byte nine-caller persistent-sound creator: gate on audio enables, allocate one of 24 flag-3 slots, snapshot resource/volume/pan/pitch/scale/class state, allocate and initialize one or optional two ordinary queued voices, dispatch the slot to the selected backend, and return its retained handle (or -1 on slot/primary-voice exhaustion)"
+
+[[func]]
 pc = 0x8012257C
 name = "DispatchSoundSlotUpdateToBackend"
 emit = false
@@ -828,8 +835,29 @@ emit = false
 status = "confirmed"
 note = "Exact 0x3E8-byte 16-caller race-time formatter: render nonnegative centiseconds as M:SS with optional .hh using EmitFontGlyphPacket, render negative values as style-dependent placeholder glyph runs, remap low style banks by +14 when global mode 0x8018AE94 equals 2, and return the final X pen"
 
+[[func]]
+pc = 0x8012E408
+name = "CreateObjectInstance"
+emit = false
+status = "confirmed"
+note = "Exact 0x12C-byte twelve-call-site deep-copy constructor: allocate a 40-byte instance from the shared arena, copy its 16-byte name and scalar fields, allocate and memcpy its owned 80-byte payload, reset the runtime field at +0x24, report allocation failures through the retained New Instance diagnostic, and return the new instance"
+
+[[func]]
+pc = 0x8010EAC4
+name = "EmitLocalizedFontGlyphPacket"
+emit = false
+status = "confirmed"
+note = "Exact 0x784-byte seven-argument localized glyph packet builder with 15 direct callers: accept modes/heights 8, 9, 16, or 18, select bank-sensitive six-byte glyph metrics and texture state, populate and OT-link one 40-byte POLY_FT4, increment the packet count, and return x plus the mode-scaled glyph width and one/two-pixel gap; fifth argument unused"
+
 [[object]]
 addr = 0x8016DD60
 name = "kMode1IndexPermutation"
 status = "confirmed"
 note = "Eight-byte permutation {0,5,1,4,2,3,6,7}; copied to ResolveModeDependentIndex's stack and indexed only for selector/mode 1"
+
+[[func]]
+pc = 0x801562B8
+name = "ApplyRacerDamageEvent"
+emit = false
+status = "confirmed"
+note = "Exact 0x8D4-byte 12-caller racer damage/energy updater: gate inactive or protected sessions, map supported event codes through a 132-entry dispatch table or accept an explicit delta, apply racer/mode scaling, clamp the per-racer Q8 damage accumulator, update percent/timers, and trigger the 100-percent disabled-state transition and threshold effect"
