@@ -639,6 +639,19 @@ status = "confirmed"
 note = "Exact 0x2C0-byte shared audio sink with three direct callers: gate on two audio-enable bytes, allocate one of 24 sound slots, snapshot volume/pan/pitch and Q8 pitch scale, resolve or reserve one/two of 24 voices, initialize 36-byte voice state from a 20-byte resource descriptor, then submit the slot to the active audio backend"
 
 [[func]]
+pc = 0x8012257C
+name = "DispatchSoundSlotUpdateToBackend"
+emit = false
+status = "confirmed"
+note = "Exact 0x54-byte five-caller audio bridge: read unsigned gAudioBackendMode, forward sound-slot index a0 unchanged to 0x80121C6C for mode 1 or 0x80121D4C for mode 2, perform no call for every other mode, and make no authoritative slot/global mutation or semantic return itself"
+
+[[object]]
+addr = 0x801D6E55
+name = "gAudioBackendMode"
+status = "confirmed"
+note = "Unsigned audio backend selector consumed by DispatchSoundSlotUpdateToBackend and audio initialization/control paths; exact values 1 and 2 select the two recovered queued-voice update implementations"
+
+[[func]]
 pc = 0x80105CDC
 name = "EmitFontGlyphPacket"
 emit = false
@@ -781,6 +794,13 @@ status = "confirmed"
 note = "Exact 0x104-byte 15-caller custom-arena free/coalescer: find a block by exact payload pointer, restore its payload bytes to arena free accounting, merge an adjacent free successor and predecessor while restoring each 20-byte header, or print the retained DFree block-not-found diagnostic"
 
 [[func]]
+pc = 0x80110DF0
+name = "LoadFrontendTexture"
+emit = false
+status = "confirmed"
+note = "Exact 0x8B0-byte two-caller frontend-overlay TIM texture builder retaining the diagnostic name LoadTexture: accept 4-bit or 8-bit TIM data, allocate a 0x26-byte descriptor, auto-place supported CLUT/image rectangles, derive TPAGE/CLUT and UV bounds, upload CLUT and pixel rectangles, optionally transform source pixels or CLUT flags, and return the descriptor; unsupported modes return null"
+
+[[func]]
 pc = 0x800EEE64
 name = "LeaveNestedInterruptCriticalSection"
 emit = false
@@ -800,6 +820,13 @@ name = "SetSoundSlotVolume"
 emit = false
 status = "confirmed"
 note = "Exact 0x64-byte 20-caller audio adapter: truncate a1 to u8, reject disabled audio, slot -1, slot >=24, and inactive slot records; otherwise write volume byte +0x1A in the selected 32-byte record at 0x801D674C and call 0x8012257C to dispatch that slot to the active backend"
+
+[[func]]
+pc = 0x80105558
+name = "DrawRaceTimeCentiseconds"
+emit = false
+status = "confirmed"
+note = "Exact 0x3E8-byte 16-caller race-time formatter: render nonnegative centiseconds as M:SS with optional .hh using EmitFontGlyphPacket, render negative values as style-dependent placeholder glyph runs, remap low style banks by +14 when global mode 0x8018AE94 equals 2, and return the final X pen"
 
 [[object]]
 addr = 0x8016DD60

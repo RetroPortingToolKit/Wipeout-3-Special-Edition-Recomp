@@ -931,3 +931,10 @@ unbounded build as a performance test; use focused targets and the bounded
   four-caller temp-heap rollback wrapper; it exposes reserved prefix space down
   to a marker (or the initial arena payload for null) and delegates the actual
   free/coalesce operation.
+- `LoadFrontendTexture` owns `0x80110DF0..0x8011169F` in the frontend overlay
+  and retains the original diagnostic name `LoadTexture`. It parses standard 4-bit and
+  8-bit TIM block layouts, allocates a 0x26-byte runtime texture descriptor,
+  auto-places supported rectangles, derives CLUT/TPAGE and UV bounds, uploads
+  CLUT/pixels through the graphics transfer path, and returns null for modes
+  other than 0/1. Its two callers are the paired bundle registrars using
+  `(abr=1, variant=0/1)`.

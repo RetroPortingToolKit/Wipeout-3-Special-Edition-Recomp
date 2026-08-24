@@ -28,6 +28,10 @@
 #define PSX_FN_NextRandom15 0x80104AA0u
 #define func_80104AA0 NextRandom15  /* alias */
 
+/* confirmed: Exact 0x3E8-byte 16-caller race-time formatter: render nonnegative centiseconds as M:SS with optional .hh using EmitFontGlyphPacket, render negative values as style-dependent placeholder glyph runs, remap low style banks by +14 when global mode 0x8018AE94 equals 2, and return the final X pen */
+#define PSX_FN_DrawRaceTimeCentiseconds 0x80105558u
+#define func_80105558 DrawRaceTimeCentiseconds  /* alias */
+
 /* known: Four-argument text renderer spanning 0x80105B78..0x80105CDB: walk the NUL-terminated byte string in a0, map ASCII letters/digits and eleven punctuation marks to font glyph indices, advance spaces by eight pixels, emit every other byte through the POLY_FT4 glyph helper at 0x80105CDC using x=a1, y=a2, style=a3, and return total horizontal advance */
 #define PSX_FN_DrawFontString 0x80105B78u
 #define func_80105B78 DrawFontString  /* alias */
@@ -43,6 +47,10 @@
 /* confirmed: Exact 0x5BC-byte five-argument localized byte-string renderer with 24 direct callers: map ASCII/punctuation and an ISO-8859-1 accented-byte table to glyph indices, select language-sensitive extended glyph banks, emit each non-space glyph through 0x8010EAC4, apply mode-sensitive space advances, and return final x minus the sign-extended starting x */
 #define PSX_FN_DrawLocalizedFontString 0x8010F3CCu
 #define func_8010F3CC DrawLocalizedFontString  /* alias */
+
+/* confirmed: Exact 0x8B0-byte two-caller frontend-overlay TIM texture builder retaining the diagnostic name LoadTexture: accept 4-bit or 8-bit TIM data, allocate a 0x26-byte descriptor, auto-place supported CLUT/image rectangles, derive TPAGE/CLUT and UV bounds, upload CLUT and pixel rectangles, optionally transform source pixels or CLUT flags, and return the descriptor; unsupported modes return null */
+#define PSX_FN_LoadFrontendTexture 0x80110DF0u
+#define func_80110DF0 LoadFrontendTexture  /* alias */
 
 /* known: 33-caller 276-byte bundle loader: publish the signed entry count from a0+0, prefix-sum its 32-bit size table at a0+4 into the global pointer workspace at 0x801CF098, acquire a destination base through 0x80116A54, relocate every prefix by that base, then decode/copy the trailing payload through 0x80115B1C */
 #define PSX_FN_LoadPackedResourceBundle 0x80111AF8u
@@ -95,6 +103,10 @@
 /* confirmed: Exact 0x64-byte 20-caller audio adapter: truncate a1 to u8, reject disabled audio, slot -1, slot >=24, and inactive slot records; otherwise write volume byte +0x1A in the selected 32-byte record at 0x801D674C and call 0x8012257C to dispatch that slot to the active backend */
 #define PSX_FN_SetSoundSlotVolume 0x801224B4u
 #define func_801224B4 SetSoundSlotVolume  /* alias */
+
+/* confirmed: Exact 0x54-byte five-caller audio bridge: read unsigned gAudioBackendMode, forward sound-slot index a0 unchanged to 0x80121C6C for mode 1 or 0x80121D4C for mode 2, perform no call for every other mode, and make no authoritative slot/global mutation or semantic return itself */
+#define PSX_FN_DispatchSoundSlotUpdateToBackend 0x8012257Cu
+#define func_8012257C DispatchSoundSlotUpdateToBackend  /* alias */
 
 /* known: True 60-byte owner with three callers: truncate a0 to byte a3, load the three global bytes at 0x80175E71/+72/+70 into a0/a1/a2, call 0x801220AC, and return; generated 0x80122654 is a non-callable fallthrough split requiring the prefix's live a3 */
 #define PSX_FN_ApplyGlobalRgbWithAlpha 0x80122650u
