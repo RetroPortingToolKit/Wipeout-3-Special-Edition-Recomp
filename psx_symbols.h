@@ -4,6 +4,10 @@
  */
 #pragma once
 
+/* confirmed: Exact 0x920-byte seven-caller track-surface collision owner: select flagged 24-byte geometry records from object halfword +0x34, reject distant candidates, construct adjacent-face plane/intersection tests, gate normal mode through a point-in-face predicate, dispatch object-flag/prior-hit-specific collision responses, and return -1 for rejected range, 0 for no hit, or 1 for a handled hit */
+#define PSX_FN_ResolveObjectTrackSurfaceCollision 0x800ECB6Cu
+#define func_800ECB6C ResolveObjectTrackSurfaceCollision  /* alias */
+
 /* confirmed: Exact frameless 0xDC-byte by-value aggregate leaf with 22 generated call instances at 18 distinct guest PCs: take point A in a0-a3, point B at caller sp+0x10, and a packed Q12 normal at sp+0x20, then return dot(B-A,n)/Q12NormSquared(n), substituting denominator one when the GTE SQR sum is zero */
 #define PSX_FN_ProjectPointDeltaOntoNormalQ12 0x800ED8ACu
 #define func_800ED8AC ProjectPointDeltaOntoNormalQ12  /* alias */
@@ -11,6 +15,10 @@
 /* confirmed: VBlank sim gate: counter vs gSimVblankSkip; skip path 0x800EE0F0 */
 #define PSX_FN_SimVblankGate 0x800EDFC8u
 #define func_800EDFC8 SimVblankGate  /* alias */
+
+/* confirmed: Exact 0xD8-byte sixteen-caller Psy-Q VRAM upload wrapper: accept RECT pointer and source-word pointer, enter the nested interrupt critical section, either submit immediately through the GPU image-transfer primitive or append a -2/RECT/data record to the eight-entry transfer ring, leave critical state, wait through DrawSync when queued, and return only after its per-call completion flag is set */
+#define PSX_FN_LoadImage 0x800EEC80u
+#define func_800EEC80 LoadImage  /* alias */
 
 /* confirmed: a0=new skip; returns previous; also queues pad slot invalidate */
 #define PSX_FN_SetSimVblankSkip 0x800EED58u
@@ -251,6 +259,10 @@
 /* known: Exact 0x594-byte owner of the 0x8014EE6C coverage address: scan 30 96-byte effect slots for free records and initialize callback, lifetime, racer index, kind, and state fields through a 15-way kind jump table; called only at 0x8015B3F8/0x8015B40C/0x8015B424 */
 #define PSX_FN_SpawnRacerEffectRecords 0x8014EA88u
 #define func_8014EA88 SpawnRacerEffectRecords  /* alias */
+
+/* confirmed: Exact 0x10C-byte six-caller frameless leaf paired with AccumulateIndexedVertexWeights: validate an object and positive signed byte +0x3F, locate the first flagged 24-byte geometry record at/after halfword +0x34, add one fixed 250/200/200 unit to three indexed 12-byte accumulator records, decrement the weight once, and return no semantic value */
+#define PSX_FN_AccumulateOneIndexedVertexWeight 0x8014F814u
+#define func_8014F814 AccumulateOneIndexedVertexWeight  /* alias */
 
 /* confirmed: Exact 0x12C-byte nine-caller leaf: validate an object and its positive signed byte +0x3F weight, locate the first flagged 24-byte geometry record at/after object halfword +0x34, add fixed 250/200/200 increments per weight unit to three indexed 12-byte accumulator records, consume the weight byte to zero, and return no semantic value */
 #define PSX_FN_AccumulateIndexedVertexWeights 0x8014F920u
