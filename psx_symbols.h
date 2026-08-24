@@ -12,6 +12,10 @@
 #define PSX_FN_SetSimVblankSkip 0x800EED58u
 #define func_800EED58 SetSimVblankSkip  /* alias */
 
+/* confirmed: Exact argument-free 0x24-byte PRNG leaf: load gRandom15State, replace it with (arithmetic_shift_right(state,1) XOR (state << 3)) modulo 32 bits, and return the new state's low 15 bits; private state begins at 0x12345678; 254 direct JAL callers */
+#define PSX_FN_NextRandom15 0x80104AA0u
+#define func_80104AA0 NextRandom15  /* alias */
+
 /* confirmed: High-fanout 456-byte GPU packet builder: reserve 40 bytes from gPrimCursor, emit a neutral-gray POLY_FT4 with caller rectangle coordinates and descriptor CLUT/TPAGE/UV fields, optionally select semitransparency and a one-texel UV footprint, then return the packet pointer */
 #define PSX_FN_EmitTexturedQuadPacket 0x80106350u
 #define func_80106350 EmitTexturedQuadPacket  /* alias */
@@ -107,6 +111,26 @@
 /* known: Exact 0x594-byte owner of the 0x8014EE6C coverage address: scan 30 96-byte effect slots for free records and initialize callback, lifetime, racer index, kind, and state fields through a 15-way kind jump table; called only at 0x8015B3F8/0x8015B40C/0x8015B424 */
 #define PSX_FN_SpawnRacerEffectRecords 0x8014EA88u
 #define func_8014EA88 SpawnRacerEffectRecords  /* alias */
+
+/* confirmed: Exact 0x3C-byte signed-angle wrapper: reduce the absolute input modulo 4096, call the private quarter-wave sine lookup, and restore odd symmetry; returns a signed Q12 value in [-4096,4096] and has 91 direct callers */
+#define PSX_FN_SinQ12FromSignedAngle 0x8015C318u
+#define func_8015C318 SinQ12FromSignedAngle  /* alias */
+
+/* confirmed: Exact 0x90-byte private sine lookup used only twice by 0x8015C318: fold a normalized 0..4095 phase into the 1025-entry signed-halfword quarter-wave table at 0x8017A74C and apply the quadrant sign */
+#define PSX_FN_LookupSinQ12Phase 0x8015C354u
+#define func_8015C354 LookupSinQ12Phase  /* alias */
+
+/* confirmed: Exact 0xA0-byte even cosine lookup: reduce the absolute signed input modulo 4096, fold it into the 1025-entry Q12 quarter-wave table at 0x8017A74C with the proper quadrant sign, and return [-4096,4096]; 81 direct callers */
+#define PSX_FN_CosQ12FromSignedAngle 0x8015C3E8u
+#define func_8015C3E8 CosQ12FromSignedAngle  /* alias */
+
+/* confirmed: Real 57-caller variadic sprintf-equivalent owner spanning 0x8015C698..0x8015CF1B: spill a1-a3 into ABI vararg slots, fall through into the generated 0x8015C6A4 parser body, format into a0, NUL-terminate, and return the character count; no caller targets the split body */
+#define PSX_FN_FormatString 0x8015C698u
+#define func_8015C698 FormatString  /* alias */
+
+/* known: Three-argument SIO1 control/query dispatcher spanning 0x8016192C..0x80161DFF: a0 selects six operation families, a1 selects register or lifecycle actions, and a2 supplies values/side selection; reads and writes the SIO1 STAT/MODE/CTRL/BAUD block at 0x1F801050, maintains its RAM shadow, and brackets reset paths with critical-section syscalls */
+#define PSX_FN_AccessSio1ControlState 0x8016192Cu
+#define func_8016192C AccessSio1ControlState  /* alias */
 
 /* confirmed: Exact PS-X EXE header entry; two-instruction non-returning trampoline to the expansion-RAM startup loader at 0x800D03B8, not the CRT initialization body */
 #define PSX_FN_PsxExeEntryTrampoline 0x80162474u

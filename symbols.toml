@@ -27,6 +27,13 @@ status = "known"
 note = "Address-taken final SIO/pad-driver stage: consume a multitap response through the private descriptor in a0, poll/configure as many as four 0xF0-byte slot records, append the final received byte, and return 0, a propagated transfer error, or -3 on timeout; the callable code ends at 0x8016CC00"
 
 [[func]]
+pc = 0x8016192C
+name = "AccessSio1ControlState"
+emit = false
+status = "known"
+note = "Three-argument SIO1 control/query dispatcher spanning 0x8016192C..0x80161DFF: a0 selects six operation families, a1 selects register or lifecycle actions, and a2 supplies values/side selection; reads and writes the SIO1 STAT/MODE/CTRL/BAUD block at 0x1F801050, maintains its RAM shadow, and brackets reset paths with critical-section syscalls"
+
+[[func]]
 pc = 0x80112048
 name = "SwapRgb24RedBlue"
 emit = false
@@ -39,6 +46,13 @@ name = "EmitTexturedQuadPacket"
 emit = false
 status = "confirmed"
 note = "High-fanout 456-byte GPU packet builder: reserve 40 bytes from gPrimCursor, emit a neutral-gray POLY_FT4 with caller rectangle coordinates and descriptor CLUT/TPAGE/UV fields, optionally select semitransparency and a one-texel UV footprint, then return the packet pointer"
+
+[[func]]
+pc = 0x80104AA0
+name = "NextRandom15"
+emit = false
+status = "confirmed"
+note = "Exact argument-free 0x24-byte PRNG leaf: load gRandom15State, replace it with (arithmetic_shift_right(state,1) XOR (state << 3)) modulo 32 bits, and return the new state's low 15 bits; private state begins at 0x12345678; 254 direct JAL callers"
 
 [[func]]
 pc = 0x80112064
@@ -388,6 +402,12 @@ status = "confirmed"
 note = "SimVblankGate increments; reset on full sim (sw 0)"
 
 [[object]]
+addr = 0x80173A94
+name = "gRandom15State"
+status = "confirmed"
+note = "Private 32-bit state for NextRandom15, initialized in the PS-X EXE image to 0x12345678; the generator stores the full XOR-shift recurrence here before masking its return value to 15 bits"
+
+[[object]]
 addr = 0x8016CC0C
 name = "kAutopilotJumpSpeedValues"
 status = "confirmed"
@@ -449,3 +469,31 @@ name = "AllocateHeapBlock"
 emit = false
 status = "confirmed"
 note = "Exact 0x1E8-byte custom main/temp heap allocator: align requested bytes upward to four, prefer a free block large enough to split off a 20-byte allocation header plus payload from its tail, otherwise warn and consume an unsplittable free block large enough for the payload; update arena remaining bytes and main-heap low-water mark, return payload at header+12, or null when no block fits; 85 direct JAL sites"
+
+[[func]]
+pc = 0x8015C318
+name = "SinQ12FromSignedAngle"
+emit = false
+status = "confirmed"
+note = "Exact 0x3C-byte signed-angle wrapper: reduce the absolute input modulo 4096, call the private quarter-wave sine lookup, and restore odd symmetry; returns a signed Q12 value in [-4096,4096] and has 91 direct callers"
+
+[[func]]
+pc = 0x8015C354
+name = "LookupSinQ12Phase"
+emit = false
+status = "confirmed"
+note = "Exact 0x90-byte private sine lookup used only twice by 0x8015C318: fold a normalized 0..4095 phase into the 1025-entry signed-halfword quarter-wave table at 0x8017A74C and apply the quadrant sign"
+
+[[func]]
+pc = 0x8015C3E8
+name = "CosQ12FromSignedAngle"
+emit = false
+status = "confirmed"
+note = "Exact 0xA0-byte even cosine lookup: reduce the absolute signed input modulo 4096, fold it into the 1025-entry Q12 quarter-wave table at 0x8017A74C with the proper quadrant sign, and return [-4096,4096]; 81 direct callers"
+
+[[func]]
+pc = 0x8015C698
+name = "FormatString"
+emit = false
+status = "confirmed"
+note = "Real 57-caller variadic sprintf-equivalent owner spanning 0x8015C698..0x8015CF1B: spill a1-a3 into ABI vararg slots, fall through into the generated 0x8015C6A4 parser body, format into a0, NUL-terminate, and return the character count; no caller targets the split body"
