@@ -708,6 +708,10 @@
 #define PSX_FN_WaitForJoyAckAndClearIrq 0x80169D30u
 #define func_80169D30 WaitForJoyAckAndClearIrq  /* alias */
 
+/* confirmed: True 0x280-byte varargs MDEC DMA dispatcher across the false 0x8016B274 split: spill a0..a3 for selectors 0..3, switch DMA direction/control, set the shifted transfer count, or launch the selected MDEC DMA channel from (address,size), returning zero or -2 on bounded hardware-wait timeout */
+#define PSX_FN_DispatchMdecDmaCommand 0x8016B264u
+#define func_8016B264 DispatchMdecDmaCommand  /* alias */
+
 /* confirmed: Exact 0x5C-byte 14-caller SPU-library timing delay: ignore all arguments, keep counter and accumulator on an 8-byte stack frame, execute 60 iterations of accumulator *= 13 with 32-bit wraparound, and return without MMIO/global mutation or semantic value; callers place it around SPU control/status/data-port accesses */
 #define PSX_FN_DelaySpuRegisterAccess 0x8016B6F8u
 #define func_8016B6F8 DelaySpuRegisterAccess  /* alias */

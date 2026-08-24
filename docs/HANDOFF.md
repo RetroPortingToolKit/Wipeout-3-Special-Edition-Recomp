@@ -1456,7 +1456,7 @@ unbounded build as a performance test; use focused targets and the bounded
   generated `0x10`-byte entry spills `a0..a3`, and the `0x8016B274` body reads
   those slots as varargs. Six entry-only callers issue selectors 0..3 to
   select direction, program the shifted count, or launch `(address,size)` with
-  64-word DMA blocking; bounded status waits return `-2` on timeout.
+  64-unit DMA blocking; bounded status waits return `-2` on timeout.
 - `ComputeObjectUpVectorQ12` owns `0x800EA870..0x800EA9AF`. Six unique callers
   (five base-region owners and one overlay owner) target only the entry. It
   reads signed object Euler angles at `+0x11E/+0x120/+0x122`, evaluates six
