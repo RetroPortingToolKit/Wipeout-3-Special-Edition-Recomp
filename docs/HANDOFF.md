@@ -1325,6 +1325,10 @@ unbounded build as a performance test; use focused targets and the bounded
   `0x8015FD2C..0x8015FD3F`. It writes packet length 6 to byte `+3` and GPU
   command `0x30` to byte `+7`, leaving all payload/link fields untouched. All
   six callers target the true entry.
+- `WaitEvent` is the canonical BIOS B0:0A trampoline at
+  `0x80160E78..0x80160E87`. It forwards the event handle and BIOS result
+  unchanged; its fourth word is unreachable padding. All six direct callers
+  target the true entry.
 - `CopyAndNormalizeControllerPacket` owns `0x80120988..0x80120A87` with seven
   entry callers. It copies/clears eight raw controller bytes, saves their
   original header at destination `+8`, accepts headers `2300/4100/7300`, and
@@ -1437,6 +1441,11 @@ unbounded build as a performance test; use focused targets and the bounded
   `0x8015D3C4..0x8015D453`, with six entry-only callers. It runs the shared
   RECT diagnostic, packs RGB as `0x00BBGGRR`, dispatches operation 8 through
   the active driver's method/context pair, and propagates the backend result.
+- `UpdateRacerContactResponseHandler` owns `0x8011BBEC..0x8011BD4B`, with
+  three entry-only callers and no overlay duplicate. After contact/racer/global
+  eligibility gates, it installs one of `0x800E913C`, `0x800E8E14`, or
+  `0x800EA760` at racer `+0x39C` and synchronizes craft/object flags `0x4` and
+  `0x10000`; existing response `0x800E9510` is left untouched.
 - `ApplyRgbToPrimitiveRecordStream` owns `0x800E8350..0x800E8513`; its six
   generated interior entries are the type 1..8 jump-table cases. Four unique
   callers supply an owner (`count +0x12`, stream `+0x1C`) and RGB bytes. It
@@ -1457,8 +1466,19 @@ unbounded build as a performance test; use focused targets and the bounded
   those slots as varargs. Six entry-only callers issue selectors 0..3 to
   select direction, program the shifted count, or launch `(address,size)` with
   64-unit DMA blocking; bounded status waits return `-2` on timeout.
+- `FillBytes` is the exact leaf at `0x8015F56C..0x8015F58F`, with six unique
+  entry-only callers and no generated duplication. It fills exactly `count`
+  bytes with the low byte of `a1`, handles zero count without access, and
+  always leaves `v0=-1`; callers treat it as void, so it is not canonical
+  standard-returning `memset`.
 - `ComputeObjectUpVectorQ12` owns `0x800EA870..0x800EA9AF`. Six unique callers
   (five base-region owners and one overlay owner) target only the entry. It
   reads signed object Euler angles at `+0x11E/+0x120/+0x122`, evaluates six
   recovered Q12 sine/cosine calls, and writes the rotated local `+Y` basis as
   three signed Q12 words; zero angles produce `(0,4096,0)`.
+- `UpdateRelatedSceneObjectGroups` owns `0x800FA490..0x800FA6FB`. It gates and
+  filters the `0xCC`-byte scene-object array, accepts records related to
+  `context+8` through bounded `+0x0C`/`+0x08` pointer-chain searches, then
+  applies linked group state/randomization via `ApplySceneObjectGroupProperty`.
+  Six generated calls are five unique entry-only sites because `0x801598E8`
+  appears in two overlay images; no interior row is called.
