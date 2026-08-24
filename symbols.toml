@@ -1196,6 +1196,13 @@ status = "confirmed"
 note = "Exact 0x10-byte eight-caller BIOS A0/1B strlen trampoline: preserve the string pointer in a0 and caller ra, select service t1=0x1B in the vector-jump delay slot, and propagate the BIOS unsigned byte count unchanged; final word is unreachable padding"
 
 [[func]]
+pc = 0x800FA364
+name = "ApplySceneObjectGroupProperty"
+emit = false
+status = "confirmed"
+note = "Exact 0x12C-byte eight-caller scene-object group mutator: scan all 0xCC-byte records at 0x8018811C/count 0x80187CE8, match full key a0 against signed halfword +8 or byte +1, then selector low8 0/1/2/3 writes linked-object byte +4, randomized halfword +0xA2, record byte +2, or record byte +3 respectively; no semantic return"
+
+[[func]]
 pc = 0x8014FA4C
 name = "SpawnTrackSectionSurfaceEffects"
 emit = false
@@ -1294,6 +1301,13 @@ status = "confirmed"
 note = "Exact 0x90-byte seven-caller canonical LibCD initializer: retry the low-level CD interrupt/hardware initializer at 0x80160DB8 up to five times, return 0 after printing the retained failure diagnostic, or install three internal CD callbacks and clear their companion state before returning 1"
 
 [[func]]
+pc = 0x80140438
+name = "EnqueueEffectInstance"
+emit = false
+status = "confirmed"
+note = "Exact 0xC8-byte leaf that advances the byte-wrapped index in the effect pool referenced by 0x801E1F14, selects the 48-byte slot at pool+4+index*48, copies position/vector/source parameters and type bytes into its fixed layout, initializes active/default fields, and returns 1; eight unique callers produce nine overlay instances"
+
+[[func]]
 pc = 0x80134CE8
 name = "SubmitRumbleDecayRequest"
 emit = false
@@ -1327,3 +1341,10 @@ name = "GetCurrentArchiveEntryOutputSize"
 emit = false
 status = "confirmed"
 note = "Logical 0x3C-byte eight-caller accessor across the generated split at 0x8014BC4C: return zero when current archive-record index 0x801E9808 is -1, otherwise index the 12-byte table at pointer 0x801E97FC and return the selected record's proven output_size word at +4 without changing state"
+
+[[func]]
+pc = 0x801107EC
+name = "EmitDrawModePacketToOrderingTable"
+emit = false
+status = "confirmed"
+note = "Exact 0xA8-byte eight-caller GPU-state emitter: reserve a 12-byte DR_MODE at gPrimCursor, compute TPAGE from caller ABR with tp/x/y zero, build mode with DFE=1 and caller DTD, then prepend the packet to the active ordering-table bucket at signed depth>>6"
