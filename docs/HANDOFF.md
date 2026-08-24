@@ -756,3 +756,16 @@ unbounded build as a performance test; use focused targets and the bounded
   96-byte slots, and initializes kind-specific racer effects through a 15-way
   jump table. Its three true direct calls are within the wrapper at
   `0x8015B3CC`; generated `0x8014EE6C` is only the kind-6 initialization arm.
+- `0x8014195C` retains its original diagnostic-authenticated name
+  `LoadTexture`. The 1,040-byte sole-called TIM loader accepts 4-bit/8-bit
+  modes, allocates a 38-byte texture descriptor, derives CLUT/TPAGE and four UV
+  pairs, and uploads palette/pixel rectangles through two `LoadImage` calls.
+- `0x80170CBC..0x80170D3B` is the callable
+  `ValidateAndRepairReverseOrderingTable`, a backward scan over packed 24-bit
+  ordering-table links. Generated entries at `0x80170CD0`, `0x80170D04`, and
+  `0x80170D24` are internal branch targets, not callable boundaries.
+- `0x80137DFC` is the high-fanout `PlaySoundEffectById` adapter (81 direct
+  calls): `-1` is a no-op, volume clamps at 230, ordinary IDs use the shared
+  resource table/class 2, ID 7 uses its dedicated resource/class 18, and
+  selectors 29/37/28 remap to metadata IDs 23/22/21 before the common voice
+  allocator at `0x80121534`.
