@@ -960,6 +960,11 @@ unbounded build as a performance test; use focused targets and the bounded
   caller RGB through GTE `DPCS`, copies a shared texture descriptor's UV,
   CLUT, and TPAGE fields, links by `depth >> 6`, and advances `gPrimCursor`.
   The executable has six direct calls and no interior call targets.
+- `LoadImage` owns `0x800EEC80..0x800EED57`. This 16-caller Psy-Q wrapper
+  submits `(RECT *, source_words)` immediately when the GPU transfer ring is
+  empty, otherwise enqueues a 12-byte `-2/RECT/data` request in its eight-slot
+  ring and waits through `DrawSync(0)` for its completion flag. Interrupt
+  critical-section nesting protects both queue paths.
 - `EmitLocalizedFontGlyphPacket` owns `0x8010EAC4..0x8010F247`: it selects
   six-byte glyph metrics and font texture state for height modes 8/9/16/18 and
   extended banks, builds and OT-links one 40-byte `POLY_FT4`, increments the
@@ -975,6 +980,16 @@ unbounded build as a performance test; use focused targets and the bounded
   object's `+0x34` index, converts positive byte `+0x3F` into fixed additions
   on three indexed 12-byte vertex accumulators, and consumes the byte to zero.
   It has nine direct callers and no external interior targets.
+- `ResolveObjectTrackSurfaceCollision` owns `0x800ECB6C..0x800ED48B`: it
+  selects flagged 24-byte geometry records from an object's `+0x34` index,
+  performs adjacent-surface fixed-point/GTE intersection tests, and dispatches
+  response helpers according to force mode, object flags, and prior-hit state.
+  It returns `-1/0/1`, has seven callers in `0x800ED48C`, and no interior alias.
+- `AccumulateOneIndexedVertexWeight` is its single-step companion at
+  `0x8014F814..0x8014F91F`: it performs the same flagged-record lookup and
+  fixed 250/200/200 indexed accumulator update once, then decrements positive
+  byte `+0x3F` by one. It has six direct callers in the track-neighbor update
+  loops and no external interior jump targets.
 - `ApplyRacerDamageEvent` owns `0x801562B8..0x80156B8B`, with 12 direct entry
   calls and no interior JAL targets. It maps selected event codes (1/2/3/5,
   0xC..0x10, 0x80..0x83) to configured deltas/effects or accepts an explicit
