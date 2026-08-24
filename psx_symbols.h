@@ -32,6 +32,10 @@
 #define PSX_FN_DrawLocalizedFontString 0x8010F3CCu
 #define func_8010F3CC DrawLocalizedFontString  /* alias */
 
+/* known: 33-caller 276-byte bundle loader: publish the signed entry count from a0+0, prefix-sum its 32-bit size table at a0+4 into the global pointer workspace at 0x801CF098, acquire a destination base through 0x80116A54, relocate every prefix by that base, then decode/copy the trailing payload through 0x80115B1C */
+#define PSX_FN_LoadPackedResourceBundle 0x80111AF8u
+#define func_80111AF8 LoadPackedResourceBundle  /* alias */
+
 /* confirmed: Seven-instruction leaf: swap bytes 0 and 2 of the three-byte color at a0 while preserving byte 1; called by four packet/material conversion sites at 0x80110C4C/74/AC/D4, with four mirrored expansion-RAM copies */
 #define PSX_FN_SwapRgb24RedBlue 0x80112048u
 #define func_80112048 SwapRgb24RedBlue  /* alias */
@@ -91,6 +95,10 @@
 /* confirmed: Exact six-instruction transform leaf with 33 direct callers: store a1/a2/a3 as 32-bit translation components at a0+0x14/+0x18/+0x1C, set the signed-halfword state field at +0x40 to one in the return delay slot, and establish no scalar return */
 #define PSX_FN_SetTransformTranslation 0x80135574u
 #define func_80135574 SetTransformTranslation  /* alias */
+
+/* confirmed: Exact 0x200-byte 13-caller Euler builder adjacent to SetTransformTranslation: sign-extend three 4096-unit angles, compute a row-major Q12 Rx(a1)*Ry(-a2)*Rz(a3) matrix into the destination's first nine halfwords, set destination+0x40 to one, and leave translation untouched */
+#define PSX_FN_BuildTransformRxRyRzMatrix 0x8013558Cu
+#define func_8013558C BuildTransformRxRyRzMatrix  /* alias */
 
 /* confirmed: Exact 0x204-byte 27-caller Euler builder: sign-extend three 4096-unit angles, evaluate recovered Q12 sine/cosine, write a row-major Ry(-a1)*Rx(a2)*Rz(-a3) matrix to nine destination halfwords, and mark destination +0x40 active */
 #define PSX_FN_BuildTransformRotationMatrix 0x8013578Cu
@@ -188,9 +196,9 @@
 #define PSX_FN_WaitForVBlankCountWithWatchdog 0x8015FA7Cu
 #define func_8015FA7C WaitForVBlankCountWithWatchdog  /* alias */
 
-/* known: 14-caller 332-byte synchronous SIO command owner: truncate a0 to a command byte, pass a1/a2 as transfer buffers to 0x80168080, perform command/status-dependent reset and preflight exchanges, retry the requested command up to four times while suppressing/restoring the callback word at 0x8017B124, and classify exhausted-transfer recovery through 0x80167B38 */
-#define PSX_FN_ExchangeSioCommandWithRetry 0x8016118Cu
-#define func_8016118C ExchangeSioCommandWithRetry  /* alias */
+/* known: 14-caller 332-byte synchronous CD-ROM command owner: truncate a0 to a command byte, pass parameter/result buffers to IssueCdCommand, perform command/status-dependent reset and preflight commands, retry up to four times while suppressing/restoring the CD sync callback at 0x8017B124, and classify exhausted recovery through 0x80167B38 */
+#define PSX_FN_CdControlWithRetry 0x8016118Cu
+#define func_8016118C CdControlWithRetry  /* alias */
 
 /* known: Three-argument SIO1 control/query dispatcher spanning 0x8016192C..0x80161DFF: a0 selects six operation families, a1 selects register or lifecycle actions, and a2 supplies values/side selection; reads and writes the SIO1 STAT/MODE/CTRL/BAUD block at 0x1F801050, maintains its RAM shadow, and brackets reset paths with critical-section syscalls */
 #define PSX_FN_AccessSio1ControlState 0x8016192Cu
@@ -203,6 +211,10 @@
 /* known: Non-returning CRT continuation entered by the expansion-RAM loader: clear BSS, derive stack and heap bounds from linker words, set gp/fp, call BIOS A0/39 InitHeap, then call RunRaceSession with a break trap as its nominal return site */
 #define PSX_FN_PsxCrtStartup 0x8016247Cu
 #define func_8016247C PsxCrtStartup  /* alias */
+
+/* confirmed: Exact 0x40C-byte 13-caller CD-ROM command core: validate and write command-specific parameters to 0x1F801802, issue the command through 0x1F801801, optionally return asynchronously, or service CD IRQ phases until completion with dual VBlank/spin timeouts and copy the eight-byte sync response */
+#define PSX_FN_IssueCdCommand 0x80168080u
+#define func_80168080 IssueCdCommand  /* alias */
 
 /* known: Address-taken final SIO/pad-driver stage: consume a multitap response through the private descriptor in a0, poll/configure as many as four 0xF0-byte slot records, append the final received byte, and return 0, a propagated transfer error, or -3 on timeout; the callable code ends at 0x8016CC00 */
 #define PSX_FN_PollMultitapControllerSlots 0x8016C86Cu
