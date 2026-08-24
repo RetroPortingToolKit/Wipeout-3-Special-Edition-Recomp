@@ -496,6 +496,10 @@
 #define PSX_FN_CdGetToc2 0x801602E8u
 #define func_801602E8 CdGetToc2  /* alias */
 
+/* confirmed: Exact 0x14-byte two-caller callback exchange leaf: return the previous CD interrupt callback from 0x801792C8 and replace it with incoming a0 in the jr delay slot; null clears dispatch, and CdInit directly installs internal callback 0x80160E44 in the same word */
+#define PSX_FN_ExchangeCdInterruptCallback 0x80160D14u
+#define func_80160D14 ExchangeCdInterruptCallback  /* alias */
+
 /* confirmed: Exact 0x90-byte seven-caller canonical LibCD initializer: retry the low-level CD interrupt/hardware initializer at 0x80160DB8 up to five times, return 0 after printing the retained failure diagnostic, or install three internal CD callbacks and clear their companion state before returning 1 */
 #define PSX_FN_CdInit 0x80160D28u
 #define func_80160D28 CdInit  /* alias */

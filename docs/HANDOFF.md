@@ -1295,6 +1295,10 @@ unbounded build as a performance test; use focused targets and the bounded
   clears the callback slots exchanged by `0x80160D14` and `CdReadyCallback`,
   restores the saved `CdSyncCallback` from `0x801D1B90`, sets the shared
   initialization flag at `0x8017627C`, and returns 1.
+- `ExchangeCdInterruptCallback` is the exact five-instruction leaf at
+  `0x80160D14..0x80160D27`. It returns the prior callback word at `0x801792C8`
+  and replaces it with incoming `a0` in the return delay slot. Its two callers
+  pass null; `CdInit` directly installs internal callback `0x80160E44` there.
 - `CopyAndNormalizeControllerPacket` owns `0x80120988..0x80120A87` with seven
   entry callers. It copies/clears eight raw controller bytes, saves their
   original header at destination `+8`, accepts headers `2300/4100/7300`, and
