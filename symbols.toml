@@ -1002,6 +1002,20 @@ status = "confirmed"
 note = "Exact 0x4C-byte ten-unique-caller six-scalar leaf: return low32(a0*stack10 + a1*stack14 + a2*stack18), with wrapping products/additions; a3 is not part of the formula, though a0..a3 are spilled to the caller argument-save area; no global or hardware effects"
 
 [[func]]
+pc = 0x8014B544
+name = "ComputeCrossProductShift9"
+emit = false
+status = "confirmed"
+note = "Exact unsplit 0x94-byte one-unique-caller vector leaf: write the three-component cross product of a1/a2/a3 and stack14/18/1C to a0 after wrapping 32-bit product subtraction and arithmetic >>9; stack10 unused, no global/hardware effects, incidental v0 equals stored Z"
+
+[[func]]
+pc = 0x8014B5D8
+name = "SubtractVector3Int32"
+emit = false
+status = "confirmed"
+note = "Exact unsplit 0x3C-byte nine-unique-caller scalarized vector leaf: write stack10/14/18 minus a0/a1/a2 to destination pointer stack20 with wrapping SUBU; a3 and stack1C unused, no calls/global/hardware effects, incidental v0 equals stored Z"
+
+[[func]]
 pc = 0x8014F814
 name = "AccumulateOneIndexedVertexWeight"
 emit = false
@@ -1071,6 +1085,27 @@ status = "confirmed"
 note = "Exact 0xA0-byte seven-caller leaf paired with ArmTimer2Timeout: read Timer 2 count, correct one 16-bit wrap with target 0x1F801128 or 0x10000, scale elapsed by >>3 when mode bit 0x200 is clear, and return unsigned elapsed >= threshold saved at 0x801EEBC4; read-only apart from MMIO"
 
 [[func]]
+pc = 0x8015F614
+name = "Strcpy"
+emit = false
+status = "confirmed"
+note = "Exact 0x10-byte 20-caller BIOS A0/19 strcpy trampoline: preserve destination/source arguments, load service selector t1=0x19, jump to BIOS vector 0xA0 without changing ra, and return the BIOS destination pointer unchanged; copy/NUL/fault behavior belongs to BIOS"
+
+[[func]]
+pc = 0x801602B4
+name = "Toupper"
+emit = false
+status = "confirmed"
+note = "Exact 0x10-byte one-caller BIOS A0/25 toupper trampoline: preserve the integer character argument, load service selector t1=0x25, jump to BIOS vector 0xA0 without changing ra, and return the BIOS converted integer unchanged; sole caller passes a zero-extended byte and stores the low result byte"
+
+[[func]]
+pc = 0x801602C4
+name = "CdGetToc"
+emit = false
+status = "confirmed"
+note = "Exact 0x24-byte one-caller LibCD wrapper: move the caller's CdlLOC output pointer to a1, pass constant session selector 1 in a0 to the 0x801602E8 TOC worker, and propagate its track-count/zero result unchanged; wrapper-local effects are only its 24-byte frame"
+
+[[func]]
 pc = 0x8014FA4C
 name = "SpawnTrackSectionSurfaceEffects"
 emit = false
@@ -1111,3 +1146,10 @@ name = "SetVector"
 emit = false
 status = "confirmed"
 note = "Exact 0x1C-byte 16-caller PsyQ-compatible VECTOR setter: copy signed 32-bit x/y/z from a1/a2/a3 to destination offsets 0/4/8, leave the +0xC pad untouched, and return no semantic value"
+
+[[func]]
+pc = 0x8014B6FC
+name = "UpdateLoadingMessageCallback"
+emit = false
+status = "confirmed"
+note = "Exact 0x134-byte no-argument callback registered at 0x8014BA84: guard against reentry, render the shared loading message at phase 0 and add a blinking underscore at phase 24, advance a modulo-48 signed-halfword phase, service the shared frame/display routine, and clear the guard"
