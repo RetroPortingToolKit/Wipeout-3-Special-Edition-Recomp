@@ -1378,6 +1378,13 @@ status = "confirmed"
 note = "Exact 0x50-byte eight-caller CD-state initializer: issue synchronous command 1 with null buffers, clear the callback word at 0x801792C8 and the LibCD ready callback, restore the saved LibCD sync callback from 0x801D1B90, set initialization flag 0x8017627C to 1, and return 1"
 
 [[func]]
+pc = 0x80160D14
+name = "ExchangeCdInterruptCallback"
+emit = false
+status = "confirmed"
+note = "Exact 0x14-byte two-caller callback exchange leaf: return the previous CD interrupt callback from 0x801792C8 and replace it with incoming a0 in the jr delay slot; null clears dispatch, and CdInit directly installs internal callback 0x80160E44 in the same word"
+
+[[func]]
 pc = 0x80120988
 name = "CopyAndNormalizeControllerPacket"
 emit = false
