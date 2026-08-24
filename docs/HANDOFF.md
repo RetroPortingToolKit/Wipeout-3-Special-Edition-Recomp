@@ -1,5 +1,173 @@
 # Handoff
 
+## True pal8 media/build lane (2026-08-24)
+
+- A legal original Redump multi-track source was recovered from the local
+  archive `D:\Wipeout 3 SE files\WipEout 3 - Special Edition (Europe) (En,Fr,De,Es,It).7z`.
+  Its original Track 01 is 94,660,944 bytes with BLAKE3
+  `8f7d08844df14b1afe8150fb0e434bf9c4f088834da65c8623025722d56586a5`, which
+  is the exact source accepted by Hueponik's `pal8_track01.xdelta3`.
+- The patch was applied with the pinned Xdelta 3.2.0 binary. The resulting
+  pal8 Track 01 is 94,660,944 bytes, MD5
+  `b7bdd4d86ca3b6013341aaca977db715`, SHA-1
+  `a93fd7e0121d469fde62547f464e0cb7adf72d5d`, and BLAKE3
+  `55f8514a84d67f738919b42ce6f88e9f1016baa5fe728b9ea11acebf7902a635`.
+  It is staged separately at `prepared_disc-pal8-20260824` with all 14 tracks;
+  the existing plain-PAL `prepared_disc` was not overwritten.
+- `build-remaster-pal8-400-20260824.game.toml` is an isolated 8 MiB/PALx2/400%
+  profile with rewind off and PGXP/HD off. `prepare_disc.py` accepted the new
+  hashes and preserved the 14-track cue/CDDA set; the boot EXE remains
+  `PC=0x80162474`.
+- The recompiler generated a separate pal8 tree under
+  `build-remaster-pal8-400-20260824/generated` (92 full C shards plus dispatch,
+  using the current `b24a140a` compiler). Root CMake now accepts
+  `PSX_GENERATED_DIR` so this tree can be built without replacing the known-good
+  generated tree. The pal8 runtime build used a tracked, conservative
+  single/two-worker schedule after prior untracked parallel attempts exhausted
+  the Windows pagefile; it produced a directly launched executable without
+  compiler errors.
+- This lane is an experiment, not yet the replacement baseline. The accepted
+  reference remains the current plain-PAL max-mod build with fresh slot 1/2
+  states and verified ~99.5-Hz replay cadence.
+- The pal8 PGXP executable linked successfully at 83,705,875 bytes. A bounded
+  no-launcher retail-BIOS boot was completed under `PID 38072`; that process
+  was terminated before returning to the plain-PAL reference. Its startup
+  audit resolves the pal8 cue and config, reports
+  `tag=cg11_b24a140a_gc3d97ace3_f2`, and settles at 99.43--99.56 guest Hz,
+  44.07--44.13 kHz SPU, and zero audio underruns/overflows. This is a boot
+  proof only: the pal8 lane has no compatible player save yet and must not be
+  judged as a race/replay result until a fresh state is made under this exact
+  executable. The process uses isolated writable state in
+  `saves-pal8-20260824`; the plain-PAL reference states remain untouched.
+
+## Fresh max-mod race/replay verification (2026-08-24)
+
+- The owner supplied fresh, compatible states made with the max Hueponik mod
+  set: `saves/scph1001/state_80162474_slot01.pst` (race start, 2,013,275
+  bytes) and `state_80162474_slot02.pst` (post-race replay, 2,020,829 bytes),
+  both written at 10:18 and carrying the current B24A codegen/ABI. No new
+  saves are required for the current investigation.
+- The intended candidate is the 8 MiB/PALx2/400% profile
+  `build-remaster-pgxp-off-20260824`, with rewind explicitly disabled. Slot 2
+  loads at `PC=0x801722B0`; a 30-second sample stayed at 99.44--99.60 guest
+  Hz, SPU 44.08--44.12 kHz, zero audio underruns/overflows, and stable
+  ~175--182 ms audio fill. This confirms the user's report that the full race
+  and replay now run extremely well; the guest counter is backed by the
+  cadence/device telemetry here, not just presentation FPS.
+- Exact current-byte overlay fragments were published only through the normal
+  compiler transaction (`--force-interior` for observed dispatch
+  continuations), with preflight checks and matching B24A codegen: high-RAM
+  `A7BEE8BA`, `DDD13CB1`, `BBD9DBAE`, `EC6C0106`, `B0D4C0B1`, `5C13D51C` and
+  low-RAM `759DDE91`, `074F91FF`, `31F385C6`, `6B944821`, `72142D48`.
+  Each build reported `PSX_SHARD_RESULT failed=0`; no stale shard was copied
+  or aliased.
+- Native coverage now displaces the prior replay hotspots step-by-step while
+  cadence remains full speed. A residual hot interpreter continuation at
+  `0x001488E4` is still visible (the capture deliberately lacks a provenance
+  root for that interior); it is not currently a performance failure. Do not
+  claim that interpreted execution is literally zero: device-touching code and
+  unproven observed-only continuations must remain fail-closed until a safe
+  coherent capture or decompilation supplies their contracts.
+- A bounded capture was taken from the supplied slot 2 replay state at the
+  exact high-RAM hot continuation `0x80780E1C`. The normal compiler pipeline
+  (`compile_overlays.py --force-interior`, current B24A140A toolchain) produced
+  both `00780000_8D944E3C` and its isolated `00780000_696C8F4E` fragment with
+  `PSX_SHARD_RESULT ok=2 failed=0`; no stale shard was copied. After a clean
+  restart the loader audit rose to `indexed=59`, the former high-RAM hot path
+  became native, and the remaining interpreter hotspot moved to low-RAM
+  `0x001488FC` while cadence stayed 99.48--99.55 Hz, SPU ~44.10 kHz, and audio
+  underruns/overflows remained zero. This is the correct way to reduce
+  interpreted work: capture the actual path, compile it, verify loader
+  publication, then measure. It does not justify blanket native admission.
+- The post-publication slot-2 presentation capture shows the guest `position`,
+  `time`, and `lap` HUD text over the replay scene; the gray/missing-UI defect
+  is not reproduced in this current plain-PAL run. Keep the older PAL8 gray/FMV
+  screenshots as an unresolved separate lane, not as evidence against this
+  active candidate.
+- A second exact continuation publication moved the active interpreter tail
+  from `0x80780E1C` to `0x80780E30`, and the low-RAM publication moved it from
+  `0x801488FC` to `0x80148910`; the next sample now reports `0x80780E44`.
+  Guest cadence remains 99.48--99.60 Hz with zero audio underruns. This
+  adjacent-block progression is expected from isolated CPS continuation
+  shards; chasing every 20-byte block is not a safe definition of completion.
+  The remaining work is a coherent decompilation/dispatch contract for the
+  routine (the owner's separate decompilation effort is directly relevant),
+  not a blanket “compile every observed PC” rule.
+- The exact low-RAM replay tail `0x80148C88` was then preflighted and published
+  through the normal B24A140A compiler transaction (2-entry region plus one
+  vetted interior island; `PSX_SHARD_RESULT ok=4 failed=0 skipped=3`). After a
+  clean restart from the owner’s slot 2, the low tail became native and the
+  interpreter moved to the next high-RAM CPS continuation `0x80780E44`.
+  Three five-second windows stayed at 99.49, 99.49, and 99.49 Hz with SPU
+  ~44.10 kHz and zero audio errors; the negative miss was cached (`miss_cached=1`,
+  `watched_gen=2`). This is a measured improvement, not blanket observed-PC
+  admission. Current exact process is PID 37596; logs are
+  `build-remaster-pgxp-off-20260824/active-slot2-lowtail.out.log` and `.err.log`.
+- The runtime source's local dirty-flow and CPS range logic is unchanged in
+  this pass; the missing-tail behavior is being measured from exact user-state
+  captures rather than hidden with a broad observed-PC admission rule. The
+  current remaining architectural candidate is to preserve dispatch provenance
+  for local dirty-flow tail transfers so a coherent CPS owner can be loaded,
+  not to promote every observed PC wholesale.
+- Old-root compiler jobs under `C:\Users\Shokunin\Documents\ChatGPT\wipeout3se`
+  were explicitly terminated before each active-cache compile. Only the exact
+  cleanroom candidate process is left running for verification.
+
+## Replay miss-cache and launch provenance audit (2026-08-24)
+
+- The replay slowdown has one verified runtime cause: `memory.c` was notifying
+  `overlay_loader` for every manifested-code write, while the lazy negative
+  dispatch cache keyed every miss to one global watched-code generation. In the
+  replay trace the hot interpreter PC `0x00780984` therefore had
+  `miss_cached=0`, `try_calls` grew by roughly 27–31k per five-second sample,
+  and guest cadence fell to 43–57 Hz even though `code_gen` stayed at 30 and
+  `work guest` stayed near 993 ms/s. This is not a display-counter artifact or
+  a proven device-deadline/thread-scheduler defect.
+- The cache now records the exact manifest dependency pages and their existing
+  page generations; an unrelated overlay write no longer expires a hot miss,
+  while a write to any page of a multi-page candidate still does. Entries with
+  more than the compact dependency budget conservatively use the aggregate
+  watched epoch, so cross-page invalidation cannot leave a stale negative. Loader
+  publication, cache rescans, and savestate restore still invalidate through
+  their existing global/whole-RAM paths. The runtime guard test covers the
+  dependency capture and overflow fallback. Current rebuilt replay logs show
+  `miss_cached=1`, stable `watched_gen`, and no continuing manifest-rescan storm
+  for the active hot miss.
+- A diagnostics-only fix now increments the post-load device-advance
+  `adv(n/sum/max)` counters at the actual device chunk boundary. It does not
+  change cycle or device timing. Focused cycle, boot-state, and interpreter
+  guard tests pass.
+- PGXP launch provenance is guarded: the launcher compares canonical and
+  sibling `game.toml` hashes and refuses stale mismatches unless an explicit
+  profile A/B opts in. CMake stages configs for both normal and PGXP targets and
+  accepts `PSX_GAME_CONFIG_SOURCE` so an intentional 400% profile is not
+  overwritten by the canonical 900% profile.
+- The current max PGXP executable was rebuilt from the patched runtime and
+  passes the focused PGXP/HD/presentation/save-state tests. Its slot-3 replay
+  state loads successfully at 900%; with the active cache it no longer shows
+  the old `0x00780984` miss storm, but guest cadence remains variable (~43–75
+  Hz in this stress state). That remaining variability is the next CPU/replay
+  investigation target; do not call 400% playable from the old slot-3 state,
+  because its boot-state preflight correctly rejects that 900%-timed save.
+- A fresh save made under the intended 400% profile is required for a fair
+  400% comparison. Do not copy stale overlay shards by hand; use a fresh
+  capture and the normal compiler pipeline, then verify the target appears in
+  the loader index before measuring performance.
+- The fresh player race-start state is the UI slot 1 file
+  `saves/scph1001/state_80162474_slot00.pst` (the frontend labels backend slot
+  0 as slot 1). A controlled headless replay-capture run from that state first
+  measured only 2–5 guest Hz while 67 matching overlay DLLs were mapped, then
+  reached 95–100 guest Hz once the cache was warm. A clean relaunch with that
+  warmed cache starts near 100 Hz. This proves the apparent 3 FPS stall is a
+  cold lazy-overlay loading cliff, not a host-CPU saturation invariant; the
+  runtime still needs a bounded prewarm/wait policy so the player does not have
+  to drive through the cliff.
+- The same player screenshots show a separate unresolved presentation defect:
+  menu and in-race 2D/UI primitives are absent or partially drawn, with gray
+  uninitialized-looking panels and missing HUD elements. This remains a first-
+  class acceptance blocker even when guest cadence is warm; do not treat the
+  warm 100-Hz telemetry as a complete product pass.
+
 ## Standard-runtime restart baseline (2026-08-23)
 
 - The restart uses `build-psx-standard` with the audited upstream runtime,
@@ -2246,3 +2414,329 @@ the target race/replay with this build; the existing state remains loadable.
 - The exact candidate process was closed after the run and verified at zero
   matching processes. Future tests must use the guarded launcher and preserve
   this single-instance invariant.
+
+## Savestate UI restore and clean 400% handoff (2026-08-24)
+
+- The race-start state supplied by the owner is preserved at
+  `saves/scph1001/state_80162474_slot00.pst` (backend slot 1) and copied into
+  the isolated `analysis-saves-race` card directory. No new state is required
+  for the next playable check.
+- `gpu_snapshot_read()` now restores renderer texture-window, draw-offset, and
+  mask mirrors, then clears host-only widescreen/UI tags, prepass ranks,
+  backdrop phase, framebuffer observations, and split-screen latches. These are
+  rebuilt from the restored frame instead of leaking the abandoned frame into
+  menu/HUD primitives. The candidate PGXP runtime relinked successfully.
+- A focused verification pass is green: runtime cycle boundaries, cycle batch,
+  boot-state transaction (3/3), PGXP/render-policy, PGXP, HD texture, bezel,
+  and boot-state tests (5/5), plus interpreter/dirty-text/static-index guards.
+- A new fast-path guard avoids PGXP provenance lookups when all corrections are
+  disabled. This preserves the native PS1 path for the explicit PGXP-off A/B;
+  the change is built but the remaining low-RAM replay path still needs a
+  native shard, so it is not presented as the final performance fix.
+- The sibling `build-remaster-pgxp-hdstate-20260823/game.toml` is a deliberate
+  400% profile but uses relative media/output paths. Launching it by default
+  produced ~2 Hz on the race state; explicitly selecting
+  `analysis-nohd/game.toml` (absolute disc/seed/output paths, HD pack off)
+  reaches 56–68 guest Hz with PGXP on and rewind off. The known-profile process
+  is currently the sole running candidate (PID 15136); do not start another
+  instance. Its logs are `user-ready-knownprofile.out.log` and `.err.log`.
+- A stale overlay compiler from the old `wipeout3se` worktree was found
+  consuming CPU and stopped; no unrelated applications were terminated. Any
+  future run must check for that exact old-worktree compiler before judging
+  cadence.
+
+Next concrete step: the owner should test the already-running known-profile
+  window and, if the restored race is visually correct, drive/save one race.
+  If UI is still absent, capture one screenshot from this process before any
+  further rebuild. For performance, trace why the explicit profile's
+  `0x00174A08` low-RAM dispatch remains interpreted; do not publish the failed
+  mixed-code `force-interior` fragment or alias stale cache shards.
+
+## Rebuilt 400% race candidate with rewind disabled (2026-08-24)
+
+- The current candidate is the freshly rebuilt
+  `build-remaster-pgxp-hdstate-20260823/Wipeout_3_Special_Edition__Recompiled_pgxp.exe`.
+  The game C was regenerated with the current recompiler and the build was
+  reconfigured so its shard list matches the generated output (192 shards).
+- The recompiler now shares a reachable-CFG closure between normal and alias
+  emission and emits a regression fixture for the A08/A44 mixed code/data
+  shape. Its focused `recompiler_patch_test` passed, but the generated
+  `func_80174A08` is still an unknown-dispatch stub; this remains an open
+  low-RAM coverage issue, not a claimed fix.
+- The staged runtime profile is intentionally 400% CPU, PALx2/100 Hz, PGXP on,
+  and HD texture pack off. Controlled A/B already proved that the current HD
+  tracker path collapses the same restored state to roughly 2 Hz, while HD off
+  stays around 56–68 guest Hz.
+- Automatic rewind is explicitly disabled with `PSX_REWIND=0`. Previous replay
+  benchmarks were contaminated by the default full raw snapshot ring (every
+  4 VBlanks during FMV); do not compare those numbers to this run.
+- Exactly one candidate is running (PID 14688) from the cleanroom path. It
+  loaded the owner's slot-1 race state successfully (`pc=0x801700C4`) and has
+  remained responsive at roughly 58–65 guest Hz in the first intervals. Logs:
+  `build-remaster-pgxp-hdstate-20260823/user-ready-regenerated.out.log` and
+  `.err.log`.
+- The owner can now play the loaded race and save a fresh race-start state and
+  a post-race/replay state if reachable. No new state is required merely to
+  start this check; do not launch a second instance while it is running.
+
+## Rewind default corrected (2026-08-24)
+
+- `psx_rewind.c` now treats rewind as opt-in: a plain launch has no raw snapshot
+  ring, while `PSX_REWIND=1` explicitly enables the interactive feature. The
+  previous default captured the complete machine every few VBlanks (FMV mode
+  used four), contaminating FMV/menu/race/replay performance even when rewind
+  was never opened. `PSX_REWIND=0` remains an explicit disable.
+- A separate PGXP-off 400%/PALx2/HD-off build is being compiled for a visual and
+  UI A/B; the currently running PID 14688 remains untouched so the owner can
+  play the existing rewind-off candidate.
+
+Next concrete step: use the fresh states from this rewind-off/HD-off build to
+separate ordinary race performance from replay performance, then address the
+remaining low-RAM native-dispatch and UI/HUD coverage issues from those exact
+states. Keep process cleanup scoped to this executable path.
+
+## PGXP-off controlled A/B is running (2026-08-24)
+
+- A separate `build-remaster-pgxp-off-20260824` executable was rebuilt from the
+  current source with 400% CPU, PALx2, HD textures off, and all PGXP geometry/
+  perspective/culling corrections off. Its staged `game.toml` hash matches the
+  deliberate A/B input exactly; SCPH-1001 was staged explicitly.
+- The previous candidate was stopped by exact executable path before launch.
+  There is currently one WipEout process only: the new PGXP-off executable.
+  Launch environment includes `PSX_REWIND=0`, `PSX_DISABLE_HD_TEXTURE=1`,
+  `PSX_RUNTIME_PERF_DIAG=1`, and the GL presentation probe.
+- The owner's old slot-1 state in `saves/scph1001` was found, but this fresh
+  executable rejected it during section preflight after codegen/ABI migration.
+  This is an input compatibility failure, not evidence about the A/B runtime.
+  The process is therefore booted without a usable restored race state; the
+  owner should make a fresh race-start state in this executable before judging
+  gameplay or replay.
+- Startup diagnostics are reaching the game path at roughly 80–95 guest Hz
+  while the menu/boot loop runs, with rewind disabled and HD uploads off. The
+  exact logs are `build-remaster-pgxp-off-20260824/user-slot1-off.out.log` and
+  `.err.log`.
+
+Next concrete step: the owner should play a race in this sole running window
+and save a fresh race-start state (slot 1) plus a post-race/replay state if
+reachable. Then use those exact states for the CPU/overlay/UI investigation;
+do not reuse the rejected pre-A/B state or start a second process.
+
+## Current clean run and remaining blockers (2026-08-24)
+
+- The PGXP-off target was relinked after removing a runtime block that
+  unconditionally forced WipEout PGXP controls on after `game.toml` was read.
+  The explicit all-false PGXP A/B is now actually honored; this is a bounded
+  correctness fix, not a performance claim.
+- The old process was stopped by exact executable path and the rebuilt
+  `build-remaster-pgxp-off-20260824/Wipeout_3_Special_Edition__Recompiled_pgxp.exe`
+  is the sole running WipEout process (PID 15392). It was launched with
+  400%/PALx2, HD textures disabled, rewind disabled, and no stale save-state
+  slot selected. The owner must create a new slot-1 race state in this build;
+  the prior 900% state is incompatible and was deliberately not loaded.
+- Missing race/menu HUD elements and the reported 3 FPS in-race view remain
+  open defects. They are now part of the same acceptance gate as gameplay
+  cadence: capture fresh race and replay states, then inspect UI primitive
+  coverage and CPU/overlay invalidation on those exact states.
+- The current prepared disc is the plain PAL patch (`pal_track01`), not the
+  requested `pal8` enhanced 8 MB patch. Applying the archived `pal8` delta to
+  this already-patched image fails its source hash check. A legal original
+  unpatched Track01 is still needed before claiming a true PAL8 baseline;
+  never overwrite the current media with a mismatched delta.
+
+## Guarded playable handoff without stale state (2026-08-24)
+
+- The previous candidate process was no longer present when checked; no second
+  WipEout instance is running. The deliberate PGXP-off 400% executable was
+  relaunched through `tools/run_candidate_single.ps1` as PID 35352.
+- This launch uses the staged `build-remaster-pgxp-off-20260824/game.toml`,
+  PALx2/400%, HD textures off, all PGXP corrections off, `PSX_REWIND=0`, and
+  no forced save slot. Logs are
+  `build-remaster-pgxp-off-20260824/user-clean-400.out.log` and `.err.log`.
+- The old slot-1 file (`state_80162474_slot01.pst`, ABI 22 / codegen
+  `0x42326476`) fails section preflight under the current ABI and is not a
+  valid measurement input. Slot 0 loads through migration but leaves a
+  different, old replay path; neither should be used as the new baseline.
+- Clean boot reaches the game path without the raw rewind ring: early cadence
+  is ~90--100 guest Hz with zero interpreter work in the BIOS/menu loop. The
+  owner should play this sole window and save fresh slot-1 race-start and,
+  if reachable, post-race/replay states from this exact executable.
+- The UI audit found no renderer/present failure: OpenGL is initialized,
+  GP0 packets execute, and the post-load probe records 237 swaps/63 intentional
+  skips over 300 VBlanks. The `GL upload/draw` telemetry is upload-only and is
+  not a scene-draw counter. Missing HUD/menu primitives therefore remain an
+  upstream CPU/dirty-code coverage issue to diagnose from fresh states.
+
+## Cache-aligned playable handoff (2026-08-24)
+
+- Rebuilt `psxrecomp/recompiler/build/psxrecomp-game.exe` from the current
+  source. Its `--codegen-hash` is `b24a140a`, matching
+  `psxrecomp/runtime/include/overlay_codegen_hash.h`.
+- Ran the historical overlay capture through the current compiler in a
+  throwaway preflight (`built OK: 2, failed: 0`), then published the same two
+  verified shards into the active candidate cache. No old `4e941aa0` or
+  quarantined shards were copied.
+- Relaunched the sole guarded candidate as PID 34528 with the active
+  `cg11_b24a140a_gc3d97ace3_f2` cache, PALx2/400%, PGXP/HD off, and
+  `PSX_REWIND=0`. Startup audit reports `indexed=2`, `status=ok`.
+- This is the only process to test now. The owner should play the race and
+  save a fresh slot-1 race-start state in this exact process; if the race can
+  be completed, save a second post-race/replay state as well. Old slot files
+  remain invalid because they contain a different 100 Hz patched code image.
+- Acceptance still includes the missing menu/race UI, stable cadence, no
+  flying geometry, and truthful telemetry. Do not call this a final baseline
+  until fresh-state logs show the actual race/replay hot PCs served by native
+  overlays or a proven cause is fixed.
+
+## CPU/scheduler audit conclusion (2026-08-24)
+
+- The HLE scheduler is outer-loop based: a guest yield saves the TCB and
+  returns once to the scheduler, which restores the target and dispatches. It
+  does not perform a scheduler operation per instruction. LLE save-state loads
+  are explicitly rejected because cross-fiber restore is unsafe. Keep HLE
+  enabled while measuring.
+- The old 3--20 FPS save-state runs are dominated by dirty interpreter work at
+  `0x80170E04`, not by HLE/LLE switching or the GPU. The generated native
+  function exists, but the old state has ten instruction-word differences from
+  the generated image (nine SRA and one SRL words) inside that function. Text
+  validation correctly rejects it, so the whole function falls back to the
+  interpreter. Never disable that guard or whitelist the address.
+- The older replay traces also show a separate global overlay negative-cache
+  invalidation storm; it remains a follow-up only after a fresh exact-code
+  state is running. Do not tune device deadlines or the frame pacer from the
+  mismatched-state traces.
+
+## Fresh-state capture protocol (2026-08-24)
+
+- The current PGXP-off shipping candidate has no debug TCP server and does not
+  auto-compile overlays. Its runtime capture store is
+  `build-remaster-pgxp-off-20260824/overlay_captures.json`; capture evidence is
+  written on clean shutdown.
+- UI slot 1 is backend `slot00.pst`; UI slot 2 is `slot01.pst`, under the
+  launch-selected `saves/scph1001` directory. A fresh state must be made by
+  PID 34528, not imported from the old 100 Hz build.
+- After fresh states exist, relaunch only through the exact-path guard with
+  `PSX_LOAD_SLOT=0` or `1`, `PSX_REWIND=0`, and a fresh capture path. Run the
+  capture state through race/replay, close normally so the manifest is flushed,
+  then run `compile_overlays.py --check` followed by the real compile using the
+  rebuilt `b24a140a` recompiler. Never publish stale history shards by hand.
+
+## Fresh owner states and replay coverage (2026-08-24 12:00)
+
+- The owner supplied fresh states in the plain PAL/8 MiB 400% lane. Slot 1
+  (`state_80162474_slot01.pst`, SHA256
+  `8472F6A89268EB4DEDC22249B8AE41C4AE1906656066252057D6C2E896B1BB2A`)
+  restores at `pc=0x8015C404`; slot 2 (SHA256
+  `E9C2A5EFE5B796C2B44B28FC49BFA710BE88FF1C7DA26C78DACE8A60073DD554`)
+  restores at `pc=0x801722B0`.
+- With the exact B24 executable/config, `PSX_REWIND=0`, HLE scheduler, and
+  HD textures off, both states sustain `99.45--99.60 Hz`, SPU
+  `44.0--44.1 kHz`, and zero audio underruns/overflows. A live slot-2 window
+  visibly contains the position/time/lap HUD; the old 3 FPS result is not
+  reproduced by these states.
+- Clean shutdown of slot 2 flushed an exact replay capture for
+  `0x80780000` with dispatch roots `0x80780688`, `0x80780998`, and
+  `0x80780E44`. The current recompiler (`b24a140a`) passed `--check` and
+  published `00780000_A5D657CE.dll/.ranges` (3 functions, 0 unsupported, 0
+  unknown). A later run captured `0x807809AC`, producing
+  `00780000_B9F810F3.dll/.ranges` (5 functions, same clean result).
+- The low replay path likewise produced a canonical 18-function
+  `00148000_59BBFF88.dll/.ranges` containing `0x80148920`, plus a bounded
+  exact-demand orphan `00148000_4E580E7B.dll/.ranges` for `0x80148CF8`.
+  These were generated through `compile_overlays.py`, never copied or hand
+  edited. The cache now audits as `indexed=71`, tag
+  `cg11_b24a140a_gc3d97ace3_f2`.
+- The hot interpreter PC moves between nearby continuation entries as the
+  restored replay progresses (`0x80780E44`, `0x807809AC`, `0x80148920`,
+  `0x80148CF8`, then other neighboring tails), while native work remains
+  roughly `520--535k` calls/5 s and interpreter work `19--25k` calls/5 s.
+  This is bounded path-coverage fallout, not a pacer, GPU, or host-CPU
+  failure. Do not admit all observed PCs: compile only exact captured roots or
+  validated `--force-interior` demands.
+- The sole active process, if left running for manual inspection, must be the
+  exact `build-remaster-pgxp-off-20260824` executable. Stop it by exact path
+  before any rebuild or cache replacement; never run a second WipEout instance.
+- True PAL8 provenance remains a separate unfinished lane. Plain-PAL states,
+  media, and shards cannot be reused as PAL8 evidence; fresh PAL8 states and a
+  PAL8-specific capture/cache are still required before claiming that target.
+
+## Rebuilt candidate and fresh-state verification (2026-08-24 12:15)
+
+- The Release PGXP target initially failed to relink because GCC 16.1.0 has a
+  deterministic internal compiler error in `psx_pgxp_fast_alu()` while compiling
+  `generated/SCES_028.45_full_123.c` with fast cycles + PGXP at `-O2/-O3`.
+  The bounded fix is source-specific `-O1` for that one generated TU in
+  `psxrecomp/runtime/runtime.cmake`; the rest of the generated game and runtime
+  remain at their normal Release optimization. The command now contains
+  `-O3 ... -O1 -O1`, and `psx-runtime-pgxp` relinked successfully.
+- The rebuilt executable is
+  `build-remaster-pgxp-off-20260824/Wipeout_3_Special_Edition__Recompiled_pgxp.exe`
+  (SHA256 `47A2D7E705D4BA14A26727E681491CC5C0F097025AB8A7549F6390A5B0AB4D21`).
+  Its sibling config is SHA256
+  `00D0092E904792F21E7D0F8C92E0205FBBF890794C70712046E5149D9576ED99` and is
+  the deliberate PALx2/400% PGXP-off/HD-off A/B profile.
+- The latest exact user-state capture for `0x80780A48` passed compiler
+  preflight and real publication as `00780000_C8C2A692.dll/.ranges` under the
+  active B24 cache (1 dispatch-root function, 0 unsupported/unknown).
+- Using the rebuilt executable, explicit SCPH-1001 BIOS, the actual `saves`
+  root, HLE scheduler, `PSX_REWIND=0`, and slots 1 and 2:
+  - slot 1 loaded `pc=0x8015C404` and held `99.45--99.64 Hz`, SPU
+    `44.0--44.1 kHz`, with zero audio underruns/overflows;
+  - slot 2 loaded `pc=0x801722B0` and held `99.45--99.69 Hz`, SPU
+    `44.0--44.1 kHz`, with zero audio underruns/overflows.
+  Both processes were closed cleanly and no exact candidate process remains.
+- This confirms the user’s “ran extremely well” result is reproducible from the
+  fresh race-start and post-race states on the rebuilt candidate. The moving
+  interpreter tail is still bounded path coverage; do not claim all execution
+  is native or true PAL8 until those separate lanes are closed.
+
+## True PAL8 capture/compile pass (2026-08-24 12:25)
+
+- The true PAL8 candidate is
+  `build-remaster-pal8-400-20260824/Wipeout_3_Special_Edition__Recompiled_pgxp.exe`
+  (SHA256 `AD244157AECCB117A9EEF557B511A96EAA0ED7E4F99CAD309C9198176264DD85`).
+  Its sibling config is the 8 MiB `pal8` image, PALx2, 400% CPU clock, and
+  PGXP/HD disabled for the performance A/B.
+- The PAL8 attract/menu capture (`overlay_captures.json`, seven regions) passed
+  `compile_overlays.py --check` and the real compile with the current B24
+  recompiler: `built OK: 7`, `failed: 0`, `unsupported: 0`, `unknown: 0`.
+  All seven DLL/range pairs are published under the exact active cache tag
+  `cg11_b24a140a_gc3d97ace3_f2`; no stale shards were copied.
+- Relaunching the PAL8 attract state with the sibling config, absolute BIOS and
+  memcard paths, `PSX_REWIND=0`, and HLE scheduling restored `pc=0x80101E64`.
+  The run reached 1,845 frames with 38 registered native functions, 240,120
+  native dispatches versus 44,531 interpreted dispatches, zero invalidations,
+  zero unsupported midblocks, and clean shutdown. This is a valid PAL8
+  performance result for the attract/menu state, not a race/replay result.
+- The PAL8 24-bit FMV stripe remains unpatched: paired presentation evidence
+  shows the defect before final OpenGL composition, and no safe source fix has
+  been established. A PAL8-specific race-start and replay state is still needed
+  because the owner’s plain-PAL states cannot validate PAL8 media/code paths.
+
+## Fresh exact-tail publication (2026-08-24 12:35)
+
+- The current plain fresh-state capture was re-run through
+  `compile_overlays.py` with the B24 recompiler, CPS flavor 2, and no force or
+  stale-shard aliasing. The transaction published 80 exact-demand shards and
+  skipped 3 cached/data-only entries with `PSX_SHARD_RESULT ok=80 failed=0`.
+- The candidate then audited `indexed=152` under the active
+  `cg11_b24a140a_gc3d97ace3_f2` namespace. Slot 1 restored at
+  `pc=0x8015C404`; slot 2 restored at `pc=0x801722B0`; both exited cleanly
+  with no competing WipEout/PSXRecomp/compiler process left behind.
+- The post-publication run report recorded 153 registered overlay functions,
+  1,850,184 native dispatches versus 140,438 interpreted dispatches, 45 loads,
+  zero invalidations/revalidations, and zero unsupported interpreter midblocks.
+  The remaining interpreter work is bounded path coverage, not a cache-hash or
+  invalidation storm. A claim of zero interpretation would still require
+  further exact captures; broad observed-PC admission is unsafe.
+
+## Diagnostic tail reduction (2026-08-24 12:45)
+
+- A slot-2 run with `PSX_RUNTIME_PERF_DIAG=1` held `guest=99.27--99.77 Hz`,
+  `spu=44000--44127 Hz`, and zero underruns/overflows. Native dispatch was
+  about `213k--229k/s`; interpreted dispatch was `13k--19k/s`, with loader
+  invalidations and revalidations both zero.
+- After publishing the newly flushed `0x80780000` capture as
+  `00780000_C46BF7EE.dll/.ranges`, a second run held `guest=99.34--99.77 Hz`
+  with native `223k--241k/s` and interpreted `6k--8k/s`. The hot interpreter
+  moved to another exact tail (`0x000F5BA4`), confirming bounded coverage churn
+  rather than a global timing defect. Do not broaden admission to observed PCs.
