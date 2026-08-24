@@ -1881,6 +1881,13 @@ status = "confirmed"
 note = "Logical 0x434-byte one-caller frontend model/resource loader across 20 false generated record-type case translations: register the current texture bundle, append a resource pointer to the caller array, attach linked nodes to a shared initialized context, build model state from the next archive entry, optionally mirror X geometry and convert variable packed primitive records, and return the caller-selected array entry"
 
 [[func]]
+pc = 0x8012DA10
+name = "PrepareFrontendImageWarpTables"
+emit = false
+status = "confirmed"
+note = "Exact 0x2A4-byte one-caller frontend image-table builder: convert a 64x8 RGB24 source to a transposed 0x38-prefixed GPU color-word table at 0x801DE670, conditionally round/publish its first color by mode, snapshot three layout halfwords, and build 26 trigonometric 80-byte warp rows at 0x801DDE50 using Q12 sine/cosine; a1/a3 ignored, no semantic return"
+
+[[func]]
 pc = 0x8011FF10
 name = "SpawnType2ParticleEffect"
 emit = false
