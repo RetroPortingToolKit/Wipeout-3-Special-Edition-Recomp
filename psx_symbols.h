@@ -264,9 +264,17 @@
 #define PSX_FN_ClipAndEmitSceneryPrimitive 0x80142634u
 #define func_80142634 ClipAndEmitSceneryPrimitive  /* alias */
 
+/* confirmed: Exact 0x18-byte 21-caller frameless integer absolute-value leaf: return a0 unchanged when signed nonnegative, otherwise return two's-complement 0-a0; INT32_MIN consequently remains 0x80000000, with no memory or hardware effects */
+#define PSX_FN_AbsoluteValue32 0x8014B3D4u
+#define func_8014B3D4 AbsoluteValue32  /* alias */
+
 /* confirmed: Exact 0x5C-byte three-component magnitude helper with 38 direct callers: compute the low-32-bit sum x*x+y*y+z*z, pass it to the GTE-normalized lookup-table square-root approximation at 0x8015C488, and return that result unchanged; generated 0x8014B638 is its internal delayed frame setup */
 #define PSX_FN_ApproximateVectorLength3i 0x8014B614u
 #define func_8014B614 ApproximateVectorLength3i  /* alias */
+
+/* confirmed: Exact 53-caller signed arithmetic leaf: return value / 2^(shift&31) with truncation toward zero by negating negative inputs around SRAV; generated R 8014B6A4 14 is only the unique prefix, while the positive path uses internal suffix 0x8014B6B8..BF and the full semantic extent ends at 0x8014B6C0 */
+#define PSX_FN_DivideSignedByPowerOfTwoTowardZero 0x8014B6A4u
+#define func_8014B6A4 DivideSignedByPowerOfTwoTowardZero  /* alias */
 
 /* known: 23-site 316-byte resource accessor: select the 12-byte current entry through index 0x801E9808 and table 0x801E97FC, return null for index -1, otherwise return an archive pointer directly or allocate and materialize the entry by decode/copy according to a0; allocation failures report through the common diagnostic */
 #define PSX_FN_AcquireCurrentArchiveEntry 0x8014B830u
@@ -356,6 +364,14 @@
 #define PSX_FN_SetSemiTrans 0x8015FD4Cu
 #define func_8015FD4C SetSemiTrans  /* alias */
 
+/* confirmed: Exact 0x94-byte 11-caller PsyQ-compatible DR_MODE packet builder: set two-word packet length, encode E1 draw-mode command from DFE/DTD and masked TPAGE, optionally encode E2 texture-window masks/offsets from RECT, otherwise emit a zero/NOP second word; no semantic return */
+#define PSX_FN_SetDrawMode 0x801601B4u
+#define func_801601B4 SetDrawMode  /* alias */
+
+/* confirmed: Exact 0x14-byte 22-caller PsyQ-compatible POLY_F4 initializer: preserve the packet OT link while setting tag length byte to 5 and GP0 command byte to 0x28; machine v0 incidentally retains 0x28 but callers treat the routine as void */
+#define PSX_FN_SetPolyF4 0x80160254u
+#define func_80160254 SetPolyF4  /* alias */
+
 /* confirmed: Exact 0x3C-byte 25-caller leaf implementing the canonical Psy-Q GetTPage(tp, abr, x, y) packing formula: ((tp&3)<<7)|((abr&3)<<5)|((y&0x100)>>4)|((x&0x3FF)>>6)|((y&0x200)<<2), with no memory or hardware side effects */
 #define PSX_FN_GetTPage 0x80160274u
 #define func_80160274 GetTPage  /* alias */
@@ -387,6 +403,10 @@
 /* confirmed: Exact 0x40C-byte 13-caller CD-ROM command core: validate and write command-specific parameters to 0x1F801802, issue the command through 0x1F801801, optionally return asynchronously, or service CD IRQ phases until completion with dual VBlank/spin timeouts and copy the eight-byte sync response */
 #define PSX_FN_IssueCdCommand 0x80168080u
 #define func_80168080 IssueCdCommand  /* alias */
+
+/* confirmed: Exact 0x5C-byte 14-caller SPU-library timing delay: ignore all arguments, keep counter and accumulator on an 8-byte stack frame, execute 60 iterations of accumulator *= 13 with 32-bit wraparound, and return without MMIO/global mutation or semantic value; callers place it around SPU control/status/data-port accesses */
+#define PSX_FN_DelaySpuRegisterAccess 0x8016B6F8u
+#define func_8016B6F8 DelaySpuRegisterAccess  /* alias */
 
 /* known: Address-taken final SIO/pad-driver stage: consume a multitap response through the private descriptor in a0, poll/configure as many as four 0xF0-byte slot records, append the final received byte, and return 0, a propagated transfer error, or -3 on timeout; the callable code ends at 0x8016CC00 */
 #define PSX_FN_PollMultitapControllerSlots 0x8016C86Cu

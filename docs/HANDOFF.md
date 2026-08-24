@@ -977,6 +977,9 @@ unbounded build as a performance test; use focused targets and the bounded
 - `Memcpy` owns the adjacent `0x8015CF38..0x8015CF47` BIOS A0/2A trampoline.
   All 34 executable calls target its entry, and it forwards destination,
   source, length, memory effects, and the destination return to BIOS unchanged.
+- `AbsoluteValue32` owns `0x8014B3D4..0x8014B3EB`. It is a 21-caller signed
+  integer absolute-value leaf with ordinary two's-complement wrap at
+  `INT32_MIN`; no call targets either internal branch/return block.
 - `EmitLocalizedFontGlyphPacket` owns `0x8010EAC4..0x8010F247`: it selects
   six-byte glyph metrics and font texture state for height modes 8/9/16/18 and
   extended banks, builds and OT-links one 40-byte `POLY_FT4`, increments the
@@ -1014,6 +1017,12 @@ unbounded build as a performance test; use focused targets and the bounded
   the retained `LoadImage` operation name, then calls the active GPU driver's
   vtable `+0x08` method as `(driver+0x20 context, rect, operation 8, pixels)`
   and returns its result unchanged. It has five callers and no interior alias.
+- `DivideSignedByPowerOfTwoTowardZero` is entered at `0x8014B6A4` and returns
+  signed `value / 2^(shift&31)` with truncation toward zero. Its generated
+  `R ... 14` prefix branches into `0x8014B6B8..BF`; that generated 8-byte F/R
+  is an internal positive return suffix with zero direct callers. The real
+  entry has 53 executable callers (plus two opcode-shaped data words) and
+  semantic extent through `0x8014B6BF`.
 - `AccumulateOneIndexedVertexWeight` is its single-step companion at
   `0x8014F814..0x8014F91F`: it performs the same flagged-record lookup and
   fixed 250/200/200 indexed accumulator update once, then decrements positive
@@ -1046,6 +1055,11 @@ unbounded build as a performance test; use focused targets and the bounded
   severity to 16 bits, returns unless severity is exactly 2, and then invokes
   BIOS B0 service `0x38` (`exit`) with status zero. All executable callers pass
   severity 2; no retained historical function spelling is proven.
+- `DelaySpuRegisterAccess` owns `0x8016B6F8..0x8016B753`, has 14 direct callers
+  and no interior targets. It is a no-argument 60-iteration multiply busy loop
+  with stack-only state; adjacent SPU-library callers use it around control,
+  transfer-port, and status accesses. It has no direct MMIO/global mutation or
+  semantic return, and no historical private-library spelling is claimed.
 - `SpawnTrackSectionSurfaceEffects` logically owns
   `0x8014FA4C..0x80150577` despite generated splits at FAE0/FDE0/FF4C/50548.
   Its sole real caller passes a track section and effect flags; it selects a
@@ -1066,3 +1080,13 @@ unbounded build as a performance test; use focused targets and the bounded
   and image data, and returns null for other modes. Unlike
   `LoadFrontendTexture`, it has no special sentinels, variant upload, or pixel
   mirroring.
+- `SetDrawMode` is the PsyQ-compatible frameless leaf at
+  `0x801601B4..0x80160247`, with 11 callers and no interior entry targets. It
+  builds a two-word `DR_MODE`: E1 draw-mode bits from DFE/DTD and masked TPAGE,
+  plus an optional E2 texture-window command packed from a RECT (or zero/NOP
+  when null). It writes packet state only and has no semantic return.
+- `SetPolyF4` is the exact PsyQ-compatible leaf at
+  `0x80160254..0x80160267`: it preserves the 24-bit OT link, writes packet
+  length 5 to tag byte `+3`, and writes GP0 code `0x28` to command byte `+7`.
+  It has 22 callers, all targeting the true entry, and no interior targets;
+  callers allocate/advance 24-byte packets and ignore incidental `v0=0x28`.
