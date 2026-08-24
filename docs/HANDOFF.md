@@ -1162,6 +1162,12 @@ unbounded build as a performance test; use focused targets and the bounded
   callers and no interior targets, preserves the string pointer and original
   `ra`, and propagates the BIOS byte count excluding NUL unchanged. Scanning,
   invalid-pointer behavior, and all reads belong to BIOS.
+- `ApplySceneObjectGroupProperty` owns `0x800FA364..0x800FA48F`, has eight
+  direct callers and no interior targets. It scans all 0xCC-byte records at
+  base `0x8018811C`/count `0x80187CE8`, matches key against signed `+8` or byte
+  `+1`, and selector 0/1/2/3 updates linked byte `+4`, randomized halfword
+  `+0xA2`, record byte `+2`, or record byte `+3`. Every match is updated; only
+  selector 1 advances RNG, once per match.
 - `SpawnTrackSectionSurfaceEffects` logically owns
   `0x8014FA4C..0x80150577` despite generated splits at FAE0/FDE0/FF4C/50548.
   Its sole real caller passes a track section and effect flags; it selects a
@@ -1235,6 +1241,11 @@ unbounded build as a performance test; use focused targets and the bounded
   sync, ready, and data callbacks, clears their companion state, and returns 1.
   Exhaustion prints the retained failure diagnostic and returns 0. Seven unique
   callers have no overlay duplicates or interior targets.
+- `EnqueueEffectInstance` is the straight-line leaf at
+  `0x80140438..0x801404FF`: it advances the byte-wrapped index of the pool
+  referenced by `0x801E1F14`, fills a 48-byte position/vector/parameter record,
+  marks it active, and returns 1. Eight unique callers produce nine generated
+  instances because `0x8015997C` appears in two overlay variants.
 - `SubmitRumbleDecayRequest` owns `0x80134CE8..0x80134D23` with 12 entry-only
   callers. It replaces rumble-state words `+0x0C/+0x10/+0x14` with Q8 motor
   amplitude, signed priority, and Q8 decay only when both the new amplitude
@@ -1260,3 +1271,8 @@ unbounded build as a performance test; use focused targets and the bounded
   archive index `-1`; otherwise it returns word `+4` (`output_size`) from the
   selected 12-byte record in the table at `0x801E97FC`. Its eight callers all
   target the true entry, and the accessor has no arguments or state changes.
+- `EmitDrawModePacketToOrderingTable` owns `0x801107EC..0x80110893` with eight
+  entry-only callers. It reserves a 12-byte `DR_MODE` from `gPrimCursor`, uses
+  `GetTPage(0, abr, 0, 0)`, builds it with DFE 1 and caller DTD, and prepends
+  it to the active ordering-table bucket at signed `depth >> 6`. It returns no
+  semantic value; its effects are the packet, cursor, and OT link updates.

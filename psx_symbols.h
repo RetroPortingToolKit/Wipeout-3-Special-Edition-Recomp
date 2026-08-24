@@ -36,6 +36,10 @@
 #define PSX_FN_HandleErrorSeverity 0x800F82ECu
 #define func_800F82EC HandleErrorSeverity  /* alias */
 
+/* confirmed: Exact 0x12C-byte eight-caller scene-object group mutator: scan all 0xCC-byte records at 0x8018811C/count 0x80187CE8, match full key a0 against signed halfword +8 or byte +1, then selector low8 0/1/2/3 writes linked-object byte +4, randomized halfword +0xA2, record byte +2, or record byte +3 respectively; no semantic return */
+#define PSX_FN_ApplySceneObjectGroupProperty 0x800FA364u
+#define func_800FA364 ApplySceneObjectGroupProperty  /* alias */
+
 /* confirmed: Exact frameless 0x148-byte seven-caller input decoder: truncate a1 to 16 bits, clear racer record a0's runtime action word at +0x0C, expand packed low bits 0..9 into sparse action bits 4,5,6,7,9,10,11,13,14,15, and return packed bits 10..15 as an unsigned six-bit auxiliary value */
 #define PSX_FN_DecodePackedRacerControls 0x80102E70u
 #define func_80102E70 DecodePackedRacerControls  /* alias */
@@ -83,6 +87,10 @@
 /* confirmed: Exact 0x170-byte 10-caller signed decimal renderer: optionally emit a minus glyph, decompose the magnitude into at most five low decimal digits, zero-pad to the caller's stack-supplied minimum width, emit digits through EmitFontGlyphPacket with a mode-2 style-bank remap, and return the final X pen */
 #define PSX_FN_DrawSignedDecimalInteger 0x80110560u
 #define func_80110560 DrawSignedDecimalInteger  /* alias */
+
+/* confirmed: Exact 0xA8-byte eight-caller GPU-state emitter: reserve a 12-byte DR_MODE at gPrimCursor, compute TPAGE from caller ABR with tp/x/y zero, build mode with DFE=1 and caller DTD, then prepend the packet to the active ordering-table bucket at signed depth>>6 */
+#define PSX_FN_EmitDrawModePacketToOrderingTable 0x801107ECu
+#define func_801107EC EmitDrawModePacketToOrderingTable  /* alias */
 
 /* confirmed: Exact 0x8B0-byte two-caller frontend-overlay TIM texture builder retaining the diagnostic name LoadTexture: accept 4-bit or 8-bit TIM data, allocate a 0x26-byte descriptor, auto-place supported CLUT/image rectangles, derive TPAGE/CLUT and UV bounds, upload CLUT and pixel rectangles, optionally transform source pixels or CLUT flags, and return the descriptor; unsupported modes return null */
 #define PSX_FN_LoadFrontendTexture 0x80110DF0u
@@ -267,6 +275,10 @@
 /* confirmed: Exact 0xDC-byte sound-effect wrapper: reject id -1, clamp signed volume above 230, truncate volume/pan/pitch to bytes, remap ids 29/37/28 to sink selectors 23/22/21, route id 7 through the dedicated resource at 0x801E17A8 with class 18, route other ids through the 0x801E178C pointer table with class 2, then call 0x80121534; 81 direct JAL callers */
 #define PSX_FN_PlaySoundEffectById 0x80137DFCu
 #define func_80137DFC PlaySoundEffectById  /* alias */
+
+/* confirmed: Exact 0xC8-byte leaf that advances the byte-wrapped index in the effect pool referenced by 0x801E1F14, selects the 48-byte slot at pool+4+index*48, copies position/vector/source parameters and type bytes into its fixed layout, initializes active/default fields, and returns 1; eight unique callers produce nine overlay instances */
+#define PSX_FN_EnqueueEffectInstance 0x80140438u
+#define func_80140438 EnqueueEffectInstance  /* alias */
 
 /* known: Single-caller argument-free scene-pass orchestrator: unless globally suppressed, optionally submit one of two view-mode-specific layers, then always submit three ordered race-scene layers before returning */
 #define PSX_FN_SubmitRaceSceneLayers 0x80140770u
