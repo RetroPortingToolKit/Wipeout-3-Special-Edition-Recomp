@@ -664,6 +664,14 @@
 #define PSX_FN_DeliverEvent 0x80168CF8u
 #define func_80168CF8 DeliverEvent  /* alias */
 
+/* confirmed: Exact 0x10-byte canonical BIOS A0:44 FlushCache trampoline: preserve caller ra, select service t1=0x44 in the A0-vector jump delay slot, and return directly through BIOS; six unique entry callers, final NOP unreachable padding */
+#define PSX_FN_FlushCache 0x80168D18u
+#define func_80168D18 FlushCache  /* alias */
+
+/* confirmed: Exact 0x10-byte canonical BIOS C0:03 SysDeqIntRP trampoline: preserve incoming priority/index and interrupt-record pointer in a0/a1 plus caller ra, select service t1=3 in the C0-vector jump delay slot, and propagate the BIOS result; six entry callers, final NOP unreachable padding */
+#define PSX_FN_SysDeqIntRP 0x80168D28u
+#define func_80168D28 SysDeqIntRP  /* alias */
+
 /* confirmed: Exact 0x90-byte seven-caller JOY/SIO0 handshake helper: acknowledge only SIO interrupt bit 7 through I_STAT, poll JOY_STAT ACK bit 7 until clear under the already-armed Timer 2 timeout, return 0 on expiry, or set JOY_CTRL ACK/IRQ-reset bit 0x10 and return 1 */
 #define PSX_FN_WaitForJoyAckAndClearIrq 0x80169D30u
 #define func_80169D30 WaitForJoyAckAndClearIrq  /* alias */

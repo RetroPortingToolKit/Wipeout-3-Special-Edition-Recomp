@@ -1317,6 +1317,10 @@ unbounded build as a performance test; use focused targets and the bounded
   `0x8015F594..0x8015F5A3`. They forward their argument registers and BIOS
   results unchanged. Each has six entry-only callers and one unreachable
   padding NOP.
+- `FlushCache` and `SysDeqIntRP` are canonical BIOS A0:44 and C0:03
+  trampolines at `0x80168D18..0x80168D27` and
+  `0x80168D28..0x80168D37`. Each has six entry-only callers, three executable
+  vector-jump words, and one unreachable padding NOP.
 - `CopyAndNormalizeControllerPacket` owns `0x80120988..0x80120A87` with seven
   entry callers. It copies/clears eight raw controller bytes, saves their
   original header at destination `+8`, accepts headers `2300/4100/7300`, and
