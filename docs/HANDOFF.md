@@ -2760,3 +2760,31 @@ do not reuse the rejected pre-A/B state or start a second process.
 - The script parses successfully, and the existing interpreter and static
   overlay guard tests pass after the change. A true PAL8 launch was admitted by
   the guard and then exact-path cleaned; no candidate process remained.
+
+## Max-mod replay and canonical PAL8 base (2026-08-24)
+
+- The user’s slot 1/slot 2 pair remains the reproducible plain-PAL 8 MiB
+  400% A/B pair. With `PSX_REWIND=0`, slot 1 restored `0x8015C404` and slot 2
+  restored `0x801722B0`; the replay sample held `99.44--100.03 Hz`, SPU
+  `43.8--44.3 kHz`, zero audio errors, zero loader invalidations, and roughly
+  `119--123k` native versus `3--4k` interpreted dispatches/s. This is the
+  clean proof that the earlier replay invalidation storm is not present in the
+  compiled candidate. It is not true-PAL8 media evidence.
+- The canonical non-PGXP true-PAL8 executable is
+  `build-remaster-pal8-off-20260824/Wipeout_3_Special_Edition__Recompiled.exe`.
+  Its staged config is true 8 MiB PAL8/PALx2/400% with rewind compiled out.
+  The PAL8 attract capture was compiled through the normal B24/f0 pipeline
+  (`PSX_SHARD_RESULT ok=3 failed=0 skipped=3`), and the cache audits as
+  `cg11_b24a140a_gc3d97ace3_f0`. A post-build boot-state check held
+  `99.49--100.27 Hz`, SPU about `44.1 kHz`, zero audio errors, and native
+  dispatch was active (`~57k/s`).
+- The narrow static-overlay invalidation fix is committed in the psxrecomp
+  submodule as `c74246ea`: only the exact high-RAM image
+  `[0x00780000, 0x00782004)` is armed for generation tracking at boot, with a
+  focused `perf_round3_guards_test`. Direct Python and ctest checks pass; the
+  rebuilt canonical PAL8 base links and launches. This is invalidation
+  bookkeeping only and does not widen overlay admission.
+- Open work: capture fresh true-PAL8 race-start/replay states (the current
+  user pair is plain-PAL), verify in-race/menu UI and FMV transition on PAL8,
+  and publish only exact PAL8 path overlays. Keep `PSX_REWIND=0` for all
+  performance comparisons. Do not run two exact candidates concurrently.
