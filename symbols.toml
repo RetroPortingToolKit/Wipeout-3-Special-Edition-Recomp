@@ -1420,6 +1420,13 @@ status = "confirmed"
 note = "Exact 0x90-byte seven-caller JOY/SIO0 handshake helper: acknowledge only SIO interrupt bit 7 through I_STAT, poll JOY_STAT ACK bit 7 until clear under the already-armed Timer 2 timeout, return 0 on expiry, or set JOY_CTRL ACK/IRQ-reset bit 0x10 and return 1"
 
 [[func]]
+pc = 0x800F2F48
+name = "TransformIndexedPairedVertex"
+emit = false
+status = "confirmed"
+note = "Exact 0xAC-byte seven-unique-call-site geometry helper: select endpoint a2 from packed 12-byte vertex-pair records at owner+0x18, reconstruct its three signed 16-bit components, transform/translate it through the GTE RotTrans-shaped leaf into a0, and propagate the GTE FLAG word"
+
+[[func]]
 pc = 0x801203F0
 name = "ApplyAnalogControllerCalibration"
 emit = false
