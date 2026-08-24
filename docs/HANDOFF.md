@@ -818,3 +818,18 @@ unbounded build as a performance test; use focused targets and the bounded
   `EmitFontGlyphPacket` at `0x80105CDC`. The latter selects one of four metric
   bands, emits/OT-links a 40-byte `POLY_FT4`, and advances the exact primitive
   cursor at `0x80198620` (correcting the prior catalog typo `0x801A8620`).
+- `DrawResourceString` at `0x80113BEC` is a 41-caller transparent adapter over
+  `gResourceStringTable[index]` into `DrawFontString`. The pointer table begins
+  at `0x8017BF1C`, is runtime-populated and has observed accesses through index
+  340; retained page-tail bytes are zero data despite generated `F/R ... E4`.
+- `ApproximateVectorLength3i` owns `0x8014B614..0x8014B66F`; generated
+  `0x8014B638` is an impossible-to-call internal continuation consuming live
+  multiply results. It sends low-32-bit `x*x+y*y+z*z` to the Q12 lookup-based
+  approximate square-root helper at `0x8015C488`.
+- `VSync` at `0x8015F904` is the 45-caller root-counter/GPU-field timing API:
+  negative mode queries software VBlank count, mode 1 queries Timer1 delta,
+  and other modes perform stable-sample waits with GPU phase and watchdog
+  handling through `0x8015FA7C`.
+- `SetTransformTranslation` at `0x80135574` is a 33-caller six-instruction
+  leaf that writes translation XYZ at `+0x14/+0x18/+0x1C` and marks transform
+  state halfword `+0x40` as one.

@@ -36,6 +36,10 @@
 #define PSX_FN_ByteSwapTwoU16Values 0x80112064u
 #define func_80112064 ByteSwapTwoU16Values  /* alias */
 
+/* confirmed: Exact 0x34-byte 41-caller adapter: replace resource-string index a0 with gResourceStringTable[a0], forward x/y/style unchanged to DrawFontString, and return its total horizontal advance unchanged */
+#define PSX_FN_DrawResourceString 0x80113BECu
+#define func_80113BEC DrawResourceString  /* alias */
+
 /* known: Sole-called non-returning race-session owner: initialize race/render/audio state, then run the closed per-frame simulation/view/render loop containing the only call to RenderRaceFrame */
 #define PSX_FN_RunRaceSession 0x80116128u
 #define func_80116128 RunRaceSession  /* alias */
@@ -75,6 +79,10 @@
 /* known: Argument-free 408-byte leaf: select six display/FOV scalars with 0x80173B00, derive viewport and perspective clip coefficients, and write 0x801E14EC/14F0/14F4/2480/2484/2488/25CC */
 #define PSX_FN_RebuildViewportClipCoefficients 0x8013535Cu
 #define func_8013535C RebuildViewportClipCoefficients  /* alias */
+
+/* confirmed: Exact six-instruction transform leaf with 33 direct callers: store a1/a2/a3 as 32-bit translation components at a0+0x14/+0x18/+0x1C, set the signed-halfword state field at +0x40 to one in the return delay slot, and establish no scalar return */
+#define PSX_FN_SetTransformTranslation 0x80135574u
+#define func_80135574 SetTransformTranslation  /* alias */
 
 /* known: Six-scalar signed-16 leaf used by RenderRaceFrame: performs the same seven viewport/perspective coefficient stores as 0x8013535C from caller-selected C/B/D/F/A/E inputs */
 #define PSX_FN_RebuildViewportClipCoefficientsFromScalars 0x80135B8Cu
@@ -120,6 +128,10 @@
 #define PSX_FN_ClipAndEmitSceneryPrimitive 0x80142634u
 #define func_80142634 ClipAndEmitSceneryPrimitive  /* alias */
 
+/* confirmed: Exact 0x5C-byte three-component magnitude helper with 38 direct callers: compute the low-32-bit sum x*x+y*y+z*z, pass it to the GTE-normalized lookup-table square-root approximation at 0x8015C488, and return that result unchanged; generated 0x8014B638 is its internal delayed frame setup */
+#define PSX_FN_ApproximateVectorLength3i 0x8014B614u
+#define func_8014B614 ApproximateVectorLength3i  /* alias */
+
 /* known: Exact 0x594-byte owner of the 0x8014EE6C coverage address: scan 30 96-byte effect slots for free records and initialize callback, lifetime, racer index, kind, and state fields through a 15-way kind jump table; called only at 0x8015B3F8/0x8015B40C/0x8015B424 */
 #define PSX_FN_SpawnRacerEffectRecords 0x8014EA88u
 #define func_8014EA88 SpawnRacerEffectRecords  /* alias */
@@ -139,6 +151,10 @@
 /* confirmed: Real 57-caller variadic sprintf-equivalent owner spanning 0x8015C698..0x8015CF1B: spill a1-a3 into ABI vararg slots, fall through into the generated 0x8015C6A4 parser body, format into a0, NUL-terminate, and return the character count; no caller targets the split body */
 #define PSX_FN_FormatString 0x8015C698u
 #define func_8015C698 FormatString  /* alias */
+
+/* known: PsyQ-compatible VBlank/timer synchronizer spanning 0x8015F904..0x8015FA7B: mode<0 returns the software VBlank counter, mode 1 returns Timer1 ticks since the saved baseline without waiting, and mode 0 or >=2 waits through 0x8015FA7C, synchronizes GPU field state when required, refreshes the frame/timer baselines, and returns the pre-wait Timer1 delta */
+#define PSX_FN_VSync 0x8015F904u
+#define func_8015F904 VSync  /* alias */
 
 /* known: Three-argument SIO1 control/query dispatcher spanning 0x8016192C..0x80161DFF: a0 selects six operation families, a1 selects register or lifecycle actions, and a2 supplies values/side selection; reads and writes the SIO1 STAT/MODE/CTRL/BAUD block at 0x1F801050, maintains its RAM shadow, and brackets reset paths with critical-section syscalls */
 #define PSX_FN_AccessSio1ControlState 0x8016192Cu
