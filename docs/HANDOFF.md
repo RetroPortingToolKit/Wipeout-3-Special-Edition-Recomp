@@ -965,6 +965,9 @@ unbounded build as a performance test; use focused targets and the bounded
   empty, otherwise enqueues a 12-byte `-2/RECT/data` request in its eight-slot
   ring and waits through `DrawSync(0)` for its completion flag. Interrupt
   critical-section nesting protects both queue paths.
+- `GetTPage` owns `0x80160274..0x801602AF`. Its 15-instruction leaf is the
+  canonical Psy-Q four-argument TPAGE bit packer, has 25 direct callers and no
+  interior targets, and touches neither memory nor hardware state.
 - `EmitLocalizedFontGlyphPacket` owns `0x8010EAC4..0x8010F247`: it selects
   six-byte glyph metrics and font texture state for height modes 8/9/16/18 and
   extended banks, builds and OT-links one 40-byte `POLY_FT4`, increments the
@@ -985,6 +988,10 @@ unbounded build as a performance test; use focused targets and the bounded
   performs adjacent-surface fixed-point/GTE intersection tests, and dispatches
   response helpers according to force mode, object flags, and prior-hit state.
   It returns `-1/0/1`, has seven callers in `0x800ED48C`, and no interior alias.
+- `CdControl` owns `0x80160F1C..0x80161057`: it suppresses/restores the CD sync
+  callback, performs status-bit command-1 and table-driven command-2 preflight,
+  retries the requested `IssueCdCommand` transaction up to four times, and
+  returns boolean success. It has 12 direct callers and no interior alias.
 - `AccumulateOneIndexedVertexWeight` is its single-step companion at
   `0x8014F814..0x8014F91F`: it performs the same flagged-record lookup and
   fixed 250/200/200 indexed accumulator update once, then decrements positive
@@ -1002,3 +1009,15 @@ unbounded build as a performance test; use focused targets and the bounded
   track-section records, minimizes squared distance after `>>4` coordinate
   scaling, optionally searches a flag-selected branch chain, and returns the
   closest section without modifying shared state.
+- `TrySpawnRandomGeometryParticle` owns `0x8011E69C..0x8011E963`, has one
+  direct caller and no interior call targets. It passes a mode and 1-in-16 RNG
+  gate, pops one of two free-index stacks, and initializes a 48-byte type-3
+  effect record around a geometry-selected vertex with randomized position,
+  motion/intensity fields, lifetime 40, and its source-owner pointer.
+- `SpawnTrackSectionSurfaceEffects` logically owns
+  `0x8014FA4C..0x80150577` despite generated splits at FAE0/FDE0/FF4C/50548.
+  Its sole real caller passes a track section and effect flags; it selects a
+  flagged geometry face and, over four iterations, derives two randomized
+  surface positions/directions and submits eight type-2 effects total. The
+  apparent `8002B4F0 -> 8014FDE0` JAL is data decoded as code, not a callable
+  interior entry.

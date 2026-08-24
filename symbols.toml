@@ -871,6 +871,13 @@ status = "confirmed"
 note = "Exact 0xD8-byte sixteen-caller Psy-Q VRAM upload wrapper: accept RECT pointer and source-word pointer, enter the nested interrupt critical section, either submit immediately through the GPU image-transfer primitive or append a -2/RECT/data record to the eight-entry transfer ring, leave critical state, wait through DrawSync when queued, and return only after its per-call completion flag is set"
 
 [[func]]
+pc = 0x80160274
+name = "GetTPage"
+emit = false
+status = "confirmed"
+note = "Exact 0x3C-byte 25-caller leaf implementing the canonical Psy-Q GetTPage(tp, abr, x, y) packing formula: ((tp&3)<<7)|((abr&3)<<5)|((y&0x100)>>4)|((x&0x3FF)>>6)|((y&0x200)<<2), with no memory or hardware side effects"
+
+[[func]]
 pc = 0x8010EAC4
 name = "EmitLocalizedFontGlyphPacket"
 emit = false
@@ -899,6 +906,13 @@ status = "confirmed"
 note = "Exact 0x920-byte seven-caller track-surface collision owner: select flagged 24-byte geometry records from object halfword +0x34, reject distant candidates, construct adjacent-face plane/intersection tests, gate normal mode through a point-in-face predicate, dispatch object-flag/prior-hit-specific collision responses, and return -1 for rejected range, 0 for no hit, or 1 for a handled hit"
 
 [[func]]
+pc = 0x80160F1C
+name = "CdControl"
+emit = false
+status = "confirmed"
+note = "Exact 0x13C-byte 12-caller PsyQ-style synchronous CD command wrapper: truncate command to u8, suppress and restore the sync callback, conditionally issue command 1 from status bit 0x10 and command 2 from a command-indexed preflight table, retry the requested IssueCdCommand transaction up to four times, and return 1 on success or 0 after exhaustion"
+
+[[func]]
 pc = 0x8014F814
 name = "AccumulateOneIndexedVertexWeight"
 emit = false
@@ -924,3 +938,17 @@ name = "FindNearestTrackSection"
 emit = false
 status = "confirmed"
 note = "Exact 0x260-byte 12-caller leaf: from a seed track-section node and XYZ point, skip 2 then test that node plus 5 successors (or skip 8/test plus 20 in mode 1), minimize squared signed deltas after >>4 scaling, optionally search a flag-selected branch chain, and return the closest section pointer"
+
+[[func]]
+pc = 0x8011E69C
+name = "TrySpawnRandomGeometryParticle"
+emit = false
+status = "confirmed"
+note = "Exact 0x2C8-byte no-argument particle-pool initializer with one direct caller: unless mode byte 0x801D1B3E equals 1, pass a 1-in-16 RNG gate, pop an index from one of two free-index stacks, and initialize a 48-byte type-3 effect record around a geometry-selected vertex with randomized X/Z position, signed motion, three intensity bytes, lifetime 40, and owner pointer; no semantic return"
+
+[[func]]
+pc = 0x8014FA4C
+name = "SpawnTrackSectionSurfaceEffects"
+emit = false
+status = "confirmed"
+note = "Logical 0xB2C-byte one-caller owner across generated split pieces through epilogue 0x80150548: locate a flagged geometry face from a track section, run four iterations deriving randomized positions and direction vectors on topology selected by input flags, and submit two type-2 effects per iteration through 0x8011FF10"
