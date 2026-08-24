@@ -212,6 +212,10 @@
 #define PSX_FN_IsRaceRecordStatusZeroTypeOne 0x80134964u
 #define func_80134964 IsRaceRecordStatusZeroTypeOne  /* alias */
 
+/* confirmed: Exact 0x3C-byte 12-caller rumble-state updater: accept a Q8 motor amplitude, signed priority, and Q8 per-tick decay only when both amplitude and priority are at least the active request, then replace state words +0x0C/+0x10/+0x14; otherwise leave state unchanged */
+#define PSX_FN_SubmitRumbleDecayRequest 0x80134CE8u
+#define func_80134CE8 SubmitRumbleDecayRequest  /* alias */
+
 /* known: Argument-free 408-byte leaf: select six display/FOV scalars with 0x80173B00, derive viewport and perspective clip coefficients, and write 0x801E14EC/14F0/14F4/2480/2484/2488/25CC */
 #define PSX_FN_RebuildViewportClipCoefficients 0x8013535Cu
 #define func_8013535C RebuildViewportClipCoefficients  /* alias */
@@ -448,6 +452,10 @@
 #define PSX_FN_CdSyncCallback 0x80160EF4u
 #define func_80160EF4 CdSyncCallback  /* alias */
 
+/* confirmed: Exact 0x14-byte nine-caller canonical LibCD callback exchange leaf: load and return the previous CD ready callback from 0x8017B128, then store incoming a0 in the jr delay slot; null suppresses ready-event dispatch and no validation, locking, or interrupt masking occurs */
+#define PSX_FN_CdReadyCallback 0x80160F08u
+#define func_80160F08 CdReadyCallback  /* alias */
+
 /* confirmed: Exact 0x13C-byte 12-caller PsyQ-style synchronous CD command wrapper: truncate command to u8, suppress and restore the sync callback, conditionally issue command 1 from status bit 0x10 and command 2 from a command-indexed preflight table, retry the requested IssueCdCommand transaction up to four times, and return 1 on success or 0 after exhaustion */
 #define PSX_FN_CdControl 0x80160F1Cu
 #define func_80160F1C CdControl  /* alias */
@@ -471,6 +479,10 @@
 /* known: Non-returning CRT continuation entered by the expansion-RAM loader: clear BSS, derive stack and heap bounds from linker words, set gp/fp, call BIOS A0/39 InitHeap, then call RunRaceSession with a break trap as its nominal return site */
 #define PSX_FN_PsxCrtStartup 0x8016247Cu
 #define func_8016247C PsxCrtStartup  /* alias */
+
+/* confirmed: Exact 0x10-byte Psy-Q/BIOS syscall-1 thunk with 16 unique executable callers: set a0 to 1, execute syscall 0, and return the previous COP0 Status IEc bit (0 or 1) after clearing IEc; no memory effects or interior entry targets */
+#define PSX_FN_EnterCriticalSection 0x801671D0u
+#define func_801671D0 EnterCriticalSection  /* alias */
 
 /* confirmed: Exact 0x40C-byte 13-caller CD-ROM command core: validate and write command-specific parameters to 0x1F801802, issue the command through 0x1F801801, optionally return asynchronously, or service CD IRQ phases until completion with dual VBlank/spin timeouts and copy the eight-byte sync response */
 #define PSX_FN_IssueCdCommand 0x80168080u
