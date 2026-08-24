@@ -36,6 +36,10 @@
 #define PSX_FN_LoadPackedResourceBundle 0x80111AF8u
 #define func_80111AF8 LoadPackedResourceBundle  /* alias */
 
+/* confirmed: Exact pre-prologue 0xE4-byte owner with 24 direct callers: read the signed entry count before framing, convert each relocated bundle pointer through the texture-resource builder at 0x80110DF0 with flags (1,0), append non-null descriptors to the global texture table/count, then release the bundle allocation through 0x80116DBC */
+#define PSX_FN_RegisterTextureBundleEntries 0x80111DA0u
+#define func_80111DA0 RegisterTextureBundleEntries  /* alias */
+
 /* confirmed: Seven-instruction leaf: swap bytes 0 and 2 of the three-byte color at a0 while preserving byte 1; called by four packet/material conversion sites at 0x80110C4C/74/AC/D4, with four mirrored expansion-RAM copies */
 #define PSX_FN_SwapRgb24RedBlue 0x80112048u
 #define func_80112048 SwapRgb24RedBlue  /* alias */
@@ -159,6 +163,14 @@
 /* confirmed: Exact 0x5C-byte three-component magnitude helper with 38 direct callers: compute the low-32-bit sum x*x+y*y+z*z, pass it to the GTE-normalized lookup-table square-root approximation at 0x8015C488, and return that result unchanged; generated 0x8014B638 is its internal delayed frame setup */
 #define PSX_FN_ApproximateVectorLength3i 0x8014B614u
 #define func_8014B614 ApproximateVectorLength3i  /* alias */
+
+/* known: 23-site 316-byte resource accessor: select the 12-byte current entry through index 0x801E9808 and table 0x801E97FC, return null for index -1, otherwise return an archive pointer directly or allocate and materialize the entry by decode/copy according to a0; allocation failures report through the common diagnostic */
+#define PSX_FN_AcquireCurrentArchiveEntry 0x8014B830u
+#define func_8014B830 AcquireCurrentArchiveEntry  /* alias */
+
+/* confirmed: Exact 0xD4-byte no-argument temp-heap cleanup: if the tracked top index is not -1, release the optional pending free-list block, pop every 12-byte offset record from the top down, and return tracked blocks to the temp heap unless the heap-lock flag suppresses deallocation; 23 direct JAL callers in the retained EXE */
+#define PSX_FN_ReleaseAllTrackedTempHeapBlocks 0x8014B96Cu
+#define func_8014B96C ReleaseAllTrackedTempHeapBlocks  /* alias */
 
 /* known: Exact 0x594-byte owner of the 0x8014EE6C coverage address: scan 30 96-byte effect slots for free records and initialize callback, lifetime, racer index, kind, and state fields through a 15-way kind jump table; called only at 0x8015B3F8/0x8015B40C/0x8015B424 */
 #define PSX_FN_SpawnRacerEffectRecords 0x8014EA88u

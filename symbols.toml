@@ -394,6 +394,13 @@ status = "known"
 note = "Single-caller non-leaf: updates active bits on 28-byte object records, prepares the GTE view transform, compacts visible oriented quads through 0x80172E3C, and emits 40-byte GPU POLY_FT4 packets into the current OT"
 
 [[func]]
+pc = 0x8014B830
+name = "AcquireCurrentArchiveEntry"
+emit = false
+status = "known"
+note = "23-site 316-byte resource accessor: select the 12-byte current entry through index 0x801E9808 and table 0x801E97FC, return null for index -1, otherwise return an archive pointer directly or allocate and materialize the entry by decode/copy according to a0; allocation failures report through the common diagnostic"
+
+[[func]]
 pc = 0x80141F68
 name = "DrainQueuedRenderObjects"
 emit = false
@@ -638,6 +645,13 @@ emit = false
 status = "confirmed"
 note = "Exact 0x5BC-byte five-argument localized byte-string renderer with 24 direct callers: map ASCII/punctuation and an ISO-8859-1 accented-byte table to glyph indices, select language-sensitive extended glyph banks, emit each non-space glyph through 0x8010EAC4, apply mode-sensitive space advances, and return final x minus the sign-extended starting x"
 
+[[func]]
+pc = 0x80111DA0
+name = "RegisterTextureBundleEntries"
+emit = false
+status = "confirmed"
+note = "Exact pre-prologue 0xE4-byte owner with 24 direct callers: read the signed entry count before framing, convert each relocated bundle pointer through the texture-resource builder at 0x80110DF0 with flags (1,0), append non-null descriptors to the global texture table/count, then release the bundle allocation through 0x80116DBC"
+
 [[object]]
 addr = 0x8016D634
 name = "gLocalizedFontByteTable"
@@ -709,3 +723,10 @@ name = "IssueCdCommand"
 emit = false
 status = "confirmed"
 note = "Exact 0x40C-byte 13-caller CD-ROM command core: validate and write command-specific parameters to 0x1F801802, issue the command through 0x1F801801, optionally return asynchronously, or service CD IRQ phases until completion with dual VBlank/spin timeouts and copy the eight-byte sync response"
+
+[[func]]
+pc = 0x8014B96C
+name = "ReleaseAllTrackedTempHeapBlocks"
+emit = false
+status = "confirmed"
+note = "Exact 0xD4-byte no-argument temp-heap cleanup: if the tracked top index is not -1, release the optional pending free-list block, pop every 12-byte offset record from the top down, and return tracked blocks to the temp heap unless the heap-lock flag suppresses deallocation; 23 direct JAL callers in the retained EXE"
