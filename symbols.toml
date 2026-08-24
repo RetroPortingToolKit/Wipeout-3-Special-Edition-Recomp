@@ -1462,6 +1462,13 @@ status = "confirmed"
 note = "Exact 0x6C-byte three-caller snapshot permutation with the shared eight-pointer quad ABI: map row-major destination corners [0,1;2,3] from source [1,3;0,2], a counterclockwise quarter-turn; preserves exact 16-bit patterns and is alias-safe"
 
 [[func]]
+pc = 0x8011FF04
+name = "ResetParticleTilePacketPool"
+emit = false
+status = "confirmed"
+note = "Exact 0x0C-byte three-caller leaf: clear the allocation count at 0x80175D40 for the proven 32-record particle TILE_1 packet pool at 0x801D4EDC; store executes in the jr delay slot, no arguments or other effects"
+
+[[func]]
 pc = 0x80120988
 name = "CopyAndNormalizeControllerPacket"
 emit = false
@@ -1804,6 +1811,13 @@ status = "confirmed"
 note = "Exact 0x70-byte no-argument one-caller initializer: configure three 12-byte GPU TILE_1 packets in each of 32 records at 0x801D4EDC by setting tag word count byte +3 to 2 and GP0 command byte +7 to 0x68, then call the adjacent leaf that resets the pool allocation count at 0x80175D40; no duplicate or interior entry"
 
 [[func]]
+pc = 0x801103FC
+name = "DrawMappedTextString"
+emit = false
+status = "confirmed"
+note = "Logical 0x164-byte null-terminated text renderer across 12 false generated case-entry translations: map uppercase letters, digits and supported punctuation to glyph indices, advance spaces by 8, emit other bytes through the 40-byte font-packet helper with mode-2 style remapping and caller grayscale, and return horizontal width; no direct executable caller or external interior target"
+
+[[func]]
 pc = 0x801102B8
 name = "MirrorQuadVerticalCoordinates"
 emit = false
@@ -1837,3 +1851,10 @@ name = "LoadQuadTextureCoordinates"
 emit = false
 status = "confirmed"
 note = "Exact 0xB4-byte two-caller leaf: sign-extend the low 16 bits of texture index a0, dereference its entry in the pointer table at 0x801CE96C, and copy eight consecutive descriptor halfwords +0x16..+0x24 into the caller's u0,v0,u1,v1,u2,v2,u3,v3 pointers; source loader for the adjacent quad-coordinate permutation family"
+
+[[func]]
+pc = 0x80110894
+name = "PrepareFrontendImageResource"
+emit = false
+status = "confirmed"
+note = "Exact 0x128-byte one-caller frontend image pipeline: ignore a0-a2, retain a3 option record, acquire the current archive image, decode its selected RGB5 halfword into three rounded 8-bit tint globals, build a texture descriptor, invoke the two private frontend image-layout builders with option byte +5, and release all tracked temporary heap blocks; no semantic return"

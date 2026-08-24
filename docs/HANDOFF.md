@@ -1338,6 +1338,10 @@ unbounded build as a performance test; use focused targets and the bounded
   topology it maps destination `[0,1;2,3]` from source `[1,3;0,2]`, the inverse
   quarter-turn of `RotateQuadCoordinatesClockwise`. Three callers target the
   entry and the full snapshot makes aliases safe.
+- `ResetParticleTilePacketPool` is the three-instruction leaf at
+  `0x8011FF04..0x8011FF0F`. It clears allocation count `0x80175D40` for the
+  proven 32-record/96-`TILE_1` pool at `0x801D4EDC`. Three callers target the
+  entry, and the delay-slot store is its sole effect.
 - `CopyAndNormalizeControllerPacket` owns `0x80120988..0x80120A87` with seven
   entry callers. It copies/clears eight raw controller bytes, saves their
   original header at destination `+8`, accepts headers `2300/4100/7300`, and
@@ -1571,6 +1575,11 @@ unbounded build as a performance test; use focused targets and the bounded
   sole entry call at `0x80133B8C`. It preconfigures three 12-byte GPU TILE_1
   packets in each of 32 records at `0x801D4EDC`, then resets the shared pool
   allocation count at `0x80175D40`; there is no duplicate or interior entry.
+- `DrawMappedTextString` logically owns `0x801103FC..0x8011055F`; twelve
+  repeated generated rows at punctuation jump-table cases are internal block
+  translations, not functions. It maps uppercase ASCII, digits, punctuation
+  and spaces to font output, returns rendered width, and has no direct or
+  literal-pointer caller and no external interior target in the retained EXE.
 - `SpawnRandomizedParticleRecords` owns `0x8011FE6C..0x8011FE93` and discards
   original `a0` while forwarding `(a1 count, a2 origin, a3 spread)` to private
   `EnqueueRandomizedParticleRecords` (`0x80140F9C..0x801410C7`). Four unique
@@ -1604,3 +1613,8 @@ unbounded build as a performance test; use focused targets and the bounded
   `0x801CE96C[index]`, and copies descriptor halfwords `+0x16..+0x24` into
   eight `(u0,v0,...,u3,v3)` output pointers before the adjacent orientation
   permutations; it is frameless, call-free, and has no interior target.
+- `PrepareFrontendImageResource` owns `0x80110894..0x801109BB`, with one
+  entry-only caller. It ignores `a0..a2`, uses option byte `a3[5]`, expands a
+  selected archive-image RGB5 value into three rounded tint globals, builds a
+  texture descriptor, invokes private `0x8012DA10/0x8012DCB4` layout owners,
+  and releases temporary archive blocks; its returned `s4` is incidental.
