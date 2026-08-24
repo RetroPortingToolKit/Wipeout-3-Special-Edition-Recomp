@@ -292,6 +292,10 @@
 #define PSX_FN_ResetParticleTilePacketPool 0x8011FF04u
 #define func_8011FF04 ResetParticleTilePacketPool  /* alias */
 
+/* confirmed: Exact 0x68-byte two-site particle adapter: forward position a0 and vector sources a1/a2, pack low bytes of a3 and stack args 4/5 as a local RGB word, force effect type 2 and parameter 1024, bias stack arg 6 to an 8-bit subtype +2, and return EnqueueEffectInstance's success value; downstream type-2 records feed the particle TILE_1 path */
+#define PSX_FN_SpawnType2ParticleEffect 0x8011FF10u
+#define func_8011FF10 SpawnType2ParticleEffect  /* alias */
+
 /* confirmed: True 0x3B4-byte frameless owner spanning six false generated splits: resolve logical pad 0..7 through two ports/four multitap slots, accept 0x7300 analog-pad and 0x2300 NegCon-class packets, apply per-pad deadzone/scale calibration with clamping and history updates, mutate axis/pressure bytes in place, and return the packet pointer or null */
 #define PSX_FN_ApplyAnalogControllerCalibration 0x801203F0u
 #define func_801203F0 ApplyAnalogControllerCalibration  /* alias */
