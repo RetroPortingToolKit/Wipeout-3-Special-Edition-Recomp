@@ -652,6 +652,13 @@ emit = false
 status = "confirmed"
 note = "Exact pre-prologue 0xE4-byte owner with 24 direct callers: read the signed entry count before framing, convert each relocated bundle pointer through the texture-resource builder at 0x80110DF0 with flags (1,0), append non-null descriptors to the global texture table/count, then release the bundle allocation through 0x80116DBC"
 
+[[func]]
+pc = 0x800ED8AC
+name = "ProjectPointDeltaOntoNormalQ12"
+emit = false
+status = "confirmed"
+note = "Exact frameless 0xDC-byte by-value aggregate leaf with 22 generated call instances at 18 distinct guest PCs: take point A in a0-a3, point B at caller sp+0x10, and a packed Q12 normal at sp+0x20, then return dot(B-A,n)/Q12NormSquared(n), substituting denominator one when the GTE SQR sum is zero"
+
 [[object]]
 addr = 0x8016D634
 name = "gLocalizedFontByteTable"
@@ -730,3 +737,23 @@ name = "ReleaseAllTrackedTempHeapBlocks"
 emit = false
 status = "confirmed"
 note = "Exact 0xD4-byte no-argument temp-heap cleanup: if the tracked top index is not -1, release the optional pending free-list block, pop every 12-byte offset record from the top down, and return tracked blocks to the temp heap unless the heap-lock flag suppresses deallocation; 23 direct JAL callers in the retained EXE"
+
+[[func]]
+pc = 0x800EEE18
+name = "EnterNestedInterruptCriticalSection"
+emit = false
+status = "confirmed"
+note = "Exact 0x4C-byte 22-caller nesting adapter: inspect COP0 Status IEc, increment gInterruptCriticalNesting when interrupts are already disabled, otherwise reset nesting to zero and call the low-level helper that clears Status bits 0 and 10; paired leave routine begins at 0x800EEE64"
+
+[[func]]
+pc = 0x80117C08
+name = "ResolveModeDependentIndex"
+emit = false
+status = "confirmed"
+note = "Exact 0x5C-byte 23-caller leaf: snapshot the eight-byte permutation at 0x8016DD60, then return table[index] for mode 1, index+14 for mode 0, index+8 for mode 2, or 1 for every other mode; a2/a3 unused and mode-1 bounds are a caller invariant"
+
+[[object]]
+addr = 0x8016DD60
+name = "kMode1IndexPermutation"
+status = "confirmed"
+note = "Eight-byte permutation {0,5,1,4,2,3,6,7}; copied to ResolveModeDependentIndex's stack and indexed only for selector/mode 1"
