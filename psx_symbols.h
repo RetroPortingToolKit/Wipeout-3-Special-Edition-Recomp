@@ -532,6 +532,10 @@
 #define PSX_FN_SetSemiTrans 0x8015FD4Cu
 #define func_8015FD4C SetSemiTrans  /* alias */
 
+/* confirmed: Exact 0x10-byte canonical PlayStation BIOS B0:38 exit trampoline: preserve signed status in a0 and caller ra, select service 0x38 in the vector-jump delay slot, and never return under the BIOS contract; seven entry callers pass status 0 once and -1 six times, with no interior targets */
+#define PSX_FN_Exit 0x8015FD7Cu
+#define func_8015FD7C Exit  /* alias */
+
 /* confirmed: Psy-Q/BIOS A0:2B memset thunk: three executable instructions at 0x8015FEF4..0x8015FEFF plus one unreachable padding NOP complete the generated 0x10-byte owner; twelve unique callers pass destination/value/count in a0/a1/a2, with no overlay duplicates or interior guest targets */
 #define PSX_FN_Memset 0x8015FEF4u
 #define func_8015FEF4 Memset  /* alias */

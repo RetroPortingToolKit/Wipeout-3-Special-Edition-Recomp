@@ -1348,6 +1348,11 @@ unbounded build as a performance test; use focused targets and the bounded
   `0x8018AE44` state and records/returns output byte zero. Fourteen generated
   instances are six unique entry callers; all interior dispatch rows are
   loop/post-call continuations.
+- `DispatchRacerEffectSpawn` owns `0x8015B3CC..0x8015B443`. It forwards the
+  first three spawn arguments and a byte-truncated effect kind to
+  `SpawnRacerEffectRecords`, except composite kind 13 expands into sequential
+  kinds 14 and 15. Its six unique callers comprise five overlay addresses and
+  one main-image address; none targets an interior continuation.
 - `WaitForJoyAckAndClearIrq` owns `0x80169D30..0x80169DBF` with seven callers.
   It acknowledges SIO interrupt bit 7 in `I_STAT`, waits for JOY_STAT ACK bit
   7 to clear under the caller-armed Timer 2 deadline, returns zero on timeout,
@@ -1389,3 +1394,8 @@ unbounded build as a performance test; use focused targets and the bounded
   first-fits the three base/capacity/cursor descriptors at `0x801D38B8`, stores
   a rounded-size header, advances the selected cursor, returns payload+4, and
   calls BIOS `exit(-1)` if every arena is full.
+- `Exit` is the canonical four-word BIOS `B0:38` trampoline at
+  `0x8015FD7C..0x8015FD8B`; the last NOP is unreachable padding. Seven
+  entry-only callers pass status zero once and `-1` six times. The thunk
+  preserves `a0`/caller `ra`, selects service `0x38`, and never returns under
+  the BIOS contract; it has no direct memory or hardware effects itself.
