@@ -24,6 +24,10 @@
 #define PSX_FN_RunRaceSession 0x80116128u
 #define func_80116128 RunRaceSession  /* alias */
 
+/* confirmed: Exact 0x1E8-byte custom main/temp heap allocator: align requested bytes upward to four, prefer a free block large enough to split off a 20-byte allocation header plus payload from its tail, otherwise warn and consume an unsplittable free block large enough for the payload; update arena remaining bytes and main-heap low-water mark, return payload at header+12, or null when no block fits; 85 direct JAL sites */
+#define PSX_FN_AllocateHeapBlock 0x8011686Cu
+#define func_8011686C AllocateHeapBlock  /* alias */
+
 /* known: Callable race-view renderer: owns the 376-byte frame at 0x8012268C, runs scene/vehicle/effects/HUD submission and display synchronization, then returns through the split epilogue at 0x801247FC; a0 is the view/player descriptor and a1/a2 are caller-supplied render context values */
 #define PSX_FN_RenderRaceFrame 0x8012268Cu
 #define func_8012268C RenderRaceFrame  /* alias */
@@ -35,6 +39,14 @@
 /* known: Argument-free race/view initializer spanning 0x80133B64..0x80134013: initialize each 0x3A4-byte viewport record, publish the active record, rebuild global clip coefficients, assign racer-to-viewport state, and finish through the split epilogue at 0x80133F60 */
 #define PSX_FN_InitializeRaceViewportState 0x80133B64u
 #define func_80133B64 InitializeRaceViewportState  /* alias */
+
+/* known: Exact 0x48-byte signed-index predicate: negative indices return false; otherwise select the 0x3A4-byte racer record at 0x801910E0 and return true exactly when its leading status byte is zero; 81 direct JAL callers */
+#define PSX_FN_IsRacerSlotVacant 0x8013491Cu
+#define func_8013491C IsRacerSlotVacant  /* alias */
+
+/* known: 61-caller 136-byte leaf predicate: reject negative race-record indices, index the 0x801910E0 table with an exact 0x3A4-byte stride, and return 1 exactly when signed byte +0 is zero and signed byte +3 is one */
+#define PSX_FN_IsRaceRecordStatusZeroTypeOne 0x80134964u
+#define func_80134964 IsRaceRecordStatusZeroTypeOne  /* alias */
 
 /* known: Argument-free 408-byte leaf: select six display/FOV scalars with 0x80173B00, derive viewport and perspective clip coefficients, and write 0x801E14EC/14F0/14F4/2480/2484/2488/25CC */
 #define PSX_FN_RebuildViewportClipCoefficients 0x8013535Cu

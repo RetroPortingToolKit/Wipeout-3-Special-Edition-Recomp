@@ -769,3 +769,11 @@ unbounded build as a performance test; use focused targets and the bounded
   resource table/class 2, ID 7 uses its dedicated resource/class 18, and
   selectors 29/37/28 remap to metadata IDs 23/22/21 before the common voice
   allocator at `0x80121534`.
+- `0x8011686C` is the confirmed shared `AllocateHeapBlock` implementation (85
+  direct calls): align to four bytes, prefer a tail split with a 20-byte block
+  header, maintain arena counters/main-heap low-water state, warn when no
+  contiguous split exists, then fall back to consuming a whole free block.
+- Racer-slot predicates index `0x801910E0 + index * 0x3A4` after rejecting
+  negative indices. `IsRacerSlotVacant` at `0x8013491C` tests byte `+0 == 0`
+  across 81 callers; `IsRaceRecordStatusZeroTypeOne` at `0x80134964` further
+  requires byte `+3 == 1` across 61 callers.

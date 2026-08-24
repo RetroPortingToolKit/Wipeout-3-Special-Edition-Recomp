@@ -245,6 +245,13 @@ emit = false
 status = "known"
 note = "Argument-free race/view initializer spanning 0x80133B64..0x80134013: initialize each 0x3A4-byte viewport record, publish the active record, rebuild global clip coefficients, assign racer-to-viewport state, and finish through the split epilogue at 0x80133F60"
 
+[[func]]
+pc = 0x8013491C
+name = "IsRacerSlotVacant"
+emit = false
+status = "known"
+note = "Exact 0x48-byte signed-index predicate: negative indices return false; otherwise select the 0x3A4-byte racer record at 0x801910E0 and return true exactly when its leading status byte is zero; 81 direct JAL callers"
+
 [[block]]
 pc = 0x80133D3C
 name = "InitializeRaceViewportAssignments"
@@ -256,6 +263,13 @@ pc = 0x80133F60
 name = "InitializeRaceViewportStateEpilogue"
 status = "known"
 note = "Internal tail of 0x80133B64 reached by branches from both preceding generated ranges; performs final viewport mapping and restores the original 56-byte frame"
+
+[[func]]
+pc = 0x80134964
+name = "IsRaceRecordStatusZeroTypeOne"
+emit = false
+status = "known"
+note = "61-caller 136-byte leaf predicate: reject negative race-record indices, index the 0x801910E0 table with an exact 0x3A4-byte stride, and return 1 exactly when signed byte +0 is zero and signed byte +3 is one"
 
 [[func]]
 pc = 0x8013535C
@@ -407,3 +421,10 @@ name = "PlaySoundEffectById"
 emit = false
 status = "confirmed"
 note = "Exact 0xDC-byte sound-effect wrapper: reject id -1, clamp signed volume above 230, truncate volume/pan/pitch to bytes, remap ids 29/37/28 to sink selectors 23/22/21, route id 7 through the dedicated resource at 0x801E17A8 with class 18, route other ids through the 0x801E178C pointer table with class 2, then call 0x80121534; 81 direct JAL callers"
+
+[[func]]
+pc = 0x8011686C
+name = "AllocateHeapBlock"
+emit = false
+status = "confirmed"
+note = "Exact 0x1E8-byte custom main/temp heap allocator: align requested bytes upward to four, prefer a free block large enough to split off a 20-byte allocation header plus payload from its tail, otherwise warn and consume an unsplittable free block large enough for the payload; update arena remaining bytes and main-heap low-water mark, return payload at header+12, or null when no block fits; 85 direct JAL sites"
