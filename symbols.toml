@@ -1886,3 +1886,10 @@ name = "SpawnType2ParticleEffect"
 emit = false
 status = "confirmed"
 note = "Exact 0x68-byte two-site particle adapter: forward position a0 and vector sources a1/a2, pack low bytes of a3 and stack args 4/5 as a local RGB word, force effect type 2 and parameter 1024, bias stack arg 6 to an 8-bit subtype +2, and return EnqueueEffectInstance's success value; downstream type-2 records feed the particle TILE_1 path"
+
+[[func]]
+pc = 0x8011FF78
+name = "SpawnRacerType1ParticleBurst"
+emit = false
+status = "confirmed"
+note = "Exact 0x20-byte one-caller transparent adapter: forward racer index a0 unchanged to private 0x8013CA90, which applies racer/session eligibility gates and appends up to two randomized type-1 records to the 48-byte particle ring at 0x801E1B10; no semantic return, duplicate, or interior target"
