@@ -196,6 +196,10 @@
 #define PSX_FN_NormalizeVector3Q12InPlace 0x80118FDCu
 #define func_80118FDC NormalizeVector3Q12InPlace  /* alias */
 
+/* confirmed: Exact 0x160-byte three-caller contact-state dispatcher: resolve a racer and its 0x1AC-byte craft/object, require contact flag 0x1000 and eligible racer/global state, then select callback 0x800E913C, 0x800E8E14, or 0x800EA760 at racer +0x39C while synchronizing object flag bits 0x4/0x10000; no overlay duplicate */
+#define PSX_FN_UpdateRacerContactResponseHandler 0x8011BBECu
+#define func_8011BBEC UpdateRacerContactResponseHandler  /* alias */
+
 /* confirmed: Exact 0x50C-byte menu-input classifier: accept action 0..11, recognize actions 0..3 from a selected 0x73 analog-pad record when the left-stick axis is at least 93 counts from center, otherwise sum the action's PSX button mask across eligible 0x3A4-byte racer/controller records; 49 direct JAL sites */
 #define PSX_FN_GetMenuActionState 0x8011BDD0u
 #define func_8011BDD0 GetMenuActionState  /* alias */
