@@ -356,6 +356,10 @@
 #define PSX_FN_ConsumeOneShotFlag80175F90 0x8012C1A4u
 #define func_8012C1A4 ConsumeOneShotFlag80175F90  /* alias */
 
+/* confirmed: Exact 0x2A4-byte one-caller frontend image-table builder: convert a 64x8 RGB24 source to a transposed 0x38-prefixed GPU color-word table at 0x801DE670, conditionally round/publish its first color by mode, snapshot three layout halfwords, and build 26 trigonometric 80-byte warp rows at 0x801DDE50 using Q12 sine/cosine; a1/a3 ignored, no semantic return */
+#define PSX_FN_PrepareFrontendImageWarpTables 0x8012DA10u
+#define func_8012DA10 PrepareFrontendImageWarpTables  /* alias */
+
 /* confirmed: Exact 0x3C-byte six-caller resource-loader adapter: sign-extend the low halfword of index a0, call the private resource core 0x8012CD44 as (0,0,0,NULL,index,size_out), and return its resource pointer unchanged; all six unique calls target the entry and the sole interior row is only the nested-call continuation */
 #define PSX_FN_LoadResourceBySignedIndex 0x8012E2D4u
 #define func_8012E2D4 LoadResourceBySignedIndex  /* alias */

@@ -1585,6 +1585,10 @@ unbounded build as a performance test; use focused targets and the bounded
   sole caller is `0x801228C0`; it registers a texture bundle, appends and binds
   linked model resources, builds archive-backed model state, optionally mirrors
   X geometry/converts primitive records, and returns a selected array entry.
+- `PrepareFrontendImageWarpTables` owns `0x8012DA10..0x8012DCB3`, with sole
+  caller `0x80110960`. It converts 512 RGB24 pixels into the transposed
+  `0x38`-prefixed color-word table at `0x801DE670`, then builds 26 Q12
+  sine/cosine-driven 80-byte warp rows at `0x801DDE50`; `a1/a3` are ignored.
 - `SpawnRandomizedParticleRecords` owns `0x8011FE6C..0x8011FE93` and discards
   original `a0` while forwarding `(a1 count, a2 origin, a3 spread)` to private
   `EnqueueRandomizedParticleRecords` (`0x80140F9C..0x801410C7`). Four unique
@@ -1629,6 +1633,12 @@ unbounded build as a performance test; use focused targets and the bounded
   translations. It uses fixed RGB 128 and style-conditional semitransparency,
   distinguishing it from the caller-grayscale, always-semitransparent private
   sibling; no external call/jump enters either renderer's interior.
+- Revalidated existing `DrawRaceTimeCentiseconds` at
+  `0x80105558..0x8010593F`: all 16 physical callers are emitted exactly once,
+  with no external interior target. It formats `M:SS` plus optional `.hh` or
+  a three/five-glyph negative placeholder and delegates every packet to the
+  fixed-neutral-gray `EmitFontGlyphPacket`; it never uses the grayscale
+  sibling or constructs a primitive directly.
 - `RotateQuadCoordinatesClockwise` owns `0x80110324..0x8011038F`, with two
   entry-only callers. It snapshots four `(x,y)` pairs and permutes their 2x2
   corner grid from `[0,1;2,3]` to `[2,0;3,1]`, a clockwise quarter-turn; it is
