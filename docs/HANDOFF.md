@@ -606,3 +606,55 @@ unbounded build as a performance test; use focused targets and the bounded
   `docs/audits/semantic-*.md` files. `symbols.toml` uses `[[block]]` for the two
   internal labels, and `psx_symbols.h` has been regenerated from callable
   `[[func]]` entries only.
+
+## Indexed high-RAM closure and renderer tranche 2 (2026-08-24)
+
+- The first exact run that survived all 644 capture rows and five duplicate
+  recipe removals failed deterministically in
+  `unresolved_static_variant_requests`: it rebuilt and materialized every
+  aggregate function identity for every byte recipe, then raised `MemoryError`
+  in `current_variant_func_ids`. This is a generator defect, not evidence that
+  the retained generated source matches.
+- The unresolved-demand pass now indexes variants once by dispatch address and
+  validates only identities capable of satisfying each requested entry. A
+  regression test includes an unrelated malformed identity and proves it is
+  not inspected. The fix is psxrecomp commit `6c1bf67c`.
+- A subsequent managed run completed all 91 primary-shard CPS rewrites but hit
+  the command host's approximately 20-minute lifetime before final output.
+  Synthesized shard sources are now written immediately to temporary spool
+  files and removed from live metadata, bounding reconstruction memory;
+  psxrecomp commit `b3384250`. The detached exact check using this version is
+  running with unbuffered durable logs under
+  `artifacts/highram-background-check-spooled.*.log`.
+- `0x8012268C` is the sole-called `RenderRaceFrame` owner. Its generated output
+  is split, but semantic control continues through `0x8012482B`; it owns race
+  scene, vehicles, effects, HUD, and display synchronization.
+- `0x801727E8` is the true callable `SubdivideAndSubmitMeshPrimitives` entry.
+  It forces the selector argument and falls into the internal prologue at
+  `0x801727EC`; the old callable symbol at `0x801727EC` was false.
+- `0x80172E3C` is `BuildVisibleOrientedQuadList`. It projects and compacts
+  accepted oriented quads into 20-byte scratch records, returning 0--47 or -1
+  on overflow; the prior far clip-code packer name was incorrect.
+- `0x8013535C` is `RebuildViewportClipCoefficients`, an argument-free leaf with
+  one direct caller. It writes seven mode-indexed fixed-point outputs rather
+  than merely four generic frustum bounds.
+- `0x80135B8C` is the scalar-input twin
+  `RebuildViewportClipCoefficientsFromScalars`; its six signed-16 arguments
+  feed the same formulas and seven outputs, with `RenderRaceFrame` providing
+  overridden view offsets.
+- `0x801415F4` is `BuildVisibleObjectQuadPackets`: it filters 28-byte activity
+  records, prepares transform state, consumes the compact visible-quad list,
+  and emits/OT-links 40-byte `POLY_FT4` packets.
+- `0x801422FC` is `SubmitSceneSectionFaces`: it installs the owner transform,
+  submits a direct signed-index face list, then decodes packed run/catalog
+  entries and invokes resolved object renderers polymorphically.
+- `0x80162474` is the confirmed PS-X EXE header entry
+  `PsxExeEntryTrampoline`, a two-instruction non-returning jump rather than the
+  CRT body. The downstream loader probes expansion RAM, copies/relocates the
+  high-RAM payload when available, and rejoins initialization at `0x8016247C`.
+- `0x80172DDC` is `PrepareVisibleQuadTransform`: it installs the nested GTE
+  transform, mirrors translation into background-color registers, and writes
+  three coordinate offsets to scratchpad for `BuildVisibleOrientedQuadList`.
+- The previously guessed clip sites/globals are now known: one shared side-axis
+  coefficient plus distinct horizontal and vertical depth coefficients,
+  produced by both viewport-coefficient builders and consumed at `0x80142634`.
