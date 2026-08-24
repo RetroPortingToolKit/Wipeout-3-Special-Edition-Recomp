@@ -2834,3 +2834,17 @@ do not reuse the rejected pre-A/B state or start a second process.
   `title_crtc=PALx2 base=50Hz multiplier=2x effective=99.493634Hz` plus the
   `10.050894 ms/frame` wall pacer. A 50 Hz display/counter reading from some
   other layer must not replace this guest/present telemetry.
+
+## PAL patch clock-match correction (2026-08-24)
+
+- The user’s current Hueponik image is the 50 Hz patch, not the PALx2/100 Hz
+  patch. Running it with the canonical PAL8 profile (`pal_video_clock_multiplier
+  = 2`) makes gameplay advance at roughly 2x while CDDA and SFX remain on their
+  independent clocks. This is an intentional clock mismatch, not evidence of a
+  new CPU or renderer regression.
+- A separate untracked `build-remaster-pal8-off-20260824/game-50hz.toml` profile
+  now sets `pal_video_clock_multiplier = 1` at the same 400% CPU/cache settings.
+  It is ready to launch with `--game game-50hz.toml`; the active PALx2 process was
+  left untouched while the user was testing.
+- Do not compare a 50 Hz patch against a PALx2 counter. Validate the matching
+  50 Hz profile first, then separately test the 100 Hz patch/profile pair.
