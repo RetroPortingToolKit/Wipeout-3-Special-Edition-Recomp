@@ -510,3 +510,99 @@ unbounded build as a performance test; use focused targets and the bounded
   optimization of the hot `0x801700F0`, `0x801704F0`, and `0x80171D0C`
   geometry path and the per-replacement GL submission path, followed by a
   wall-clock race-progress/audio receipt rather than title-bar telemetry.
+
+## Overlay fragment/build consistency review (2026-08-24)
+
+- The retained `artifacts/highram-fragment` experiment is not a runnable
+  overlay cache: its directory contains only a patched C fragment and lock
+  sentinels, with no `00780000_*.dll`. Its cache tag
+  (`cg11_edf77f6b_gc0a23b42c_f0`) predates the current submodule/codegen state
+  and must not be copied into a current cache or treated as runtime evidence.
+- The current Release executable does contain `generated/overlays_highram.c`
+  and the high-RAM dispatcher, but that generated source is ignored and was
+  produced before the final `psxrecomp` changes that regenerated
+  `overlay_codegen_hash.h`. Regenerate the bounded high-RAM source after the
+  final recompiler/runtime commit before producing a shipping executable.
+- `CMakeLists.txt` only consumes `generated/overlays_highram.c` when that
+  ignored file already exists; the build graph has no generation recipe for
+  it. A clean checkout therefore cannot reproduce the current high-RAM
+  dispatcher from durable inputs. Keep this as a build/release blocker until
+  the capture recipe or a durable generated-input contract is recorded.
+- The existing high-RAM runtime logs do not close the performance proof:
+  release/debug race probes recorded no high-RAM native dispatch, while the
+  control remained around 29 guest Hz with millions of interpreted
+  instructions per second. Static-release boundary verification passed, but
+  the freshness gate correctly rejects the executable because current source
+  timestamps are newer than the binary.
+
+## Rewind performance A/B (2026-08-24)
+
+- A hidden-cost hypothesis was tested against the clean-room PGXP candidate:
+  builds with rewind support enable it by default and older logs confirm the
+  aggressive `interval=15`, `fmv=4`, `depth=50` policy. This could plausibly
+  serialize large 8 MiB snapshots often enough to contaminate performance
+  measurements.
+- The valid same-binary/same-state 30-second headless A/B used executable
+  SHA-256 `47DFA7EFBF334814840CDA5F35E82A91D735D2433C087AFE024637419E684F71`.
+  Both arms loaded slot 0 and resumed at `0x8016835C`; the only intended
+  difference was default rewind-on versus `PSX_REWIND=0`.
+- Rewind was not the primary bottleneck in this state. Rewind-on measured 28
+  telemetry windows at mean/median 63.89/62.2 guest Hz; rewind-off measured 29
+  windows at 62.30/61.9 guest Hz. The small negative delta is run noise, not a
+  rewind benefit. Receipts are retained in
+  `artifacts/rewind-ab-pgxp2-20260824/`.
+- An earlier pair in `artifacts/rewind-ab-20260824/` is invalid because its
+  cloned save directory had one extra nesting level and both arms reported
+  `LOAD FAILED`; do not use its boot/headless telemetry.
+
+## High-RAM overlay reproducibility contract (2026-08-24)
+
+- `tools/generate_highram_overlay.py` now pins the retained proprietary input
+  by SHA-256 (`0d5fa49ab033c759f18395a6e39c1c24aeb228dd8da6426dadb84c8b853e6808`),
+  schema, row counts, bounded address/size, and observed execution/dispatch
+  counts. An explicit `--capture` changes only the path and cannot bypass the
+  identity checks.
+- The wrapper generates through a same-filesystem temporary directory,
+  validates the high-RAM-prefixed static symbols, and atomically publishes the
+  result. `--check` compares without replacing it; compiler output is retained
+  in a temporary log and only a bounded failure tail reaches the console.
+- CMake exposes an explicit, fail-closed `generate-highram-overlay` target.
+  It is deliberately not part of the default build and requires
+  `-DWIPEOUT3_HIGHRAM_CAPTURES=<private capture>`; clean configuration remains
+  possible without distributing the proprietary capture.
+- The recompiler static generator supports a deterministic
+  `--static-symbol-prefix highram` namespace, leaving default ABI names
+  unchanged. Its final static bundle assembly streams source fragments without
+  allocating a second translation-unit-sized string, and all CPS resume cases
+  are planned and applied in one reconstruction per shard; block labels are
+  indexed once rather than found by a whole-source regex for every
+  continuation. Bounded exact diagnostic runs exposed and removed the prior
+  quadratic source rewrites and final Windows page-churn path.
+- Focused wrapper, namespace, and batched-resume tests pass. Exact end-to-end
+  attempts exposed the scaling defects above, but the final corrected run was
+  terminated externally before it flushed logs or created static output while
+  two unrelated elevated evidence-build processes held roughly 32 GiB resident
+  memory. Windows denied forced termination of those processes. Therefore no
+  exact match/stale receipt exists yet: rerun `--check` after those elevated
+  processes exit, and do not use the ignored generated source for a release
+  until that check passes (or regenerate and then re-check).
+
+## Renderer semantic tranche (2026-08-24)
+
+- `0x801700C4` is the true private-ABI `SubmitTexturedQuad` entry;
+  `0x801700F0` is its internal fast FT4 packet/OT-link path, not an independent
+  callable function. Near-depth work tail-transfers to `0x80170B5C`.
+- `0x80170254` is the callable leaf `ProjectPackedVertexPairs`, with two direct
+  callers. It expands packed vertex-index pairs into projected 16-byte records
+  and returns the shared screen-edge clip-code AND.
+- `0x801704F0` is `BuildProjectQuadMidpoints`: it creates four edge midpoints
+  and a center, projects all five, and stores SXY/depth/clip records.
+- `0x80171AFC..0x801727E7` is `TransformAndSubmitMeshPrimitives`, reached by
+  three small selector wrappers. It transforms source vertices into the clip
+  cache, rejects fully clipped meshes, performs NCLIP/AVSZ processing, builds
+  triangle/quad packets, and links them into the ordering table.
+  `0x80171D0C` is an internal packet-build loop within this function.
+- Evidence and register-convention details live in the corresponding
+  `docs/audits/semantic-*.md` files. `symbols.toml` uses `[[block]]` for the two
+  internal labels, and `psx_symbols.h` has been regenerated from callable
+  `[[func]]` entries only.

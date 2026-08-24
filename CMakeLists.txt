@@ -8,6 +8,48 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(PSXRECOMP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/psxrecomp" CACHE PATH
     "Path to psxrecomp")
 
+# High-RAM overlay generation consumes captured retail-game bytes, so it must
+# remain an explicit local operation rather than part of configure or the
+# default build.  A clean checkout can always configure without the private
+# capture corpus; requesting this target without its prerequisites fails
+# closed in tools/generate_highram_overlay.py with an actionable diagnostic.
+set(WIPEOUT3_HIGHRAM_CAPTURES "" CACHE FILEPATH
+    "Private high-RAM overlay capture JSON used by generate-highram-overlay")
+set(WIPEOUT3_HIGHRAM_OUTPUT
+    "${CMAKE_CURRENT_SOURCE_DIR}/generated/overlays_highram.c" CACHE FILEPATH
+    "Generated high-RAM static overlay translation unit")
+find_program(WIPEOUT3_HIGHRAM_PYTHON NAMES python3 python py)
+set(_WIPEOUT3_HIGHRAM_GENERATOR
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_highram_overlay.py")
+
+if(WIPEOUT3_HIGHRAM_CAPTURES STREQUAL "")
+    add_custom_target(generate-highram-overlay
+        COMMAND "${CMAKE_COMMAND}" -E echo
+            "ERROR: set -DWIPEOUT3_HIGHRAM_CAPTURES=<private-overlay-capture.json> before requesting generate-highram-overlay."
+        COMMAND "${CMAKE_COMMAND}" -E false
+        VERBATIM)
+elseif(WIPEOUT3_HIGHRAM_PYTHON AND EXISTS "${_WIPEOUT3_HIGHRAM_GENERATOR}")
+    add_custom_target(generate-highram-overlay
+        COMMAND "${WIPEOUT3_HIGHRAM_PYTHON}"
+            "${_WIPEOUT3_HIGHRAM_GENERATOR}"
+            --capture "${WIPEOUT3_HIGHRAM_CAPTURES}"
+            --output "${WIPEOUT3_HIGHRAM_OUTPUT}"
+        COMMENT "Generating bounded high-RAM native overlay dispatch"
+        VERBATIM)
+elseif(NOT EXISTS "${_WIPEOUT3_HIGHRAM_GENERATOR}")
+    add_custom_target(generate-highram-overlay
+        COMMAND "${CMAKE_COMMAND}" -E echo
+            "ERROR: generate-highram-overlay requires ${_WIPEOUT3_HIGHRAM_GENERATOR}."
+        COMMAND "${CMAKE_COMMAND}" -E false
+        VERBATIM)
+else()
+    add_custom_target(generate-highram-overlay
+        COMMAND "${CMAKE_COMMAND}" -E echo
+            "ERROR: generate-highram-overlay requires a Python 3 interpreter (python3, python, or py)."
+        COMMAND "${CMAKE_COMMAND}" -E false
+        VERBATIM)
+endif()
+
 # --- Standalone product surfaces -------------------------------------------
 # Scaffold prompts / flags fill these. Without recomp-ui, PSX_RECOMP_UI is OFF.
 # Setup-host CI requires WIZARD_CMAKE_BLOCK / ENABLE_SETUP_WIZARD (FORCE_SETUP_HOST
