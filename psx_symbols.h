@@ -4,6 +4,10 @@
  */
 #pragma once
 
+/* confirmed: True 0xF8-byte six-caller owner across the false 0x800E7324 split: sign-extend the caller's 16-bit byte offset into an animation command stream, return the opcode byte at that offset, decode the following 16 unaligned little-endian bytes into four output words, and touch no global state */
+#define PSX_FN_DecodeAnimationCommandRecord 0x800E7264u
+#define func_800E7264 DecodeAnimationCommandRecord  /* alias */
+
 /* confirmed: Exact 0x920-byte seven-caller track-surface collision owner: select flagged 24-byte geometry records from object halfword +0x34, reject distant candidates, construct adjacent-face plane/intersection tests, gate normal mode through a point-in-face predicate, dispatch object-flag/prior-hit-specific collision responses, and return -1 for rejected range, 0 for no hit, or 1 for a handled hit */
 #define PSX_FN_ResolveObjectTrackSurfaceCollision 0x800ECB6Cu
 #define func_800ECB6C ResolveObjectTrackSurfaceCollision  /* alias */
@@ -123,6 +127,10 @@
 /* confirmed: Nine-instruction leaf: byte-swap each of the two consecutive 16-bit values at a0 in place; called from four packet/material conversion branches at 0x80110C60/90/C0/FC, which pass fields at record offsets 4 or 16 */
 #define PSX_FN_ByteSwapTwoU16Values 0x80112064u
 #define func_80112064 ByteSwapTwoU16Values  /* alias */
+
+/* confirmed: Logical 0x9C-byte four-caller packed-record converter across generated tails 0x801120B4/0x801120EC: dereference the pointer slot at a0, swap the complete two-byte fields at +8 and +12 when type byte +0 is 2, swap fields +4 and +8 when it is 6, and otherwise leave the record unchanged */
+#define PSX_FN_SwapPackedRecordU16FieldsByType 0x80112088u
+#define func_80112088 SwapPackedRecordU16FieldsByType  /* alias */
 
 /* confirmed: Exact 0x34-byte 41-caller adapter: replace resource-string index a0 with gResourceStringTable[a0], forward x/y/style unchanged to DrawFontString, and return its total horizontal advance unchanged */
 #define PSX_FN_DrawResourceString 0x80113BECu
@@ -583,6 +591,10 @@
 /* confirmed: Psy-Q/BIOS B0:3F string-output thunk: the executable entry is 0x801671A8..0x801671B3 followed by 12 bytes of unreachable alignment padding through the generated 0x18-byte owner end; ten unique executable callers pass a string pointer in a0, with no overlay duplicates, interior call targets, RAM stores, or COP0 effects */
 #define PSX_FN_Puts 0x801671A8u
 #define func_801671A8 Puts  /* alias */
+
+/* confirmed: Exact 0x10-byte canonical BIOS C0:0A ChangeClearPad trampoline: preserve incoming mode in a0 and caller ra, select service t1=0x0A in the C0-vector jump delay slot, and propagate the BIOS result unchanged; seven unique entry callers, final NOP is unreachable padding */
+#define PSX_FN_ChangeClearPad 0x801671C0u
+#define func_801671C0 ChangeClearPad  /* alias */
 
 /* confirmed: Exact 0x10-byte Psy-Q/BIOS syscall-1 thunk with 16 unique executable callers: set a0 to 1, execute syscall 0, and return the previous COP0 Status IEc bit (0 or 1) after clearing IEc; no memory effects or interior entry targets */
 #define PSX_FN_EnterCriticalSection 0x801671D0u
