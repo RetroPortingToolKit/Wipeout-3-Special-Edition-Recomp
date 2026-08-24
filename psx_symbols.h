@@ -124,6 +124,10 @@
 #define PSX_FN_EmitCenteredTexturedSprite 0x8011E4B8u
 #define func_8011E4B8 EmitCenteredTexturedSprite  /* alias */
 
+/* confirmed: Exact 0x2C8-byte no-argument particle-pool initializer with one direct caller: unless mode byte 0x801D1B3E equals 1, pass a 1-in-16 RNG gate, pop an index from one of two free-index stacks, and initialize a 48-byte type-3 effect record around a geometry-selected vertex with randomized X/Z position, signed motion, three intensity bytes, lifetime 40, and owner pointer; no semantic return */
+#define PSX_FN_TrySpawnRandomGeometryParticle 0x8011E69Cu
+#define func_8011E69C TrySpawnRandomGeometryParticle  /* alias */
+
 /* confirmed: Exact 0x2C0-byte shared audio sink with three direct callers: gate on two audio-enable bytes, allocate one of 24 sound slots, snapshot volume/pan/pitch and Q8 pitch scale, resolve or reserve one/two of 24 voices, initialize 36-byte voice state from a 20-byte resource descriptor, then submit the slot to the active audio backend */
 #define PSX_FN_AllocateAndQueueSoundVoice 0x80121534u
 #define func_80121534 AllocateAndQueueSoundVoice  /* alias */
@@ -268,6 +272,10 @@
 #define PSX_FN_AccumulateIndexedVertexWeights 0x8014F920u
 #define func_8014F920 AccumulateIndexedVertexWeights  /* alias */
 
+/* confirmed: Logical 0xB2C-byte one-caller owner across generated split pieces through epilogue 0x80150548: locate a flagged geometry face from a track section, run four iterations deriving randomized positions and direction vectors on topology selected by input flags, and submit two type-2 effects per iteration through 0x8011FF10 */
+#define PSX_FN_SpawnTrackSectionSurfaceEffects 0x8014FA4Cu
+#define func_8014FA4C SpawnTrackSectionSurfaceEffects  /* alias */
+
 /* confirmed: Exact 0x8D4-byte 12-caller racer damage/energy updater: gate inactive or protected sessions, map supported event codes through a 132-entry dispatch table or accept an explicit delta, apply racer/mode scaling, clamp the per-racer Q8 damage accumulator, update percent/timers, and trigger the 100-percent disabled-state transition and threshold effect */
 #define PSX_FN_ApplyRacerDamageEvent 0x801562B8u
 #define func_801562B8 ApplyRacerDamageEvent  /* alias */
@@ -311,6 +319,14 @@
 /* confirmed: Exact 0x98-byte VSync-private helper with two direct callers: signed-poll gVBlankCount until it reaches a0, decrement a watchdog initialized to a1<<21, and on expiry print 'VSync: timeout', invoke ChangeClearPAD(0) and ChangeClearRCnt(3,0), then return early */
 #define PSX_FN_WaitForVBlankCountWithWatchdog 0x8015FA7Cu
 #define func_8015FA7C WaitForVBlankCountWithWatchdog  /* alias */
+
+/* confirmed: Exact 0x3C-byte 25-caller leaf implementing the canonical Psy-Q GetTPage(tp, abr, x, y) packing formula: ((tp&3)<<7)|((abr&3)<<5)|((y&0x100)>>4)|((x&0x3FF)>>6)|((y&0x200)<<2), with no memory or hardware side effects */
+#define PSX_FN_GetTPage 0x80160274u
+#define func_80160274 GetTPage  /* alias */
+
+/* confirmed: Exact 0x13C-byte 12-caller PsyQ-style synchronous CD command wrapper: truncate command to u8, suppress and restore the sync callback, conditionally issue command 1 from status bit 0x10 and command 2 from a command-indexed preflight table, retry the requested IssueCdCommand transaction up to four times, and return 1 on success or 0 after exhaustion */
+#define PSX_FN_CdControl 0x80160F1Cu
+#define func_80160F1C CdControl  /* alias */
 
 /* known: 14-caller 332-byte synchronous CD-ROM command owner: truncate a0 to a command byte, pass parameter/result buffers to IssueCdCommand, perform command/status-dependent reset and preflight commands, retry up to four times while suppressing/restoring the CD sync callback at 0x8017B124, and classify exhausted recovery through 0x80167B38 */
 #define PSX_FN_CdControlWithRetry 0x8016118Cu
