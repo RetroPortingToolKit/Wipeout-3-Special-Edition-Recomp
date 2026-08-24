@@ -1312,6 +1312,11 @@ unbounded build as a performance test; use focused targets and the bounded
   `0x8015F5E4..0x8015F5F3`. It forwards both string pointers and the signed
   BIOS comparison result unchanged; the fourth word is unreachable padding.
   All seven direct callers target the true entry.
+- `OpenEvent` and `EnableEvent` are the canonical BIOS B0:08 and B0:0C
+  trampolines at `0x8015F5C4..0x8015F5D3` and
+  `0x8015F594..0x8015F5A3`. They forward their argument registers and BIOS
+  results unchanged. Each has six entry-only callers and one unreachable
+  padding NOP.
 - `CopyAndNormalizeControllerPacket` owns `0x80120988..0x80120A87` with seven
   entry callers. It copies/clears eight raw controller bytes, saves their
   original header at destination `+8`, accepts headers `2300/4100/7300`, and
@@ -1337,6 +1342,12 @@ unbounded build as a performance test; use focused targets and the bounded
   without writing when the flag is clear; otherwise it clears the word and
   returns one. Seven generated instances are four unique entry callers, with
   no interior calls; the sole observed producer sets the word at `0x8012B9E8`.
+- `BuildNineByteLookupIndexMap` owns `0x801027CC..0x80102883`. It maps each of
+  nine source bytes to its first index in the shared lookup selected by
+  `0x80173A30/0x80173A38`, writing zero on failure, then resets selected
+  `0x8018AE44` state and records/returns output byte zero. Fourteen generated
+  instances are six unique entry callers; all interior dispatch rows are
+  loop/post-call continuations.
 - `WaitForJoyAckAndClearIrq` owns `0x80169D30..0x80169DBF` with seven callers.
   It acknowledges SIO interrupt bit 7 in `I_STAT`, waits for JOY_STAT ACK bit
   7 to clear under the caller-armed Timer 2 deadline, returns zero on timeout,
@@ -1373,3 +1384,8 @@ unbounded build as a performance test; use focused targets and the bounded
   low view bit 1 for racer type byte `+2 == 1`, otherwise bit 2, ignores the
   opposite bit in the object's mask, and requires exact equality with the
   current scene mask at `0x801762CC` plus the selected bit.
+- `AllocateFromThreeBumpArenas` owns `0x80117FD0..0x8011805B`. Its six call
+  sites belong to one resource loader. It rounds requests to four bytes,
+  first-fits the three base/capacity/cursor descriptors at `0x801D38B8`, stores
+  a rounded-size header, advances the selected cursor, returns payload+4, and
+  calls BIOS `exit(-1)` if every arena is full.
