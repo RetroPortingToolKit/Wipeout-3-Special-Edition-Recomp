@@ -492,6 +492,10 @@
 #define PSX_FN_ReleaseAllTrackedTempHeapBlocks 0x8014B96Cu
 #define func_8014B96C ReleaseAllTrackedTempHeapBlocks  /* alias */
 
+/* confirmed: Exact 0x9C-byte no-argument five-caller temp-heap tracker pop: return on an empty -1 top, otherwise decrement the 12-byte archive-record stack, roll the arena prefix back to the popped offset when deallocation is enabled, use null for the final rollback, and clear the suppression flag when the stack becomes empty; no external interior target or duplicate body */
+#define PSX_FN_PopTrackedTempHeapBlock 0x8014BB94u
+#define func_8014BB94 PopTrackedTempHeapBlock  /* alias */
+
 /* confirmed: Logical 0x3C-byte eight-caller accessor across the generated split at 0x8014BC4C: return zero when current archive-record index 0x801E9808 is -1, otherwise index the 12-byte table at pointer 0x801E97FC and return the selected record's proven output_size word at +4 without changing state */
 #define PSX_FN_GetCurrentArchiveEntryOutputSize 0x8014BC30u
 #define func_8014BC30 GetCurrentArchiveEntryOutputSize  /* alias */
