@@ -2712,6 +2712,15 @@ do not reuse the rejected pre-A/B state or start a second process.
   been established. A PAL8-specific race-start and replay state is still needed
   because the owner’s plain-PAL states cannot validate PAL8 media/code paths.
 
+## Exact process-guard validation (2026-08-24 12:55)
+
+- `tools/run_candidate_single.ps1` was exercised against the true PAL8
+  executable with `-AllowConfigMismatch`, an absolute BIOS, and the PAL8 state
+  directory. It returned `candidate_start_ok` after the bounded startup check.
+- The candidate was then closed/killed by its exact executable path; a follow-up
+  CIM query confirmed zero remaining processes for that path. The guard’s
+  cleanup scope did not touch any other WipEout/PSXRecomp process.
+
 ## Fresh exact-tail publication (2026-08-24 12:35)
 
 - The current plain fresh-state capture was re-run through
@@ -2740,3 +2749,14 @@ do not reuse the rejected pre-A/B state or start a second process.
   with native `223k--241k/s` and interpreted `6k--8k/s`. The hot interpreter
   moved to another exact tail (`0x000F5BA4`), confirming bounded coverage churn
   rather than a global timing defect. Do not broaden admission to observed PCs.
+
+## Process guard hardening (2026-08-24 13:05)
+
+- `tools/run_candidate_single.ps1` previously filtered CIM processes by the
+  literal PGXP filename before applying its exact-path check. It now enumerates
+  processes and matches only the resolved executable path, covering both the
+  PGXP sibling and a future clean base `...Recompiled.exe` without widening
+  cleanup to other builds.
+- The script parses successfully, and the existing interpreter and static
+  overlay guard tests pass after the change. A true PAL8 launch was admitted by
+  the guard and then exact-path cleaned; no candidate process remained.

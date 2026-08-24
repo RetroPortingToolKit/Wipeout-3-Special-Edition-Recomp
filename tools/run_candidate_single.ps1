@@ -19,7 +19,12 @@ if (-not $WorkingDirectory) {
 $resolvedWorkingDirectory = (Resolve-Path -LiteralPath $WorkingDirectory).Path
 
 function Get-CandidateProcesses {
-    Get-CimInstance Win32_Process -Filter "Name='Wipeout_3_Special_Edition__Recompiled_pgxp.exe'" |
+    # Match the resolved path rather than a hard-coded filename.  The clean
+    # base runtime and the PGXP sibling have different names, but both must be
+    # protected by the same single-instance/crash admission guard.  Restrict
+    # cleanup to this exact path so another build (or another chat's process)
+    # is never terminated.
+    Get-CimInstance Win32_Process |
         Where-Object { $_.ExecutablePath -eq $resolvedExecutable }
 }
 
