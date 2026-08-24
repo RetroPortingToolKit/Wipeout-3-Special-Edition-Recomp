@@ -709,3 +709,34 @@ unbounded build as a performance test; use focused targets and the bounded
   coverage for this island. `InitializeRaceRuntimeResources` passes the path to
   `0x80141D6C` and actually publishes four allocations, including the allocator
   delay-slot result previously missed.
+
+## Data-island correction and completed high-RAM receipt (2026-08-24)
+
+- Static CPS closure now reuses already-built fragment guards across later
+  snapshot demands and immediately synthesizes/spools each isolated fragment;
+  psxrecomp commit `3ca4141d` removes the last repeated-fragment rebuild path.
+- The pinned 644-row high-RAM corpus now compiles in about 20 seconds. A normal
+  generation atomically published `generated/overlays_highram.c` at 20,133,914
+  bytes, and an immediate independent `--check` regenerated identical output.
+- `0x8016CC0C..0x8016F183` is a data island, not executable code: 235 printable
+  NUL-terminated runs plus pointer/data tables occupy the interval. The prior
+  `0x8016F180` seed was removed and the real `0x8016F94C` callable seed added.
+- Generator hardening `61d89e28` rejects out-of-image direct jumps as
+  clean-tail proof. Follow-up `4c791b51` removes positively classified data
+  candidates whose only provenance is heuristic whole-image `jr $ra` scanning,
+  while preserving forced/direct-call diagnostic stubs. A fresh base
+  regeneration proves `0x8016CC0C` and `0x8016F180` absent from ranges,
+  declarations, dispatch, and shard bodies; only real `F/R 8016F94C 124`
+  remains.
+- `0x8016C86C` is `PollMultitapControllerSlots`, the address-taken final SIO/pad
+  stage ending at `0x8016CC00`. `0x80141D6C` is
+  `InitializeShadowTextureAtlas`; its legacy path argument is ignored and it
+  uploads the embedded fixed VRAM atlas. `0x801701B4` is
+  `SetupAndProjectPackedVertexPairs`, a three-caller setup prefix that falls
+  through into the independently callable `ProjectPackedVertexPairs`.
+- `0x80170D3C` is `InitializeSceneryClipScratchpad`, the sole-called leaf that
+  copies the 17-word renderer template to scratchpad and initializes clip
+  workspace constants. `0x801719DC` is
+  `CallSceneryClipperPreservingRendererContext`, the four-caller ABI bridge
+  that checkpoints renderer-private registers, calls the shared scenery
+  clipper, then restores context while retaining the updated packet cursor.

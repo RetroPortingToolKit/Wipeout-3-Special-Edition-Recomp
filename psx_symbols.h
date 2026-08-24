@@ -48,6 +48,10 @@
 #define PSX_FN_BuildVisibleObjectQuadPackets 0x801415F4u
 #define func_801415F4 BuildVisibleObjectQuadPackets  /* alias */
 
+/* known: Single-caller shadow-texture initializer: ignores the legacy source-path a0, allocates a 38-byte halfword descriptor, derives its flags from a1, initializes the fixed 800,256 / 32x224 VRAM atlas layout, uploads embedded pixels from 0x8003484C through LoadImage, and returns the descriptor */
+#define PSX_FN_InitializeShadowTextureAtlas 0x80141D6Cu
+#define func_80141D6C InitializeShadowTextureAtlas  /* alias */
+
 /* known: Single-caller section submitter: installs the owner transform, submits an indexed face list via 0x8016FC28, then resolves packed repeated entries and invokes each renderer callback */
 #define PSX_FN_SubmitSceneSectionFaces 0x801422FCu
 #define func_801422FC SubmitSceneSectionFaces  /* alias */
@@ -63,6 +67,10 @@
 /* known: Non-returning CRT continuation entered by the expansion-RAM loader: clear BSS, derive stack and heap bounds from linker words, set gp/fp, call BIOS A0/39 InitHeap, then call RunRaceSession with a break trap as its nominal return site */
 #define PSX_FN_PsxCrtStartup 0x8016247Cu
 #define func_8016247C PsxCrtStartup  /* alias */
+
+/* known: Address-taken final SIO/pad-driver stage: consume a multitap response through the private descriptor in a0, poll/configure as many as four 0xF0-byte slot records, append the final received byte, and return 0, a propagated transfer error, or -3 on timeout; the callable code ends at 0x8016CC00 */
+#define PSX_FN_PollMultitapControllerSlots 0x8016C86Cu
+#define func_8016C86C PollMultitapControllerSlots  /* alias */
 
 /* known: Renderer-private tail target of 0x8016FC28: for 1..8 consecutive 64-byte face records, project packed vertex pairs through 0x80170254, reject a shared-outcode group, then invoke the scratchpad-selected primitive callback for each 24-byte subrecord and preserve the updated renderer cursors */
 #define PSX_FN_ProjectAndSubmitPackedFaceGroups 0x8016F94Cu
@@ -88,6 +96,10 @@
 #define PSX_FN_SubmitTexturedQuad 0x801700C4u
 #define func_801700C4 SubmitTexturedQuad  /* alias */
 
+/* known: Three-caller renderer-private entry: derive the indexed 64-byte face and active render/template context, initialize clip workspace and packet/OT cursors, then fall through to ProjectPackedVertexPairs at 0x80170254 and return its aggregate clip mask */
+#define PSX_FN_SetupAndProjectPackedVertexPairs 0x801701B4u
+#define func_801701B4 SetupAndProjectPackedVertexPairs  /* alias */
+
 /* known: Callable renderer-private register ABI: expand packed vertex-index pairs into 32-byte projected pair records and return the AND of their RIGHT|LEFT|BOTTOM|TOP clip codes */
 #define PSX_FN_ProjectPackedVertexPairs 0x80170254u
 #define func_80170254 ProjectPackedVertexPairs  /* alias */
@@ -103,6 +115,14 @@
 /* known: Shared renderer-private tail-call function: marshal four projected vertices plus texture/material state into the 0x801E25D0 clipping workspace, call ClipAndEmitSceneryPrimitive, restore the inherited register context, and return through the original caller's ra */
 #define PSX_FN_ClipAndSubmitNearTexturedQuad 0x80170B5Cu
 #define func_80170B5C ClipAndSubmitNearTexturedQuad  /* alias */
+
+/* known: No-argument renderer setup leaf: copy 17 template words from 0x801762E0/0x80176300 into scratchpad 0x1F800078..0x1F8000B8, then initialize the 0x801E25D0 clipping workspace mode/count fields */
+#define PSX_FN_InitializeSceneryClipScratchpad 0x80170D3Cu
+#define func_80170D3C InitializeSceneryClipScratchpad  /* alias */
+
+/* known: Four-call-site renderer-private context trampoline: save the caller's live register file in scratchpad, publish the packet cursor at 0x80198620, call ClipAndEmitSceneryPrimitive, then restore the pre-call registers and discard the clipper's scalar return */
+#define PSX_FN_CallSceneryClipperPreservingRendererContext 0x801719DCu
+#define func_801719DC CallSceneryClipperPreservingRendererContext  /* alias */
 
 /* known: Shared body tail-entered by 0x80171AD8/AE4/AF4: transform mesh vertices, pack clip codes, reject/cull primitives, emit GPU packets, and OT-link by depth; v0 is an extra OT selector */
 #define PSX_FN_TransformAndSubmitMeshPrimitives 0x80171AFCu
