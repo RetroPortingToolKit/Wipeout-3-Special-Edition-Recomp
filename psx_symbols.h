@@ -4,6 +4,10 @@
  */
 #pragma once
 
+/* confirmed: Exact runtime-overlay 0x210-byte high-score initializer: only when a1=-1, fill the a2-selected 0xDC0-byte bank with 22 groups of four race-time and four lap-time records, cycling 17 developer names and rank bytes while copying paired default times; five unique entry-only calls, three deliberate no-ops */
+#define PSX_FN_InitializeDefaultHighScoreBank 0x800DF694u
+#define func_800DF694 InitializeDefaultHighScoreBank  /* alias */
+
 /* confirmed: Exact 0x5C-byte leaf with six unique callers: select a 0x16C-byte runtime racer by index, set halfword +0x132 to min(9 * signed halfword +0x146, floor(5 * unsigned halfword +0x14A / 4)), and clear halfwords +0x14C and +0x12A */
 #define PSX_FN_InitializeIndexedRacerSpeedState 0x800E5480u
 #define func_800E5480 InitializeIndexedRacerSpeedState  /* alias */
@@ -136,6 +140,10 @@
 #define PSX_FN_DrawLocalizedFontString 0x8010F3CCu
 #define func_8010F3CC DrawLocalizedFontString  /* alias */
 
+/* confirmed: Exact 0xB4-byte two-caller leaf: sign-extend the low 16 bits of texture index a0, dereference its entry in the pointer table at 0x801CE96C, and copy eight consecutive descriptor halfwords +0x16..+0x24 into the caller's u0,v0,u1,v1,u2,v2,u3,v3 pointers; source loader for the adjacent quad-coordinate permutation family */
+#define PSX_FN_LoadQuadTextureCoordinates 0x80110198u
+#define func_80110198 LoadQuadTextureCoordinates  /* alias */
+
 /* confirmed: Exact 0x6C-byte five-caller eight-pointer quad-coordinate permutation: snapshot signed halfwords x0,y0,x1,y1,x2,y2,x3,y3, swap x0 with x1 and x2 with x3 while preserving every y value, and write all eight results back; call-free with no overlay duplicate */
 #define PSX_FN_MirrorQuadHorizontalCoordinates 0x8011024Cu
 #define func_8011024C MirrorQuadHorizontalCoordinates  /* alias */
@@ -143,6 +151,14 @@
 /* confirmed: Exact 0x6C-byte four-caller eight-pointer quad-coordinate permutation: snapshot signed halfwords x0,y0,x1,y1,x2,y2,x3,y3, preserve all X values, swap y0 with y2 and y1 with y3, and write all eight results back; call-free with no overlay duplicate or interior target */
 #define PSX_FN_MirrorQuadVerticalCoordinates 0x801102B8u
 #define func_801102B8 MirrorQuadVerticalCoordinates  /* alias */
+
+/* confirmed: Exact 0x6C-byte two-caller eight-pointer quad-coordinate permutation: snapshot four signed-halfword coordinate pairs and rotate their 2x2 corner assignment clockwise from [0,1;2,3] to [2,0;3,1]; call-free with no overlay duplicate or interior target */
+#define PSX_FN_RotateQuadCoordinatesClockwise 0x80110324u
+#define func_80110324 RotateQuadCoordinatesClockwise  /* alias */
+
+/* confirmed: Exact 0x6C-byte three-caller snapshot permutation with the shared eight-pointer quad ABI: map row-major destination corners [0,1;2,3] from source [1,3;0,2], a counterclockwise quarter-turn; preserves exact 16-bit patterns and is alias-safe */
+#define PSX_FN_RotateQuadCoordinatesCounterclockwise 0x80110390u
+#define func_80110390 RotateQuadCoordinatesCounterclockwise  /* alias */
 
 /* confirmed: Exact 0x170-byte 10-caller signed decimal renderer: optionally emit a minus glyph, decompose the magnitude into at most five low decimal digits, zero-pad to the caller's stack-supplied minimum width, emit digits through EmitFontGlyphPacket with a mode-2 style-bank remap, and return the final X pen */
 #define PSX_FN_DrawSignedDecimalInteger 0x80110560u
@@ -251,6 +267,10 @@
 /* confirmed: Exact 0x28-byte adapter with four unique callers: ignore original a0 and forward (a1 count, a2 origin, a3 spread) to EnqueueRandomizedParticleRecords; five generated call instances include one duplicated overlay call */
 #define PSX_FN_SpawnRandomizedParticleRecords 0x8011FE6Cu
 #define func_8011FE6C SpawnRandomizedParticleRecords  /* alias */
+
+/* confirmed: Exact 0x70-byte no-argument one-caller initializer: configure three 12-byte GPU TILE_1 packets in each of 32 records at 0x801D4EDC by setting tag word count byte +3 to 2 and GP0 command byte +7 to 0x68, then call the adjacent leaf that resets the pool allocation count at 0x80175D40; no duplicate or interior entry */
+#define PSX_FN_InitializeParticleTilePacketPool 0x8011FE94u
+#define func_8011FE94 InitializeParticleTilePacketPool  /* alias */
 
 /* confirmed: True 0x3B4-byte frameless owner spanning six false generated splits: resolve logical pad 0..7 through two ports/four multitap slots, accept 0x7300 analog-pad and 0x2300 NegCon-class packets, apply per-pad deadzone/scale calibration with clamping and history updates, mutate axis/pressure bytes in place, and return the packet pointer or null */
 #define PSX_FN_ApplyAnalogControllerCalibration 0x801203F0u
