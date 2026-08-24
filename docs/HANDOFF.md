@@ -1642,3 +1642,8 @@ unbounded build as a performance test; use focused targets and the bounded
   position plus two vector sources, three RGB bytes, fixed type 2/parameter
   1024, and `(subtype+2)&0xFF` for `EnqueueEffectInstance`, returning its 1;
   these records feed the recovered particle TILE_1 path downstream.
+- `SpawnRacerType1ParticleBurst` owns `0x8011FF78..0x8011FF97`, with one
+  entry-only caller. It transparently forwards racer index `a0` to private
+  `0x8013CA90`, which applies racer/session gates and appends up to two
+  randomized type-1 records to the `0x801E1B10` particle ring; unlike the
+  adjacent type-2 adapter it accepts no explicit vectors/RGB and has no return.

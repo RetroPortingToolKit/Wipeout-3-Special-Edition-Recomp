@@ -304,6 +304,10 @@
 #define PSX_FN_SpawnType2ParticleEffect 0x8011FF10u
 #define func_8011FF10 SpawnType2ParticleEffect  /* alias */
 
+/* confirmed: Exact 0x20-byte one-caller transparent adapter: forward racer index a0 unchanged to private 0x8013CA90, which applies racer/session eligibility gates and appends up to two randomized type-1 records to the 48-byte particle ring at 0x801E1B10; no semantic return, duplicate, or interior target */
+#define PSX_FN_SpawnRacerType1ParticleBurst 0x8011FF78u
+#define func_8011FF78 SpawnRacerType1ParticleBurst  /* alias */
+
 /* confirmed: True 0x3B4-byte frameless owner spanning six false generated splits: resolve logical pad 0..7 through two ports/four multitap slots, accept 0x7300 analog-pad and 0x2300 NegCon-class packets, apply per-pad deadzone/scale calibration with clamping and history updates, mutate axis/pressure bytes in place, and return the packet pointer or null */
 #define PSX_FN_ApplyAnalogControllerCalibration 0x801203F0u
 #define func_801203F0 ApplyAnalogControllerCalibration  /* alias */
