@@ -788,3 +788,18 @@ unbounded build as a performance test; use focused targets and the bounded
   endpoints and listener context; it computes midpoint distance, wrapped
   heading-based left/right attenuation, clamps volume to 230 and pan to 0..30,
   then calls the shared voice allocator.
+- `0x80104AA0` is `NextRandom15`, a 254-caller private-state RNG. It stores
+  `(old >>s 1) XOR (old << 3)` to `gRandom15State` at `0x80173A94`, then
+  returns the low 15 bits; adjacent seeded words are independent streams.
+- Fixed-point trig uses 4096 angle units per turn and signed Q12 output.
+  `SinQ12FromSignedAngle` (`0x8015C318`) and
+  `CosQ12FromSignedAngle` (`0x8015C3E8`) fold through the private quarter-wave
+  lookup and 1025-entry table at `0x8017A74C`.
+- `0x8016192C..0x80161DFF` is `AccessSio1ControlState`, a 40-caller two-level
+  selector over SIO1 STAT/MODE/CTRL/BAUD at `0x1F801050`, shadow state, baud
+  division, and critical-section lifecycle. Fourteen generated interior
+  entries are computed-jump labels, not separate ABIs.
+- `0x8015C698` is the real variadic `FormatString` entry. Its 12-byte
+  argument-spill prefix falls directly into generated piece `0x8015C6A4`; the
+  combined 2,180-byte owner is sprintf-equivalent and has 57 direct callers,
+  while the split body has none.
