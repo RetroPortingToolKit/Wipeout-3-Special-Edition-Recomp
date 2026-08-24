@@ -2871,3 +2871,13 @@ do not reuse the rejected pre-A/B state or start a second process.
   FMV, and fresh race/replay coverage remain acceptance checks, but any new
   performance comparison must start from this exact executable/media/config
   tuple and keep automatic rewind disabled.
+
+## Unified 100 Hz visual acceptance update (2026-08-24)
+
+- User directly confirmed the exact unified candidate is solid in-race: the
+  3-2-1 sequence, overall graphics, and polygon geometry are correct with no
+  observed flying or missing polygons. This closes the prior PGXP/geometry
+  acceptance concern for the active PGXP-off/HD-off profile.
+- The remaining visual acceptance item is a direct clean-boot/menu-to-FMV
+  transition on this same executable/media/config tuple. Do not use the old
+  fixed-50 Hz PAL8 image or stale cache when collecting that evidence.
