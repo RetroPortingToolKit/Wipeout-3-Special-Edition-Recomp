@@ -1581,6 +1581,13 @@ status = "confirmed"
 note = "Exact 0x5C-byte leaf with six unique callers: select a 0x16C-byte runtime racer by index, set halfword +0x132 to min(9 * signed halfword +0x146, floor(5 * unsigned halfword +0x14A / 4)), and clear halfwords +0x14C and +0x12A"
 
 [[func]]
+pc = 0x8016B264
+name = "DispatchMdecDmaCommand"
+emit = false
+status = "confirmed"
+note = "True 0x280-byte varargs MDEC DMA dispatcher across the false 0x8016B274 split: spill a0..a3 for selectors 0..3, switch DMA direction/control, set the shifted transfer count, or launch the selected MDEC DMA channel from (address,size), returning zero or -2 on bounded hardware-wait timeout"
+
+[[func]]
 pc = 0x8015FD7C
 name = "Exit"
 emit = false
@@ -1603,7 +1610,21 @@ note = "Exact 0x88-byte six-caller pure racer predicate: reject negative indices
 
 [[func]]
 pc = 0x8015B65C
-name = "EmitTexturedQuadPacket"
+name = "EmitTexturedScreenQuadPacket"
 emit = false
 status = "confirmed"
 note = "Exact 0x188-byte three-caller POLY_FT4 builder: reserve 40 bytes from gPrimCursor, write four signed XY pairs, RGB, texture UV/CLUT state, choose opaque 0x2C or semitransparent 0x2E with ABR-1 GetTPage, then prepend the packet to the active ordering-table bucket at signed depth>>6; no overlay duplicate"
+
+[[func]]
+pc = 0x800EA870
+name = "ComputeObjectUpVectorQ12"
+emit = false
+status = "confirmed"
+note = "Exact 0x140-byte six-caller shared helper: read signed 4096-unit Euler angles at object offsets +0x11E/+0x120/+0x122, evaluate SinQ12FromSignedAngle and CosQ12FromSignedAngle, and write the rotated local +Y basis as three signed Q12 words; six generated calls are six unique guest sites across base and overlay owners, with no interior entry calls"
+
+[[func]]
+pc = 0x8015D3C4
+name = "ClearImage"
+emit = false
+status = "confirmed"
+note = "Exact 0x90-byte six-caller canonical PsyQ GPU wrapper: log/validate the RECT through the shared GPU diagnostic helper, pack caller RGB bytes as 0x00BBGGRR, and dispatch operation 8 through the active GPU driver's +8 method with its +0x0C context, propagating the backend result"
