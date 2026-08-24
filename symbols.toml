@@ -1685,6 +1685,13 @@ status = "confirmed"
 note = "Exact 0x414-byte call-free font-metric initializer: truncate selector/variant to bytes, clamp selector >=10 to 9, choose one of the embedded signed-halfword metric sources and a 64/100-entry extent, scale values with exact signed division by 100, and populate six global glyph metric bands at 0x801CDA88..0x801CE69C; six consecutive calls in owner 0x80104AC4 are six unique entry sites with no overlay or interior calls"
 
 [[func]]
+pc = 0x80116A54
+name = "AllocateArenaBlockBestFit"
+emit = false
+status = "confirmed"
+note = "Exact 0x1EC-byte five-caller arena allocator: align requested bytes to four, scan the arena's +0x10 block chain for the smallest free block fitting payload plus the 20-byte header, diagnose and return null on failure, otherwise split/link the selected block, debit arena +8, update the global minimum-free watermark, and return header +0x0C payload pointer"
+
+[[func]]
 pc = 0x8015D3C4
 name = "ClearImage"
 emit = false
@@ -1711,3 +1718,10 @@ name = "InitializeOrRefreshEffectSlot"
 emit = false
 status = "confirmed"
 note = "Exact 0x6B4-byte six-caller effect-pool initializer: index a 0xCC-byte slot, initialize only state 0 or refresh state 3, bind owner/source geometry, apply mode-1..4 RNG/geometry-specific position and motion fields, publish three caller callbacks at +0xC0/+0xC4/+0xC8, and activate through 0x800F96D0; no overlay duplicate"
+
+[[func]]
+pc = 0x80141458
+name = "QueueOrientedQuadSourceRecord"
+emit = false
+status = "confirmed"
+note = "Exact 0x19C-byte five-caller scene-record producer: unless disabled by mode byte 0x801D1B3E, advance past queued 28-byte records flagged bit 2 within a 64-entry window, append position plus four halfword attributes and four bytes, force active bit 0x8000, advance the tail index, and leave rendering to BuildVisibleObjectQuadPackets"
