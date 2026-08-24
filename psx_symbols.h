@@ -48,6 +48,10 @@
 #define PSX_FN_InstallLinkedRenderTransform 0x80136078u
 #define func_80136078 InstallLinkedRenderTransform  /* alias */
 
+/* confirmed: Exact 0xDC-byte sound-effect wrapper: reject id -1, clamp signed volume above 230, truncate volume/pan/pitch to bytes, remap ids 29/37/28 to sink selectors 23/22/21, route id 7 through the dedicated resource at 0x801E17A8 with class 18, route other ids through the 0x801E178C pointer table with class 2, then call 0x80121534; 81 direct JAL callers */
+#define PSX_FN_PlaySoundEffectById 0x80137DFCu
+#define func_80137DFC PlaySoundEffectById  /* alias */
+
 /* known: Single-caller argument-free scene-pass orchestrator: unless globally suppressed, optionally submit one of two view-mode-specific layers, then always submit three ordered race-scene layers before returning */
 #define PSX_FN_SubmitRaceSceneLayers 0x80140770u
 #define func_80140770 SubmitRaceSceneLayers  /* alias */
@@ -55,6 +59,10 @@
 /* known: Single-caller non-leaf: updates active bits on 28-byte object records, prepares the GTE view transform, compacts visible oriented quads through 0x80172E3C, and emits 40-byte GPU POLY_FT4 packets into the current OT */
 #define PSX_FN_BuildVisibleObjectQuadPackets 0x801415F4u
 #define func_801415F4 BuildVisibleObjectQuadPackets  /* alias */
+
+/* known: Exact 1040-byte TIM texture loader: accept 4-bit/8-bit indexed TIM data and signed page mode, allocate a 38-byte descriptor, auto-place missing 4-bit CLUT/image rectangles, derive CLUT/TPAGE and four UV corners, upload both TIM blocks through LoadImage, return the descriptor; reject unsupported pixel modes with null */
+#define PSX_FN_LoadTexture 0x8014195Cu
+#define func_8014195C LoadTexture  /* alias */
 
 /* known: Single-caller shadow-texture initializer: ignores the legacy source-path a0, allocates a 38-byte halfword descriptor, derives its flags from a1, initializes the fixed 800,256 / 32x224 VRAM atlas layout, uploads embedded pixels from 0x8003484C through LoadImage, and returns the descriptor */
 #define PSX_FN_InitializeShadowTextureAtlas 0x80141D6Cu
@@ -131,6 +139,10 @@
 /* known: Shared renderer-private tail-call function: marshal four projected vertices plus texture/material state into the 0x801E25D0 clipping workspace, call ClipAndEmitSceneryPrimitive, restore the inherited register context, and return through the original caller's ra */
 #define PSX_FN_ClipAndSubmitNearTexturedQuad 0x80170B5Cu
 #define func_80170B5C ClipAndSubmitNearTexturedQuad  /* alias */
+
+/* known: Single owner of 0x80170CBC..0x80170D3B: scan a reverse GPU ordering-table link chain backward and repair a broken link; 0x80170CD0, 0x80170D04, and 0x80170D24 are internal branch targets, not callable routines */
+#define PSX_FN_ValidateAndRepairReverseOrderingTable 0x80170CBCu
+#define func_80170CBC ValidateAndRepairReverseOrderingTable  /* alias */
 
 /* known: No-argument renderer setup leaf: copy 17 template words from 0x801762E0/0x80176300 into scratchpad 0x1F800078..0x1F8000B8, then initialize the 0x801E25D0 clipping workspace mode/count fields */
 #define PSX_FN_InitializeSceneryClipScratchpad 0x80170D3Cu

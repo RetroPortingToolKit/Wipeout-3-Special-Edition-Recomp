@@ -131,6 +131,13 @@ status = "known"
 note = "Shared renderer-private tail-call function: marshal four projected vertices plus texture/material state into the 0x801E25D0 clipping workspace, call ClipAndEmitSceneryPrimitive, restore the inherited register context, and return through the original caller's ra"
 
 [[func]]
+pc = 0x80170CBC
+name = "ValidateAndRepairReverseOrderingTable"
+emit = false
+status = "known"
+note = "Single owner of 0x80170CBC..0x80170D3B: scan a reverse GPU ordering-table link chain backward and repair a broken link; 0x80170CD0, 0x80170D04, and 0x80170D24 are internal branch targets, not callable routines"
+
+[[func]]
 pc = 0x80170D3C
 name = "InitializeSceneryClipScratchpad"
 emit = false
@@ -209,6 +216,13 @@ name = "InitializeRaceRuntimeResources"
 emit = false
 status = "known"
 note = "Argument-free startup initializer called once from 0x80116128: create/configure the shared 80-byte transform object, allocate and publish race-owned work buffers, initialize dependent race subsystems, create a 38-byte display/resource descriptor through 0x80141D6C, and publish that returned handle"
+
+[[func]]
+pc = 0x8014195C
+name = "LoadTexture"
+emit = false
+status = "known"
+note = "Exact 1040-byte TIM texture loader: accept 4-bit/8-bit indexed TIM data and signed page mode, allocate a 38-byte descriptor, auto-place missing 4-bit CLUT/image rectangles, derive CLUT/TPAGE and four UV corners, upload both TIM blocks through LoadImage, return the descriptor; reject unsupported pixel modes with null"
 
 [[func]]
 pc = 0x80141D6C
@@ -386,3 +400,10 @@ addr = 0x8016E170
 name = "kShadsBt4SourcePath"
 status = "confirmed"
 note = "29-byte NUL-terminated string `c:\\wipeout3\\common\\shads.bt4`; materialized only at 0x80124928..0x8012492C and passed as the unused a0 argument to 0x80141D6C, not executable code or a callback"
+
+[[func]]
+pc = 0x80137DFC
+name = "PlaySoundEffectById"
+emit = false
+status = "confirmed"
+note = "Exact 0xDC-byte sound-effect wrapper: reject id -1, clamp signed volume above 230, truncate volume/pan/pitch to bytes, remap ids 29/37/28 to sink selectors 23/22/21, route id 7 through the dedicated resource at 0x801E17A8 with class 18, route other ids through the 0x801E178C pointer table with class 2, then call 0x80121534; 81 direct JAL callers"
