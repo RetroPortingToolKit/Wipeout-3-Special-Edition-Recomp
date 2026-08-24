@@ -160,6 +160,10 @@
 #define PSX_FN_TrySpawnRandomGeometryParticle 0x8011E69Cu
 #define func_8011E69C TrySpawnRandomGeometryParticle  /* alias */
 
+/* confirmed: Exact 0x100-byte seven-caller controller-response sanitizer: copy eight bytes from a nonnull source or clear them, preserve the raw header at destination +8, accept 0x2300/0x4100/0x7300, otherwise force released buttons and centered axes, and canonicalize recognized 0x23FF/0x41FF/0x73FF error headers to 0x4100 */
+#define PSX_FN_CopyAndNormalizeControllerPacket 0x80120988u
+#define func_80120988 CopyAndNormalizeControllerPacket  /* alias */
+
 /* confirmed: Exact 0x2C0-byte shared audio sink with three direct callers: gate on two audio-enable bytes, allocate one of 24 sound slots, snapshot volume/pan/pitch and Q8 pitch scale, resolve or reserve one/two of 24 voices, initialize 36-byte voice state from a 20-byte resource descriptor, then submit the slot to the active audio backend */
 #define PSX_FN_AllocateAndQueueSoundVoice 0x80121534u
 #define func_80121534 AllocateAndQueueSoundVoice  /* alias */
@@ -275,6 +279,10 @@
 /* confirmed: Exact 0xDC-byte sound-effect wrapper: reject id -1, clamp signed volume above 230, truncate volume/pan/pitch to bytes, remap ids 29/37/28 to sink selectors 23/22/21, route id 7 through the dedicated resource at 0x801E17A8 with class 18, route other ids through the 0x801E178C pointer table with class 2, then call 0x80121534; 81 direct JAL callers */
 #define PSX_FN_PlaySoundEffectById 0x80137DFCu
 #define func_80137DFC PlaySoundEffectById  /* alias */
+
+/* confirmed: Exact 0x50-byte eight-caller CD-state initializer: issue synchronous command 1 with null buffers, clear the callback word at 0x801792C8 and the LibCD ready callback, restore the saved LibCD sync callback from 0x801D1B90, set initialization flag 0x8017627C to 1, and return 1 */
+#define PSX_FN_RestoreCdCallbackConfiguration 0x80138188u
+#define func_80138188 RestoreCdCallbackConfiguration  /* alias */
 
 /* confirmed: Exact 0xC8-byte leaf that advances the byte-wrapped index in the effect pool referenced by 0x801E1F14, selects the 48-byte slot at pool+4+index*48, copies position/vector/source parameters and type bytes into its fixed layout, initializes active/default fields, and returns 1; eight unique callers produce nine overlay instances */
 #define PSX_FN_EnqueueEffectInstance 0x80140438u
@@ -535,6 +543,14 @@
 /* confirmed: Exact 0x18-byte nine-caller interrupt-mask exchange leaf: load the active 16-bit I_MASK register pointer from 0x8017A4F4 (initialized to 0x1F801074), return its old zero-extended value, and store the low half of a0 in the jr delay slot; GPU/DMA callers use zero/restore pairs */
 #define PSX_FN_SetIntrMask 0x80162690u
 #define func_80162690 SetIntrMask  /* alias */
+
+/* confirmed: Exact 0x104-byte seven-caller canonical LibCD converter: add the 150-sector lead-in, split signed sector count into minutes/seconds/frames by 75 and 60, pack each component as BCD into output bytes +0/+1/+2, leave +3 untouched, and return the output pointer; call-free with no shared state */
+#define PSX_FN_CdIntToPos 0x801649C4u
+#define func_801649C4 CdIntToPos  /* alias */
+
+/* confirmed: Exact 0x80-byte seven-caller canonical LibCD leaf: decode the three packed-BCD minute/second/frame bytes at a0, return ((minute*60)+second)*75+frame-150 as a signed logical-sector index, and touch no state beyond registers */
+#define PSX_FN_CdPosToInt 0x80164AC8u
+#define func_80164AC8 CdPosToInt  /* alias */
 
 /* confirmed: Exact 0x10-byte fourteen-caller syscall-2 wrapper: set a0=2, execute syscall, enable COP0 Status IEc and interrupt-mask bit IM2 through the BIOS syscall contract, return v0=0, and touch no RAM or ordinary library state */
 #define PSX_FN_ExitCriticalSection 0x80165550u

@@ -1203,6 +1203,13 @@ status = "confirmed"
 note = "Exact 0x12C-byte eight-caller scene-object group mutator: scan all 0xCC-byte records at 0x8018811C/count 0x80187CE8, match full key a0 against signed halfword +8 or byte +1, then selector low8 0/1/2/3 writes linked-object byte +4, randomized halfword +0xA2, record byte +2, or record byte +3 respectively; no semantic return"
 
 [[func]]
+pc = 0x801649C4
+name = "CdIntToPos"
+emit = false
+status = "confirmed"
+note = "Exact 0x104-byte seven-caller canonical LibCD converter: add the 150-sector lead-in, split signed sector count into minutes/seconds/frames by 75 and 60, pack each component as BCD into output bytes +0/+1/+2, leave +3 untouched, and return the output pointer; call-free with no shared state"
+
+[[func]]
 pc = 0x8014FA4C
 name = "SpawnTrackSectionSurfaceEffects"
 emit = false
@@ -1315,6 +1322,13 @@ status = "confirmed"
 note = "Exact 0x144-byte seven-caller argument-free PsyQ GPU watchdog: sample VSync(-1), return 0 while the deadline/call-count guard remains healthy, otherwise print retained GPU diagnostics, mask interrupts, reset tracked GPU/DMA state and GP1, restore the prior interrupt mask, and return -1"
 
 [[func]]
+pc = 0x80164AC8
+name = "CdPosToInt"
+emit = false
+status = "confirmed"
+note = "Exact 0x80-byte seven-caller canonical LibCD leaf: decode the three packed-BCD minute/second/frame bytes at a0, return ((minute*60)+second)*75+frame-150 as a signed logical-sector index, and touch no state beyond registers"
+
+[[func]]
 pc = 0x80134CE8
 name = "SubmitRumbleDecayRequest"
 emit = false
@@ -1355,3 +1369,17 @@ name = "EmitDrawModePacketToOrderingTable"
 emit = false
 status = "confirmed"
 note = "Exact 0xA8-byte eight-caller GPU-state emitter: reserve a 12-byte DR_MODE at gPrimCursor, compute TPAGE from caller ABR with tp/x/y zero, build mode with DFE=1 and caller DTD, then prepend the packet to the active ordering-table bucket at signed depth>>6"
+
+[[func]]
+pc = 0x80138188
+name = "RestoreCdCallbackConfiguration"
+emit = false
+status = "confirmed"
+note = "Exact 0x50-byte eight-caller CD-state initializer: issue synchronous command 1 with null buffers, clear the callback word at 0x801792C8 and the LibCD ready callback, restore the saved LibCD sync callback from 0x801D1B90, set initialization flag 0x8017627C to 1, and return 1"
+
+[[func]]
+pc = 0x80120988
+name = "CopyAndNormalizeControllerPacket"
+emit = false
+status = "confirmed"
+note = "Exact 0x100-byte seven-caller controller-response sanitizer: copy eight bytes from a nonnull source or clear them, preserve the raw header at destination +8, accept 0x2300/0x4100/0x7300, otherwise force released buttons and centered axes, and canonicalize recognized 0x23FF/0x41FF/0x73FF error headers to 0x4100"

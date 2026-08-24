@@ -1168,6 +1168,11 @@ unbounded build as a performance test; use focused targets and the bounded
   `+1`, and selector 0/1/2/3 updates linked byte `+4`, randomized halfword
   `+0xA2`, record byte `+2`, or record byte `+3`. Every match is updated; only
   selector 1 advances RNG, once per match.
+- `CdIntToPos` owns `0x801649C4..0x80164AC7`, has seven direct callers and no
+  interior targets. It adds the 150-sector lead-in, divides signed total by 75
+  and 60, packs minute/second/frame components as BCD into output bytes
+  `+0/+1/+2`, leaves byte `+3` untouched, and returns the original pointer.
+  It is call-free and has no shared or hardware effects.
 - `SpawnTrackSectionSurfaceEffects` logically owns
   `0x8014FA4C..0x80150577` despite generated splits at FAE0/FDE0/FF4C/50548.
   Its sole real caller passes a track section and effect flags; it selects a
@@ -1251,6 +1256,10 @@ unbounded build as a performance test; use focused targets and the bounded
   prints GPU diagnostics, masks interrupts, resets tracked GPU/DMA state and
   GP1, restores I_MASK, and returns -1. Its seven GPU-library callers have no
   overlay duplicates or interior targets.
+- `CdPosToInt` is the straight-line LibCD leaf at
+  `0x80164AC8..0x80164B47`: it BCD-decodes minute/second/frame and returns
+  `((minute*60)+second)*75+frame-150`. Seven unique callers have no overlay
+  duplicates or interior targets, and the conversion has no state effects.
 - `SubmitRumbleDecayRequest` owns `0x80134CE8..0x80134D23` with 12 entry-only
   callers. It replaces rumble-state words `+0x0C/+0x10/+0x14` with Q8 motor
   amplitude, signed priority, and Q8 decay only when both the new amplitude
@@ -1281,3 +1290,13 @@ unbounded build as a performance test; use focused targets and the bounded
   `GetTPage(0, abr, 0, 0)`, builds it with DFE 1 and caller DTD, and prepends
   it to the active ordering-table bucket at signed `depth >> 6`. It returns no
   semantic value; its effects are the packet, cursor, and OT link updates.
+- `RestoreCdCallbackConfiguration` owns `0x80138188..0x801381D7` with eight
+  entry-only callers. It synchronously issues CD command 1 with null buffers,
+  clears the callback slots exchanged by `0x80160D14` and `CdReadyCallback`,
+  restores the saved `CdSyncCallback` from `0x801D1B90`, sets the shared
+  initialization flag at `0x8017627C`, and returns 1.
+- `CopyAndNormalizeControllerPacket` owns `0x80120988..0x80120A87` with seven
+  entry callers. It copies/clears eight raw controller bytes, saves their
+  original header at destination `+8`, accepts headers `2300/4100/7300`, and
+  otherwise forces buttons `FFFF` plus four centered `80` axes. Recognized
+  `23FF/41FF/73FF` error headers are additionally canonicalized to `4100`.
