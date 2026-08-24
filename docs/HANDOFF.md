@@ -1589,6 +1589,11 @@ unbounded build as a performance test; use focused targets and the bounded
   caller `0x80110960`. It converts 512 RGB24 pixels into the transposed
   `0x38`-prefixed color-word table at `0x801DE670`, then builds 26 Q12
   sine/cosine-driven 80-byte warp rows at `0x801DDE50`; `a1/a3` are ignored.
+- `InitializeFrontendImageWarpPacketChains` owns
+  `0x8012DCB4..0x8012DEA3`, with sole caller `0x80110988`. It sequentially
+  links 175 POLY_G4 packets into 64 neutral POLY_FT4 atlas strips in the
+  caller workspace, sets FT4 CLUT/TPAGE/UVs, and publishes first/last FT4
+  pointers at workspace `+0x22A0/+0x229C`; `a2/a3` are ignored.
 - `SpawnRandomizedParticleRecords` owns `0x8011FE6C..0x8011FE93` and discards
   original `a0` while forwarding `(a1 count, a2 origin, a3 spread)` to private
   `EnqueueRandomizedParticleRecords` (`0x80140F9C..0x801410C7`). Four unique
@@ -1639,6 +1644,13 @@ unbounded build as a performance test; use focused targets and the bounded
   a three/five-glyph negative placeholder and delegates every packet to the
   fixed-neutral-gray `EmitFontGlyphPacket`; it never uses the grayscale
   sibling or constructs a primitive directly.
+- `DrawAsciiTextString` is the logical `0x80105B78..0x80105CDB` owner; 12
+  generated subentries are internal character-map cases. It maps the authored
+  uppercase ASCII subset, advances spaces by eight, threads X through
+  fixed-neutral-gray `EmitFontGlyphPacket`, and returns total width. There are
+  72 unique runtime call PCs (69 retained plus three overlay-only) but 104
+  generated emissions from repeated overlay/overlap translations, with no
+  external interior target.
 - `RotateQuadCoordinatesClockwise` owns `0x80110324..0x8011038F`, with two
   entry-only callers. It snapshots four `(x,y)` pairs and permutes their 2x2
   corner grid from `[0,1;2,3]` to `[2,0;3,1]`, a clockwise quarter-turn; it is
@@ -1663,3 +1675,8 @@ unbounded build as a performance test; use focused targets and the bounded
   `0x8013CA90`, which applies racer/session gates and appends up to two
   randomized type-1 records to the `0x801E1B10` particle ring; unlike the
   adjacent type-2 adapter it accepts no explicit vectors/RGB and has no return.
+- `DrainParticleEffectQueue` owns `0x8011FF98..0x801202EF`, reads no arguments,
+  and is reentrancy guarded. It consumes up to two pending 40-byte particle
+  records, publishes them as the current 80-byte slot of a 16-entry ring,
+  advances masked producer/consumer cursors, invokes the optional callback at
+  `0x80175D44`, and has no direct or interior static caller.
