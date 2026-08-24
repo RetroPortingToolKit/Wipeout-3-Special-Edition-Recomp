@@ -899,6 +899,13 @@ status = "confirmed"
 note = "Exact 0x10-byte 34-caller BIOS A0/2A memcpy trampoline: preserve destination/source/length arguments, load t1=0x2A, jump to BIOS vector 0xA0, and return the BIOS destination result unchanged"
 
 [[func]]
+pc = 0x8014B3D4
+name = "AbsoluteValue32"
+emit = false
+status = "confirmed"
+note = "Exact 0x18-byte 21-caller frameless integer absolute-value leaf: return a0 unchanged when signed nonnegative, otherwise return two's-complement 0-a0; INT32_MIN consequently remains 0x80000000, with no memory or hardware effects"
+
+[[func]]
 pc = 0x8010EAC4
 name = "EmitLocalizedFontGlyphPacket"
 emit = false
@@ -955,6 +962,19 @@ status = "confirmed"
 note = "Exact 0x60-byte five-caller PsyQ low-level VRAM upload dispatcher: validate/log the RECT with retained 'LoadImage' name, then call the active GPU driver's transfer method at vtable +0x08 as (driver+0x20 context, RECT, operation 8, source words) and return its result unchanged"
 
 [[func]]
+pc = 0x8014B6A4
+name = "DivideSignedByPowerOfTwoTowardZero"
+emit = false
+status = "confirmed"
+note = "Exact 53-caller signed arithmetic leaf: return value / 2^(shift&31) with truncation toward zero by negating negative inputs around SRAV; generated R 8014B6A4 14 is only the unique prefix, while the positive path uses internal suffix 0x8014B6B8..BF and the full semantic extent ends at 0x8014B6C0"
+
+[[block]]
+pc = 0x8014B6B8
+name = "DivideSignedByPowerOfTwoPositiveSuffix"
+status = "confirmed"
+note = "Internal positive-input return suffix of DivideSignedByPowerOfTwoTowardZero; reached only by branch from 0x8014B6A4 and has zero direct JAL callers despite generated F/R 8014B6B8 8"
+
+[[func]]
 pc = 0x8014F814
 name = "AccumulateOneIndexedVertexWeight"
 emit = false
@@ -1003,6 +1023,13 @@ status = "confirmed"
 note = "Exact 0x40-byte 31-caller error-policy adapter: accept an ignored diagnostic-string pointer and a value normalized to signed 16 bits, return for every severity except exactly 2, and for severity 2 tail into the BIOS B0:38 exit service with status zero; every executable caller passes severity 2"
 
 [[func]]
+pc = 0x8016B6F8
+name = "DelaySpuRegisterAccess"
+emit = false
+status = "confirmed"
+note = "Exact 0x5C-byte 14-caller SPU-library timing delay: ignore all arguments, keep counter and accumulator on an 8-byte stack frame, execute 60 iterations of accumulator *= 13 with 32-bit wraparound, and return without MMIO/global mutation or semantic value; callers place it around SPU control/status/data-port accesses"
+
+[[func]]
 pc = 0x8014FA4C
 name = "SpawnTrackSectionSurfaceEffects"
 emit = false
@@ -1022,3 +1049,17 @@ name = "LoadSimpleTimTexture"
 emit = false
 status = "confirmed"
 note = "Exact 0x458-byte one-caller TIM converter: accept 4-bit or 8-bit indexed images plus signed-16 ABR, allocate and populate a 0x26-byte TPAGE/CLUT/UV descriptor, auto-place supported rectangles, force STP bit 15 on the 16-entry 4-bit CLUT, upload CLUT and pixels, return the descriptor, or return null for unsupported modes"
+
+[[func]]
+pc = 0x801601B4
+name = "SetDrawMode"
+emit = false
+status = "confirmed"
+note = "Exact 0x94-byte 11-caller PsyQ-compatible DR_MODE packet builder: set two-word packet length, encode E1 draw-mode command from DFE/DTD and masked TPAGE, optionally encode E2 texture-window masks/offsets from RECT, otherwise emit a zero/NOP second word; no semantic return"
+
+[[func]]
+pc = 0x80160254
+name = "SetPolyF4"
+emit = false
+status = "confirmed"
+note = "Exact 0x14-byte 22-caller PsyQ-compatible POLY_F4 initializer: preserve the packet OT link while setting tag length byte to 5 and GP0 command byte to 0x28; machine v0 incidentally retains 0x28 but callers treat the routine as void"
