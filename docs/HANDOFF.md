@@ -1362,6 +1362,11 @@ unbounded build as a performance test; use focused targets and the bounded
   12-byte descriptors at `0x801D38B8` without resetting their cursors. Indices
   3+ terminate through `Exit(-1)`; the signed check does not reject negatives.
   No caller targets an interior continuation.
+- `SetGlobalStereoWidth` owns `0x801222F4..0x80122377`. With audio enabled it
+  clamps its byte input to 127 and stores `0x801D6E54`; when the backend gate is
+  also enabled it dispatches command 6 with Q8 endpoints `+width/-width`. Ten
+  generated instances are six unique callers after overlay/coverage duplicate
+  accounting, and no interior block is directly called.
 - `WaitForJoyAckAndClearIrq` owns `0x80169D30..0x80169DBF` with seven callers.
   It acknowledges SIO interrupt bit 7 in `I_STAT`, waits for JOY_STAT ACK bit
   7 to clear under the caller-armed Timer 2 deadline, returns zero on timeout,
@@ -1414,8 +1419,18 @@ unbounded build as a performance test; use focused targets and the bounded
   suppresses and saves CD callbacks, conditionally runs command-9 recovery,
   starts the lower read engine, and returns boolean acceptance; callers then
   poll adjacent read-sync at `0x80160C10`.
+- `IsRaceRecordStatusZeroTypeNonzero` is the exact pure leaf at
+  `0x80134AD8..0x80134B5F`, with six entry-only callers. It rejects negative
+  indices, selects `0x801910E0 + index*0x3A4`, and returns true only for byte
+  `+0 == 0` and byte `+3 != 0`; unlike the nearby stricter predicate, values
+  other than one also satisfy the second test.
 - `ApplyRgbToPrimitiveRecordStream` owns `0x800E8350..0x800E8513`; its six
   generated interior entries are the type 1..8 jump-table cases. Four unique
   callers supply an owner (`count +0x12`, stream `+0x1C`) and RGB bytes. It
   overwrites one, three, or four per-vertex RGB triplets at full or unsigned
   half intensity according to the exact variable-size record layout.
+- `CdReadSync` owns exactly `0x80160C10..0x80160D13`, with six entry-only
+  callers and no generated duplication. It is the synchronizer paired with
+  adjacent asynchronous `CdRead`: mode zero waits, nonzero polls, it enforces
+  60/1200-vblank recovery deadlines, services optional status output, and
+  returns progress/completion or `-1` on timeout/error.
