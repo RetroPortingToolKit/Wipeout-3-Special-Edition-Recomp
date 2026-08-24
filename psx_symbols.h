@@ -40,6 +40,10 @@
 #define PSX_FN_DecodePackedRacerControls 0x80102E70u
 #define func_80102E70 DecodePackedRacerControls  /* alias */
 
+/* confirmed: Exact 0x2C-byte 13-caller pure race-random sampler: add the selected-racer seed at 0x80173A8C to the race-frame counter at 0x80173AEC modulo 32 bits, XOR arithmetic-right-by-1 with left-by-3, and return the low 15 bits without updating either input */
+#define PSX_FN_ComputeRaceFrameRandom15 0x80104A1Cu
+#define func_80104A1C ComputeRaceFrameRandom15  /* alias */
+
 /* confirmed: Exact argument-free 0x24-byte PRNG leaf: load gRandom15State, replace it with (arithmetic_shift_right(state,1) XOR (state << 3)) modulo 32 bits, and return the new state's low 15 bits; private state begins at 0x12345678; 254 direct JAL callers */
 #define PSX_FN_NextRandom15 0x80104AA0u
 #define func_80104AA0 NextRandom15  /* alias */
@@ -172,6 +176,10 @@
 #define PSX_FN_InitializeRaceRuntimeResources 0x8012482Cu
 #define func_8012482C InitializeRaceRuntimeResources  /* alias */
 
+/* confirmed: Exact 0x14-byte 25-caller frameless in-place byte-pair swap: exchange bytes at pointer offsets 0 and 1, touch no other memory or state, and expose only an incidental original-byte-1 value in v0 */
+#define PSX_FN_SwapAdjacentBytes 0x8012E310u
+#define func_8012E310 SwapAdjacentBytes  /* alias */
+
 /* confirmed: Exact 0x12C-byte twelve-call-site deep-copy constructor: allocate a 40-byte instance from the shared arena, copy its 16-byte name and scalar fields, allocate and memcpy its owned 80-byte payload, reset the runtime field at +0x24, report allocation failures through the retained New Instance diagnostic, and return the new instance */
 #define PSX_FN_CreateObjectInstance 0x8012E408u
 #define func_8012E408 CreateObjectInstance  /* alias */
@@ -283,6 +291,10 @@
 /* confirmed: Exact 0x5C-byte three-component magnitude helper with 38 direct callers: compute the low-32-bit sum x*x+y*y+z*z, pass it to the GTE-normalized lookup-table square-root approximation at 0x8015C488, and return that result unchanged; generated 0x8014B638 is its internal delayed frame setup */
 #define PSX_FN_ApproximateVectorLength3i 0x8014B614u
 #define func_8014B614 ApproximateVectorLength3i  /* alias */
+
+/* confirmed: Exact unsplit 0x34-byte nine-caller arccosine leaf: index the 4097-entry signed-halfword table at 0x8017634C by abs(Q12 cosine), reflect negative inputs as 0x4000-table[index], and return an angle with pi=0x4000; caller must constrain input to -4096..4096 */
+#define PSX_FN_ApproximateArccosQ12 0x8014B670u
+#define func_8014B670 ApproximateArccosQ12  /* alias */
 
 /* confirmed: Exact 53-caller signed arithmetic leaf: return value / 2^(shift&31) with truncation toward zero by negating negative inputs around SRAV; generated R 8014B6A4 14 is only the unique prefix, while the positive path uses internal suffix 0x8014B6B8..BF and the full semantic extent ends at 0x8014B6C0 */
 #define PSX_FN_DivideSignedByPowerOfTwoTowardZero 0x8014B6A4u
@@ -415,6 +427,10 @@
 /* confirmed: Exact 0x24-byte one-caller LibCD wrapper: move the caller's CdlLOC output pointer to a1, pass constant session selector 1 in a0 to the 0x801602E8 TOC worker, and propagate its track-count/zero result unchanged; wrapper-local effects are only its 24-byte frame */
 #define PSX_FN_CdGetToc 0x801602C4u
 #define func_801602C4 CdGetToc  /* alias */
+
+/* confirmed: Exact 0x224-byte two-caller LibCD TOC worker retaining the CdGetToc2 diagnostic name: ignore a0, suppress/restore the sync callback, issue GetTN then GetTD for lead-out and each BCD-decoded track, write minute/second/zero records at four-byte stride through a1, and return populated track count or zero on any command failure */
+#define PSX_FN_CdGetToc2 0x801602E8u
+#define func_801602E8 CdGetToc2  /* alias */
 
 /* confirmed: Exact 0x13C-byte 12-caller PsyQ-style synchronous CD command wrapper: truncate command to u8, suppress and restore the sync callback, conditionally issue command 1 from status bit 0x10 and command 2 from a command-indexed preflight table, retry the requested IssueCdCommand transaction up to four times, and return 1 on success or 0 after exhaustion */
 #define PSX_FN_CdControl 0x80160F1Cu
