@@ -140,6 +140,10 @@
 #define PSX_FN_EmitTexturedQuadPacket 0x80106350u
 #define func_80106350 EmitTexturedQuadPacket  /* alias */
 
+/* confirmed: Logical one-caller race-status HUD owner spanning false generated splits through 0x801078D3: count active 0x16C-byte racers, derive placement/status values, and conditionally draw numeric ranks, times, labels and four textured quads through recovered font/resource/quad helpers; void, original a0 unused, no executable interior caller */
+#define PSX_FN_DrawRaceStatusHud 0x80106518u
+#define func_80106518 DrawRaceStatusHud  /* alias */
+
 /* confirmed: Exact 0x784-byte seven-argument localized glyph packet builder with 15 direct callers: accept modes/heights 8, 9, 16, or 18, select bank-sensitive six-byte glyph metrics and texture state, populate and OT-link one 40-byte POLY_FT4, increment the packet count, and return x plus the mode-scaled glyph width and one/two-pixel gap; fifth argument unused */
 #define PSX_FN_EmitLocalizedFontGlyphPacket 0x8010EAC4u
 #define func_8010EAC4 EmitLocalizedFontGlyphPacket  /* alias */
@@ -316,6 +320,10 @@
 #define PSX_FN_DrainParticleEffectQueue 0x8011FF98u
 #define func_8011FF98 DrainParticleEffectQueue  /* alias */
 
+/* confirmed: Exact 0x100-byte three-caller critical-section consumer: when published cursor 0x80175D48 differs from consumed cursor 0x80175D50, copy the next 80-byte two-record particle batch from the 16-slot ring at 0x801D54D8 into working storage 0x801D5488, advance the published cursor modulo 16, and return 1; otherwise return 0 */
+#define PSX_FN_LatchParticleEffectBatch 0x801202F0u
+#define func_801202F0 LatchParticleEffectBatch  /* alias */
+
 /* confirmed: True 0x3B4-byte frameless owner spanning six false generated splits: resolve logical pad 0..7 through two ports/four multitap slots, accept 0x7300 analog-pad and 0x2300 NegCon-class packets, apply per-pad deadzone/scale calibration with clamping and history updates, mutate axis/pressure bytes in place, and return the packet pointer or null */
 #define PSX_FN_ApplyAnalogControllerCalibration 0x801203F0u
 #define func_801203F0 ApplyAnalogControllerCalibration  /* alias */
@@ -372,6 +380,10 @@
 #define PSX_FN_InitializeFrontendImageWarpPacketChains 0x8012DCB4u
 #define func_8012DCB4 InitializeFrontendImageWarpPacketChains  /* alias */
 
+/* confirmed: Exact 0x3F8-byte one-caller frontend warp renderer: derive and activate a temporary transform from state angles, splice the initialized packet workspace into the active ordering-table bucket, select a scrolling subset of the 64 FT4 strips, project the prepared 26x8 warp grid through GTE RTPS into 175 POLY_G4 packets while copying four colors per cell, terminate the chain at the prior OT head, and restore the source transform */
+#define PSX_FN_RenderFrontendImageWarp 0x8012DEA4u
+#define func_8012DEA4 RenderFrontendImageWarp  /* alias */
+
 /* confirmed: Exact 0x3C-byte six-caller resource-loader adapter: sign-extend the low halfword of index a0, call the private resource core 0x8012CD44 as (0,0,0,NULL,index,size_out), and return its resource pointer unchanged; all six unique calls target the entry and the sole interior row is only the nested-call continuation */
 #define PSX_FN_LoadResourceBySignedIndex 0x8012E2D4u
 #define func_8012E2D4 LoadResourceBySignedIndex  /* alias */
@@ -419,6 +431,10 @@
 /* confirmed: Exact 0x3C-byte 12-caller rumble-state updater: accept a Q8 motor amplitude, signed priority, and Q8 per-tick decay only when both amplitude and priority are at least the active request, then replace state words +0x0C/+0x10/+0x14; otherwise leave state unchanged */
 #define PSX_FN_SubmitRumbleDecayRequest 0x80134CE8u
 #define func_80134CE8 SubmitRumbleDecayRequest  /* alias */
+
+/* confirmed: Exact 0xC8-byte two-unique-caller rumble tick: when the 24-byte state is enabled, derive digital and clamped analog actuator bytes, publish them to the selected port, decrement the digital countdown and clear its priority on expiry, Q8-decay analog amplitude and clear it/priority below 50; disabled state outputs zero and freezes decay; 458 generated JAL emissions collapse to guest PCs 0x80123E30/0x80123E70 */
+#define PSX_FN_UpdateRumbleStateForPort 0x80134D24u
+#define func_80134D24 UpdateRumbleStateForPort  /* alias */
 
 /* known: Argument-free 408-byte leaf: select six display/FOV scalars with 0x80173B00, derive viewport and perspective clip coefficients, and write 0x801E14EC/14F0/14F4/2480/2484/2488/25CC */
 #define PSX_FN_RebuildViewportClipCoefficients 0x8013535Cu
@@ -519,6 +535,10 @@
 /* confirmed: True 0x554-byte leaf renderer across six false generated splits: transform an eight-point glow around caller world XYZ, cull invalid/behind-camera projections, reserve four semitransparent POLY_G3 packets, fade caller RGB*intensity/256 to black at outer vertices, and link two triangle pairs into depth-selected ordering-table buckets */
 #define PSX_FN_EmitWorldSpaceRadialGlow 0x80148E94u
 #define func_80148E94 EmitWorldSpaceRadialGlow  /* alias */
+
+/* confirmed: Exact 0x144-byte GPU POLY_G4 builder: reserve 36 bytes from gPrimCursor 0x80198620 and the parallel cursor at 0x80176348, fill four signed XY pairs and four RGB triplets from the 21-argument ABI, choose GP0 command 0x38/0x3A from the final semitransparency flag, and return the packet; 942 generated overlay emissions collapse to four retained executable calls and 0x8014A858/85C are internal continuations */
+#define PSX_FN_EmitGouraudQuadPacket 0x8014A798u
+#define func_8014A798 EmitGouraudQuadPacket  /* alias */
 
 /* confirmed: Exact 0x18-byte 21-caller frameless integer absolute-value leaf: return a0 unchanged when signed nonnegative, otherwise return two's-complement 0-a0; INT32_MIN consequently remains 0x80000000, with no memory or hardware effects */
 #define PSX_FN_AbsoluteValue32 0x8014B3D4u
