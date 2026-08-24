@@ -24,6 +24,10 @@
 #define PSX_FN_LeaveNestedInterruptCriticalSection 0x800EEE64u
 #define func_800EEE64 LeaveNestedInterruptCriticalSection  /* alias */
 
+/* confirmed: Exact frameless 0x148-byte seven-caller input decoder: truncate a1 to 16 bits, clear racer record a0's runtime action word at +0x0C, expand packed low bits 0..9 into sparse action bits 4,5,6,7,9,10,11,13,14,15, and return packed bits 10..15 as an unsigned six-bit auxiliary value */
+#define PSX_FN_DecodePackedRacerControls 0x80102E70u
+#define func_80102E70 DecodePackedRacerControls  /* alias */
+
 /* confirmed: Exact argument-free 0x24-byte PRNG leaf: load gRandom15State, replace it with (arithmetic_shift_right(state,1) XOR (state << 3)) modulo 32 bits, and return the new state's low 15 bits; private state begins at 0x12345678; 254 direct JAL callers */
 #define PSX_FN_NextRandom15 0x80104AA0u
 #define func_80104AA0 NextRandom15  /* alias */
@@ -51,6 +55,10 @@
 /* confirmed: Exact 0x5BC-byte five-argument localized byte-string renderer with 24 direct callers: map ASCII/punctuation and an ISO-8859-1 accented-byte table to glyph indices, select language-sensitive extended glyph banks, emit each non-space glyph through 0x8010EAC4, apply mode-sensitive space advances, and return final x minus the sign-extended starting x */
 #define PSX_FN_DrawLocalizedFontString 0x8010F3CCu
 #define func_8010F3CC DrawLocalizedFontString  /* alias */
+
+/* confirmed: Exact 0x170-byte 10-caller signed decimal renderer: optionally emit a minus glyph, decompose the magnitude into at most five low decimal digits, zero-pad to the caller's stack-supplied minimum width, emit digits through EmitFontGlyphPacket with a mode-2 style-bank remap, and return the final X pen */
+#define PSX_FN_DrawSignedDecimalInteger 0x80110560u
+#define func_80110560 DrawSignedDecimalInteger  /* alias */
 
 /* confirmed: Exact 0x8B0-byte two-caller frontend-overlay TIM texture builder retaining the diagnostic name LoadTexture: accept 4-bit or 8-bit TIM data, allocate a 0x26-byte descriptor, auto-place supported CLUT/image rectangles, derive TPAGE/CLUT and UV bounds, upload CLUT and pixel rectangles, optionally transform source pixels or CLUT flags, and return the descriptor; unsupported modes return null */
 #define PSX_FN_LoadFrontendTexture 0x80110DF0u
@@ -96,9 +104,17 @@
 #define PSX_FN_ResolveModeDependentIndex 0x80117C08u
 #define func_80117C08 ResolveModeDependentIndex  /* alias */
 
+/* confirmed: Exact 0x15C-byte nine-caller geometry helper: approximate the length of the three signed 32-bit components after arithmetic >>6 reduction, substitute denominator one for zero, overwrite each component with signed `(component << 6) / reduced_length` (approximately a Q12 unit vector), and expose no semantic scalar return */
+#define PSX_FN_NormalizeVector3Q12InPlace 0x80118FDCu
+#define func_80118FDC NormalizeVector3Q12InPlace  /* alias */
+
 /* confirmed: Exact 0x50C-byte menu-input classifier: accept action 0..11, recognize actions 0..3 from a selected 0x73 analog-pad record when the left-stick axis is at least 93 counts from center, otherwise sum the action's PSX button mask across eligible 0x3A4-byte racer/controller records; 49 direct JAL sites */
 #define PSX_FN_GetMenuActionState 0x8011BDD0u
 #define func_8011BDD0 GetMenuActionState  /* alias */
+
+/* confirmed: Exact 0x1E4-byte six-call-site leaf renderer: reserve and initialize one 40-byte semitransparent POLY_FT4 at gPrimCursor, center a square of caller size on signed screen X/Y, derive RGB through GTE DPCS from three stack colors and a fade byte, copy all UV/CLUT/TPAGE fields from the shared sprite texture descriptor, link it into the selected ordering-table depth bucket, and advance the cursor */
+#define PSX_FN_EmitCenteredTexturedSprite 0x8011E4B8u
+#define func_8011E4B8 EmitCenteredTexturedSprite  /* alias */
 
 /* confirmed: Exact 0x2C0-byte shared audio sink with three direct callers: gate on two audio-enable bytes, allocate one of 24 sound slots, snapshot volume/pan/pitch and Q8 pitch scale, resolve or reserve one/two of 24 voices, initialize 36-byte voice state from a 20-byte resource descriptor, then submit the slot to the active audio backend */
 #define PSX_FN_AllocateAndQueueSoundVoice 0x80121534u
@@ -131,6 +147,10 @@
 /* confirmed: Exact 0x12C-byte twelve-call-site deep-copy constructor: allocate a 40-byte instance from the shared arena, copy its 16-byte name and scalar fields, allocate and memcpy its owned 80-byte payload, reset the runtime field at +0x24, report allocation failures through the retained New Instance diagnostic, and return the new instance */
 #define PSX_FN_CreateObjectInstance 0x8012E408u
 #define func_8012E408 CreateObjectInstance  /* alias */
+
+/* confirmed: Exact 0x260-byte 12-caller leaf: from a seed track-section node and XYZ point, skip 2 then test that node plus 5 successors (or skip 8/test plus 20 in mode 1), minimize squared signed deltas after >>4 scaling, optionally search a flag-selected branch chain, and return the closest section pointer */
+#define PSX_FN_FindNearestTrackSection 0x8012ED50u
+#define func_8012ED50 FindNearestTrackSection  /* alias */
 
 /* known: Argument-free race/view initializer spanning 0x80133B64..0x80134013: initialize each 0x3A4-byte viewport record, publish the active record, rebuild global clip coefficients, assign racer-to-viewport state, and finish through the split epilogue at 0x80133F60 */
 #define PSX_FN_InitializeRaceViewportState 0x80133B64u
@@ -231,6 +251,10 @@
 /* known: Exact 0x594-byte owner of the 0x8014EE6C coverage address: scan 30 96-byte effect slots for free records and initialize callback, lifetime, racer index, kind, and state fields through a 15-way kind jump table; called only at 0x8015B3F8/0x8015B40C/0x8015B424 */
 #define PSX_FN_SpawnRacerEffectRecords 0x8014EA88u
 #define func_8014EA88 SpawnRacerEffectRecords  /* alias */
+
+/* confirmed: Exact 0x12C-byte nine-caller leaf: validate an object and its positive signed byte +0x3F weight, locate the first flagged 24-byte geometry record at/after object halfword +0x34, add fixed 250/200/200 increments per weight unit to three indexed 12-byte accumulator records, consume the weight byte to zero, and return no semantic value */
+#define PSX_FN_AccumulateIndexedVertexWeights 0x8014F920u
+#define func_8014F920 AccumulateIndexedVertexWeights  /* alias */
 
 /* confirmed: Exact 0x8D4-byte 12-caller racer damage/energy updater: gate inactive or protected sessions, map supported event codes through a 132-entry dispatch table or accept an explicit delta, apply racer/mode scaling, clamp the per-racer Q8 damage accumulator, update percent/timers, and trigger the 100-percent disabled-state transition and threshold effect */
 #define PSX_FN_ApplyRacerDamageEvent 0x801562B8u
