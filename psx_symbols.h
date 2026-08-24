@@ -56,6 +56,10 @@
 #define PSX_FN_AllocateAndQueueSoundVoice 0x80121534u
 #define func_80121534 AllocateAndQueueSoundVoice  /* alias */
 
+/* known: True 60-byte owner with three callers: truncate a0 to byte a3, load the three global bytes at 0x80175E71/+72/+70 into a0/a1/a2, call 0x801220AC, and return; generated 0x80122654 is a non-callable fallthrough split requiring the prefix's live a3 */
+#define PSX_FN_ApplyGlobalRgbWithAlpha 0x80122650u
+#define func_80122650 ApplyGlobalRgbWithAlpha  /* alias */
+
 /* known: Callable race-view renderer: owns the 376-byte frame at 0x8012268C, runs scene/vehicle/effects/HUD submission and display synchronization, then returns through the split epilogue at 0x801247FC; a0 is the view/player descriptor and a1/a2 are caller-supplied render context values */
 #define PSX_FN_RenderRaceFrame 0x8012268Cu
 #define func_8012268C RenderRaceFrame  /* alias */
@@ -84,6 +88,10 @@
 #define PSX_FN_SetTransformTranslation 0x80135574u
 #define func_80135574 SetTransformTranslation  /* alias */
 
+/* confirmed: Exact 0x204-byte 27-caller Euler builder: sign-extend three 4096-unit angles, evaluate recovered Q12 sine/cosine, write a row-major Ry(-a1)*Rx(a2)*Rz(-a3) matrix to nine destination halfwords, and mark destination +0x40 active */
+#define PSX_FN_BuildTransformRotationMatrix 0x8013578Cu
+#define func_8013578C BuildTransformRotationMatrix  /* alias */
+
 /* known: Six-scalar signed-16 leaf used by RenderRaceFrame: performs the same seven viewport/perspective coefficient stores as 0x8013535C from caller-selected C/B/D/F/A/E inputs */
 #define PSX_FN_RebuildViewportClipCoefficientsFromScalars 0x80135B8Cu
 #define func_80135B8C RebuildViewportClipCoefficientsFromScalars  /* alias */
@@ -91,6 +99,10 @@
 /* known: Two-caller projection/GTE setup: set H from 0x801E14F0, follow +0x44 links to the terminal transform, build MATRIX scratch at 0x1F800010 with its middle rotation row scaled by 0x801E14EC/256 and translation {0,0,0x801E14F4/2}, then install TR and rotation */
 #define PSX_FN_InstallLinkedRenderTransform 0x80136078u
 #define func_80136078 InstallLinkedRenderTransform  /* alias */
+
+/* confirmed: Exact 0x2B0-byte six-argument looping-sound state dispatcher with 28 direct callers: handle -1 stop/reset, otherwise gate one inactive audio status, slew per-selector/channel volume by 16 toward the requested target, stop at zero, create missing selector 4..31 sounds, or update an existing sound's pan, pitch, Q8 pitch scale, and scaled volume */
+#define PSX_FN_UpdateLoopingSoundChannel 0x8013670Cu
+#define func_8013670C UpdateLoopingSoundChannel  /* alias */
 
 /* confirmed: Exact 0x24C-byte spatial sound adapter with 34 direct JAL callers: midpoint an explicit XYZ and context-linked XYZ, distance-attenuate from radius 16384, wrap relative heading into [-1024,1024], derive/clamp stereo volume and 0..30 pan, then call 0x80121534 using the sound resource table at 0x801E178C; a2 and stack +0x18 are ignored */
 #define PSX_FN_PlaySpatialSoundAtSegmentMidpoint 0x80136D0Cu

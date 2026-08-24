@@ -833,3 +833,13 @@ unbounded build as a performance test; use focused targets and the bounded
 - `SetTransformTranslation` at `0x80135574` is a 33-caller six-instruction
   leaf that writes translation XYZ at `+0x14/+0x18/+0x1C` and marks transform
   state halfword `+0x40` as one.
+- `BuildTransformRotationMatrix` at `0x8013578C` uses the recovered Q12 trig
+  functions to write the complete row-major rotation
+  `Ry(-a1) * Rx(a2) * Rz(-a3)` and marks transform state `+0x40`; 27 callers.
+- `UpdateLoopingSoundChannel` at `0x8013670C` owns looping sound creation,
+  stop/reset, 16-step volume slewing, and live pan/pitch/Q8-scale updates across
+  28 callers, with selector validation on missing-handle creation.
+- `ApplyGlobalRgbWithAlpha` owns `0x80122650..0x8012268B`: three callers pass
+  a byte value, the wrapper binds global bytes `0x80175E71/+72/+70`, and calls
+  `0x801220AC`. Generated `0x80122654` is a live-`a3` fallthrough block, not an
+  ABI entry.
