@@ -883,3 +883,16 @@ unbounded build as a performance test; use focused targets and the bounded
   `CdControlWithRetry`, using hardware registers `0x1F801800..03`, table-driven
   parameter counts, sync/async modes, 8-byte responses and dual timeout/error
   handling. This corrects the earlier SIO interpretation of the wrapper.
+- `AcquireCurrentArchiveEntry` at `0x8014B830` reads the current 12-byte
+  archive record, returns direct data when policy permits, otherwise allocates
+  through main/temp heaps and copies or decodes via `0x80115B1C`; 23 unique
+  callers (one apparent extra was an overlapping-shard duplicate).
+- `RegisterTextureBundleEntries` owns the pre-prologue at `0x80111DA0`, walks
+  relocated pointers returned by `LoadPackedResourceBundle`, builds 38-byte
+  texture descriptors, appends them to the global table/count, then releases
+  the temporary bundle allocation; 24 callers, no interior calls.
+- `ReleaseAllTrackedTempHeapBlocks` owns `0x8014B96C..0x8014BA3F`. With a
+  nonempty top index it releases the pending internal free-list block, pops
+  all 12-byte offset records in reverse order, and frees their temp-heap
+  blocks unless the heap-lock flag suppresses deallocation; the retained EXE
+  has 23 direct callers (not the earlier inventory estimate of 24).
