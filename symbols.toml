@@ -53,6 +53,13 @@ status = "known"
 note = "Three-argument SIO1 control/query dispatcher spanning 0x8016192C..0x80161DFF: a0 selects six operation families, a1 selects register or lifecycle actions, and a2 supplies values/side selection; reads and writes the SIO1 STAT/MODE/CTRL/BAUD block at 0x1F801050, maintains its RAM shadow, and brackets reset paths with critical-section syscalls"
 
 [[func]]
+pc = 0x8016118C
+name = "ExchangeSioCommandWithRetry"
+emit = false
+status = "known"
+note = "14-caller 332-byte synchronous SIO command owner: truncate a0 to a command byte, pass a1/a2 as transfer buffers to 0x80168080, perform command/status-dependent reset and preflight exchanges, retry the requested command up to four times while suppressing/restoring the callback word at 0x8017B124, and classify exhausted-transfer recovery through 0x80167B38"
+
+[[func]]
 pc = 0x80112048
 name = "SwapRgb24RedBlue"
 emit = false
@@ -611,6 +618,25 @@ status = "confirmed"
 note = "Exact 0x260-byte 47-caller glyph renderer: select one of four six-byte glyph-metric bands from style, reserve and OT-link a neutral-gray 40-byte POLY_FT4 using style-selected CLUT/TPAGE state, and return x + 2*glyph_width + 2"
 
 [[func]]
+pc = 0x8010F3CC
+name = "DrawLocalizedFontString"
+emit = false
+status = "confirmed"
+note = "Exact 0x5BC-byte five-argument localized byte-string renderer with 24 direct callers: map ASCII/punctuation and an ISO-8859-1 accented-byte table to glyph indices, select language-sensitive extended glyph banks, emit each non-space glyph through 0x8010EAC4, apply mode-sensitive space advances, and return final x minus the sign-extended starting x"
+
+[[object]]
+addr = 0x8016D634
+name = "gLocalizedFontByteTable"
+status = "confirmed"
+note = "Exact 42-byte NUL-terminated lookup list: 41 ISO-8859-1 accented/special input bytes followed by zero, searched by DrawLocalizedFontString"
+
+[[object]]
+addr = 0x8016D660
+name = "gLocalizedFontGlyphTable"
+status = "confirmed"
+note = "Exact 41-entry little-endian signed-halfword table paired by index with gLocalizedFontByteTable; supplies extended glyph indices 0..39"
+
+[[func]]
 pc = 0x80113BEC
 name = "DrawResourceString"
 emit = false
@@ -655,3 +681,10 @@ addr = 0x8017AF5C
 name = "kApproximateSqrtMantissaQ12"
 status = "confirmed"
 note = "192 signed halfwords indexed by normalized mantissa 64..255; entry n-64 is exactly floor(512*sqrt(n)), spans 4096..8175, and rescales into the integer square-root approximation"
+
+[[func]]
+pc = 0x8015FA7C
+name = "WaitForVBlankCountWithWatchdog"
+emit = false
+status = "confirmed"
+note = "Exact 0x98-byte VSync-private helper with two direct callers: signed-poll gVBlankCount until it reaches a0, decrement a watchdog initialized to a1<<21, and on expiry print 'VSync: timeout', invoke ChangeClearPAD(0) and ChangeClearRCnt(3,0), then return early"

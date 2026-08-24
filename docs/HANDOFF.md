@@ -860,3 +860,15 @@ unbounded build as a performance test; use focused targets and the bounded
 - `Atan2Q12` at `0x8015C518` is the 35-caller signed fixed-point atan2 leaf:
   full turn `0x1000`, output `[-0x800,+0x800]`, using the 1025-entry table at
   `0x801786D8` with exact quadrant/axis folding.
+- `ExchangeSioCommandWithRetry` at `0x8016118C` wraps the lower SIO exchange
+  with command-specific reset/preflight behavior, temporary callback
+  suppression and at most four attempts; 14 callers, with exhausted retries
+  normalized through the recovery helper.
+- `WaitForVBlankCountWithWatchdog` at `0x8015FA7C` is the two-call helper inside
+  `VSync`. It polls signed `gVBlankCount` with a `(scale << 21)` watchdog;
+  timeout prints the retained diagnostic, calls `ChangeClearPAD/RCnt`, and
+  returns early rather than resuming the wait (correcting the earlier audit).
+- `DrawLocalizedFontString` owns `0x8010F3CC..0x8010F987` across 24 callers. It
+  maps ASCII/punctuation and ISO-8859-1 bytes through the localized byte/glyph
+  tables at `0x8016D634/0x8016D660`, emits glyphs directly, applies language
+  bank `0x900/0x901`, and returns horizontal advance rather than a new string.

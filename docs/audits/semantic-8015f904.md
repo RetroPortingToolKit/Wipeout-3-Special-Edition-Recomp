@@ -82,8 +82,10 @@ when signed `gVBlankCount >= target`; otherwise it polls until that relation is
 true. Its stack-local watchdog starts from `timeout_scale << 21` and is
 decremented on each poll. On the exact transition to `-1`, it invokes the
 diagnostic/recovery triplet at `0x801671A8`, `0x80162464(0)`, and
-`0x801671C0(3, 0)`, then continues checking the target. It does not fabricate
-or directly increment the VBlank count.
+`0x801671C0(3, 0)`, then returns early even if the target remains unmet. It
+does not fabricate or directly increment the VBlank count. The prior wording
+that said polling continued after recovery was incorrect; the unconditional
+jump at `0x8015FAE4` goes to the helper epilogue.
 
 This helper contract explains both calls from `VSync`: the first enforces any
 requested multi-frame distance, and the second always waits for the final
