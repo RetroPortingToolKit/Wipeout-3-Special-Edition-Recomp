@@ -1748,8 +1748,22 @@ status = "confirmed"
 note = "Exact 0xA4-byte leaf SPU address helper: optionally round address a1 upward by the configured alignment, derive its configured right-shifted 16-bit SPU unit, return that unit for selector a0=-2, return the normalized byte address for a0=-1, or store the unit in the halfword address table at selector a0 and return the normalized byte address; three unique entry-only callers"
 
 [[func]]
+pc = 0x8015D1A8
+name = "ResetGraph"
+emit = false
+status = "confirmed"
+note = "Exact 0x98-byte five-caller Psy-Q ResetGraph: when graph-debug level >=2 report the requested mode through the debug callback; mode 0 clears the 20-byte GPU state record, then dispatch the backend command 0x03000000, while nonzero mode dispatches 0x03000001; returns the backend callback result"
+
+[[func]]
 pc = 0x80105940
 name = "DrawDecimalValueWithTwoDigitFraction"
 emit = false
 status = "confirmed"
 note = "Exact 0x238-byte five-caller font renderer: decompose a whole-number component into up to five decimal digits, zero-pad it to caller width, emit glyph 0x25 as separator, then emit a second component zero-padded to two digits, threading the X pen through EmitFontGlyphPacket and returning the final pen"
+
+[[func]]
+pc = 0x8011024C
+name = "MirrorQuadHorizontalCoordinates"
+emit = false
+status = "confirmed"
+note = "Exact 0x6C-byte five-caller eight-pointer quad-coordinate permutation: snapshot signed halfwords x0,y0,x1,y1,x2,y2,x3,y3, swap x0 with x1 and x2 with x3 while preserving every y value, and write all eight results back; call-free with no overlay duplicate"
