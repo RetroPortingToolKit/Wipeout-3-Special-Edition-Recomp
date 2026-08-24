@@ -1525,6 +1525,13 @@ status = "confirmed"
 note = "Exact 0x8C-byte six-site first-fit allocator used by one resource loader: round payload size up to four bytes, search three 12-byte base/capacity/cursor arena descriptors at 0x801D38B8, prepend the rounded size word, advance the selected cursor, return payload+4, or terminate through BIOS exit(-1) when all arenas are full"
 
 [[func]]
+pc = 0x800E8350
+name = "ApplyRgbToPrimitiveRecordStream"
+emit = false
+status = "confirmed"
+note = "Exact 0x1C4-byte leaf with four unique entry callers: walk the signed count at owner +0x12 through the variable-size record stream at +0x1C, dispatch types 1..8, and overwrite each primitive vertex RGB with the supplied three bytes or their unsigned halves according to the record layout"
+
+[[func]]
 pc = 0x8015FD7C
 name = "Exit"
 emit = false
