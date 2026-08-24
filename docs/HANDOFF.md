@@ -938,3 +938,23 @@ unbounded build as a performance test; use focused targets and the bounded
   CLUT/pixels through the graphics transfer path, and returns null for modes
   other than 0/1. Its two callers are the paired bundle registrars using
   `(abr=1, variant=0/1)`.
+- `CreatePersistentSoundSlot` owns `0x801217F4..0x80121A57`: nine callers use
+  its returned flag-3 slot handle for ambient/looping updates; it initializes
+  one or optional two ordinary queued voices and dispatches the slot, with
+  exact non-rollback edge cases documented for exhausted voice allocation.
+- `CreateObjectInstance` owns `0x8012E408..0x8012E533`. It allocates a
+  40-byte instance and a distinct 80-byte owned payload from the shared arena,
+  copies the source name/scalars/payload, clears the new instance's runtime
+  word at `+0x24`, and returns the clone. Twelve direct call sites and no
+  interior entries were found; its retained failure text begins `New Instance`.
+- `EmitLocalizedFontGlyphPacket` owns `0x8010EAC4..0x8010F247`: it selects
+  six-byte glyph metrics and font texture state for height modes 8/9/16/18 and
+  extended banks, builds and OT-links one 40-byte `POLY_FT4`, increments the
+  packet cursor, and returns the next X pen. It has 15 direct callers and no
+  external interior targets.
+- `ApplyRacerDamageEvent` owns `0x801562B8..0x80156B8B`, with 12 direct entry
+  calls and no interior JAL targets. It maps selected event codes (1/2/3/5,
+  0xC..0x10, 0x80..0x83) to configured deltas/effects or accepts an explicit
+  delta, applies racer/mode scaling, updates/clamps per-racer Q8 damage and
+  percent state, manages hit timers, and performs the 100-percent disabled
+  transition plus the 76-percent crossing effect.
