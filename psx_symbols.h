@@ -216,6 +216,10 @@
 #define PSX_FN_ReleaseSoundSlot 0x80121A58u
 #define func_80121A58 ReleaseSoundSlot  /* alias */
 
+/* confirmed: Exact 0x84-byte six-caller audio setter: require enable bytes 0x80175E68 and 0x80175E69, clamp byte-truncated width to 127, store it at 0x801D6E54, and when 0x80175E6A is enabled dispatch command 6 with signed Q8 endpoints +width and -width; ten generated instances collapse to six unique sites */
+#define PSX_FN_SetGlobalStereoWidth 0x801222F4u
+#define func_801222F4 SetGlobalStereoWidth  /* alias */
+
 /* confirmed: Exact 0x64-byte 20-caller audio adapter: truncate a1 to u8, reject disabled audio, slot -1, slot >=24, and inactive slot records; otherwise write volume byte +0x1A in the selected 32-byte record at 0x801D674C and call 0x8012257C to dispatch that slot to the active backend */
 #define PSX_FN_SetSoundSlotVolume 0x801224B4u
 #define func_801224B4 SetSoundSlotVolume  /* alias */
@@ -275,6 +279,10 @@
 /* confirmed: Logical 0x60-byte eight-caller pure predicate across the generated split at 0x80134A58: return false for racer index -1; otherwise index the 0x3A4-byte racer record at 0x801910E0 and test input bit 0x02 when record byte +2 equals 1, or bit 0x20 for every other type */
 #define PSX_FN_TestRacerInputFlag2Or20 0x80134A44u
 #define func_80134A44 TestRacerInputFlag2Or20  /* alias */
+
+/* confirmed: Exact 0x88-byte six-caller pure racer predicate: reject negative indices, select the 0x3A4-byte record at 0x801910E0, and return true exactly when byte +0 is zero and byte +3 is nonzero; unlike the nearby stricter type-one predicate, every nonzero +3 value passes */
+#define PSX_FN_IsRaceRecordStatusZeroTypeNonzero 0x80134AD8u
+#define func_80134AD8 IsRaceRecordStatusZeroTypeNonzero  /* alias */
 
 /* confirmed: Exact 0x3C-byte 12-caller rumble-state updater: accept a Q8 motor amplitude, signed priority, and Q8 per-tick decay only when both amplitude and priority are at least the active request, then replace state words +0x0C/+0x10/+0x14; otherwise leave state unchanged */
 #define PSX_FN_SubmitRumbleDecayRequest 0x80134CE8u
@@ -579,6 +587,10 @@
 /* confirmed: Exact 0x19C-byte six-caller canonical LibCD read starter: wait up to 120 VBlanks for a prior read, publish sector count/destination/mode, derive 2048/2340/2328-byte transfer geometry from mode bits, suppress and save CD callbacks, optionally issue command 9 recovery, start the read core, and return normalized boolean acceptance */
 #define PSX_FN_CdRead 0x80160A74u
 #define func_80160A74 CdRead  /* alias */
+
+/* confirmed: Exact 0x104-byte PsyQ-compatible CD read synchronizer with six entry-only callers: mode zero blocks, nonzero mode polls; monitor the asynchronous CdRead state and 60/1200-vblank deadlines, invoke read recovery when stale, service CdSync-style status output, and return remaining work, zero/one completion state, or -1 on timeout/error */
+#define PSX_FN_CdReadSync 0x80160C10u
+#define func_80160C10 CdReadSync  /* alias */
 
 /* confirmed: Exact 0x14-byte two-caller callback exchange leaf: return the previous CD interrupt callback from 0x801792C8 and replace it with incoming a0 in the jr delay slot; null clears dispatch, and CdInit directly installs internal callback 0x80160E44 in the same word */
 #define PSX_FN_ExchangeCdInterruptCallback 0x80160D14u
