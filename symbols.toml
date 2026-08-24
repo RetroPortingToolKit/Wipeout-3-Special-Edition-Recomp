@@ -514,6 +514,13 @@ status = "confirmed"
 note = "Exact 0x24C-byte spatial sound adapter with 34 direct JAL callers: midpoint an explicit XYZ and context-linked XYZ, distance-attenuate from radius 16384, wrap relative heading into [-1024,1024], derive/clamp stereo volume and 0..30 pan, then call 0x80121534 using the sound resource table at 0x801E178C; a2 and stack +0x18 are ignored"
 
 [[func]]
+pc = 0x8013670C
+name = "UpdateLoopingSoundChannel"
+emit = false
+status = "confirmed"
+note = "Exact 0x2B0-byte six-argument looping-sound state dispatcher with 28 direct callers: handle -1 stop/reset, otherwise gate one inactive audio status, slew per-selector/channel volume by 16 toward the requested target, stop at zero, create missing selector 4..31 sounds, or update an existing sound's pan, pitch, Q8 pitch scale, and scaled volume"
+
+[[func]]
 pc = 0x80137DFC
 name = "PlaySoundEffectById"
 emit = false
@@ -563,6 +570,19 @@ status = "confirmed"
 note = "Exact six-instruction transform leaf with 33 direct callers: store a1/a2/a3 as 32-bit translation components at a0+0x14/+0x18/+0x1C, set the signed-halfword state field at +0x40 to one in the return delay slot, and establish no scalar return"
 
 [[func]]
+pc = 0x80122650
+name = "ApplyGlobalRgbWithAlpha"
+emit = false
+status = "known"
+note = "True 60-byte owner with three callers: truncate a0 to byte a3, load the three global bytes at 0x80175E71/+72/+70 into a0/a1/a2, call 0x801220AC, and return; generated 0x80122654 is a non-callable fallthrough split requiring the prefix's live a3"
+
+[[block]]
+pc = 0x80122654
+name = "ApplyGlobalRgbWithAlphaBody"
+status = "confirmed"
+note = "Internal fallthrough body of 0x80122650: consumes the prefix's live a3, loads global RGB bytes, frames/calls 0x801220AC, and returns; has zero direct callers and is not an ABI entry"
+
+[[func]]
 pc = 0x80121534
 name = "AllocateAndQueueSoundVoice"
 emit = false
@@ -595,3 +615,10 @@ addr = 0x8017BF1C
 name = "gResourceStringTable"
 status = "known"
 note = "Runtime-populated word table of NUL-terminated UI/resource-string pointers; indexed directly by DrawResourceString and formatting paths, with observed fixed accesses through entry 340; the generated F/R 8017BF1C E4 describes zero-filled data, not executable code or the full table"
+
+[[func]]
+pc = 0x8013578C
+name = "BuildTransformRotationMatrix"
+emit = false
+status = "confirmed"
+note = "Exact 0x204-byte 27-caller Euler builder: sign-extend three 4096-unit angles, evaluate recovered Q12 sine/cosine, write a row-major Ry(-a1)*Rx(a2)*Rz(-a3) matrix to nine destination halfwords, and mark destination +0x40 active"
