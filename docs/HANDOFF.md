@@ -977,6 +977,9 @@ unbounded build as a performance test; use focused targets and the bounded
 - `Memcpy` owns the adjacent `0x8015CF38..0x8015CF47` BIOS A0/2A trampoline.
   All 34 executable calls target its entry, and it forwards destination,
   source, length, memory effects, and the destination return to BIOS unchanged.
+- `SwapAdjacentBytes` owns `0x8012E310..0x8012E323`. It exchanges exactly
+  bytes `p[0]` and `p[1]` in place, has 25 direct entry calls and no interior
+  targets, and otherwise has no shared-state or hardware effects.
 - `AbsoluteValue32` owns `0x8014B3D4..0x8014B3EB`. It is a 21-caller signed
   integer absolute-value leaf with ordinary two's-complement wrap at
   `INT32_MIN`; no call targets either internal branch/return block.
@@ -1044,6 +1047,10 @@ unbounded build as a performance test; use focused targets and the bounded
   the wrapping componentwise difference `B-A` from scalar register/stack
   arguments to a caller-supplied three-word destination. It has nine unique
   guest calls (12 overlay instances), all in geometry owner `0x800EBDF0`.
+- `ApproximateArccosQ12` is the unsplit `0x8014B670..0x8014B6A3` leaf: it
+  indexes the 4097-halfword table at `0x8017634C` by absolute Q12 cosine and
+  reflects negative inputs around pi=`0x4000`. It has nine direct callers, no
+  overlay duplicates/interior target, and requires input in `[-4096,4096]`.
 - `AccumulateOneIndexedVertexWeight` is its single-step companion at
   `0x8014F814..0x8014F91F`: it performs the same flagged-record lookup and
   fixed 250/200/200 indexed accumulator update once, then decrements positive
@@ -1106,6 +1113,12 @@ unbounded build as a performance test; use focused targets and the bounded
   internal selector/session `a0=1`, calls the `0x801602E8` GetTN/GetTD worker,
   and propagates its track-count/zero result unchanged. Device/output effects
   belong to the worker; the wrapper itself only uses a 24-byte frame.
+- `CdGetToc2` owns `0x801602E8..0x8016050B`, has two direct callers and no
+  interior targets. It ignores its first argument, suppresses/restores the CD
+  sync callback, issues GetTN then GetTD(lead-out/each BCD track), writes
+  minute/second/zero records at four-byte stride, and returns the inclusive
+  track count or zero. Failures retain any earlier output and optionally print
+  the worker's retained `CdGetToc2: error` diagnostic.
 - `SpawnTrackSectionSurfaceEffects` logically owns
   `0x8014FA4C..0x80150577` despite generated splits at FAE0/FDE0/FF4C/50548.
   Its sole real caller passes a track section and effect flags; it selects a
@@ -1146,3 +1159,8 @@ unbounded build as a performance test; use focused targets and the bounded
   loading string is rendered at phase 0 and rerendered with `_` at phase 24,
   and the callback always services the shared frame/display routine before
   clearing its guard. It accepts no arguments and has no semantic return.
+- `ComputeRaceFrameRandom15` is the pure 13-caller leaf at
+  `0x80104A1C..0x80104A47`: it hashes the selected-racer seed at `0x80173A8C`
+  plus the incrementing race-frame counter at `0x80173AEC` using
+  `((int32_t)sum >> 1) ^ (sum << 3)`, then returns the low 15 bits. Unlike
+  `NextRandom15`, it mutates no PRNG state; all callers target the true entry.
