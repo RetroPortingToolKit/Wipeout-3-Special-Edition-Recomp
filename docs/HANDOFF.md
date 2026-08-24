@@ -1353,6 +1353,11 @@ unbounded build as a performance test; use focused targets and the bounded
   `SpawnRacerEffectRecords`, except composite kind 13 expands into sequential
   kinds 14 and 15. Its six unique callers comprise five overlay addresses and
   one main-image address; none targets an interior continuation.
+- `ConfigureBumpArena` owns `0x80118E44..0x80118EA3`. Its six resource-loader
+  callers configure the base and four-byte-rounded-down capacity of the three
+  12-byte descriptors at `0x801D38B8` without resetting their cursors. Indices
+  3+ terminate through `Exit(-1)`; the signed check does not reject negatives.
+  No caller targets an interior continuation.
 - `WaitForJoyAckAndClearIrq` owns `0x80169D30..0x80169DBF` with seven callers.
   It acknowledges SIO interrupt bit 7 in `I_STAT`, waits for JOY_STAT ACK bit
   7 to clear under the caller-armed Timer 2 deadline, returns zero on timeout,
@@ -1399,6 +1404,12 @@ unbounded build as a performance test; use focused targets and the bounded
   entry-only callers pass status zero once and `-1` six times. The thunk
   preserves `a0`/caller `ra`, selects service `0x38`, and never returns under
   the BIOS contract; it has no direct memory or hardware effects itself.
+- `CdRead` owns the exact LibCD range `0x80160A74..0x80160C0F` with six
+  entry-only callers. It waits at most 120 VBlanks for a prior read, publishes
+  count/destination/mode, derives 2048/2340/2328-byte sector geometry,
+  suppresses and saves CD callbacks, conditionally runs command-9 recovery,
+  starts the lower read engine, and returns boolean acceptance; callers then
+  poll adjacent read-sync at `0x80160C10`.
 - `ApplyRgbToPrimitiveRecordStream` owns `0x800E8350..0x800E8513`; its six
   generated interior entries are the type 1..8 jump-table cases. Four unique
   callers supply an owner (`count +0x12`, stream `+0x1C`) and RGB bytes. It

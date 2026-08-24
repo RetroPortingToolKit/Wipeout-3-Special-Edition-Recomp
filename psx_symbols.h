@@ -176,6 +176,10 @@
 #define PSX_FN_AllocateFromThreeBumpArenas 0x80117FD0u
 #define func_80117FD0 AllocateFromThreeBumpArenas  /* alias */
 
+/* confirmed: Exact 0x60-byte six-caller configuration helper for the three 12-byte bump-arena descriptors at 0x801D38B8: for signed index below 3 store base a1 and capacity a2 rounded down to four bytes while preserving cursor +8; index 3 or above terminates through BIOS exit(-1), while negative indices are not rejected */
+#define PSX_FN_ConfigureBumpArena 0x80118E44u
+#define func_80118E44 ConfigureBumpArena  /* alias */
+
 /* confirmed: Exact 0x15C-byte nine-caller geometry helper: approximate the length of the three signed 32-bit components after arithmetic >>6 reduction, substitute denominator one for zero, overwrite each component with signed `(component << 6) / reduced_length` (approximately a Q12 unit vector), and expose no semantic scalar return */
 #define PSX_FN_NormalizeVector3Q12InPlace 0x80118FDCu
 #define func_80118FDC NormalizeVector3Q12InPlace  /* alias */
@@ -571,6 +575,10 @@
 /* confirmed: Exact 0x224-byte two-caller LibCD TOC worker retaining the CdGetToc2 diagnostic name: ignore a0, suppress/restore the sync callback, issue GetTN then GetTD for lead-out and each BCD-decoded track, write minute/second/zero records at four-byte stride through a1, and return populated track count or zero on any command failure */
 #define PSX_FN_CdGetToc2 0x801602E8u
 #define func_801602E8 CdGetToc2  /* alias */
+
+/* confirmed: Exact 0x19C-byte six-caller canonical LibCD read starter: wait up to 120 VBlanks for a prior read, publish sector count/destination/mode, derive 2048/2340/2328-byte transfer geometry from mode bits, suppress and save CD callbacks, optionally issue command 9 recovery, start the read core, and return normalized boolean acceptance */
+#define PSX_FN_CdRead 0x80160A74u
+#define func_80160A74 CdRead  /* alias */
 
 /* confirmed: Exact 0x14-byte two-caller callback exchange leaf: return the previous CD interrupt callback from 0x801792C8 and replace it with incoming a0 in the jr delay slot; null clears dispatch, and CdInit directly installs internal callback 0x80160E44 in the same word */
 #define PSX_FN_ExchangeCdInterruptCallback 0x80160D14u

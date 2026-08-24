@@ -1469,6 +1469,13 @@ status = "confirmed"
 note = "Exact 0x78-byte six-caller adapter over SpawnRacerEffectRecords: preserve a0/a1/a2, truncate kind a3 to a byte, expand composite kind 13 into sequential kinds 14 and 15, and otherwise forward the original kind once; five callers are in overlay code and one is in the main image"
 
 [[func]]
+pc = 0x80118E44
+name = "ConfigureBumpArena"
+emit = false
+status = "confirmed"
+note = "Exact 0x60-byte six-caller configuration helper for the three 12-byte bump-arena descriptors at 0x801D38B8: for signed index below 3 store base a1 and capacity a2 rounded down to four bytes while preserving cursor +8; index 3 or above terminates through BIOS exit(-1), while negative indices are not rejected"
+
+[[func]]
 pc = 0x80169D30
 name = "WaitForJoyAckAndClearIrq"
 emit = false
@@ -1537,3 +1544,10 @@ name = "Exit"
 emit = false
 status = "confirmed"
 note = "Exact 0x10-byte canonical PlayStation BIOS B0:38 exit trampoline: preserve signed status in a0 and caller ra, select service 0x38 in the vector-jump delay slot, and never return under the BIOS contract; seven entry callers pass status 0 once and -1 six times, with no interior targets"
+
+[[func]]
+pc = 0x80160A74
+name = "CdRead"
+emit = false
+status = "confirmed"
+note = "Exact 0x19C-byte six-caller canonical LibCD read starter: wait up to 120 VBlanks for a prior read, publish sector count/destination/mode, derive 2048/2340/2328-byte transfer geometry from mode bits, suppress and save CD callbacks, optionally issue command 9 recovery, start the read core, and return normalized boolean acceptance"
