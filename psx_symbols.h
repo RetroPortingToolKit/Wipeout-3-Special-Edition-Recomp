@@ -32,6 +32,10 @@
 #define PSX_FN_LeaveNestedInterruptCriticalSection 0x800EEE64u
 #define func_800EEE64 LeaveNestedInterruptCriticalSection  /* alias */
 
+/* confirmed: Exact 0xAC-byte seven-unique-call-site geometry helper: select endpoint a2 from packed 12-byte vertex-pair records at owner+0x18, reconstruct its three signed 16-bit components, transform/translate it through the GTE RotTrans-shaped leaf into a0, and propagate the GTE FLAG word */
+#define PSX_FN_TransformIndexedPairedVertex 0x800F2F48u
+#define func_800F2F48 TransformIndexedPairedVertex  /* alias */
+
 /* confirmed: Exact 0x40-byte 31-caller error-policy adapter: accept an ignored diagnostic-string pointer and a value normalized to signed 16 bits, return for every severity except exactly 2, and for severity 2 tail into the BIOS B0:38 exit service with status zero; every executable caller passes severity 2 */
 #define PSX_FN_HandleErrorSeverity 0x800F82ECu
 #define func_800F82EC HandleErrorSeverity  /* alias */
