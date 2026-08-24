@@ -132,6 +132,10 @@
 #define PSX_FN_CreateTextureDescriptorFromImageData 0x80141E5Cu
 #define func_80141E5C CreateTextureDescriptorFromImageData  /* alias */
 
+/* known: Argument-free 348-byte renderer drain with 23 direct callers: activate each queued object's +0x20 state, select 0x80171AF4/AE4/AD8 from per-entry mode 0/1/2 (mode 1 also consumes an auxiliary word), submit every entry, then clear the queue count at 0x801762D0 */
+#define PSX_FN_DrainQueuedRenderObjects 0x80141F68u
+#define func_80141F68 DrainQueuedRenderObjects  /* alias */
+
 /* known: Single-caller section submitter: installs the owner transform, submits an indexed face list via 0x8016FC28, then resolves packed repeated entries and invokes each renderer callback */
 #define PSX_FN_SubmitSceneSectionFaces 0x801422FCu
 #define func_801422FC SubmitSceneSectionFaces  /* alias */
@@ -159,6 +163,14 @@
 /* confirmed: Exact 0xA0-byte even cosine lookup: reduce the absolute signed input modulo 4096, fold it into the 1025-entry Q12 quarter-wave table at 0x8017A74C with the proper quadrant sign, and return [-4096,4096]; 81 direct callers */
 #define PSX_FN_CosQ12FromSignedAngle 0x8015C3E8u
 #define func_8015C3E8 CosQ12FromSignedAngle  /* alias */
+
+/* confirmed: Logical 0x84-byte 33-caller integer square-root approximation: normalize a nonnegative 32-bit input with GTE LZCS/LZCR, index the 192-entry Q12 sqrt-mantissa table at 0x8017AF5C, rescale by half the binary exponent, and return zero through internal tail 0x8015C504 */
+#define PSX_FN_ApproximateSqrtNonnegative32 0x8015C488u
+#define func_8015C488 ApproximateSqrtNonnegative32  /* alias */
+
+/* confirmed: Exact 0x174-byte signed atan2(y,x)-style leaf with 35 direct callers: return a signed -0x800..0x800 angle where 0x1000 is one turn, use abs-component ratio and the 1025-entry atan table at 0x801786D8, fold signs into four quadrants, define (0,0)=0 and the negative x axis as +0x800 */
+#define PSX_FN_Atan2Q12 0x8015C518u
+#define func_8015C518 Atan2Q12  /* alias */
 
 /* confirmed: Real 57-caller variadic sprintf-equivalent owner spanning 0x8015C698..0x8015CF1B: spill a1-a3 into ABI vararg slots, fall through into the generated 0x8015C6A4 parser body, format into a0, NUL-terminate, and return the character count; no caller targets the split body */
 #define PSX_FN_FormatString 0x8015C698u

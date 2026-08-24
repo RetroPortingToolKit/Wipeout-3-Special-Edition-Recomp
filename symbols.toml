@@ -380,6 +380,13 @@ status = "known"
 note = "Single-caller non-leaf: updates active bits on 28-byte object records, prepares the GTE view transform, compacts visible oriented quads through 0x80172E3C, and emits 40-byte GPU POLY_FT4 packets into the current OT"
 
 [[func]]
+pc = 0x80141F68
+name = "DrainQueuedRenderObjects"
+emit = false
+status = "known"
+note = "Argument-free 348-byte renderer drain with 23 direct callers: activate each queued object's +0x20 state, select 0x80171AF4/AE4/AD8 from per-entry mode 0/1/2 (mode 1 also consumes an auxiliary word), submit every entry, then clear the queue count at 0x801762D0"
+
+[[func]]
 pc = 0x801422FC
 name = "SubmitSceneSectionFaces"
 emit = false
@@ -563,6 +570,13 @@ status = "confirmed"
 note = "Real 57-caller variadic sprintf-equivalent owner spanning 0x8015C698..0x8015CF1B: spill a1-a3 into ABI vararg slots, fall through into the generated 0x8015C6A4 parser body, format into a0, NUL-terminate, and return the character count; no caller targets the split body"
 
 [[func]]
+pc = 0x8015C518
+name = "Atan2Q12"
+emit = false
+status = "confirmed"
+note = "Exact 0x174-byte signed atan2(y,x)-style leaf with 35 direct callers: return a signed -0x800..0x800 angle where 0x1000 is one turn, use abs-component ratio and the 1025-entry atan table at 0x801786D8, fold signs into four quadrants, define (0,0)=0 and the negative x axis as +0x800"
+
+[[func]]
 pc = 0x80135574
 name = "SetTransformTranslation"
 emit = false
@@ -622,3 +636,22 @@ name = "BuildTransformRotationMatrix"
 emit = false
 status = "confirmed"
 note = "Exact 0x204-byte 27-caller Euler builder: sign-extend three 4096-unit angles, evaluate recovered Q12 sine/cosine, write a row-major Ry(-a1)*Rx(a2)*Rz(-a3) matrix to nine destination halfwords, and mark destination +0x40 active"
+
+[[func]]
+pc = 0x8015C488
+name = "ApproximateSqrtNonnegative32"
+emit = false
+status = "confirmed"
+note = "Logical 0x84-byte 33-caller integer square-root approximation: normalize a nonnegative 32-bit input with GTE LZCS/LZCR, index the 192-entry Q12 sqrt-mantissa table at 0x8017AF5C, rescale by half the binary exponent, and return zero through internal tail 0x8015C504"
+
+[[block]]
+pc = 0x8015C504
+name = "ApproximateSqrtZeroReturn"
+status = "confirmed"
+note = "Internal zero-input return of ApproximateSqrtNonnegative32 reached only from 0x8015C49C; no direct call targets it, despite its generated F/R 8 split"
+
+[[object]]
+addr = 0x8017AF5C
+name = "kApproximateSqrtMantissaQ12"
+status = "confirmed"
+note = "192 signed halfwords indexed by normalized mantissa 64..255; entry n-64 is exactly floor(512*sqrt(n)), spans 4096..8175, and rescales into the integer square-root approximation"
