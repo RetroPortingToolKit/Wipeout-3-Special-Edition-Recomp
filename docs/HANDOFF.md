@@ -1569,3 +1569,7 @@ unbounded build as a performance test; use focused targets and the bounded
   masked 48-byte ring, copies the origin, generates three PRNG/spread offsets,
   and initializes fixed particle state/type fields. Neither has an interior
   call target.
+- `MirrorQuadVerticalCoordinates` owns `0x801102B8..0x80110323`, with four
+  entry-only callers. Its eight-pointer snapshot permutation preserves all X
+  halfwords and exchanges the Y rows (`y0<->y2`, `y1<->y3`), complementing
+  `MirrorQuadHorizontalCoordinates`; it is call-free and has no duplicate.

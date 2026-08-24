@@ -1788,3 +1788,10 @@ name = "PopTrackedTempHeapBlock"
 emit = false
 status = "confirmed"
 note = "Exact 0x9C-byte no-argument five-caller temp-heap tracker pop: return on an empty -1 top, otherwise decrement the 12-byte archive-record stack, roll the arena prefix back to the popped offset when deallocation is enabled, use null for the final rollback, and clear the suppression flag when the stack becomes empty; no external interior target or duplicate body"
+
+[[func]]
+pc = 0x801102B8
+name = "MirrorQuadVerticalCoordinates"
+emit = false
+status = "confirmed"
+note = "Exact 0x6C-byte four-caller eight-pointer quad-coordinate permutation: snapshot signed halfwords x0,y0,x1,y1,x2,y2,x3,y3, preserve all X values, swap y0 with y2 and y1 with y3, and write all eight results back; call-free with no overlay duplicate or interior target"

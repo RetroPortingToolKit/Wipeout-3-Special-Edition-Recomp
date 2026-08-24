@@ -140,6 +140,10 @@
 #define PSX_FN_MirrorQuadHorizontalCoordinates 0x8011024Cu
 #define func_8011024C MirrorQuadHorizontalCoordinates  /* alias */
 
+/* confirmed: Exact 0x6C-byte four-caller eight-pointer quad-coordinate permutation: snapshot signed halfwords x0,y0,x1,y1,x2,y2,x3,y3, preserve all X values, swap y0 with y2 and y1 with y3, and write all eight results back; call-free with no overlay duplicate or interior target */
+#define PSX_FN_MirrorQuadVerticalCoordinates 0x801102B8u
+#define func_801102B8 MirrorQuadVerticalCoordinates  /* alias */
+
 /* confirmed: Exact 0x170-byte 10-caller signed decimal renderer: optionally emit a minus glyph, decompose the magnitude into at most five low decimal digits, zero-pad to the caller's stack-supplied minimum width, emit digits through EmitFontGlyphPacket with a mode-2 style-bank remap, and return the final X pen */
 #define PSX_FN_DrawSignedDecimalInteger 0x80110560u
 #define func_80110560 DrawSignedDecimalInteger  /* alias */
