@@ -1865,3 +1865,10 @@ name = "PrepareFrontendImageResource"
 emit = false
 status = "confirmed"
 note = "Exact 0x128-byte one-caller frontend image pipeline: ignore a0-a2, retain a3 option record, acquire the current archive image, decode its selected RGB5 halfword into three rounded 8-bit tint globals, build a texture descriptor, invoke the two private frontend image-layout builders with option byte +5, and release all tracked temporary heap blocks; no semantic return"
+
+[[func]]
+pc = 0x8011FF10
+name = "SpawnType2ParticleEffect"
+emit = false
+status = "confirmed"
+note = "Exact 0x68-byte two-site particle adapter: forward position a0 and vector sources a1/a2, pack low bytes of a3 and stack args 4/5 as a local RGB word, force effect type 2 and parameter 1024, bias stack arg 6 to an 8-bit subtype +2, and return EnqueueEffectInstance's success value; downstream type-2 records feed the particle TILE_1 path"

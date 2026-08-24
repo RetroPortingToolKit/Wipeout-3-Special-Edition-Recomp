@@ -1625,3 +1625,8 @@ unbounded build as a performance test; use focused targets and the bounded
   selected archive-image RGB5 value into three rounded tint globals, builds a
   texture descriptor, invokes private `0x8012DA10/0x8012DCB4` layout owners,
   and releases temporary archive blocks; its returned `s4` is incidental.
+- `SpawnType2ParticleEffect` owns `0x8011FF10..0x8011FF77`, with two static
+  entry-only sites in the four-iteration surface-effect owner. It repackages
+  position plus two vector sources, three RGB bytes, fixed type 2/parameter
+  1024, and `(subtype+2)&0xFF` for `EnqueueEffectInstance`, returning its 1;
+  these records feed the recovered particle TILE_1 path downstream.
