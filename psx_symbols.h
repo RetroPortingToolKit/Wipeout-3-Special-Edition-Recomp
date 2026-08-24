@@ -72,6 +72,10 @@
 #define PSX_FN_ClipAndEmitSceneryPrimitive 0x80142634u
 #define func_80142634 ClipAndEmitSceneryPrimitive  /* alias */
 
+/* known: Exact 0x594-byte owner of the 0x8014EE6C coverage address: scan 30 96-byte effect slots for free records and initialize callback, lifetime, racer index, kind, and state fields through a 15-way kind jump table; called only at 0x8015B3F8/0x8015B40C/0x8015B424 */
+#define PSX_FN_SpawnRacerEffectRecords 0x8014EA88u
+#define func_8014EA88 SpawnRacerEffectRecords  /* alias */
+
 /* confirmed: Exact PS-X EXE header entry; two-instruction non-returning trampoline to the expansion-RAM startup loader at 0x800D03B8, not the CRT initialization body */
 #define PSX_FN_PsxExeEntryTrampoline 0x80162474u
 #define func_80162474 PsxExeEntryTrampoline  /* alias */
