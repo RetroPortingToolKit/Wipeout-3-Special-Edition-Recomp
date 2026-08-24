@@ -803,3 +803,8 @@ unbounded build as a performance test; use focused targets and the bounded
   argument-spill prefix falls directly into generated piece `0x8015C6A4`; the
   combined 2,180-byte owner is sprintf-equivalent and has 57 direct callers,
   while the split body has none.
+- `0x80121534` is the confirmed `AllocateAndQueueSoundVoice` sink. Its first
+  argument is an integer descriptor handle, not a resource pointer. It manages
+  24 sound slots and 24 voice records (ordinary 0..20, reserved 21..23), can
+  allocate a second voice from class bit 8, applies Q8 pitch scaling, and
+  submits initialized voices to the backend.

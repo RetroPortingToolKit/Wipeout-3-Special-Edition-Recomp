@@ -27,6 +27,25 @@ status = "known"
 note = "Address-taken final SIO/pad-driver stage: consume a multitap response through the private descriptor in a0, poll/configure as many as four 0xF0-byte slot records, append the final received byte, and return 0, a propagated transfer error, or -3 on timeout; the callable code ends at 0x8016CC00"
 
 [[func]]
+pc = 0x8017B90C
+name = "UpdatePerformanceTuningMenu"
+emit = false
+status = "confirmed"
+note = "Exact argument-free 0x2C4-byte runtime tuning-menu owner: aggregate controller bits across up to 16 racer records, toggle and navigate four FRAME RATE/SHIP LOD/SHIP DIST/BIRDS rows, apply selected patch-table halfwords, draw the menu, call the display update, and publish gSimVblankSkip plus gPalX2TitleState; sole real JAL caller at 0x80123EF8"
+
+[[block]]
+pc = 0x8017B920
+name = "UpdatePerformanceTuningMenuStateBase"
+status = "confirmed"
+note = "Internal straight-line instruction of UpdatePerformanceTuningMenu that completes s0=0x8017B8E4; the apparent JAL at 0x800D2654 is a word in the expansion-loader relocation-pair table, not executable code or a caller"
+
+[[block]]
+pc = 0x8017BBA4
+name = "PublishPalX2SelectionFlag"
+status = "confirmed"
+note = "Internal straight-line instruction of UpdatePerformanceTuningMenu: convert FRAME RATE selector >=2 to one and store it at gPalX2TitleState; the apparent JAL at 0x800D269C is relocation-table data, not executable code or a caller"
+
+[[func]]
 pc = 0x8016192C
 name = "AccessSio1ControlState"
 emit = false
@@ -402,6 +421,24 @@ status = "confirmed"
 note = "SimVblankGate increments; reset on full sim (sw 0)"
 
 [[object]]
+addr = 0x8017B8E4
+name = "gPerformanceTuningMenuState"
+status = "confirmed"
+note = "0x28-byte data object immediately preceding UpdatePerformanceTuningMenu: open flag, selected row, four row selections, redraw flag, and reserved words; initialized selections are {1,1,0,1}"
+
+[[object]]
+addr = 0x8017BC18
+name = "kPerformanceTuningMenuTables"
+status = "confirmed"
+note = "Data after the 0x8017B90C..0x8017BBCF code owner and zero padding: four patch-table pointers, option counts {3,10,4,3}, option-string-table pointers, and labels FRAME RATE/SHIP LOD/SHIP DIST/BIRDS"
+
+[[object]]
+addr = 0x80175064
+name = "gPalX2TitleState"
+status = "confirmed"
+note = "Title-side PAL-x2 flag published by UpdatePerformanceTuningMenu: zero for FRAME RATE selectors 0/1 and one for selector >=2; authenticated selector 2 is the 100 Hz title path"
+
+[[object]]
 addr = 0x80173A94
 name = "gRandom15State"
 status = "confirmed"
@@ -497,3 +534,10 @@ name = "FormatString"
 emit = false
 status = "confirmed"
 note = "Real 57-caller variadic sprintf-equivalent owner spanning 0x8015C698..0x8015CF1B: spill a1-a3 into ABI vararg slots, fall through into the generated 0x8015C6A4 parser body, format into a0, NUL-terminate, and return the character count; no caller targets the split body"
+
+[[func]]
+pc = 0x80121534
+name = "AllocateAndQueueSoundVoice"
+emit = false
+status = "confirmed"
+note = "Exact 0x2C0-byte shared audio sink with three direct callers: gate on two audio-enable bytes, allocate one of 24 sound slots, snapshot volume/pan/pitch and Q8 pitch scale, resolve or reserve one/two of 24 voices, initialize 36-byte voice state from a 20-byte resource descriptor, then submit the slot to the active audio backend"
