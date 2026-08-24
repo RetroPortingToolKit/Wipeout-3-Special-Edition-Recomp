@@ -1036,6 +1036,14 @@ unbounded build as a performance test; use focused targets and the bounded
   signed products supplied as `a0..a2` and stack arguments 5..7, with no scale
   or saturation. It has ten unique guest callers (12 overlay instances) and no
   interior target or global/hardware effect.
+- `ComputeCrossProductShift9` is the unsplit `0x8014B544..0x8014B5D7` leaf:
+  it writes `wrap32(A x B) >> 9` to three destination words, with the wrap
+  occurring before the arithmetic shift. It has one unique guest caller (two
+  overlay instances); its residual `v0 = out.z` is not consumed.
+- `SubtractVector3Int32` is the unsplit `0x8014B5D8..0x8014B613` leaf: it writes
+  the wrapping componentwise difference `B-A` from scalar register/stack
+  arguments to a caller-supplied three-word destination. It has nine unique
+  guest calls (12 overlay instances), all in geometry owner `0x800EBDF0`.
 - `AccumulateOneIndexedVertexWeight` is its single-step companion at
   `0x8014F814..0x8014F91F`: it performs the same flagged-record lookup and
   fixed 250/200/200 indexed accumulator update once, then decrements positive
@@ -1083,6 +1091,21 @@ unbounded build as a performance test; use focused targets and the bounded
   wrap using target `0x1F801128` (or `0x10000` when zero), applies `>>3` elapsed
   scaling when mode bit `0x200` is clear, and returns canonical unsigned
   `elapsed >= threshold` without mutating the saved timeout state.
+- `Strcpy` owns `0x8015F614..0x8015F623` and is the four-word BIOS A0/19
+  trampoline, including one unreachable padding NOP. It has 20 direct entry
+  callers and no interior targets, preserves destination/source and caller
+  `ra`, and returns the BIOS destination pointer unchanged; all byte-copy,
+  terminating-NUL, capacity, overlap, and fault behavior belongs to BIOS.
+- `Toupper` owns `0x801602B4..0x801602C3` and is the four-word BIOS A0/25
+  trampoline, including one unreachable padding NOP. Its sole caller at
+  `0x80113438` passes a zero-extended byte and stores the low converted result
+  byte; there are no interior targets, and the thunk preserves `a0`, caller
+  `ra`, and the BIOS integer return without direct state effects.
+- `CdGetToc` owns `0x801602C4..0x801602E7`, has one direct caller and no
+  interior targets. It forwards the caller's TOC output pointer as `a1`, sets
+  internal selector/session `a0=1`, calls the `0x801602E8` GetTN/GetTD worker,
+  and propagates its track-count/zero result unchanged. Device/output effects
+  belong to the worker; the wrapper itself only uses a 24-byte frame.
 - `SpawnTrackSectionSurfaceEffects` logically owns
   `0x8014FA4C..0x80150577` despite generated splits at FAE0/FDE0/FF4C/50548.
   Its sole real caller passes a track section and effect flags; it selects a
@@ -1117,3 +1140,9 @@ unbounded build as a performance test; use focused targets and the bounded
   `0x8014B6E0..0x8014B6FB`: its 16 callers all target the true entry, and it
   copies signed 32-bit `x/y/z` arguments to destination offsets `0/4/8` while
   leaving the VECTOR pad at `+0xC` untouched. It has no semantic return.
+- `UpdateLoadingMessageCallback` owns `0x8014B6FC..0x8014B82F`. It is installed
+  as the callback at `0x8014BA84..8C` rather than directly called: a byte guard
+  prevents reentry, a signed-halfword phase advances modulo 48, the shared
+  loading string is rendered at phase 0 and rerendered with `_` at phase 24,
+  and the callback always services the shared frame/display routine before
+  clearing its guard. It accepts no arguments and has no semantic return.

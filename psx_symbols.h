@@ -272,6 +272,14 @@
 #define PSX_FN_DotProduct3Int32 0x8014B4F8u
 #define func_8014B4F8 DotProduct3Int32  /* alias */
 
+/* confirmed: Exact unsplit 0x94-byte one-unique-caller vector leaf: write the three-component cross product of a1/a2/a3 and stack14/18/1C to a0 after wrapping 32-bit product subtraction and arithmetic >>9; stack10 unused, no global/hardware effects, incidental v0 equals stored Z */
+#define PSX_FN_ComputeCrossProductShift9 0x8014B544u
+#define func_8014B544 ComputeCrossProductShift9  /* alias */
+
+/* confirmed: Exact unsplit 0x3C-byte nine-unique-caller scalarized vector leaf: write stack10/14/18 minus a0/a1/a2 to destination pointer stack20 with wrapping SUBU; a3 and stack1C unused, no calls/global/hardware effects, incidental v0 equals stored Z */
+#define PSX_FN_SubtractVector3Int32 0x8014B5D8u
+#define func_8014B5D8 SubtractVector3Int32  /* alias */
+
 /* confirmed: Exact 0x5C-byte three-component magnitude helper with 38 direct callers: compute the low-32-bit sum x*x+y*y+z*z, pass it to the GTE-normalized lookup-table square-root approximation at 0x8015C488, and return that result unchanged; generated 0x8014B638 is its internal delayed frame setup */
 #define PSX_FN_ApproximateVectorLength3i 0x8014B614u
 #define func_8014B614 ApproximateVectorLength3i  /* alias */
@@ -287,6 +295,10 @@
 /* confirmed: Exact 0x1C-byte 16-caller PsyQ-compatible VECTOR setter: copy signed 32-bit x/y/z from a1/a2/a3 to destination offsets 0/4/8, leave the +0xC pad untouched, and return no semantic value */
 #define PSX_FN_SetVector 0x8014B6E0u
 #define func_8014B6E0 SetVector  /* alias */
+
+/* confirmed: Exact 0x134-byte no-argument callback registered at 0x8014BA84: guard against reentry, render the shared loading message at phase 0 and add a blinking underscore at phase 24, advance a modulo-48 signed-halfword phase, service the shared frame/display routine, and clear the guard */
+#define PSX_FN_UpdateLoadingMessageCallback 0x8014B6FCu
+#define func_8014B6FC UpdateLoadingMessageCallback  /* alias */
 
 /* known: 23-site 316-byte resource accessor: select the 12-byte current entry through index 0x801E9808 and table 0x801E97FC, return null for index -1, otherwise return an archive pointer directly or allocate and materialize the entry by decode/copy according to a0; allocation failures report through the common diagnostic */
 #define PSX_FN_AcquireCurrentArchiveEntry 0x8014B830u
@@ -360,6 +372,10 @@
 #define PSX_FN_PutDrawEnv 0x8015D68Cu
 #define func_8015D68C PutDrawEnv  /* alias */
 
+/* confirmed: Exact 0x10-byte 20-caller BIOS A0/19 strcpy trampoline: preserve destination/source arguments, load service selector t1=0x19, jump to BIOS vector 0xA0 without changing ra, and return the BIOS destination pointer unchanged; copy/NUL/fault behavior belongs to BIOS */
+#define PSX_FN_Strcpy 0x8015F614u
+#define func_8015F614 Strcpy  /* alias */
+
 /* confirmed: Exact 0x14-byte 20-caller Psy-Q packet initializer: set packet tag length byte +3 to 9 and primitive code byte +7 to 0x2C for an opaque flat-textured quadrilateral, preserving the 24-bit OT link and all caller-owned color, UV, CLUT, TPAGE, and XY fields */
 #define PSX_FN_SetPolyFT4 0x8015F7A4u
 #define func_8015F7A4 SetPolyFT4  /* alias */
@@ -391,6 +407,14 @@
 /* confirmed: Exact 0x3C-byte 25-caller leaf implementing the canonical Psy-Q GetTPage(tp, abr, x, y) packing formula: ((tp&3)<<7)|((abr&3)<<5)|((y&0x100)>>4)|((x&0x3FF)>>6)|((y&0x200)<<2), with no memory or hardware side effects */
 #define PSX_FN_GetTPage 0x80160274u
 #define func_80160274 GetTPage  /* alias */
+
+/* confirmed: Exact 0x10-byte one-caller BIOS A0/25 toupper trampoline: preserve the integer character argument, load service selector t1=0x25, jump to BIOS vector 0xA0 without changing ra, and return the BIOS converted integer unchanged; sole caller passes a zero-extended byte and stores the low result byte */
+#define PSX_FN_Toupper 0x801602B4u
+#define func_801602B4 Toupper  /* alias */
+
+/* confirmed: Exact 0x24-byte one-caller LibCD wrapper: move the caller's CdlLOC output pointer to a1, pass constant session selector 1 in a0 to the 0x801602E8 TOC worker, and propagate its track-count/zero result unchanged; wrapper-local effects are only its 24-byte frame */
+#define PSX_FN_CdGetToc 0x801602C4u
+#define func_801602C4 CdGetToc  /* alias */
 
 /* confirmed: Exact 0x13C-byte 12-caller PsyQ-style synchronous CD command wrapper: truncate command to u8, suppress and restore the sync callback, conditionally issue command 1 from status bit 0x10 and command 2 from a command-indexed preflight table, retry the requested IssueCdCommand transaction up to four times, and return 1 on success or 0 after exhaustion */
 #define PSX_FN_CdControl 0x80160F1Cu
