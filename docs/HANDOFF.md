@@ -1471,6 +1471,11 @@ unbounded build as a performance test; use focused targets and the bounded
   bytes with the low byte of `a1`, handles zero count without access, and
   always leaves `v0=-1`; callers treat it as void, so it is not canonical
   standard-returning `memset`.
+- `NextRacerRandom15` is the exact argument-free leaf at
+  `0x8015B5D8..0x8015B5FB`. It advances independent state `0x80173A98` with
+  `(sra(state,1) ^ (state << 3))`, stores the full word, and returns its low 15
+  bits. Three unique racer/gameplay callers are each emitted twice by
+  overlapping translations.
 - `ComputeObjectUpVectorQ12` owns `0x800EA870..0x800EA9AF`. Six unique callers
   (five base-region owners and one overlay owner) target only the entry. It
   reads signed object Euler angles at `+0x11E/+0x120/+0x122`, evaluates six

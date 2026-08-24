@@ -468,6 +468,10 @@
 #define PSX_FN_DispatchRacerEffectSpawn 0x8015B3CCu
 #define func_8015B3CC DispatchRacerEffectSpawn  /* alias */
 
+/* confirmed: Exact argument-free 0x24-byte racer/gameplay PRNG leaf: advance private state at 0x80173A98 with arithmetic_shift_right(state,1) XOR (state << 3), store the full 32-bit result, and return its low 15 bits; three unique callers are each emitted twice by overlapping translations */
+#define PSX_FN_NextRacerRandom15 0x8015B5D8u
+#define func_8015B5D8 NextRacerRandom15  /* alias */
+
 /* confirmed: Exact 0x188-byte three-caller POLY_FT4 builder: reserve 40 bytes from gPrimCursor, write four signed XY pairs, RGB, texture UV/CLUT state, choose opaque 0x2C or semitransparent 0x2E with ABR-1 GetTPage, then prepend the packet to the active ordering-table bucket at signed depth>>6; no overlay duplicate */
 #define PSX_FN_EmitTexturedScreenQuadPacket 0x8015B65Cu
 #define func_8015B65C EmitTexturedScreenQuadPacket  /* alias */
