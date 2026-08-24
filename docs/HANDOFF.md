@@ -1604,6 +1604,13 @@ unbounded build as a performance test; use focused targets and the bounded
   XY pairs and RGB bytes, and returns the still-unlinked packet for the
   caller's ordering-table splice. Its only callees are confirmed `SetPolyF4`
   and `SetSemiTrans`; there is no duplicate or interior target.
+- `DrawAsciiFontCharacter` is the logical `0x80110094..0x80110197` owner; 14
+  generated subentries are internal punctuation jump-table aliases, not
+  functions. It handles NUL/space locally, maps letters, digits, and 13
+  punctuation characters to font glyphs, calls `EmitFontGlyphPacket`, and
+  returns horizontal advance. Three main and three unique overlay call PCs
+  become 15 generated emissions because four overlay images repeat the latter
+  translations; no external target enters the owner interior.
 - `RotateQuadCoordinatesClockwise` owns `0x80110324..0x8011038F`, with two
   entry-only callers. It snapshots four `(x,y)` pairs and permutes their 2x2
   corner grid from `[0,1;2,3]` to `[2,0;3,1]`, a clockwise quarter-turn; it is
