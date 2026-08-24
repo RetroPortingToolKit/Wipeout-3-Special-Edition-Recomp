@@ -1470,6 +1470,11 @@ unbounded build as a performance test; use focused targets and the bounded
   whole component, separator glyph `0x25`, and a fraction padded to two digits,
   threading `EmitFontGlyphPacket`'s X pen through every digit and returning the
   final pen; callers commonly supply quotient/remainder modulo 100.
+- `MirrorQuadHorizontalCoordinates` is the exact leaf at
+  `0x8011024C..0x801102B7`, with five entry-only orientation callers and no
+  overlay duplicate. It snapshots eight signed halfwords and permutes
+  `(x0,y0,x1,y1,x2,y2,x3,y3)` to
+  `(x1,y0,x0,y1,x3,y2,x2,y3)`; adjacent owners implement other orientations.
 - `ApplyRgbToPrimitiveRecordStream` owns `0x800E8350..0x800E8513`; its six
   generated interior entries are the type 1..8 jump-table cases. Four unique
   callers supply an owner (`count +0x12`, stream `+0x1C`) and RGB bytes. It
@@ -1548,3 +1553,8 @@ unbounded build as a performance test; use focused targets and the bounded
   emission). It optionally alignment-rounds `a1`, converts it by the configured
   right shift, and uses `a0=-2/-1` for unit/address returns or otherwise stores
   the 16-bit unit in the SPU address table before returning the byte address.
+- Psy-Q `ResetGraph` owns `0x8015D1A8..0x8015D23F`, with five unique entry-only
+  callers. At graph-debug level >=2 it reports the mode; mode 0 fills the
+  20-byte GPU state record with `0xFF` and sends backend command `0x03000000`,
+  while nonzero mode sends `0x03000001`. It returns the indirect GPU backend
+  callback result and performs no direct MMIO.
