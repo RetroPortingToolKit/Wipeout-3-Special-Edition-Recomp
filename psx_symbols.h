@@ -556,6 +556,10 @@
 #define PSX_FN_Printf 0x8015CF48u
 #define func_8015CF48 Printf  /* alias */
 
+/* confirmed: Exact 0x98-byte five-caller Psy-Q ResetGraph: when graph-debug level >=2 report the requested mode through the debug callback; mode 0 clears the 20-byte GPU state record, then dispatch the backend command 0x03000000, while nonzero mode dispatches 0x03000001; returns the backend callback result */
+#define PSX_FN_ResetGraph 0x8015D1A8u
+#define func_8015D1A8 ResetGraph  /* alias */
+
 /* confirmed: Exact 0x68-byte 13-caller PsyQ GPU synchronization dispatcher: preserve mode a0, optionally emit the retained 'DrawSync(%d)...' diagnostic when GPU driver type >=2, call the active GPU driver's vtable +0x3C sync method with mode, and return its result unchanged */
 #define PSX_FN_DrawSync 0x8015D240u
 #define func_8015D240 DrawSync  /* alias */
