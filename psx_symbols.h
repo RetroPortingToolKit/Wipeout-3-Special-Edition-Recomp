@@ -28,6 +28,10 @@
 #define PSX_FN_EmitTexturedQuadPacket 0x80106350u
 #define func_80106350 EmitTexturedQuadPacket  /* alias */
 
+/* confirmed: Exact 0x5BC-byte five-argument localized byte-string renderer with 24 direct callers: map ASCII/punctuation and an ISO-8859-1 accented-byte table to glyph indices, select language-sensitive extended glyph banks, emit each non-space glyph through 0x8010EAC4, apply mode-sensitive space advances, and return final x minus the sign-extended starting x */
+#define PSX_FN_DrawLocalizedFontString 0x8010F3CCu
+#define func_8010F3CC DrawLocalizedFontString  /* alias */
+
 /* confirmed: Seven-instruction leaf: swap bytes 0 and 2 of the three-byte color at a0 while preserving byte 1; called by four packet/material conversion sites at 0x80110C4C/74/AC/D4, with four mirrored expansion-RAM copies */
 #define PSX_FN_SwapRgb24RedBlue 0x80112048u
 #define func_80112048 SwapRgb24RedBlue  /* alias */
@@ -179,6 +183,14 @@
 /* known: PsyQ-compatible VBlank/timer synchronizer spanning 0x8015F904..0x8015FA7B: mode<0 returns the software VBlank counter, mode 1 returns Timer1 ticks since the saved baseline without waiting, and mode 0 or >=2 waits through 0x8015FA7C, synchronizes GPU field state when required, refreshes the frame/timer baselines, and returns the pre-wait Timer1 delta */
 #define PSX_FN_VSync 0x8015F904u
 #define func_8015F904 VSync  /* alias */
+
+/* confirmed: Exact 0x98-byte VSync-private helper with two direct callers: signed-poll gVBlankCount until it reaches a0, decrement a watchdog initialized to a1<<21, and on expiry print 'VSync: timeout', invoke ChangeClearPAD(0) and ChangeClearRCnt(3,0), then return early */
+#define PSX_FN_WaitForVBlankCountWithWatchdog 0x8015FA7Cu
+#define func_8015FA7C WaitForVBlankCountWithWatchdog  /* alias */
+
+/* known: 14-caller 332-byte synchronous SIO command owner: truncate a0 to a command byte, pass a1/a2 as transfer buffers to 0x80168080, perform command/status-dependent reset and preflight exchanges, retry the requested command up to four times while suppressing/restoring the callback word at 0x8017B124, and classify exhausted-transfer recovery through 0x80167B38 */
+#define PSX_FN_ExchangeSioCommandWithRetry 0x8016118Cu
+#define func_8016118C ExchangeSioCommandWithRetry  /* alias */
 
 /* known: Three-argument SIO1 control/query dispatcher spanning 0x8016192C..0x80161DFF: a0 selects six operation families, a1 selects register or lifecycle actions, and a2 supplies values/side selection; reads and writes the SIO1 STAT/MODE/CTRL/BAUD block at 0x1F801050, maintains its RAM shadow, and brackets reset paths with critical-section syscalls */
 #define PSX_FN_AccessSio1ControlState 0x8016192Cu
