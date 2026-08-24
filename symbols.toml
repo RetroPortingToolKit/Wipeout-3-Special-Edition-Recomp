@@ -1755,6 +1755,20 @@ status = "confirmed"
 note = "Exact 0x98-byte five-caller Psy-Q ResetGraph: when graph-debug level >=2 report the requested mode through the debug callback; mode 0 clears the 20-byte GPU state record, then dispatch the backend command 0x03000000, while nonzero mode dispatches 0x03000001; returns the backend callback result"
 
 [[func]]
+pc = 0x8011FE6C
+name = "SpawnRandomizedParticleRecords"
+emit = false
+status = "confirmed"
+note = "Exact 0x28-byte adapter with four unique callers: ignore original a0 and forward (a1 count, a2 origin, a3 spread) to EnqueueRandomizedParticleRecords; five generated call instances include one duplicated overlay call"
+
+[[func]]
+pc = 0x80140F9C
+name = "EnqueueRandomizedParticleRecords"
+emit = false
+status = "confirmed"
+note = "Exact 0x12C-byte private particle producer: for positive count, advance the masked 48-byte ring at 0x801E1B10, copy a three-word origin, generate three independent spread-axis offsets from NextRandom15 low six bits plus component-32, clear six state bytes, and set fixed fields +40=8/+44=1/+45=8/+46=2; called only by SpawnRandomizedParticleRecords"
+
+[[func]]
 pc = 0x80105940
 name = "DrawDecimalValueWithTwoDigitFraction"
 emit = false
@@ -1767,3 +1781,10 @@ name = "MirrorQuadHorizontalCoordinates"
 emit = false
 status = "confirmed"
 note = "Exact 0x6C-byte five-caller eight-pointer quad-coordinate permutation: snapshot signed halfwords x0,y0,x1,y1,x2,y2,x3,y3, swap x0 with x1 and x2 with x3 while preserving every y value, and write all eight results back; call-free with no overlay duplicate"
+
+[[func]]
+pc = 0x8014BB94
+name = "PopTrackedTempHeapBlock"
+emit = false
+status = "confirmed"
+note = "Exact 0x9C-byte no-argument five-caller temp-heap tracker pop: return on an empty -1 top, otherwise decrement the 12-byte archive-record stack, roll the arena prefix back to the popped offset when deallocation is enabled, use null for the final rollback, and clear the suppression flag when the stack becomes empty; no external interior target or duplicate body"

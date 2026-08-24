@@ -1558,3 +1558,14 @@ unbounded build as a performance test; use focused targets and the bounded
   20-byte GPU state record with `0xFF` and sends backend command `0x03000000`,
   while nonzero mode sends `0x03000001`. It returns the indirect GPU backend
   callback result and performs no direct MMIO.
+- `PopTrackedTempHeapBlock` owns `0x8014BB94..0x8014BC2F`, with five unique
+  entry-only callers and no duplicate body. It pops one 12-byte archive record,
+  optionally rolls the temp-arena prefix back to its stored offset (or null on
+  the final record), and clears the rollback-suppression flag when empty.
+- `SpawnRandomizedParticleRecords` owns `0x8011FE6C..0x8011FE93` and discards
+  original `a0` while forwarding `(a1 count, a2 origin, a3 spread)` to private
+  `EnqueueRandomizedParticleRecords` (`0x80140F9C..0x801410C7`). Four unique
+  wrapper callers (five overlay instances) pass count 8; the callee advances a
+  masked 48-byte ring, copies the origin, generates three PRNG/spread offsets,
+  and initializes fixed particle state/type fields. Neither has an interior
+  call target.
