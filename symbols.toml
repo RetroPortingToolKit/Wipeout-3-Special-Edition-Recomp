@@ -279,6 +279,19 @@ status = "known"
 note = "Exact 1040-byte TIM texture loader: accept 4-bit/8-bit indexed TIM data and signed page mode, allocate a 38-byte descriptor, auto-place missing 4-bit CLUT/image rectangles, derive CLUT/TPAGE and four UV corners, upload both TIM blocks through LoadImage, return the descriptor; reject unsupported pixel modes with null"
 
 [[func]]
+pc = 0x8014B614
+name = "ApproximateVectorLength3i"
+emit = false
+status = "confirmed"
+note = "Exact 0x5C-byte three-component magnitude helper with 38 direct callers: compute the low-32-bit sum x*x+y*y+z*z, pass it to the GTE-normalized lookup-table square-root approximation at 0x8015C488, and return that result unchanged; generated 0x8014B638 is its internal delayed frame setup"
+
+[[block]]
+pc = 0x8014B638
+name = "ApproximateVectorLength3iCallFrame"
+status = "confirmed"
+note = "Internal fallthrough of ApproximateVectorLength3i after the z*z multiply: allocate/save the call frame, finish the modulo-2^32 square sum, call 0x8015C488, restore, and return; no direct calls target this split"
+
+[[func]]
 pc = 0x80141D6C
 name = "InitializeShadowTextureAtlas"
 emit = false
@@ -543,6 +556,13 @@ status = "confirmed"
 note = "Real 57-caller variadic sprintf-equivalent owner spanning 0x8015C698..0x8015CF1B: spill a1-a3 into ABI vararg slots, fall through into the generated 0x8015C6A4 parser body, format into a0, NUL-terminate, and return the character count; no caller targets the split body"
 
 [[func]]
+pc = 0x80135574
+name = "SetTransformTranslation"
+emit = false
+status = "confirmed"
+note = "Exact six-instruction transform leaf with 33 direct callers: store a1/a2/a3 as 32-bit translation components at a0+0x14/+0x18/+0x1C, set the signed-halfword state field at +0x40 to one in the return delay slot, and establish no scalar return"
+
+[[func]]
 pc = 0x80121534
 name = "AllocateAndQueueSoundVoice"
 emit = false
@@ -555,3 +575,23 @@ name = "EmitFontGlyphPacket"
 emit = false
 status = "confirmed"
 note = "Exact 0x260-byte 47-caller glyph renderer: select one of four six-byte glyph-metric bands from style, reserve and OT-link a neutral-gray 40-byte POLY_FT4 using style-selected CLUT/TPAGE state, and return x + 2*glyph_width + 2"
+
+[[func]]
+pc = 0x80113BEC
+name = "DrawResourceString"
+emit = false
+status = "confirmed"
+note = "Exact 0x34-byte 41-caller adapter: replace resource-string index a0 with gResourceStringTable[a0], forward x/y/style unchanged to DrawFontString, and return its total horizontal advance unchanged"
+
+[[func]]
+pc = 0x8015F904
+name = "VSync"
+emit = false
+status = "known"
+note = "PsyQ-compatible VBlank/timer synchronizer spanning 0x8015F904..0x8015FA7B: mode<0 returns the software VBlank counter, mode 1 returns Timer1 ticks since the saved baseline without waiting, and mode 0 or >=2 waits through 0x8015FA7C, synchronizes GPU field state when required, refreshes the frame/timer baselines, and returns the pre-wait Timer1 delta"
+
+[[object]]
+addr = 0x8017BF1C
+name = "gResourceStringTable"
+status = "known"
+note = "Runtime-populated word table of NUL-terminated UI/resource-string pointers; indexed directly by DrawResourceString and formatting paths, with observed fixed accesses through entry 340; the generated F/R 8017BF1C E4 describes zero-filled data, not executable code or the full table"
