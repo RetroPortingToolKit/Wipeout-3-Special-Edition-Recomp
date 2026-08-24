@@ -27,6 +27,20 @@ status = "known"
 note = "Address-taken final SIO/pad-driver stage: consume a multitap response through the private descriptor in a0, poll/configure as many as four 0xF0-byte slot records, append the final received byte, and return 0, a propagated transfer error, or -3 on timeout; the callable code ends at 0x8016CC00"
 
 [[func]]
+pc = 0x80112048
+name = "SwapRgb24RedBlue"
+emit = false
+status = "confirmed"
+note = "Seven-instruction leaf: swap bytes 0 and 2 of the three-byte color at a0 while preserving byte 1; called by four packet/material conversion sites at 0x80110C4C/74/AC/D4, with four mirrored expansion-RAM copies"
+
+[[func]]
+pc = 0x80112064
+name = "ByteSwapTwoU16Values"
+emit = false
+status = "confirmed"
+note = "Nine-instruction leaf: byte-swap each of the two consecutive 16-bit values at a0 in place; called from four packet/material conversion branches at 0x80110C60/90/C0/FC, which pass fields at record offsets 4 or 16"
+
+[[func]]
 pc = 0x80116128
 name = "RunRaceSession"
 emit = false
@@ -190,6 +204,13 @@ name = "InitializeShadowTextureAtlas"
 emit = false
 status = "known"
 note = "Single-caller shadow-texture initializer: ignores the legacy source-path a0, allocates a 38-byte halfword descriptor, derives its flags from a1, initializes the fixed 800,256 / 32x224 VRAM atlas layout, uploads embedded pixels from 0x8003484C through LoadImage, and returns the descriptor"
+
+[[func]]
+pc = 0x80141E5C
+name = "CreateTextureDescriptorFromImageData"
+emit = false
+status = "known"
+note = "Four-caller 36-byte public adapter: preserve a0 image-data pointer, canonicalize a1 to signed 16 bits, delegate to the full texture-descriptor builder at 0x8014195C, and return its 38-byte descriptor unchanged"
 
 [[func]]
 pc = 0x80133B64

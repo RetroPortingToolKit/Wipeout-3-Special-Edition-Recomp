@@ -12,6 +12,14 @@
 #define PSX_FN_SetSimVblankSkip 0x800EED58u
 #define func_800EED58 SetSimVblankSkip  /* alias */
 
+/* confirmed: Seven-instruction leaf: swap bytes 0 and 2 of the three-byte color at a0 while preserving byte 1; called by four packet/material conversion sites at 0x80110C4C/74/AC/D4, with four mirrored expansion-RAM copies */
+#define PSX_FN_SwapRgb24RedBlue 0x80112048u
+#define func_80112048 SwapRgb24RedBlue  /* alias */
+
+/* confirmed: Nine-instruction leaf: byte-swap each of the two consecutive 16-bit values at a0 in place; called from four packet/material conversion branches at 0x80110C60/90/C0/FC, which pass fields at record offsets 4 or 16 */
+#define PSX_FN_ByteSwapTwoU16Values 0x80112064u
+#define func_80112064 ByteSwapTwoU16Values  /* alias */
+
 /* known: Sole-called non-returning race-session owner: initialize race/render/audio state, then run the closed per-frame simulation/view/render loop containing the only call to RenderRaceFrame */
 #define PSX_FN_RunRaceSession 0x80116128u
 #define func_80116128 RunRaceSession  /* alias */
@@ -51,6 +59,10 @@
 /* known: Single-caller shadow-texture initializer: ignores the legacy source-path a0, allocates a 38-byte halfword descriptor, derives its flags from a1, initializes the fixed 800,256 / 32x224 VRAM atlas layout, uploads embedded pixels from 0x8003484C through LoadImage, and returns the descriptor */
 #define PSX_FN_InitializeShadowTextureAtlas 0x80141D6Cu
 #define func_80141D6C InitializeShadowTextureAtlas  /* alias */
+
+/* known: Four-caller 36-byte public adapter: preserve a0 image-data pointer, canonicalize a1 to signed 16 bits, delegate to the full texture-descriptor builder at 0x8014195C, and return its 38-byte descriptor unchanged */
+#define PSX_FN_CreateTextureDescriptorFromImageData 0x80141E5Cu
+#define func_80141E5C CreateTextureDescriptorFromImageData  /* alias */
 
 /* known: Single-caller section submitter: installs the owner transform, submits an indexed face list via 0x8016FC28, then resolves packed repeated entries and invokes each renderer callback */
 #define PSX_FN_SubmitSceneSectionFaces 0x801422FCu
