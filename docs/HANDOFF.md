@@ -1490,6 +1490,12 @@ unbounded build as a performance test; use focused targets and the bounded
   entry-only GPU-library callers ignore return residue. It stores
   `VSync(-1)+240` at deadline `0x80179084` and clears counter `0x80179088`, the
   two guards consumed by adjacent `CheckAndRecoverGpuTimeout`.
+- `TokenizeAndMeasureResourceStringBlock` owns
+  `0x80113914..0x80113A17`; six repeated generated entries are selector cases.
+  It selects one of six fixed language blocks, NUL-terminates semicolon/control
+  delimited strings, skips low control bytes, stops at `#`, and returns the
+  compacted byte requirement. Five entry callers feed the adjacent 347-string
+  table initializer's maximum-allocation pass.
 - `ComputeObjectUpVectorQ12` owns `0x800EA870..0x800EA9AF`. Six unique callers
   (five base-region owners and one overlay owner) target only the entry. It
   reads signed object Euler angles at `+0x11E/+0x120/+0x122`, evaluates six

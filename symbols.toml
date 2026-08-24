@@ -1622,6 +1622,13 @@ status = "confirmed"
 note = "Exact argument-free 0x34-byte GPU-library helper with five entry-only callers: sample VSync(-1), store the returned vblank count plus 240 at watchdog deadline 0x80179084, clear watchdog counter 0x80179088, and return with the deadline only as ignored register residue"
 
 [[func]]
+pc = 0x80113914
+name = "TokenizeAndMeasureResourceStringBlock"
+emit = false
+status = "confirmed"
+note = "Exact 0x104-byte resource-language preprocessor with five entry callers: selector 0..5 chooses a fixed source block, replace semicolon or control-byte string terminators with NUL, skip remaining control bytes, stop at '#', and return the byte count required by the adjacent compacting string-table initializer"
+
+[[func]]
 pc = 0x8015FD7C
 name = "Exit"
 emit = false
