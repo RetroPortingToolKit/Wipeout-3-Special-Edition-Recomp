@@ -1259,6 +1259,13 @@ status = "confirmed"
 note = "Psy-Q/BIOS B0:3F string-output thunk: the executable entry is 0x801671A8..0x801671B3 followed by 12 bytes of unreachable alignment padding through the generated 0x18-byte owner end; ten unique executable callers pass a string pointer in a0, with no overlay duplicates, interior call targets, RAM stores, or COP0 effects"
 
 [[func]]
+pc = 0x80168CF8
+name = "DeliverEvent"
+emit = false
+status = "confirmed"
+note = "Psy-Q/BIOS B0:07 event-delivery thunk: three executable instructions at 0x80168CF8..0x80168D03 plus one unreachable padding NOP complete the generated 0x10-byte owner; eleven unique callers pass event class/spec in a0/a1, with no overlay duplicates or interior guest targets"
+
+[[func]]
 pc = 0x80134CE8
 name = "SubmitRumbleDecayRequest"
 emit = false
@@ -1271,3 +1278,10 @@ name = "TestRacerInputFlag2Or20"
 emit = false
 status = "confirmed"
 note = "Logical 0x60-byte eight-caller pure predicate across the generated split at 0x80134A58: return false for racer index -1; otherwise index the 0x3A4-byte racer record at 0x801910E0 and test input bit 0x02 when record byte +2 equals 1, or bit 0x20 for every other type"
+
+[[func]]
+pc = 0x801349EC
+name = "TestRacerInputFlag1Or10"
+emit = false
+status = "confirmed"
+note = "Logical 0x58-byte seven-caller pure predicate across the generated split at 0x80134A00: return false for racer index -1; otherwise index the 0x3A4-byte racer record at 0x801910E0 and test input bit 0x01 when record byte +2 equals 1, or bit 0x10 for every other type"

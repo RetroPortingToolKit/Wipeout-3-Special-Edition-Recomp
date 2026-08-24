@@ -1209,6 +1209,11 @@ unbounded build as a performance test; use focused targets and the bounded
   three trailing NOPs fill the 0x18-byte generated owner. Ten unique callers
   have no overlay duplicates or interior targets, and the thunk has no COP0
   effect.
+- `DeliverEvent` at `0x80168CF8` is the BIOS B0:07 two-argument event-delivery
+  thunk. Three executable instructions end at `0x80168D03`; one trailing NOP
+  fills its 0x10-byte generated owner. Eleven unique callers have no overlay
+  duplicates or interior targets; matching enabled events are marked ready or
+  have their callback invoked according to event mode.
 - `SubmitRumbleDecayRequest` owns `0x80134CE8..0x80134D23` with 12 entry-only
   callers. It replaces rumble-state words `+0x0C/+0x10/+0x14` with Q8 motor
   amplitude, signed priority, and Q8 decay only when both the new amplitude
@@ -1219,3 +1224,8 @@ unbounded build as a performance test; use focused targets and the bounded
   `0x80134A58`. It returns false for racer index `-1`; otherwise racer record
   byte `+2 == 1` selects input mask `0x02`, and every other value selects mask
   `0x20`. All eight callers target the true entry; the predicate has no writes.
+- `TestRacerInputFlag1Or10` is the paired logical owner at
+  `0x801349EC..0x80134A43`, crossing the artificial split at `0x80134A00`.
+  Racer index `-1` returns false; otherwise record byte `+2 == 1` selects input
+  bit `0x01`, with bit `0x10` selected for every other type. Its seven callers
+  all use the true entry, and it performs no writes.
