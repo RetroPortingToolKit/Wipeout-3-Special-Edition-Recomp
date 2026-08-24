@@ -428,6 +428,10 @@
 #define PSX_FN_PutDrawEnv 0x8015D68Cu
 #define func_8015D68C PutDrawEnv  /* alias */
 
+/* confirmed: Exact 0x144-byte seven-caller argument-free PsyQ GPU watchdog: sample VSync(-1), return 0 while the deadline/call-count guard remains healthy, otherwise print retained GPU diagnostics, mask interrupts, reset tracked GPU/DMA state and GP1, restore the prior interrupt mask, and return -1 */
+#define PSX_FN_CheckAndRecoverGpuTimeout 0x8015F360u
+#define func_8015F360 CheckAndRecoverGpuTimeout  /* alias */
+
 /* confirmed: Exact 0x10-byte eight-caller BIOS A0/1B strlen trampoline: preserve the string pointer in a0 and caller ra, select service t1=0x1B in the vector-jump delay slot, and propagate the BIOS unsigned byte count unchanged; final word is unreachable padding */
 #define PSX_FN_Strlen 0x8015F5D4u
 #define func_8015F5D4 Strlen  /* alias */
