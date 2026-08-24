@@ -747,3 +747,12 @@ unbounded build as a performance test; use focused targets and the bounded
 - `0x80141E5C` is `CreateTextureDescriptorFromImageData`, a four-caller public
   adapter that sign-normalizes its mode argument and delegates unchanged image
   data to the full descriptor/parser/uploader at `0x8014195C`.
+- Coverage splits at `0x80140118`, `0x8014EE6C`, `0x80172940`, and
+  `0x801731D4` are not callable ABI entries. They are now cataloged as internal
+  blocks of, respectively, the owner at `0x80140000`, `SpawnRacerEffectRecords`
+  at `0x8014EA88`, `SubdivideAndSubmitMeshPrimitives`, and
+  `BuildVisibleOrientedQuadList`.
+- `SpawnRacerEffectRecords` owns `0x8014EA88..0x8014F01B`, scans thirty
+  96-byte slots, and initializes kind-specific racer effects through a 15-way
+  jump table. Its three true direct calls are within the wrapper at
+  `0x8015B3CC`; generated `0x8014EE6C` is only the kind-6 initialization arm.

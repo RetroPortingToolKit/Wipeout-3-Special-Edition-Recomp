@@ -170,6 +170,12 @@ name = "SubdivideMeshPrimitivePrologue"
 status = "known"
 note = "Stack-frame continuation of the ABI entry at 0x801727E8; not independently called and not a quad clip-code packer"
 
+[[block]]
+pc = 0x80172940
+name = "SubdivideMeshProjectedVertexClipLoopTail"
+status = "known"
+note = "Internal/shared continuation of 0x801727E8: finish the second projected midpoint outcode, iterate at 0x80172840 while vertices remain, then tail-enter the shared renderer loop at 0x80171D04; requires live owner registers and is not ABI-callable"
+
 [[func]]
 pc = 0x80172DDC
 name = "PrepareVisibleQuadTransform"
@@ -183,6 +189,12 @@ name = "BuildVisibleOrientedQuadList"
 emit = false
 status = "known"
 note = "Project and screen-clip a strided array of oriented world-space quads into 20-byte scratchpad records; returns visible count, 0, or -1 on the 48-record overflow sentinel"
+
+[[block]]
+pc = 0x801731D4
+name = "VisibleQuadListOverflowReturn"
+status = "known"
+note = "Overflow-only return epilogue of 0x80172E3C: set v0=-1, restore its scratchpad-saved register frame, and return; reached only from the owner's capacity branch and not ABI-callable"
 
 [[func]]
 pc = 0x8012268C
@@ -259,6 +271,12 @@ emit = false
 status = "known"
 note = "Single-caller argument-free scene-pass orchestrator: unless globally suppressed, optionally submit one of two view-mode-specific layers, then always submit three ordered race-scene layers before returning"
 
+[[block]]
+pc = 0x80140118
+name = "PrepareFourVertexPrimitiveLayoutTail"
+status = "confirmed"
+note = "Shared internal tail, not an ABI owner: primitive-type cases 4 and 7 in 0x80140000..0x801403EB enter here after choosing different index arrays; sets vertex count to four, advances the packed primitive cursor by 24 bytes in the jump delay slot, then joins vertex extraction/centroid averaging at 0x80140168"
+
 [[func]]
 pc = 0x801415F4
 name = "BuildVisibleObjectQuadPackets"
@@ -279,6 +297,19 @@ name = "ClipAndEmitSceneryPrimitive"
 emit = false
 status = "confirmed"
 note = "No-argument global-workspace renderer: clips a four-vertex scenery primitive against four camera side planes, interpolates geometry/UV/color attributes, triangulates the surviving polygon, and appends FT3/FT4/GT3/GT4 packets (including semitransparent variants) through gPrimCursor"
+
+[[func]]
+pc = 0x8014EA88
+name = "SpawnRacerEffectRecords"
+emit = false
+status = "known"
+note = "Exact 0x594-byte owner of the 0x8014EE6C coverage address: scan 30 96-byte effect slots for free records and initialize callback, lifetime, racer index, kind, and state fields through a 15-way kind jump table; called only at 0x8015B3F8/0x8015B40C/0x8015B424"
+
+[[block]]
+pc = 0x8014EE6C
+name = "InitializeRacerEffectKind6Record"
+status = "confirmed"
+note = "Interior straight-line block of SpawnRacerEffectRecords, reached only from jump-table kind 6 at 0x8014EE54: install callback 0x80151A84, kind 6 and lifetime a2+12 in the selected record; not an ABI-callable function despite the generated split-piece symbol"
 
 [[site]]
 pc = 0x80142664
