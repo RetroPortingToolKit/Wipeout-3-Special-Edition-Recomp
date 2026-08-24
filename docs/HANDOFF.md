@@ -1324,6 +1324,11 @@ unbounded build as a performance test; use focused targets and the bounded
   7 to clear under the caller-armed Timer 2 deadline, returns zero on timeout,
   or sets JOY_CTRL bit `0x10` and returns one. All callers test the boolean and
   convert failure into their controller/SIO timeout paths.
+- `TransformIndexedPairedVertex` owns `0x800F2F48..0x800F2FF3`. It maps vertex
+  index `i` to 12-byte pair record `i>>1` at source-owner `+0x18`, reconstructs
+  even `{+0,+2,+4}` or odd `{+8,+A,+6}` signed components, transforms them
+  through the GTE into the caller's `VECTOR`, and propagates FLAG. There are
+  seven unique executable calls but ten generated occurrences from overlap.
 - `ApplyAnalogControllerCalibration` is the true frameless owner of
   `0x801203F0..0x801207A3`; five later generated entries are only internal
   blocks. Its seven entry-only callers select logical pads zero/four. It
