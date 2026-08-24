@@ -42,6 +42,13 @@ indices before the call, and repeatedly feed the returned `x` into the next
 glyph call. This independently proves both the glyph-index input and pen-return
 semantics.
 
+Generated output contains 49 call emissions. Calls at `0x80105CA4` and
+`0x80110170` are each emitted twice because their containing text owners have
+overlapping control-flow translations; the other 45 are emitted once. Thus
+there remain exactly 47 physical call instructions and callers. Dispatch
+subentries within this owner are internal branch-resume blocks, and no
+external J/JAL enters the function interior.
+
 ## Font metric bands
 
 Each glyph metric is a six-byte entry selected as `band + glyph*6`. The style
@@ -110,10 +117,27 @@ return x + 2*glyph_width + 2
 The two-times width applies to screen geometry and pen advance, while atlas U
 advances by the unscaled metric width plus its inclusive-edge adjustment.
 
+## Relationship to the grayscale sibling
+
+The broad name `EmitFontGlyphPacket` remains appropriate because this is the
+shared 47-caller renderer used by `DrawAsciiFontCharacter`, numeric formatters,
+and many direct glyph sites. It always writes fixed RGB `(128,128,128)` and
+only enables semitransparency for styles 3, 9, and 17.
+
+Private `EmitGrayscaleFontGlyphPacket` at `0x80105354` has the same metric
+bands, geometry, OT splice, cursor advance, and next-X return, but copies a
+fifth caller argument to RGB and always emits command `0x2E` with the
+semitransparent TPAGE bit. Its sole caller is `DrawMappedTextString`. These
+field-level differences prove two sibling implementations rather than aliases
+or duplicated translations of one renderer.
+
 ## Evidence
 
 - `disc/SCES_028.45`, exact MIPS disassembly and direct-JAL scan;
 - `generated/SCES_028.45_full_106.c`, full control flow and packed writes;
 - `generated/SCES_028.45_full.ranges`, exact range;
+- generated caller translations, including the two overlapping duplicate
+  emissions;
 - `docs/audits/semantic-80106350.md`, independent 40-byte `POLY_FT4` layout;
+- `docs/audits/semantic-80105354.md`, sibling grayscale renderer comparison;
 - renderer audits independently locating `gPrimCursor` at `0x80198620`.

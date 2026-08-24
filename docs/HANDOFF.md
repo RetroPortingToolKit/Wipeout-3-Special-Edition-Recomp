@@ -1623,6 +1623,12 @@ unbounded build as a performance test; use focused targets and the bounded
   glyph metrics, copies caller grayscale to RGB, and returns the next X pen.
   `DrawAsciiFontCharacter` instead calls the fixed-neutral-gray sibling at
   `0x80105CDC`; there is no external interior target.
+- Reconciled sibling `EmitFontGlyphPacket` at `0x80105CDC..0x80105F3B`: its
+  existing 47-call census is exact, while generated output has 49 emissions
+  because calls `0x80105CA4` and `0x80110170` each occur in two overlapping
+  translations. It uses fixed RGB 128 and style-conditional semitransparency,
+  distinguishing it from the caller-grayscale, always-semitransparent private
+  sibling; no external call/jump enters either renderer's interior.
 - `RotateQuadCoordinatesClockwise` owns `0x80110324..0x8011038F`, with two
   entry-only callers. It snapshots four `(x,y)` pairs and permutes their 2x2
   corner grid from `[0,1;2,3]` to `[2,0;3,1]`, a clockwise quarter-turn; it is

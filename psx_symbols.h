@@ -124,7 +124,7 @@
 #define PSX_FN_DrawFontString 0x80105B78u
 #define func_80105B78 DrawFontString  /* alias */
 
-/* confirmed: Exact 0x260-byte 47-caller glyph renderer: select one of four six-byte glyph-metric bands from style, reserve and OT-link a neutral-gray 40-byte POLY_FT4 using style-selected CLUT/TPAGE state, and return x + 2*glyph_width + 2 */
+/* confirmed: Exact 0x260-byte 47-caller glyph renderer: select one of four six-byte glyph-metric bands from style, reserve and OT-link a fixed-neutral-gray 40-byte POLY_FT4 with style-selected semitransparency/CLUT/TPAGE, and return x + 2*glyph_width + 2; 49 emissions duplicate two calls through overlapping translations */
 #define PSX_FN_EmitFontGlyphPacket 0x80105CDCu
 #define func_80105CDC EmitFontGlyphPacket  /* alias */
 
