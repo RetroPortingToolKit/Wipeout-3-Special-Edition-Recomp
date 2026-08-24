@@ -980,6 +980,9 @@ unbounded build as a performance test; use focused targets and the bounded
 - `SwapAdjacentBytes` owns `0x8012E310..0x8012E323`. It exchanges exactly
   bytes `p[0]` and `p[1]` in place, has 25 direct entry calls and no interior
   targets, and otherwise has no shared-state or hardware effects.
+- `ReverseFourBytes` owns the adjacent `0x8012E324..0x8012E347` leaf. It
+  reverses exactly four bytes in place, has nine direct entry calls and no
+  interior targets, and leaves all other state untouched.
 - `AbsoluteValue32` owns `0x8014B3D4..0x8014B3EB`. It is a 21-caller signed
   integer absolute-value leaf with ordinary two's-complement wrap at
   `INT32_MIN`; no call targets either internal branch/return block.
@@ -1051,6 +1054,10 @@ unbounded build as a performance test; use focused targets and the bounded
   indexes the 4097-halfword table at `0x8017634C` by absolute Q12 cosine and
   reflects negative inputs around pi=`0x4000`. It has nine direct callers, no
   overlay duplicates/interior target, and requires input in `[-4096,4096]`.
+- `ComputeRaceFrameRandom15OffsetA00` is the unsplit
+  `0x80104A48..0x80104A73` leaf: it mixes the selected-racer seed plus race
+  frame counter plus `0xA00`, returns the low 15-bit sample, and stores no
+  state. It has nine unique callers (ten overlay instances).
 - `AccumulateOneIndexedVertexWeight` is its single-step companion at
   `0x8014F814..0x8014F91F`: it performs the same flagged-record lookup and
   fixed 250/200/200 indexed accumulator update once, then decrements positive
@@ -1119,6 +1126,11 @@ unbounded build as a performance test; use focused targets and the bounded
   minute/second/zero records at four-byte stride, and returns the inclusive
   track count or zero. Failures retain any earlier output and optionally print
   the worker's retained `CdGetToc2: error` diagnostic.
+- `CdSyncCallback` owns `0x80160EF4..0x80160F07`, is a five-instruction LibCD
+  leaf with 12 direct callers and no interior targets. It loads and returns the
+  previous callback from `0x8017B124`, then stores the incoming pointer in the
+  return delay slot. Null suppresses callback dispatch; the exchange performs
+  no validation, locking, interrupt masking, or nested-state management.
 - `SpawnTrackSectionSurfaceEffects` logically owns
   `0x8014FA4C..0x80150577` despite generated splits at FAE0/FDE0/FF4C/50548.
   Its sole real caller passes a track section and effect flags; it selects a
@@ -1164,3 +1176,7 @@ unbounded build as a performance test; use focused targets and the bounded
   plus the incrementing race-frame counter at `0x80173AEC` using
   `((int32_t)sum >> 1) ^ (sum << 3)`, then returns the low 15 bits. Unlike
   `NextRandom15`, it mutates no PRNG state; all callers target the true entry.
+- `ComputeRaceFrameRandom15OffsetF00` is the independent eight-caller sibling
+  at `0x80104A74..0x80104A9F`. It applies the same pure 15-bit mix to
+  `selected_racer_seed + race_frame_counter + 0xF00`; it takes no arguments,
+  writes no state, and has no interior entry targets.

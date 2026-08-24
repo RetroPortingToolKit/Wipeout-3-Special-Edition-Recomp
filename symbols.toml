@@ -906,6 +906,13 @@ status = "confirmed"
 note = "Exact 0x14-byte 25-caller frameless in-place byte-pair swap: exchange bytes at pointer offsets 0 and 1, touch no other memory or state, and expose only an incidental original-byte-1 value in v0"
 
 [[func]]
+pc = 0x8012E324
+name = "ReverseFourBytes"
+emit = false
+status = "confirmed"
+note = "Exact 0x24-byte nine-caller frameless in-place four-byte reversal: transform bytes {a,b,c,d} at pointer offsets 0..3 into {d,c,b,a}, touching no other memory or shared state"
+
+[[func]]
 pc = 0x8014B3D4
 name = "AbsoluteValue32"
 emit = false
@@ -1036,6 +1043,13 @@ status = "confirmed"
 note = "4097 signed halfwords approximating floor(acos(i/4096)*16384/pi) for i=0..4096, with entry 0 retained as 8191 and entry 4096 equal to 0; indexed by ApproximateArccosQ12"
 
 [[func]]
+pc = 0x80104A48
+name = "ComputeRaceFrameRandom15OffsetA00"
+emit = false
+status = "confirmed"
+note = "Exact unsplit 0x2C-byte nine-unique-caller deterministic random-sample leaf: wrap gSelectedRacerSeed + gRaceFrameCounter + 0xA00, mix arithmetic(sum>>1) XOR (sum<<3), mask to 15 bits, and return without advancing either shared input"
+
+[[func]]
 pc = 0x8014F814
 name = "AccumulateOneIndexedVertexWeight"
 emit = false
@@ -1133,6 +1147,13 @@ status = "confirmed"
 note = "Exact 0x224-byte two-caller LibCD TOC worker retaining the CdGetToc2 diagnostic name: ignore a0, suppress/restore the sync callback, issue GetTN then GetTD for lead-out and each BCD-decoded track, write minute/second/zero records at four-byte stride through a1, and return populated track count or zero on any command failure"
 
 [[func]]
+pc = 0x80160EF4
+name = "CdSyncCallback"
+emit = false
+status = "confirmed"
+note = "Exact 0x14-byte 12-caller canonical LibCD callback exchange leaf: load and return the previous CD sync callback from 0x8017B124, then store the incoming callback in the jr delay slot; null suppresses dispatch, no validation or synchronization is performed"
+
+[[func]]
 pc = 0x8014FA4C
 name = "SpawnTrackSectionSurfaceEffects"
 emit = false
@@ -1187,3 +1208,10 @@ name = "ComputeRaceFrameRandom15"
 emit = false
 status = "confirmed"
 note = "Exact 0x2C-byte 13-caller pure race-random sampler: add the selected-racer seed at 0x80173A8C to the race-frame counter at 0x80173AEC modulo 32 bits, XOR arithmetic-right-by-1 with left-by-3, and return the low 15 bits without updating either input"
+
+[[func]]
+pc = 0x80104A74
+name = "ComputeRaceFrameRandom15OffsetF00"
+emit = false
+status = "confirmed"
+note = "Exact 0x2C-byte eight-caller pure race-random variant: add fixed 0xF00, the selected-racer seed at 0x80173A8C, and race-frame counter at 0x80173AEC modulo 32 bits, XOR arithmetic-right-by-1 with left-by-3, and return the low 15 bits without stores"

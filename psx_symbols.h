@@ -44,6 +44,14 @@
 #define PSX_FN_ComputeRaceFrameRandom15 0x80104A1Cu
 #define func_80104A1C ComputeRaceFrameRandom15  /* alias */
 
+/* confirmed: Exact unsplit 0x2C-byte nine-unique-caller deterministic random-sample leaf: wrap gSelectedRacerSeed + gRaceFrameCounter + 0xA00, mix arithmetic(sum>>1) XOR (sum<<3), mask to 15 bits, and return without advancing either shared input */
+#define PSX_FN_ComputeRaceFrameRandom15OffsetA00 0x80104A48u
+#define func_80104A48 ComputeRaceFrameRandom15OffsetA00  /* alias */
+
+/* confirmed: Exact 0x2C-byte eight-caller pure race-random variant: add fixed 0xF00, the selected-racer seed at 0x80173A8C, and race-frame counter at 0x80173AEC modulo 32 bits, XOR arithmetic-right-by-1 with left-by-3, and return the low 15 bits without stores */
+#define PSX_FN_ComputeRaceFrameRandom15OffsetF00 0x80104A74u
+#define func_80104A74 ComputeRaceFrameRandom15OffsetF00  /* alias */
+
 /* confirmed: Exact argument-free 0x24-byte PRNG leaf: load gRandom15State, replace it with (arithmetic_shift_right(state,1) XOR (state << 3)) modulo 32 bits, and return the new state's low 15 bits; private state begins at 0x12345678; 254 direct JAL callers */
 #define PSX_FN_NextRandom15 0x80104AA0u
 #define func_80104AA0 NextRandom15  /* alias */
@@ -179,6 +187,10 @@
 /* confirmed: Exact 0x14-byte 25-caller frameless in-place byte-pair swap: exchange bytes at pointer offsets 0 and 1, touch no other memory or state, and expose only an incidental original-byte-1 value in v0 */
 #define PSX_FN_SwapAdjacentBytes 0x8012E310u
 #define func_8012E310 SwapAdjacentBytes  /* alias */
+
+/* confirmed: Exact 0x24-byte nine-caller frameless in-place four-byte reversal: transform bytes {a,b,c,d} at pointer offsets 0..3 into {d,c,b,a}, touching no other memory or shared state */
+#define PSX_FN_ReverseFourBytes 0x8012E324u
+#define func_8012E324 ReverseFourBytes  /* alias */
 
 /* confirmed: Exact 0x12C-byte twelve-call-site deep-copy constructor: allocate a 40-byte instance from the shared arena, copy its 16-byte name and scalar fields, allocate and memcpy its owned 80-byte payload, reset the runtime field at +0x24, report allocation failures through the retained New Instance diagnostic, and return the new instance */
 #define PSX_FN_CreateObjectInstance 0x8012E408u
@@ -431,6 +443,10 @@
 /* confirmed: Exact 0x224-byte two-caller LibCD TOC worker retaining the CdGetToc2 diagnostic name: ignore a0, suppress/restore the sync callback, issue GetTN then GetTD for lead-out and each BCD-decoded track, write minute/second/zero records at four-byte stride through a1, and return populated track count or zero on any command failure */
 #define PSX_FN_CdGetToc2 0x801602E8u
 #define func_801602E8 CdGetToc2  /* alias */
+
+/* confirmed: Exact 0x14-byte 12-caller canonical LibCD callback exchange leaf: load and return the previous CD sync callback from 0x8017B124, then store the incoming callback in the jr delay slot; null suppresses dispatch, no validation or synchronization is performed */
+#define PSX_FN_CdSyncCallback 0x80160EF4u
+#define func_80160EF4 CdSyncCallback  /* alias */
 
 /* confirmed: Exact 0x13C-byte 12-caller PsyQ-style synchronous CD command wrapper: truncate command to u8, suppress and restore the sync callback, conditionally issue command 1 from status bit 0x10 and command 2 from a command-indexed preflight table, retry the requested IssueCdCommand transaction up to four times, and return 1 on success or 0 after exhaustion */
 #define PSX_FN_CdControl 0x80160F1Cu
