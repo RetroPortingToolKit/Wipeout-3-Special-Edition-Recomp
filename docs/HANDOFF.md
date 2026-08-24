@@ -1399,3 +1399,8 @@ unbounded build as a performance test; use focused targets and the bounded
   entry-only callers pass status zero once and `-1` six times. The thunk
   preserves `a0`/caller `ra`, selects service `0x38`, and never returns under
   the BIOS contract; it has no direct memory or hardware effects itself.
+- `ApplyRgbToPrimitiveRecordStream` owns `0x800E8350..0x800E8513`; its six
+  generated interior entries are the type 1..8 jump-table cases. Four unique
+  callers supply an owner (`count +0x12`, stream `+0x1C`) and RGB bytes. It
+  overwrites one, three, or four per-vertex RGB triplets at full or unsigned
+  half intensity according to the exact variable-size record layout.
