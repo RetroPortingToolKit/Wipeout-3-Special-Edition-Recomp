@@ -32,6 +32,10 @@
 #define PSX_FN_SimVblankGate 0x800EDFC8u
 #define func_800EDFC8 SimVblankGate  /* alias */
 
+/* confirmed: Exact 0x1C-byte five-caller leaf: truncate incoming a0/a1/a2 to bytes and store them as RGB at 0x80173308..0x8017330A; the sole reader copies these bytes into generated primitive color fields, with no validation or other state effects */
+#define PSX_FN_SetGlobalPrimitiveRgb 0x800EEAD0u
+#define func_800EEAD0 SetGlobalPrimitiveRgb  /* alias */
+
 /* confirmed: Exact 0xD8-byte sixteen-caller Psy-Q VRAM upload wrapper: accept RECT pointer and source-word pointer, enter the nested interrupt critical section, either submit immediately through the GPU image-transfer primitive or append a -2/RECT/data record to the eight-entry transfer ring, leave critical state, wait through DrawSync when queued, and return only after its per-call completion flag is set */
 #define PSX_FN_LoadImage 0x800EEC80u
 #define func_800EEC80 LoadImage  /* alias */
@@ -103,6 +107,10 @@
 /* confirmed: Exact 0x3E8-byte 16-caller race-time formatter: render nonnegative centiseconds as M:SS with optional .hh using EmitFontGlyphPacket, render negative values as style-dependent placeholder glyph runs, remap low style banks by +14 when global mode 0x8018AE94 equals 2, and return the final X pen */
 #define PSX_FN_DrawRaceTimeCentiseconds 0x80105558u
 #define func_80105558 DrawRaceTimeCentiseconds  /* alias */
+
+/* confirmed: Exact 0x238-byte five-caller font renderer: decompose a whole-number component into up to five decimal digits, zero-pad it to caller width, emit glyph 0x25 as separator, then emit a second component zero-padded to two digits, threading the X pen through EmitFontGlyphPacket and returning the final pen */
+#define PSX_FN_DrawDecimalValueWithTwoDigitFraction 0x80105940u
+#define func_80105940 DrawDecimalValueWithTwoDigitFraction  /* alias */
 
 /* known: Four-argument text renderer spanning 0x80105B78..0x80105CDB: walk the NUL-terminated byte string in a0, map ASCII letters/digits and eleven punctuation marks to font glyph indices, advance spaces by eight pixels, emit every other byte through the POLY_FT4 glyph helper at 0x80105CDC using x=a1, y=a2, style=a3, and return total horizontal advance */
 #define PSX_FN_DrawFontString 0x80105B78u
@@ -763,6 +771,10 @@
 /* confirmed: True 0x280-byte varargs MDEC DMA dispatcher across the false 0x8016B274 split: spill a0..a3 for selectors 0..3, switch DMA direction/control, set the shifted transfer count, or launch the selected MDEC DMA channel from (address,size), returning zero or -2 on bounded hardware-wait timeout */
 #define PSX_FN_DispatchMdecDmaCommand 0x8016B264u
 #define func_8016B264 DispatchMdecDmaCommand  /* alias */
+
+/* confirmed: Exact 0xA4-byte leaf SPU address helper: optionally round address a1 upward by the configured alignment, derive its configured right-shifted 16-bit SPU unit, return that unit for selector a0=-2, return the normalized byte address for a0=-1, or store the unit in the halfword address table at selector a0 and return the normalized byte address; three unique entry-only callers */
+#define PSX_FN_NormalizeAndRegisterSpuAddress 0x8016B5ACu
+#define func_8016B5AC NormalizeAndRegisterSpuAddress  /* alias */
 
 /* confirmed: Exact 0x5C-byte 14-caller SPU-library timing delay: ignore all arguments, keep counter and accumulator on an 8-byte stack frame, execute 60 iterations of accumulator *= 13 with 32-bit wraparound, and return without MMIO/global mutation or semantic value; callers place it around SPU control/status/data-port accesses */
 #define PSX_FN_DelaySpuRegisterAccess 0x8016B6F8u

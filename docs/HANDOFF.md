@@ -1329,6 +1329,10 @@ unbounded build as a performance test; use focused targets and the bounded
   `0x80160E78..0x80160E87`. It forwards the event handle and BIOS result
   unchanged; its fourth word is unreachable padding. All six direct callers
   target the true entry.
+- `SetGlobalPrimitiveRgb` is the exact seven-instruction leaf at
+  `0x800EEAD0..0x800EEAEB`. It truncates three arguments to RGB bytes at
+  `0x80173308..0x8017330A`; the sole reader copies them into primitive color
+  fields. Five unique callers all target the true entry.
 - `CopyAndNormalizeControllerPacket` owns `0x80120988..0x80120A87` with seven
   entry callers. It copies/clears eight raw controller bytes, saves their
   original header at destination `+8`, accepts headers `2300/4100/7300`, and
@@ -1461,6 +1465,11 @@ unbounded build as a performance test; use focused targets and the bounded
   attributes to the 28-byte record array consumed by the visible oriented-quad
   renderer, skips bit-2 records within a 64-entry head/tail window, forces
   active bit `0x8000`, and advances the tail; global mode byte 1 disables it.
+- `DrawDecimalValueWithTwoDigitFraction` owns `0x80105940..0x80105B77`, with
+  five unique callers and no overlay duplicate. It renders a caller-padded
+  whole component, separator glyph `0x25`, and a fraction padded to two digits,
+  threading `EmitFontGlyphPacket`'s X pen through every digit and returning the
+  final pen; callers commonly supply quotient/remainder modulo 100.
 - `ApplyRgbToPrimitiveRecordStream` owns `0x800E8350..0x800E8513`; its six
   generated interior entries are the type 1..8 jump-table cases. Four unique
   callers supply an owner (`count +0x12`, stream `+0x1C`) and RGB bytes. It
@@ -1529,3 +1538,8 @@ unbounded build as a performance test; use focused targets and the bounded
   diagnostics and returns null on exhaustion, or splits/links the block,
   debits arena `+8`, updates minimum-free word `0x801749AC`, and returns the
   header's `+0x0C` payload pointer.
+- `NormalizeAndRegisterSpuAddress` owns `0x8016B5AC..0x8016B64F`, with three
+  unique entry-only callers (five generated instances from duplicated owner
+  emission). It optionally alignment-rounds `a1`, converts it by the configured
+  right shift, and uses `a0=-2/-1` for unit/address returns or otherwise stores
+  the 16-bit unit in the SPU address table before returning the byte address.
