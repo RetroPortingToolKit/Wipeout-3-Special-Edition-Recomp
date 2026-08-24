@@ -1671,6 +1671,13 @@ status = "confirmed"
 note = "Exact 0x3C-byte six-caller resource-loader adapter: sign-extend the low halfword of index a0, call the private resource core 0x8012CD44 as (0,0,0,NULL,index,size_out), and return its resource pointer unchanged; all six unique calls target the entry and the sole interior row is only the nested-call continuation"
 
 [[func]]
+pc = 0x80105F3C
+name = "InitializeFontGlyphMetricTables"
+emit = false
+status = "confirmed"
+note = "Exact 0x414-byte call-free font-metric initializer: truncate selector/variant to bytes, clamp selector >=10 to 9, choose one of the embedded signed-halfword metric sources and a 64/100-entry extent, scale values with exact signed division by 100, and populate six global glyph metric bands at 0x801CDA88..0x801CE69C; six consecutive calls in owner 0x80104AC4 are six unique entry sites with no overlay or interior calls"
+
+[[func]]
 pc = 0x8015D3C4
 name = "ClearImage"
 emit = false
@@ -1690,3 +1697,10 @@ name = "ComputeThreePointTrigonometricOffset"
 emit = false
 status = "confirmed"
 note = "Exact 0x2BC-byte four-caller geometry helper: measure AB/BC/AC, form the retained signed Q12 ratio from the negated sum of their modulo-32-bit squares over 2*AB*BC, apply table arccos then cosine at one-quarter angle, and write B minus normalized BC times the resulting AB-scaled distance; zero AB/BC leaves output untouched"
+
+[[func]]
+pc = 0x800F901C
+name = "InitializeOrRefreshEffectSlot"
+emit = false
+status = "confirmed"
+note = "Exact 0x6B4-byte six-caller effect-pool initializer: index a 0xCC-byte slot, initialize only state 0 or refresh state 3, bind owner/source geometry, apply mode-1..4 RNG/geometry-specific position and motion fields, publish three caller callbacks at +0xC0/+0xC4/+0xC8, and activate through 0x800F96D0; no overlay duplicate"
