@@ -1182,6 +1182,20 @@ status = "confirmed"
 note = "Exact 0x30-byte seven-caller canonical PsyQ DMA callback dispatcher: preserve channel a0 and callback a1, load the active DMA service table through 0x8017A4EC, call its +4 exchange method indirectly, and propagate the backend's previous-callback result unchanged; observed channels are 1,2,3,4"
 
 [[func]]
+pc = 0x80162690
+name = "SetIntrMask"
+emit = false
+status = "confirmed"
+note = "Exact 0x18-byte nine-caller interrupt-mask exchange leaf: load the active 16-bit I_MASK register pointer from 0x8017A4F4 (initialized to 0x1F801074), return its old zero-extended value, and store the low half of a0 in the jr delay slot; GPU/DMA callers use zero/restore pairs"
+
+[[func]]
+pc = 0x8015F5D4
+name = "Strlen"
+emit = false
+status = "confirmed"
+note = "Exact 0x10-byte eight-caller BIOS A0/1B strlen trampoline: preserve the string pointer in a0 and caller ra, select service t1=0x1B in the vector-jump delay slot, and propagate the BIOS unsigned byte count unchanged; final word is unreachable padding"
+
+[[func]]
 pc = 0x8014FA4C
 name = "SpawnTrackSectionSurfaceEffects"
 emit = false
@@ -1266,6 +1280,20 @@ status = "confirmed"
 note = "Psy-Q/BIOS B0:07 event-delivery thunk: three executable instructions at 0x80168CF8..0x80168D03 plus one unreachable padding NOP complete the generated 0x10-byte owner; eleven unique callers pass event class/spec in a0/a1, with no overlay duplicates or interior guest targets"
 
 [[func]]
+pc = 0x8015FEF4
+name = "Memset"
+emit = false
+status = "confirmed"
+note = "Psy-Q/BIOS A0:2B memset thunk: three executable instructions at 0x8015FEF4..0x8015FEFF plus one unreachable padding NOP complete the generated 0x10-byte owner; twelve unique callers pass destination/value/count in a0/a1/a2, with no overlay duplicates or interior guest targets"
+
+[[func]]
+pc = 0x80160D28
+name = "CdInit"
+emit = false
+status = "confirmed"
+note = "Exact 0x90-byte seven-caller canonical LibCD initializer: retry the low-level CD interrupt/hardware initializer at 0x80160DB8 up to five times, return 0 after printing the retained failure diagnostic, or install three internal CD callbacks and clear their companion state before returning 1"
+
+[[func]]
 pc = 0x80134CE8
 name = "SubmitRumbleDecayRequest"
 emit = false
@@ -1285,3 +1313,17 @@ name = "TestRacerInputFlag1Or10"
 emit = false
 status = "confirmed"
 note = "Logical 0x58-byte seven-caller pure predicate across the generated split at 0x80134A00: return false for racer index -1; otherwise index the 0x3A4-byte racer record at 0x801910E0 and test input bit 0x01 when record byte +2 equals 1, or bit 0x10 for every other type"
+
+[[func]]
+pc = 0x80135DD8
+name = "SetMatrixTranslation"
+emit = false
+status = "confirmed"
+note = "Exact 0x10-byte 11-caller PSX MATRIX leaf: store signed 32-bit x/y/z arguments at destination +0x14/+0x18/+0x1C, leave the nine rotation halfwords and +0x12 padding untouched, and unlike SetTransformTranslation do not modify enclosing transform state at +0x40"
+
+[[func]]
+pc = 0x8014BC30
+name = "GetCurrentArchiveEntryOutputSize"
+emit = false
+status = "confirmed"
+note = "Logical 0x3C-byte eight-caller accessor across the generated split at 0x8014BC4C: return zero when current archive-record index 0x801E9808 is -1, otherwise index the 12-byte table at pointer 0x801E97FC and return the selected record's proven output_size word at +4 without changing state"

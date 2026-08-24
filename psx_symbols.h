@@ -248,6 +248,10 @@
 #define PSX_FN_CopyTransformMatrix 0x80135CDCu
 #define func_80135CDC CopyTransformMatrix  /* alias */
 
+/* confirmed: Exact 0x10-byte 11-caller PSX MATRIX leaf: store signed 32-bit x/y/z arguments at destination +0x14/+0x18/+0x1C, leave the nine rotation halfwords and +0x12 padding untouched, and unlike SetTransformTranslation do not modify enclosing transform state at +0x40 */
+#define PSX_FN_SetMatrixTranslation 0x80135DD8u
+#define func_80135DD8 SetMatrixTranslation  /* alias */
+
 /* known: Two-caller projection/GTE setup: set H from 0x801E14F0, follow +0x44 links to the terminal transform, build MATRIX scratch at 0x1F800010 with its middle rotation row scaled by 0x801E14EC/256 and translation {0,0,0x801E14F4/2}, then install TR and rotation */
 #define PSX_FN_InstallLinkedRenderTransform 0x80136078u
 #define func_80136078 InstallLinkedRenderTransform  /* alias */
@@ -344,6 +348,10 @@
 #define PSX_FN_ReleaseAllTrackedTempHeapBlocks 0x8014B96Cu
 #define func_8014B96C ReleaseAllTrackedTempHeapBlocks  /* alias */
 
+/* confirmed: Logical 0x3C-byte eight-caller accessor across the generated split at 0x8014BC4C: return zero when current archive-record index 0x801E9808 is -1, otherwise index the 12-byte table at pointer 0x801E97FC and return the selected record's proven output_size word at +4 without changing state */
+#define PSX_FN_GetCurrentArchiveEntryOutputSize 0x8014BC30u
+#define func_8014BC30 GetCurrentArchiveEntryOutputSize  /* alias */
+
 /* known: Exact 0x594-byte owner of the 0x8014EE6C coverage address: scan 30 96-byte effect slots for free records and initialize callback, lifetime, racer index, kind, and state fields through a 15-way kind jump table; called only at 0x8015B3F8/0x8015B40C/0x8015B424 */
 #define PSX_FN_SpawnRacerEffectRecords 0x8014EA88u
 #define func_8014EA88 SpawnRacerEffectRecords  /* alias */
@@ -408,6 +416,10 @@
 #define PSX_FN_PutDrawEnv 0x8015D68Cu
 #define func_8015D68C PutDrawEnv  /* alias */
 
+/* confirmed: Exact 0x10-byte eight-caller BIOS A0/1B strlen trampoline: preserve the string pointer in a0 and caller ra, select service t1=0x1B in the vector-jump delay slot, and propagate the BIOS unsigned byte count unchanged; final word is unreachable padding */
+#define PSX_FN_Strlen 0x8015F5D4u
+#define func_8015F5D4 Strlen  /* alias */
+
 /* confirmed: Exact 0x10-byte 20-caller BIOS A0/19 strcpy trampoline: preserve destination/source arguments, load service selector t1=0x19, jump to BIOS vector 0xA0 without changing ra, and return the BIOS destination pointer unchanged; copy/NUL/fault behavior belongs to BIOS */
 #define PSX_FN_Strcpy 0x8015F614u
 #define func_8015F614 Strcpy  /* alias */
@@ -432,6 +444,10 @@
 #define PSX_FN_SetSemiTrans 0x8015FD4Cu
 #define func_8015FD4C SetSemiTrans  /* alias */
 
+/* confirmed: Psy-Q/BIOS A0:2B memset thunk: three executable instructions at 0x8015FEF4..0x8015FEFF plus one unreachable padding NOP complete the generated 0x10-byte owner; twelve unique callers pass destination/value/count in a0/a1/a2, with no overlay duplicates or interior guest targets */
+#define PSX_FN_Memset 0x8015FEF4u
+#define func_8015FEF4 Memset  /* alias */
+
 /* confirmed: Exact 0x94-byte 11-caller PsyQ-compatible DR_MODE packet builder: set two-word packet length, encode E1 draw-mode command from DFE/DTD and masked TPAGE, optionally encode E2 texture-window masks/offsets from RECT, otherwise emit a zero/NOP second word; no semantic return */
 #define PSX_FN_SetDrawMode 0x801601B4u
 #define func_801601B4 SetDrawMode  /* alias */
@@ -455,6 +471,10 @@
 /* confirmed: Exact 0x224-byte two-caller LibCD TOC worker retaining the CdGetToc2 diagnostic name: ignore a0, suppress/restore the sync callback, issue GetTN then GetTD for lead-out and each BCD-decoded track, write minute/second/zero records at four-byte stride through a1, and return populated track count or zero on any command failure */
 #define PSX_FN_CdGetToc2 0x801602E8u
 #define func_801602E8 CdGetToc2  /* alias */
+
+/* confirmed: Exact 0x90-byte seven-caller canonical LibCD initializer: retry the low-level CD interrupt/hardware initializer at 0x80160DB8 up to five times, return 0 after printing the retained failure diagnostic, or install three internal CD callbacks and clear their companion state before returning 1 */
+#define PSX_FN_CdInit 0x80160D28u
+#define func_80160D28 CdInit  /* alias */
 
 /* confirmed: Exact 0x14-byte 12-caller canonical LibCD callback exchange leaf: load and return the previous CD sync callback from 0x8017B124, then store the incoming callback in the jr delay slot; null suppresses dispatch, no validation or synchronization is performed */
 #define PSX_FN_CdSyncCallback 0x80160EF4u
@@ -495,6 +515,10 @@
 /* confirmed: Exact 0x30-byte seven-caller canonical PsyQ DMA callback dispatcher: preserve channel a0 and callback a1, load the active DMA service table through 0x8017A4EC, call its +4 exchange method indirectly, and propagate the backend's previous-callback result unchanged; observed channels are 1,2,3,4 */
 #define PSX_FN_DMACallback 0x801625ECu
 #define func_801625EC DMACallback  /* alias */
+
+/* confirmed: Exact 0x18-byte nine-caller interrupt-mask exchange leaf: load the active 16-bit I_MASK register pointer from 0x8017A4F4 (initialized to 0x1F801074), return its old zero-extended value, and store the low half of a0 in the jr delay slot; GPU/DMA callers use zero/restore pairs */
+#define PSX_FN_SetIntrMask 0x80162690u
+#define func_80162690 SetIntrMask  /* alias */
 
 /* confirmed: Exact 0x10-byte fourteen-caller syscall-2 wrapper: set a0=2, execute syscall, enable COP0 Status IEc and interrupt-mask bit IM2 through the BIOS syscall contract, return v0=0, and touch no RAM or ordinary library state */
 #define PSX_FN_ExitCriticalSection 0x80165550u
