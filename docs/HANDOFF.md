@@ -1151,6 +1151,17 @@ unbounded build as a performance test; use focused targets and the bounded
   method, and propagates the backend result. Observed channels 1/2/3/4 map to
   MDEC, GPU, CD-ROM, and SPU; all storage/register/synchronization effects are
   backend-owned and the dispatcher performs no validation.
+- `SetIntrMask` owns `0x80162690..0x801626A7`, is a six-instruction leaf with
+  nine GPU/DMA-library callers and no interior targets. It loads the active
+  I_MASK pointer from `0x8017A4F4` (initialized `0x1F801074`), returns the old
+  zero-extended halfword, and writes the low half of the new mask in the return
+  delay slot. Callers use zero/save/restore pairs; CPU status and I_STAT are
+  unaffected.
+- `Strlen` owns `0x8015F5D4..0x8015F5E3` and is the four-word BIOS A0/1B
+  trampoline, including an unreachable padding NOP. It has eight direct entry
+  callers and no interior targets, preserves the string pointer and original
+  `ra`, and propagates the BIOS byte count excluding NUL unchanged. Scanning,
+  invalid-pointer behavior, and all reads belong to BIOS.
 - `SpawnTrackSectionSurfaceEffects` logically owns
   `0x8014FA4C..0x80150577` despite generated splits at FAE0/FDE0/FF4C/50548.
   Its sole real caller passes a track section and effect flags; it selects a
@@ -1214,6 +1225,16 @@ unbounded build as a performance test; use focused targets and the bounded
   fills its 0x10-byte generated owner. Eleven unique callers have no overlay
   duplicates or interior targets; matching enabled events are marked ready or
   have their callback invoked according to event mode.
+- `Memset` at `0x8015FEF4` is the BIOS A0:2B C memory-fill thunk. Its three
+  executable instructions end at `0x8015FEFF`; one trailing NOP fills the
+  0x10-byte generated owner. Twelve unique callers have no overlay duplicates
+  or interior targets; graphics callers use the general primitive to clear
+  structures rather than issue a GPU operation.
+- `CdInit` owns exactly `0x80160D28..0x80160DB7`. It tries the lower CD
+  interrupt/hardware initializer up to five times; success installs internal
+  sync, ready, and data callbacks, clears their companion state, and returns 1.
+  Exhaustion prints the retained failure diagnostic and returns 0. Seven unique
+  callers have no overlay duplicates or interior targets.
 - `SubmitRumbleDecayRequest` owns `0x80134CE8..0x80134D23` with 12 entry-only
   callers. It replaces rumble-state words `+0x0C/+0x10/+0x14` with Q8 motor
   amplitude, signed priority, and Q8 decay only when both the new amplitude
@@ -1229,3 +1250,13 @@ unbounded build as a performance test; use focused targets and the bounded
   Racer index `-1` returns false; otherwise record byte `+2 == 1` selects input
   bit `0x01`, with bit `0x10` selected for every other type. Its seven callers
   all use the true entry, and it performs no writes.
+- `SetMatrixTranslation` is the exact four-instruction leaf at
+  `0x80135DD8..0x80135DE7`: 11 callers pass a PSX `MATRIX *` plus signed
+  translation x/y/z, which are stored at `+0x14/+0x18/+0x1C`. Rotation and
+  padding remain untouched; unlike `SetTransformTranslation`, this narrow
+  helper does not set the larger transform's `+0x40` state field.
+- `GetCurrentArchiveEntryOutputSize` owns `0x8014BC30..0x8014BC6B`, including
+  the generated continuation at `0x8014BC4C`. It returns zero for current
+  archive index `-1`; otherwise it returns word `+4` (`output_size`) from the
+  selected 12-byte record in the table at `0x801E97FC`. Its eight callers all
+  target the true entry, and the accessor has no arguments or state changes.
