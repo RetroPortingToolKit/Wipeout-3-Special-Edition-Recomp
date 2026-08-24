@@ -2817,3 +2817,20 @@ do not reuse the rejected pre-A/B state or start a second process.
   overflows, and 58 one-second cadence samples at `98.87--100.29 Hz`
   (average `99.51 Hz`). This is stronger PAL8 attract evidence, but it still
   does not replace fresh PAL8 race-start/replay states.
+
+## PAL8 high-RAM attract tail (2026-08-24 13:05)
+
+- A subsequent idle attract run exposed a separate hot tail at physical
+  `0x00781408`: about `48--50M` interpreted instructions/s and rapidly rising
+  watched generations, despite an otherwise healthy guest clock. Graceful
+  shutdown flushed a four-region capture whose `0x80780000` record explicitly
+  includes `0x80781408` as a dispatch entry.
+- The B24/f0 compiler preflight passed and publication returned
+  `PSX_SHARD_RESULT ok=2 failed=0 skipped=2`; the active cache now audits as
+  `indexed=17`. After relaunch, the high-RAM tail no longer dominates: the
+  steady-state intervals show `interp=0` and zero loader invalidations, with
+  `guest=99.20--99.50 Hz` and zero audio errors after warmup.
+- The authoritative timing line for this build is
+  `title_crtc=PALx2 base=50Hz multiplier=2x effective=99.493634Hz` plus the
+  `10.050894 ms/frame` wall pacer. A 50 Hz display/counter reading from some
+  other layer must not replace this guest/present telemetry.
