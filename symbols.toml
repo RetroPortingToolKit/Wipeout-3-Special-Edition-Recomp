@@ -1867,6 +1867,13 @@ status = "confirmed"
 note = "Logical 0x164-byte uppercase-ASCII string renderer with 72 unique runtime call PCs: remap letters/digits/11 punctuation characters, advance spaces by eight, thread X through fixed-neutral-gray EmitFontGlyphPacket, and return total width; 12 generated case aliases and 104 call emissions include overlay/overlap duplicates"
 
 [[func]]
+pc = 0x80106518
+name = "DrawRaceStatusHud"
+emit = false
+status = "confirmed"
+note = "Logical one-caller race-status HUD owner spanning false generated splits through 0x801078D3: count active 0x16C-byte racers, derive placement/status values, and conditionally draw numeric ranks, times, labels and four textured quads through recovered font/resource/quad helpers; void, original a0 unused, no executable interior caller"
+
+[[func]]
 pc = 0x80110198
 name = "LoadQuadTextureCoordinates"
 emit = false
@@ -1902,6 +1909,20 @@ status = "confirmed"
 note = "Exact 0x1F0-byte one-caller packet-pool initializer: build and sequentially link 175 36-byte POLY_G4 packets followed by 64 40-byte POLY_FT4 packets in the caller workspace, configure each textured strip's neutral RGB, atlas-mode UVs and descriptor CLUT/TPAGE, and publish first/last textured-packet pointers in the footer; a2/a3 ignored, no semantic return"
 
 [[func]]
+pc = 0x8012DEA4
+name = "RenderFrontendImageWarp"
+emit = false
+status = "confirmed"
+note = "Exact 0x3F8-byte one-caller frontend warp renderer: derive and activate a temporary transform from state angles, splice the initialized packet workspace into the active ordering-table bucket, select a scrolling subset of the 64 FT4 strips, project the prepared 26x8 warp grid through GTE RTPS into 175 POLY_G4 packets while copying four colors per cell, terminate the chain at the prior OT head, and restore the source transform"
+
+[[func]]
+pc = 0x80134D24
+name = "UpdateRumbleStateForPort"
+emit = false
+status = "confirmed"
+note = "Exact 0xC8-byte two-unique-caller rumble tick: when the 24-byte state is enabled, derive digital and clamped analog actuator bytes, publish them to the selected port, decrement the digital countdown and clear its priority on expiry, Q8-decay analog amplitude and clear it/priority below 50; disabled state outputs zero and freezes decay; 458 generated JAL emissions collapse to guest PCs 0x80123E30/0x80123E70"
+
+[[func]]
 pc = 0x8011FF10
 name = "SpawnType2ParticleEffect"
 emit = false
@@ -1921,3 +1942,17 @@ name = "DrainParticleEffectQueue"
 emit = false
 status = "confirmed"
 note = "Exact 0x358-byte no-argument particle queue drain: reentrancy-guarded transfer of up to two pending 40-byte effect records into the current 80-byte slot of a 16-entry ring, with per-record state/sentinel handling, helper-derived fields, cursor advancement, optional callback dispatch, and no semantic return; no direct or interior callers"
+
+[[func]]
+pc = 0x801202F0
+name = "LatchParticleEffectBatch"
+emit = false
+status = "confirmed"
+note = "Exact 0x100-byte three-caller critical-section consumer: when published cursor 0x80175D48 differs from consumed cursor 0x80175D50, copy the next 80-byte two-record particle batch from the 16-slot ring at 0x801D54D8 into working storage 0x801D5488, advance the published cursor modulo 16, and return 1; otherwise return 0"
+
+[[func]]
+pc = 0x8014A798
+name = "EmitGouraudQuadPacket"
+emit = false
+status = "confirmed"
+note = "Exact 0x144-byte GPU POLY_G4 builder: reserve 36 bytes from gPrimCursor 0x80198620 and the parallel cursor at 0x80176348, fill four signed XY pairs and four RGB triplets from the 21-argument ABI, choose GP0 command 0x38/0x3A from the final semitransparency flag, and return the packet; 942 generated overlay emissions collapse to four retained executable calls and 0x8014A858/85C are internal continuations"

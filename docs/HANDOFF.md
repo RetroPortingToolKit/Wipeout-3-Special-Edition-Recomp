@@ -2,6 +2,33 @@
 
 ## Current verified position
 
+### Clean semantic-decomp pause — 2026-08-24
+
+- Pause commit is the next coherent checkpoint after `af711cc`; the catalog has
+  246 functions (202 confirmed, 44 known), and `psx_symbols.h` is synchronized.
+  No semantic-audit agent has an in-flight owner.
+- Resume semantic discovery with `python tools/rank_unknown_functions.py`; the
+  report excludes cataloged functions and blocks and ranks remaining generated
+  JAL targets by emission count. Treat counts as prioritization hints only:
+  the completed `0x8014A798` and `0x80134D24` audits proved that overlay
+  retranslations can inflate 4/2 retained calls into 942/458 emissions.
+- The catalog is ready to inform recompilation now (boundaries, ABIs, callers,
+  false-split corrections, and semantic names), but it is not yet a native-C
+  replacement layer. Every catalog entry intentionally remains `emit=false`;
+  changing that flag only advertises ownership and does not supply an
+  equivalent host implementation or parity proof.
+- Recommended resume point for recomp leverage: choose one small confirmed,
+  call-free or tightly isolated helper, implement it behind a single-address
+  opt-in native-dispatch hook, and run identical-state native/interpreter
+  differential checks before measuring performance. Keep the generated CPS
+  implementation as the fallback. `LoadQuadTextureCoordinates` and the four
+  quad-coordinate permutation helpers are safer pilot candidates than the HUD,
+  particle queue, resource, or packet-allocation owners because their memory
+  surface and control flow are bounded.
+- Do not infer a speedup from symbol recovery alone. After the pilot proves the
+  replacement plumbing, prioritize replacements using real retained runtime
+  call/timing telemetry; generated emission counts are not runtime frequency.
+
 - Canonical root worktree is `master`; preserve the unrelated untracked
   `docs/internal/upstream/WIPEOUT3_SESSION_ENGINE_DRAFTS_2026-08-20.md`.
 - Clean Release build passes `tools/verify_static_release.ps1` with the
@@ -1594,6 +1621,16 @@ unbounded build as a performance test; use focused targets and the bounded
   links 175 POLY_G4 packets into 64 neutral POLY_FT4 atlas strips in the
   caller workspace, sets FT4 CLUT/TPAGE/UVs, and publishes first/last FT4
   pointers at workspace `+0x22A0/+0x229C`; `a2/a3` are ignored.
+- `RenderFrontendImageWarp` owns `0x8012DEA4..0x8012E29B`, with sole caller
+  `0x801245FC`. It temporarily activates a state-derived transform, relinks a
+  scrolling FT4-strip span behind the 175 G4 packets, projects the prepared
+  26x8 warp vertices and color table into a 25x7 shaded grid, appends the old
+  OT head, and restores the caller's 80-byte transform.
+- `UpdateRumbleStateForPort` owns `0x80134D24..0x80134DEB`. It outputs digital
+  countdown and clamped Q8 analog rumble, decrements/decays enabled state, and
+  retires priorities on expiry. Its 458 generated JAL emissions collapse to
+  the two retained guest calls `0x80123E30` (port 0) and `0x80123E70` (port 4);
+  no external interior entry exists.
 - `SpawnRandomizedParticleRecords` owns `0x8011FE6C..0x8011FE93` and discards
   original `a0` while forwarding `(a1 count, a2 origin, a3 spread)` to private
   `EnqueueRandomizedParticleRecords` (`0x80140F9C..0x801410C7`). Four unique
@@ -1651,6 +1688,14 @@ unbounded build as a performance test; use focused targets and the bounded
   72 unique runtime call PCs (69 retained plus three overlay-only) but 104
   generated emissions from repeated overlay/overlap translations, with no
   external interior target.
+- `DrawRaceStatusHud` is the true one-caller owner
+  `0x80106518..0x801078D3`; seven generated ranges beginning at `0x80106518`,
+  `0x80106AEC`, `0x80106AF0`, `0x80106BE0`, `0x80106D18`, `0x80106D1C`, and
+  `0x80106E48` share one 0x88-byte frame and return. It counts active
+  0x16C-byte racers and conditionally renders rank/count values, times, status
+  strings, localized countdown messages, and four HUD quads. The sole
+  executable caller is `0x8010D4A8`; a JAL-shaped data word targeting the
+  `0x80106AEC` delay slot is non-code, not an interior caller.
 - `RotateQuadCoordinatesClockwise` owns `0x80110324..0x8011038F`, with two
   entry-only callers. It snapshots four `(x,y)` pairs and permutes their 2x2
   corner grid from `[0,1;2,3]` to `[2,0;3,1]`, a clockwise quarter-turn; it is
@@ -1680,3 +1725,12 @@ unbounded build as a performance test; use focused targets and the bounded
   records, publishes them as the current 80-byte slot of a 16-entry ring,
   advances masked producer/consumer cursors, invokes the optional callback at
   `0x80175D44`, and has no direct or interior static caller.
+- `LatchParticleEffectBatch` owns `0x801202F0..0x801203EF`. Under the paired
+  critical-section APIs, its three callers atomically copy one newly published
+  80-byte/two-record particle ring slot into working storage at `0x801D5488`;
+  it advances the cursor modulo 16 and returns 1, or returns 0 when caught up.
+- `EmitGouraudQuadPacket` owns `0x8014A798..0x8014A8DB` and returns a newly
+  reserved 36-byte `POLY_G4`. Its 21-argument ABI supplies four signed XY pairs,
+  four RGB triplets, and a flag selecting GP0 `0x38/0x3A`; 942 generated overlay
+  emissions collapse to four retained calls in owner `0x80148128`, while
+  `0x8014A858/0x8014A85C` are untargeted internal continuations.
