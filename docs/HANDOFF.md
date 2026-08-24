@@ -1352,6 +1352,11 @@ unbounded build as a performance test; use focused targets and the bounded
   accepts only type bytes 4/8, then swaps UV pairs `0<->1` and `2<->3` over
   record bytes `+8..+F`; other types and all other bytes are unchanged. Four
   executable JAL PCs become eight generated occurrences through mirroring.
+- `RecordRacerEliminationCredit` owns `0x80104750..0x80104857` with six
+  callers. After a shared suppression gate, it accepts victim destruction
+  state 100 for vacant slots or 15 for occupied slots, increments the credited
+  racer's word counter at `0x8017C484`, and increments an additional per-racer
+  byte in session mode 7 or 6. Incoming `a2` is ignored; no value is returned.
 - `ApplyAnalogControllerCalibration` is the true frameless owner of
   `0x801203F0..0x801207A3`; five later generated entries are only internal
   blocks. Its seven entry-only callers select logical pads zero/four. It
