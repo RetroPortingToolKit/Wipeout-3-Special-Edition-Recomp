@@ -673,11 +673,25 @@ status = "confirmed"
 note = "Exact 0x5BC-byte five-argument localized byte-string renderer with 24 direct callers: map ASCII/punctuation and an ISO-8859-1 accented-byte table to glyph indices, select language-sensitive extended glyph banks, emit each non-space glyph through 0x8010EAC4, apply mode-sensitive space advances, and return final x minus the sign-extended starting x"
 
 [[func]]
+pc = 0x80102E70
+name = "DecodePackedRacerControls"
+emit = false
+status = "confirmed"
+note = "Exact frameless 0x148-byte seven-caller input decoder: truncate a1 to 16 bits, clear racer record a0's runtime action word at +0x0C, expand packed low bits 0..9 into sparse action bits 4,5,6,7,9,10,11,13,14,15, and return packed bits 10..15 as an unsigned six-bit auxiliary value"
+
+[[func]]
 pc = 0x80111DA0
 name = "RegisterTextureBundleEntries"
 emit = false
 status = "confirmed"
 note = "Exact pre-prologue 0xE4-byte owner with 24 direct callers: read the signed entry count before framing, convert each relocated bundle pointer through the texture-resource builder at 0x80110DF0 with flags (1,0), append non-null descriptors to the global texture table/count, then release the bundle allocation through 0x80116DBC"
+
+[[func]]
+pc = 0x80118FDC
+name = "NormalizeVector3Q12InPlace"
+emit = false
+status = "confirmed"
+note = "Exact 0x15C-byte nine-caller geometry helper: approximate the length of the three signed 32-bit components after arithmetic >>6 reduction, substitute denominator one for zero, overwrite each component with signed `(component << 6) / reduced_length` (approximately a Q12 unit vector), and expose no semantic scalar return"
 
 [[func]]
 pc = 0x800ED8AC
@@ -843,11 +857,32 @@ status = "confirmed"
 note = "Exact 0x12C-byte twelve-call-site deep-copy constructor: allocate a 40-byte instance from the shared arena, copy its 16-byte name and scalar fields, allocate and memcpy its owned 80-byte payload, reset the runtime field at +0x24, report allocation failures through the retained New Instance diagnostic, and return the new instance"
 
 [[func]]
+pc = 0x8011E4B8
+name = "EmitCenteredTexturedSprite"
+emit = false
+status = "confirmed"
+note = "Exact 0x1E4-byte six-call-site leaf renderer: reserve and initialize one 40-byte semitransparent POLY_FT4 at gPrimCursor, center a square of caller size on signed screen X/Y, derive RGB through GTE DPCS from three stack colors and a fade byte, copy all UV/CLUT/TPAGE fields from the shared sprite texture descriptor, link it into the selected ordering-table depth bucket, and advance the cursor"
+
+[[func]]
 pc = 0x8010EAC4
 name = "EmitLocalizedFontGlyphPacket"
 emit = false
 status = "confirmed"
 note = "Exact 0x784-byte seven-argument localized glyph packet builder with 15 direct callers: accept modes/heights 8, 9, 16, or 18, select bank-sensitive six-byte glyph metrics and texture state, populate and OT-link one 40-byte POLY_FT4, increment the packet count, and return x plus the mode-scaled glyph width and one/two-pixel gap; fifth argument unused"
+
+[[func]]
+pc = 0x80110560
+name = "DrawSignedDecimalInteger"
+emit = false
+status = "confirmed"
+note = "Exact 0x170-byte 10-caller signed decimal renderer: optionally emit a minus glyph, decompose the magnitude into at most five low decimal digits, zero-pad to the caller's stack-supplied minimum width, emit digits through EmitFontGlyphPacket with a mode-2 style-bank remap, and return the final X pen"
+
+[[func]]
+pc = 0x8014F920
+name = "AccumulateIndexedVertexWeights"
+emit = false
+status = "confirmed"
+note = "Exact 0x12C-byte nine-caller leaf: validate an object and its positive signed byte +0x3F weight, locate the first flagged 24-byte geometry record at/after object halfword +0x34, add fixed 250/200/200 increments per weight unit to three indexed 12-byte accumulator records, consume the weight byte to zero, and return no semantic value"
 
 [[object]]
 addr = 0x8016DD60
@@ -861,3 +896,10 @@ name = "ApplyRacerDamageEvent"
 emit = false
 status = "confirmed"
 note = "Exact 0x8D4-byte 12-caller racer damage/energy updater: gate inactive or protected sessions, map supported event codes through a 132-entry dispatch table or accept an explicit delta, apply racer/mode scaling, clamp the per-racer Q8 damage accumulator, update percent/timers, and trigger the 100-percent disabled-state transition and threshold effect"
+
+[[func]]
+pc = 0x8012ED50
+name = "FindNearestTrackSection"
+emit = false
+status = "confirmed"
+note = "Exact 0x260-byte 12-caller leaf: from a seed track-section node and XYZ point, skip 2 then test that node plus 5 successors (or skip 8/test plus 20 in mode 1), minimize squared signed deltas after >>4 scaling, optionally search a flag-selected branch chain, and return the closest section pointer"

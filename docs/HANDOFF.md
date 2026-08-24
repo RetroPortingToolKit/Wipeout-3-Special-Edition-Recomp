@@ -942,19 +942,48 @@ unbounded build as a performance test; use focused targets and the bounded
   its returned flag-3 slot handle for ambient/looping updates; it initializes
   one or optional two ordinary queued voices and dispatches the slot, with
   exact non-rollback edge cases documented for exhausted voice allocation.
+- `NormalizeVector3Q12InPlace` owns `0x80118FDC..0x80119137`: nine geometry
+  callers pass mutable position/vertex deltas; it length-reduces by six bits,
+  uses the approximate square-root helper, and writes an approximate Q12 unit
+  direction in place, with zero/small-vector and overflow limits audited.
+- `DecodePackedRacerControls` is the true frameless callable at
+  `0x80102E70..0x80102FB7`: seven live/saved/stream input callers expand ten
+  packed bits into racer record `+0x0C` action flags and receive packed bits
+  `10..15` as a separate unsigned six-bit result.
 - `CreateObjectInstance` owns `0x8012E408..0x8012E533`. It allocates a
   40-byte instance and a distinct 80-byte owned payload from the shared arena,
   copies the source name/scalars/payload, clears the new instance's runtime
   word at `+0x24`, and returns the clone. Twelve direct call sites and no
   interior entries were found; its retained failure text begins `New Instance`.
+- `EmitCenteredTexturedSprite` owns `0x8011E4B8..0x8011E69B`. This call-free
+  renderer emits one centered 40-byte semitransparent `POLY_FT4`, shades its
+  caller RGB through GTE `DPCS`, copies a shared texture descriptor's UV,
+  CLUT, and TPAGE fields, links by `depth >> 6`, and advances `gPrimCursor`.
+  The executable has six direct calls and no interior call targets.
 - `EmitLocalizedFontGlyphPacket` owns `0x8010EAC4..0x8010F247`: it selects
   six-byte glyph metrics and font texture state for height modes 8/9/16/18 and
   extended banks, builds and OT-links one 40-byte `POLY_FT4`, increments the
   packet cursor, and returns the next X pen. It has 15 direct callers and no
   external interior targets.
+- `DrawSignedDecimalInteger` owns `0x80110560..0x801106CF`: it emits an
+  optional minus sign and up to five low decimal digits, supports caller-set
+  leading-zero width (observed zero/two), remaps low font styles in global mode
+  2, and returns the final X pen. It has ten direct callers and no interior
+  entry targets.
+- `AccumulateIndexedVertexWeights` is the frameless leaf at
+  `0x8014F920..0x8014FA4B`: it locates a flagged 24-byte geometry record from an
+  object's `+0x34` index, converts positive byte `+0x3F` into fixed additions
+  on three indexed 12-byte vertex accumulators, and consumes the byte to zero.
+  It has nine direct callers and no external interior targets.
 - `ApplyRacerDamageEvent` owns `0x801562B8..0x80156B8B`, with 12 direct entry
   calls and no interior JAL targets. It maps selected event codes (1/2/3/5,
   0xC..0x10, 0x80..0x83) to configured deltas/effects or accepts an explicit
   delta, applies racer/mode scaling, updates/clamps per-racer Q8 damage and
   percent state, manages hit timers, and performs the 100-percent disabled
   transition plus the 76-percent crossing effect.
+- `FindNearestTrackSection` is the call-free owner at
+  `0x8012ED50..0x8012EFAF` with 12 direct callers and no interior targets. From
+  a seed node and XYZ point it scans a mode-sized window of linked 0x3C-byte
+  track-section records, minimizes squared distance after `>>4` coordinate
+  scaling, optionally searches a flag-selected branch chain, and returns the
+  closest section without modifying shared state.
