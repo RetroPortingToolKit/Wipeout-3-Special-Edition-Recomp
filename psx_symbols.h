@@ -8,6 +8,10 @@
 #define PSX_FN_DecodeAnimationCommandRecord 0x800E7264u
 #define func_800E7264 DecodeAnimationCommandRecord  /* alias */
 
+/* confirmed: Exact 0x1C4-byte leaf with four unique entry callers: walk the signed count at owner +0x12 through the variable-size record stream at +0x1C, dispatch types 1..8, and overwrite each primitive vertex RGB with the supplied three bytes or their unsigned halves according to the record layout */
+#define PSX_FN_ApplyRgbToPrimitiveRecordStream 0x800E8350u
+#define func_800E8350 ApplyRgbToPrimitiveRecordStream  /* alias */
+
 /* confirmed: Exact 0x920-byte seven-caller track-surface collision owner: select flagged 24-byte geometry records from object halfword +0x34, reject distant candidates, construct adjacent-face plane/intersection tests, gate normal mode through a point-in-face predicate, dispatch object-flag/prior-hit-specific collision responses, and return -1 for rejected range, 0 for no hit, or 1 for a handled hit */
 #define PSX_FN_ResolveObjectTrackSurfaceCollision 0x800ECB6Cu
 #define func_800ECB6C ResolveObjectTrackSurfaceCollision  /* alias */
@@ -431,6 +435,10 @@
 /* confirmed: Exact 0x8D4-byte 12-caller racer damage/energy updater: gate inactive or protected sessions, map supported event codes through a 132-entry dispatch table or accept an explicit delta, apply racer/mode scaling, clamp the per-racer Q8 damage accumulator, update percent/timers, and trigger the 100-percent disabled-state transition and threshold effect */
 #define PSX_FN_ApplyRacerDamageEvent 0x801562B8u
 #define func_801562B8 ApplyRacerDamageEvent  /* alias */
+
+/* confirmed: Exact 0x78-byte six-caller adapter over SpawnRacerEffectRecords: preserve a0/a1/a2, truncate kind a3 to a byte, expand composite kind 13 into sequential kinds 14 and 15, and otherwise forward the original kind once; five callers are in overlay code and one is in the main image */
+#define PSX_FN_DispatchRacerEffectSpawn 0x8015B3CCu
+#define func_8015B3CC DispatchRacerEffectSpawn  /* alias */
 
 /* confirmed: Exact 0x3C-byte signed-angle wrapper: reduce the absolute input modulo 4096, call the private quarter-wave sine lookup, and restore odd symmetry; returns a signed Q12 value in [-4096,4096] and has 91 direct callers */
 #define PSX_FN_SinQ12FromSignedAngle 0x8015C318u
