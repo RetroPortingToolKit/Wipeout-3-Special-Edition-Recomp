@@ -974,6 +974,9 @@ unbounded build as a performance test; use focused targets and the bounded
 - `Printf` owns `0x8015CF48..0x8015CF57`, the 65-caller BIOS A0/3F formatted
   output trampoline. It preserves all incoming variadic arguments, contributes
   only the BIOS function selector, and returns the BIOS result unchanged.
+- `Memcpy` owns the adjacent `0x8015CF38..0x8015CF47` BIOS A0/2A trampoline.
+  All 34 executable calls target its entry, and it forwards destination,
+  source, length, memory effects, and the destination return to BIOS unchanged.
 - `EmitLocalizedFontGlyphPacket` owns `0x8010EAC4..0x8010F247`: it selects
   six-byte glyph metrics and font texture state for height modes 8/9/16/18 and
   extended banks, builds and OT-links one 40-byte `POLY_FT4`, increments the
@@ -1007,6 +1010,10 @@ unbounded build as a performance test; use focused targets and the bounded
   `DrawSync(%d)...` diagnostic for GPU driver types >=2, then calls the active
   driver's vtable `+0x3C` method with mode and returns its result unchanged.
   It has 13 direct callers and no interior alias or direct MMIO access.
+- `LoadImage2` owns `0x8015D454..0x8015D4B3`: it validates/logs the RECT under
+  the retained `LoadImage` operation name, then calls the active GPU driver's
+  vtable `+0x08` method as `(driver+0x20 context, rect, operation 8, pixels)`
+  and returns its result unchanged. It has five callers and no interior alias.
 - `AccumulateOneIndexedVertexWeight` is its single-step companion at
   `0x8014F814..0x8014F91F`: it performs the same flagged-record lookup and
   fixed 250/200/200 indexed accumulator update once, then decrements positive
@@ -1034,6 +1041,11 @@ unbounded build as a performance test; use focused targets and the bounded
   slot handle, ownership-checks its primary/secondary queued voices, clears
   owned voice control/active words and the slot state, then ORs their bits into
   the deferred audio-backend mask at `0x80175E9C`.
+- `HandleErrorSeverity` owns `0x800F82EC..0x800F832B`, has 31 direct callers
+  and no interior targets. It ignores the diagnostic pointer, sign-normalizes
+  severity to 16 bits, returns unless severity is exactly 2, and then invokes
+  BIOS B0 service `0x38` (`exit`) with status zero. All executable callers pass
+  severity 2; no retained historical function spelling is proven.
 - `SpawnTrackSectionSurfaceEffects` logically owns
   `0x8014FA4C..0x80150577` despite generated splits at FAE0/FDE0/FF4C/50548.
   Its sole real caller passes a track section and effect flags; it selects a
@@ -1047,3 +1059,10 @@ unbounded build as a performance test; use focused targets and the bounded
   loader at `0x801116A0` with ABR 1, appends nonnull 0x26-byte descriptors to
   the shared texture table/count, and unconditionally frees the bundle backing
   allocation. It is the narrow companion to `RegisterTextureBundleEntries`.
+- `LoadSimpleTimTexture` owns `0x801116A0..0x80111AF7` and has the registrar as
+  its sole caller. It supports standard indexed TIM modes 0/1, allocates the
+  shared 0x26-byte descriptor, derives TPAGE/CLUT/UV state, auto-places allowed
+  rectangles, forces STP bit 15 on all 16 colors for 4-bit TIMs, uploads CLUT
+  and image data, and returns null for other modes. Unlike
+  `LoadFrontendTexture`, it has no special sentinels, variant upload, or pixel
+  mirroring.

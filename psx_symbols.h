@@ -32,6 +32,10 @@
 #define PSX_FN_LeaveNestedInterruptCriticalSection 0x800EEE64u
 #define func_800EEE64 LeaveNestedInterruptCriticalSection  /* alias */
 
+/* confirmed: Exact 0x40-byte 31-caller error-policy adapter: accept an ignored diagnostic-string pointer and a value normalized to signed 16 bits, return for every severity except exactly 2, and for severity 2 tail into the BIOS B0:38 exit service with status zero; every executable caller passes severity 2 */
+#define PSX_FN_HandleErrorSeverity 0x800F82ECu
+#define func_800F82EC HandleErrorSeverity  /* alias */
+
 /* confirmed: Exact frameless 0x148-byte seven-caller input decoder: truncate a1 to 16 bits, clear racer record a0's runtime action word at +0x0C, expand packed low bits 0..9 into sparse action bits 4,5,6,7,9,10,11,13,14,15, and return packed bits 10..15 as an unsigned six-bit auxiliary value */
 #define PSX_FN_DecodePackedRacerControls 0x80102E70u
 #define func_80102E70 DecodePackedRacerControls  /* alias */
@@ -71,6 +75,10 @@
 /* confirmed: Exact 0x8B0-byte two-caller frontend-overlay TIM texture builder retaining the diagnostic name LoadTexture: accept 4-bit or 8-bit TIM data, allocate a 0x26-byte descriptor, auto-place supported CLUT/image rectangles, derive TPAGE/CLUT and UV bounds, upload CLUT and pixel rectangles, optionally transform source pixels or CLUT flags, and return the descriptor; unsupported modes return null */
 #define PSX_FN_LoadFrontendTexture 0x80110DF0u
 #define func_80110DF0 LoadFrontendTexture  /* alias */
+
+/* confirmed: Exact 0x458-byte one-caller TIM converter: accept 4-bit or 8-bit indexed images plus signed-16 ABR, allocate and populate a 0x26-byte TPAGE/CLUT/UV descriptor, auto-place supported rectangles, force STP bit 15 on the 16-entry 4-bit CLUT, upload CLUT and pixels, return the descriptor, or return null for unsupported modes */
+#define PSX_FN_LoadSimpleTimTexture 0x801116A0u
+#define func_801116A0 LoadSimpleTimTexture  /* alias */
 
 /* known: 33-caller 276-byte bundle loader: publish the signed entry count from a0+0, prefix-sum its 32-bit size table at a0+4 into the global pointer workspace at 0x801CF098, acquire a destination base through 0x80116A54, relocate every prefix by that base, then decode/copy the trailing payload through 0x80115B1C */
 #define PSX_FN_LoadPackedResourceBundle 0x80111AF8u
@@ -312,6 +320,10 @@
 #define PSX_FN_FormatString 0x8015C698u
 #define func_8015C698 FormatString  /* alias */
 
+/* confirmed: Exact 0x10-byte 34-caller BIOS A0/2A memcpy trampoline: preserve destination/source/length arguments, load t1=0x2A, jump to BIOS vector 0xA0, and return the BIOS destination result unchanged */
+#define PSX_FN_Memcpy 0x8015CF38u
+#define func_8015CF38 Memcpy  /* alias */
+
 /* confirmed: Exact 0x10-byte 65-caller BIOS A0/3F printf trampoline: preserve the caller's format/variadic argument registers and stack, load t1=0x3F, jump to BIOS vector 0xA0, and return the BIOS formatted-output result unchanged */
 #define PSX_FN_Printf 0x8015CF48u
 #define func_8015CF48 Printf  /* alias */
@@ -319,6 +331,10 @@
 /* confirmed: Exact 0x68-byte 13-caller PsyQ GPU synchronization dispatcher: preserve mode a0, optionally emit the retained 'DrawSync(%d)...' diagnostic when GPU driver type >=2, call the active GPU driver's vtable +0x3C sync method with mode, and return its result unchanged */
 #define PSX_FN_DrawSync 0x8015D240u
 #define func_8015D240 DrawSync  /* alias */
+
+/* confirmed: Exact 0x60-byte five-caller PsyQ low-level VRAM upload dispatcher: validate/log the RECT with retained 'LoadImage' name, then call the active GPU driver's transfer method at vtable +0x08 as (driver+0x20 context, RECT, operation 8, source words) and return its result unchanged */
+#define PSX_FN_LoadImage2 0x8015D454u
+#define func_8015D454 LoadImage2  /* alias */
 
 /* confirmed: Exact 0xC0-byte PsyQ-compatible 20-caller DRAWENV installer: optionally log PutDrawEnv, compile the input environment into its embedded DR_ENV packet at +0x1C, terminate the packet tag, submit 0x40 bytes through the active GPU driver, cache the full 0x5C-byte DRAWENV, and return the input pointer */
 #define PSX_FN_PutDrawEnv 0x8015D68Cu
