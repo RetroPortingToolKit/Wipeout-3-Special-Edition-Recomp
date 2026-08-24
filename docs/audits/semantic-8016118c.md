@@ -2,8 +2,8 @@
 
 ## Result and boundary
 
-`0x8016118C` is the synchronous SIO transaction owner
-`ExchangeSioCommandWithRetry` (`known`).  The exact generated range is
+`0x8016118C` is the synchronous CD-ROM command owner
+`CdControlWithRetry` (`known`).  The exact generated range is
 `R 8016118C 14C`, so it occupies 332 bytes at
 `0x8016118C..0x801612D7`.  It creates a 56-byte frame, preserves
 `ra`, `fp`, and `s0..s7`, and returns through `0x801612D0/0x801612D4`.
@@ -15,22 +15,23 @@ interior address is a direct-call target.
 The instruction stream proves this effective interface:
 
 ```c
-int ExchangeSioCommandWithRetry(
+int CdControlWithRetry(
     uint32_t command,  // a0; only low 8 bits are retained
     void *tx,          // a1; optional source/request buffer
     void *rx);         // a2; destination/response buffer
 ```
 
 `a0` is masked with `0xff` into `s3`; `a1` and `a2` are preserved in `s1` and
-`s2`.  Every real transfer invokes the lower SIO exchange at `0x80168080` with
+`s2`.  Every real transfer invokes the lower CD command core at `0x80168080` with
 `a3 = 0`.  That callee receives one of three command values:
 
 - `(1, NULL, NULL, 0)` for a conditional reset/synchronization exchange;
 - `(2, tx, rx, 0)` for an optional preflight exchange;
 - `(command & 0xff, tx, rx, 0)` for the requested transaction.
 
-This owner does not access the `0x1F801050` SIO register block directly; the
-register-level polling and byte movement are delegated to `0x80168080`.
+This owner does not access the `0x1F801800..0x1F801803` CD-ROM register block
+directly; register writes, IRQ-phase polling, and response movement are
+delegated to `0x80168080`.
 Accordingly, `tx` and `rx` are opaque buffers here.  The routine never reads
 or writes their contents itself, though the recovery classifier later receives
 `rx`.
@@ -53,7 +54,7 @@ requested command is sent.
 The retry counter starts at `3`.  Each failed attempt decrements it and loops
 while it is not `-1`, proving at most four attempts.  There is no independent
 clock read in this owner: its timeout semantics are a bounded attempt budget,
-while any per-byte/per-transfer timeout is reported by `0x80168080` as a
+while any per-command/IRQ-phase timeout is reported by `0x80168080` as a
 nonzero result.  A zero result from the requested exchange returns success
 immediately.
 
@@ -84,8 +85,8 @@ There are 14 direct call sites:
 - `0x80160330`, `0x801603AC`, and `0x80160424`, inside `0x801602E8`;
 - `0x80160BDC`, inside `0x80160A74`.
 
-The callers span game-facing and SIO-support owners, consistent with a common
-command transaction adapter rather than a single command implementation.
+The callers span game-facing and CD-support owners, consistent with a common
+CD command adapter rather than a single command implementation.
 
 ## Confidence limits
 

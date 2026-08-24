@@ -54,10 +54,10 @@ note = "Three-argument SIO1 control/query dispatcher spanning 0x8016192C..0x8016
 
 [[func]]
 pc = 0x8016118C
-name = "ExchangeSioCommandWithRetry"
+name = "CdControlWithRetry"
 emit = false
 status = "known"
-note = "14-caller 332-byte synchronous SIO command owner: truncate a0 to a command byte, pass a1/a2 as transfer buffers to 0x80168080, perform command/status-dependent reset and preflight exchanges, retry the requested command up to four times while suppressing/restoring the callback word at 0x8017B124, and classify exhausted-transfer recovery through 0x80167B38"
+note = "14-caller 332-byte synchronous CD-ROM command owner: truncate a0 to a command byte, pass parameter/result buffers to IssueCdCommand, perform command/status-dependent reset and preflight commands, retry up to four times while suppressing/restoring the CD sync callback at 0x8017B124, and classify exhausted recovery through 0x80167B38"
 
 [[func]]
 pc = 0x80112048
@@ -65,6 +65,13 @@ name = "SwapRgb24RedBlue"
 emit = false
 status = "confirmed"
 note = "Seven-instruction leaf: swap bytes 0 and 2 of the three-byte color at a0 while preserving byte 1; called by four packet/material conversion sites at 0x80110C4C/74/AC/D4, with four mirrored expansion-RAM copies"
+
+[[func]]
+pc = 0x80111AF8
+name = "LoadPackedResourceBundle"
+emit = false
+status = "known"
+note = "33-caller 276-byte bundle loader: publish the signed entry count from a0+0, prefix-sum its 32-bit size table at a0+4 into the global pointer workspace at 0x801CF098, acquire a destination base through 0x80116A54, relocate every prefix by that base, then decode/copy the trailing payload through 0x80115B1C"
 
 [[func]]
 pc = 0x80106350
@@ -591,6 +598,13 @@ status = "confirmed"
 note = "Exact six-instruction transform leaf with 33 direct callers: store a1/a2/a3 as 32-bit translation components at a0+0x14/+0x18/+0x1C, set the signed-halfword state field at +0x40 to one in the return delay slot, and establish no scalar return"
 
 [[func]]
+pc = 0x8013558C
+name = "BuildTransformRxRyRzMatrix"
+emit = false
+status = "confirmed"
+note = "Exact 0x200-byte 13-caller Euler builder adjacent to SetTransformTranslation: sign-extend three 4096-unit angles, compute a row-major Q12 Rx(a1)*Ry(-a2)*Rz(a3) matrix into the destination's first nine halfwords, set destination+0x40 to one, and leave translation untouched"
+
+[[func]]
 pc = 0x80122650
 name = "ApplyGlobalRgbWithAlpha"
 emit = false
@@ -688,3 +702,10 @@ name = "WaitForVBlankCountWithWatchdog"
 emit = false
 status = "confirmed"
 note = "Exact 0x98-byte VSync-private helper with two direct callers: signed-poll gVBlankCount until it reaches a0, decrement a watchdog initialized to a1<<21, and on expiry print 'VSync: timeout', invoke ChangeClearPAD(0) and ChangeClearRCnt(3,0), then return early"
+
+[[func]]
+pc = 0x80168080
+name = "IssueCdCommand"
+emit = false
+status = "confirmed"
+note = "Exact 0x40C-byte 13-caller CD-ROM command core: validate and write command-specific parameters to 0x1F801802, issue the command through 0x1F801801, optionally return asynchronously, or service CD IRQ phases until completion with dual VBlank/spin timeouts and copy the eight-byte sync response"

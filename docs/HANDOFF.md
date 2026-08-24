@@ -860,8 +860,8 @@ unbounded build as a performance test; use focused targets and the bounded
 - `Atan2Q12` at `0x8015C518` is the 35-caller signed fixed-point atan2 leaf:
   full turn `0x1000`, output `[-0x800,+0x800]`, using the 1025-entry table at
   `0x801786D8` with exact quadrant/axis folding.
-- `ExchangeSioCommandWithRetry` at `0x8016118C` wraps the lower SIO exchange
-  with command-specific reset/preflight behavior, temporary callback
+- `CdControlWithRetry` at `0x8016118C` wraps the lower CD-ROM command core
+  with command-specific reset/preflight behavior, temporary sync-callback
   suppression and at most four attempts; 14 callers, with exhausted retries
   normalized through the recovery helper.
 - `WaitForVBlankCountWithWatchdog` at `0x8015FA7C` is the two-call helper inside
@@ -872,3 +872,14 @@ unbounded build as a performance test; use focused targets and the bounded
   maps ASCII/punctuation and ISO-8859-1 bytes through the localized byte/glyph
   tables at `0x8016D634/0x8016D660`, emits glyphs directly, applies language
   bank `0x900/0x901`, and returns horizontal advance rather than a new string.
+- `LoadPackedResourceBundle` at `0x80111AF8` parses a signed count and 32-bit
+  size table, builds relocated prefix boundaries, obtains/publishes one base
+  allocation, and passes the trailing payload plus base to `0x80115B1C`; 33
+  callers. The allocator/codec subtype remains deliberately unresolved.
+- `BuildTransformRxRyRzMatrix` owns `0x8013558C..0x8013578B`, writes the Q12
+  row-major composition `Rx(a1) * Ry(-a2) * Rz(a3)`, preserves translation and
+  marks state `+0x40`; 13 callers and six generated continuation entries.
+- `IssueCdCommand` at `0x80168080` is the lower CD-ROM command core behind
+  `CdControlWithRetry`, using hardware registers `0x1F801800..03`, table-driven
+  parameter counts, sync/async modes, 8-byte responses and dual timeout/error
+  handling. This corrects the earlier SIO interpretation of the wrapper.
