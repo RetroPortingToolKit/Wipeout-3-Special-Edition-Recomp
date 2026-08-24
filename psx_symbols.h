@@ -268,6 +268,10 @@
 #define PSX_FN_AbsoluteValue32 0x8014B3D4u
 #define func_8014B3D4 AbsoluteValue32  /* alias */
 
+/* confirmed: Exact 0x4C-byte ten-unique-caller six-scalar leaf: return low32(a0*stack10 + a1*stack14 + a2*stack18), with wrapping products/additions; a3 is not part of the formula, though a0..a3 are spilled to the caller argument-save area; no global or hardware effects */
+#define PSX_FN_DotProduct3Int32 0x8014B4F8u
+#define func_8014B4F8 DotProduct3Int32  /* alias */
+
 /* confirmed: Exact 0x5C-byte three-component magnitude helper with 38 direct callers: compute the low-32-bit sum x*x+y*y+z*z, pass it to the GTE-normalized lookup-table square-root approximation at 0x8015C488, and return that result unchanged; generated 0x8014B638 is its internal delayed frame setup */
 #define PSX_FN_ApproximateVectorLength3i 0x8014B614u
 #define func_8014B614 ApproximateVectorLength3i  /* alias */
@@ -279,6 +283,10 @@
 /* confirmed: Exact 17-unique-caller angle-normalization leaf: mask a0 to 12 bits, preserve 0..2048, and map 2049..4095 to -2047..-1; generated R 8014B6C0 18 is the unique prefix while internal zero-direct-caller suffix 0x8014B6D8..DF returns the nonnegative path */
 #define PSX_FN_WrapAngle4096Signed 0x8014B6C0u
 #define func_8014B6C0 WrapAngle4096Signed  /* alias */
+
+/* confirmed: Exact 0x1C-byte 16-caller PsyQ-compatible VECTOR setter: copy signed 32-bit x/y/z from a1/a2/a3 to destination offsets 0/4/8, leave the +0xC pad untouched, and return no semantic value */
+#define PSX_FN_SetVector 0x8014B6E0u
+#define func_8014B6E0 SetVector  /* alias */
 
 /* known: 23-site 316-byte resource accessor: select the 12-byte current entry through index 0x801E9808 and table 0x801E97FC, return null for index -1, otherwise return an archive pointer directly or allocate and materialize the entry by decode/copy according to a0; allocation failures report through the common diagnostic */
 #define PSX_FN_AcquireCurrentArchiveEntry 0x8014B830u
@@ -419,6 +427,10 @@
 /* confirmed: Exact 0x20-byte 12-caller library leaf: snapshot the 16-bit Timer 2 counter at 0x1F801120, store caller threshold to 0x801EEBC4 and the counter snapshot to 0x801EEBC8, and return without configuring hardware or producing a semantic value; paired timeout polling handles wrap and timer mode */
 #define PSX_FN_ArmTimer2Timeout 0x8016C51Cu
 #define func_8016C51C ArmTimer2Timeout  /* alias */
+
+/* confirmed: Exact 0xA0-byte seven-caller leaf paired with ArmTimer2Timeout: read Timer 2 count, correct one 16-bit wrap with target 0x1F801128 or 0x10000, scale elapsed by >>3 when mode bit 0x200 is clear, and return unsigned elapsed >= threshold saved at 0x801EEBC4; read-only apart from MMIO */
+#define PSX_FN_HasTimer2TimeoutExpired 0x8016C53Cu
+#define func_8016C53C HasTimer2TimeoutExpired  /* alias */
 
 /* known: Address-taken final SIO/pad-driver stage: consume a multitap response through the private descriptor in a0, poll/configure as many as four 0xF0-byte slot records, append the final received byte, and return 0, a propagated transfer error, or -3 on timeout; the callable code ends at 0x8016CC00 */
 #define PSX_FN_PollMultitapControllerSlots 0x8016C86Cu
