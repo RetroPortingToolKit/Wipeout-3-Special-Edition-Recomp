@@ -983,6 +983,9 @@ unbounded build as a performance test; use focused targets and the bounded
 - `ReverseFourBytes` owns the adjacent `0x8012E324..0x8012E347` leaf. It
   reverses exactly four bytes in place, has nine direct entry calls and no
   interior targets, and leaves all other state untouched.
+- `ExitCriticalSection` owns `0x80165550..0x8016555F`. This fourteen-caller
+  syscall-2 wrapper enables COP0 Status IEc and IM2 and returns zero; it has no
+  RAM effects or interior entry targets.
 - `AbsoluteValue32` owns `0x8014B3D4..0x8014B3EB`. It is a 21-caller signed
   integer absolute-value leaf with ordinary two's-complement wrap at
   `INT32_MIN`; no call targets either internal branch/return block.
@@ -1136,6 +1139,18 @@ unbounded build as a performance test; use focused targets and the bounded
   targets. It returns the previous ready callback from `0x8017B128` and stores
   the incoming pointer in the return delay slot. Ready-event dispatch is
   independent from sync word `0x8017B124`; null suppresses it without locking.
+- `CdDataCallback` owns `0x80161338..0x8016135B`, has nine direct callers and
+  no interior targets. It forwards the callback to dynamic DMA dispatcher
+  `0x801625EC` with fixed CD-ROM channel 3 and propagates the replaced callback
+  result. Callback storage/hardware effects belong to the active DMA backend;
+  the wrapper itself only uses a 24-byte frame and does not touch ready/sync
+  callback globals.
+- `DMACallback` owns `0x801625EC..0x8016261B`, has seven direct callers and no
+  interior targets. It preserves channel/callback arguments, loads the active
+  DMA service table through `0x8017A4EC`, indirectly calls its `+4` exchange
+  method, and propagates the backend result. Observed channels 1/2/3/4 map to
+  MDEC, GPU, CD-ROM, and SPU; all storage/register/synchronization effects are
+  backend-owned and the dispatcher performs no validation.
 - `SpawnTrackSectionSurfaceEffects` logically owns
   `0x8014FA4C..0x80150577` despite generated splits at FAE0/FDE0/FF4C/50548.
   Its sole real caller passes a track section and effect flags; it selects a
@@ -1189,8 +1204,18 @@ unbounded build as a performance test; use focused targets and the bounded
   `0x801671D0..0x801671DF`: it clears COP0 Status IEc and returns its previous
   bit value (zero or one). Sixteen unique executable callers produce nineteen
   generated instances because three SIO1 sites occur in two overlay variants.
+- `Puts` at `0x801671A8` is a BIOS B0:3F string-output thunk, not a critical-
+  section companion. Its three executable instructions end at `0x801671B3`;
+  three trailing NOPs fill the 0x18-byte generated owner. Ten unique callers
+  have no overlay duplicates or interior targets, and the thunk has no COP0
+  effect.
 - `SubmitRumbleDecayRequest` owns `0x80134CE8..0x80134D23` with 12 entry-only
   callers. It replaces rumble-state words `+0x0C/+0x10/+0x14` with Q8 motor
   amplitude, signed priority, and Q8 decay only when both the new amplitude
   and priority are at least the active values. The adjacent updater emits the
   amplitude byte to controller actuator state and applies the decay each tick.
+- `TestRacerInputFlag2Or20` is the logical owner at
+  `0x80134A44..0x80134AA3`, crossing the artificial generated split at
+  `0x80134A58`. It returns false for racer index `-1`; otherwise racer record
+  byte `+2 == 1` selects input mask `0x02`, and every other value selects mask
+  `0x20`. All eight callers target the true entry; the predicate has no writes.

@@ -212,6 +212,10 @@
 #define PSX_FN_IsRaceRecordStatusZeroTypeOne 0x80134964u
 #define func_80134964 IsRaceRecordStatusZeroTypeOne  /* alias */
 
+/* confirmed: Logical 0x60-byte eight-caller pure predicate across the generated split at 0x80134A58: return false for racer index -1; otherwise index the 0x3A4-byte racer record at 0x801910E0 and test input bit 0x02 when record byte +2 equals 1, or bit 0x20 for every other type */
+#define PSX_FN_TestRacerInputFlag2Or20 0x80134A44u
+#define func_80134A44 TestRacerInputFlag2Or20  /* alias */
+
 /* confirmed: Exact 0x3C-byte 12-caller rumble-state updater: accept a Q8 motor amplitude, signed priority, and Q8 per-tick decay only when both amplitude and priority are at least the active request, then replace state words +0x0C/+0x10/+0x14; otherwise leave state unchanged */
 #define PSX_FN_SubmitRumbleDecayRequest 0x80134CE8u
 #define func_80134CE8 SubmitRumbleDecayRequest  /* alias */
@@ -468,6 +472,10 @@
 #define PSX_FN_CdControlWithRetry 0x8016118Cu
 #define func_8016118C CdControlWithRetry  /* alias */
 
+/* confirmed: Exact 0x24-byte nine-caller canonical LibCD wrapper: forward incoming callback as a1 to the dynamic DMA-callback dispatcher at 0x801625EC with fixed CD-ROM DMA channel a0=3, and propagate the replaced prior callback result unchanged; direct effects are stack-only */
+#define PSX_FN_CdDataCallback 0x80161338u
+#define func_80161338 CdDataCallback  /* alias */
+
 /* known: Three-argument SIO1 control/query dispatcher spanning 0x8016192C..0x80161DFF: a0 selects six operation families, a1 selects register or lifecycle actions, and a2 supplies values/side selection; reads and writes the SIO1 STAT/MODE/CTRL/BAUD block at 0x1F801050, maintains its RAM shadow, and brackets reset paths with critical-section syscalls */
 #define PSX_FN_AccessSio1ControlState 0x8016192Cu
 #define func_8016192C AccessSio1ControlState  /* alias */
@@ -479,6 +487,18 @@
 /* known: Non-returning CRT continuation entered by the expansion-RAM loader: clear BSS, derive stack and heap bounds from linker words, set gp/fp, call BIOS A0/39 InitHeap, then call RunRaceSession with a break trap as its nominal return site */
 #define PSX_FN_PsxCrtStartup 0x8016247Cu
 #define func_8016247C PsxCrtStartup  /* alias */
+
+/* confirmed: Exact 0x30-byte seven-caller canonical PsyQ DMA callback dispatcher: preserve channel a0 and callback a1, load the active DMA service table through 0x8017A4EC, call its +4 exchange method indirectly, and propagate the backend's previous-callback result unchanged; observed channels are 1,2,3,4 */
+#define PSX_FN_DMACallback 0x801625ECu
+#define func_801625EC DMACallback  /* alias */
+
+/* confirmed: Exact 0x10-byte fourteen-caller syscall-2 wrapper: set a0=2, execute syscall, enable COP0 Status IEc and interrupt-mask bit IM2 through the BIOS syscall contract, return v0=0, and touch no RAM or ordinary library state */
+#define PSX_FN_ExitCriticalSection 0x80165550u
+#define func_80165550 ExitCriticalSection  /* alias */
+
+/* confirmed: Psy-Q/BIOS B0:3F string-output thunk: the executable entry is 0x801671A8..0x801671B3 followed by 12 bytes of unreachable alignment padding through the generated 0x18-byte owner end; ten unique executable callers pass a string pointer in a0, with no overlay duplicates, interior call targets, RAM stores, or COP0 effects */
+#define PSX_FN_Puts 0x801671A8u
+#define func_801671A8 Puts  /* alias */
 
 /* confirmed: Exact 0x10-byte Psy-Q/BIOS syscall-1 thunk with 16 unique executable callers: set a0 to 1, execute syscall 0, and return the previous COP0 Status IEc bit (0 or 1) after clearing IEc; no memory effects or interior entry targets */
 #define PSX_FN_EnterCriticalSection 0x801671D0u
