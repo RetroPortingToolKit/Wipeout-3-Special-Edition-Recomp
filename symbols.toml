@@ -878,6 +878,20 @@ status = "confirmed"
 note = "Exact 0x3C-byte 25-caller leaf implementing the canonical Psy-Q GetTPage(tp, abr, x, y) packing formula: ((tp&3)<<7)|((abr&3)<<5)|((y&0x100)>>4)|((x&0x3FF)>>6)|((y&0x200)<<2), with no memory or hardware side effects"
 
 [[func]]
+pc = 0x8015FD4C
+name = "SetSemiTrans"
+emit = false
+status = "confirmed"
+note = "Exact 0x28-byte 57-caller Psy-Q packet helper: set bit 1 of primitive code byte packet+7 when enable is nonzero, clear it when zero, preserve every other bit, and return with no other memory or hardware effects"
+
+[[func]]
+pc = 0x8015CF48
+name = "Printf"
+emit = false
+status = "confirmed"
+note = "Exact 0x10-byte 65-caller BIOS A0/3F printf trampoline: preserve the caller's format/variadic argument registers and stack, load t1=0x3F, jump to BIOS vector 0xA0, and return the BIOS formatted-output result unchanged"
+
+[[func]]
 pc = 0x8010EAC4
 name = "EmitLocalizedFontGlyphPacket"
 emit = false
@@ -911,6 +925,20 @@ name = "CdControl"
 emit = false
 status = "confirmed"
 note = "Exact 0x13C-byte 12-caller PsyQ-style synchronous CD command wrapper: truncate command to u8, suppress and restore the sync callback, conditionally issue command 1 from status bit 0x10 and command 2 from a command-indexed preflight table, retry the requested IssueCdCommand transaction up to four times, and return 1 on success or 0 after exhaustion"
+
+[[func]]
+pc = 0x80161058
+name = "CdControlF"
+emit = false
+status = "confirmed"
+note = "Exact 0x134-byte nine-caller PsyQ asynchronous CD command wrapper: truncate command to u8, suppress/restore the sync callback around synchronous command-1 recovery and command-2 preflight, submit the requested IssueCdCommand with async flag 1 and no result buffer, retry immediate submission failures up to four times, and return boolean acceptance"
+
+[[func]]
+pc = 0x8015D240
+name = "DrawSync"
+emit = false
+status = "confirmed"
+note = "Exact 0x68-byte 13-caller PsyQ GPU synchronization dispatcher: preserve mode a0, optionally emit the retained 'DrawSync(%d)...' diagnostic when GPU driver type >=2, call the active GPU driver's vtable +0x3C sync method with mode, and return its result unchanged"
 
 [[func]]
 pc = 0x8014F814
@@ -947,8 +975,22 @@ status = "confirmed"
 note = "Exact 0x2C8-byte no-argument particle-pool initializer with one direct caller: unless mode byte 0x801D1B3E equals 1, pass a 1-in-16 RNG gate, pop an index from one of two free-index stacks, and initialize a 48-byte type-3 effect record around a geometry-selected vertex with randomized X/Z position, signed motion, three intensity bytes, lifetime 40, and owner pointer; no semantic return"
 
 [[func]]
+pc = 0x80121A58
+name = "ReleaseSoundSlot"
+emit = false
+status = "confirmed"
+note = "Exact 0xE4-byte ten-caller audio teardown leaf: when audio is enabled and the slot index is valid, verify ownership of its one or two 36-byte queued voices, clear each owned voice's control and active words, clear the 32-byte sound slot's state word, and OR released voice bits into the deferred backend mask at 0x80175E9C; no semantic return"
+
+[[func]]
 pc = 0x8014FA4C
 name = "SpawnTrackSectionSurfaceEffects"
 emit = false
 status = "confirmed"
 note = "Logical 0xB2C-byte one-caller owner across generated split pieces through epilogue 0x80150548: locate a flagged geometry face from a track section, run four iterations deriving randomized positions and direction vectors on topology selected by input flags, and submit two type-2 effects per iteration through 0x8011FF10"
+
+[[func]]
+pc = 0x80111E84
+name = "RegisterSimpleTextureBundleEntries"
+emit = false
+status = "confirmed"
+note = "Exact 0xE0-byte eight-caller bundle consumer paired with RegisterTextureBundleEntries: convert each relocated entry through the simpler TIM loader at 0x801116A0 with ABR 1, append nonnull 0x26-byte descriptors to the shared texture table/count, then always release the bundle backing allocation through FreeHeapBlock"

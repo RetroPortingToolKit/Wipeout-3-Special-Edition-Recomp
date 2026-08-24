@@ -80,6 +80,10 @@
 #define PSX_FN_RegisterTextureBundleEntries 0x80111DA0u
 #define func_80111DA0 RegisterTextureBundleEntries  /* alias */
 
+/* confirmed: Exact 0xE0-byte eight-caller bundle consumer paired with RegisterTextureBundleEntries: convert each relocated entry through the simpler TIM loader at 0x801116A0 with ABR 1, append nonnull 0x26-byte descriptors to the shared texture table/count, then always release the bundle backing allocation through FreeHeapBlock */
+#define PSX_FN_RegisterSimpleTextureBundleEntries 0x80111E84u
+#define func_80111E84 RegisterSimpleTextureBundleEntries  /* alias */
+
 /* confirmed: Seven-instruction leaf: swap bytes 0 and 2 of the three-byte color at a0 while preserving byte 1; called by four packet/material conversion sites at 0x80110C4C/74/AC/D4, with four mirrored expansion-RAM copies */
 #define PSX_FN_SwapRgb24RedBlue 0x80112048u
 #define func_80112048 SwapRgb24RedBlue  /* alias */
@@ -135,6 +139,10 @@
 /* confirmed: Exact 0x264-byte nine-caller persistent-sound creator: gate on audio enables, allocate one of 24 flag-3 slots, snapshot resource/volume/pan/pitch/scale/class state, allocate and initialize one or optional two ordinary queued voices, dispatch the slot to the selected backend, and return its retained handle (or -1 on slot/primary-voice exhaustion) */
 #define PSX_FN_CreatePersistentSoundSlot 0x801217F4u
 #define func_801217F4 CreatePersistentSoundSlot  /* alias */
+
+/* confirmed: Exact 0xE4-byte ten-caller audio teardown leaf: when audio is enabled and the slot index is valid, verify ownership of its one or two 36-byte queued voices, clear each owned voice's control and active words, clear the 32-byte sound slot's state word, and OR released voice bits into the deferred backend mask at 0x80175E9C; no semantic return */
+#define PSX_FN_ReleaseSoundSlot 0x80121A58u
+#define func_80121A58 ReleaseSoundSlot  /* alias */
 
 /* confirmed: Exact 0x64-byte 20-caller audio adapter: truncate a1 to u8, reject disabled audio, slot -1, slot >=24, and inactive slot records; otherwise write volume byte +0x1A in the selected 32-byte record at 0x801D674C and call 0x8012257C to dispatch that slot to the active backend */
 #define PSX_FN_SetSoundSlotVolume 0x801224B4u
@@ -304,6 +312,14 @@
 #define PSX_FN_FormatString 0x8015C698u
 #define func_8015C698 FormatString  /* alias */
 
+/* confirmed: Exact 0x10-byte 65-caller BIOS A0/3F printf trampoline: preserve the caller's format/variadic argument registers and stack, load t1=0x3F, jump to BIOS vector 0xA0, and return the BIOS formatted-output result unchanged */
+#define PSX_FN_Printf 0x8015CF48u
+#define func_8015CF48 Printf  /* alias */
+
+/* confirmed: Exact 0x68-byte 13-caller PsyQ GPU synchronization dispatcher: preserve mode a0, optionally emit the retained 'DrawSync(%d)...' diagnostic when GPU driver type >=2, call the active GPU driver's vtable +0x3C sync method with mode, and return its result unchanged */
+#define PSX_FN_DrawSync 0x8015D240u
+#define func_8015D240 DrawSync  /* alias */
+
 /* confirmed: Exact 0xC0-byte PsyQ-compatible 20-caller DRAWENV installer: optionally log PutDrawEnv, compile the input environment into its embedded DR_ENV packet at +0x1C, terminate the packet tag, submit 0x40 bytes through the active GPU driver, cache the full 0x5C-byte DRAWENV, and return the input pointer */
 #define PSX_FN_PutDrawEnv 0x8015D68Cu
 #define func_8015D68C PutDrawEnv  /* alias */
@@ -320,6 +336,10 @@
 #define PSX_FN_WaitForVBlankCountWithWatchdog 0x8015FA7Cu
 #define func_8015FA7C WaitForVBlankCountWithWatchdog  /* alias */
 
+/* confirmed: Exact 0x28-byte 57-caller Psy-Q packet helper: set bit 1 of primitive code byte packet+7 when enable is nonzero, clear it when zero, preserve every other bit, and return with no other memory or hardware effects */
+#define PSX_FN_SetSemiTrans 0x8015FD4Cu
+#define func_8015FD4C SetSemiTrans  /* alias */
+
 /* confirmed: Exact 0x3C-byte 25-caller leaf implementing the canonical Psy-Q GetTPage(tp, abr, x, y) packing formula: ((tp&3)<<7)|((abr&3)<<5)|((y&0x100)>>4)|((x&0x3FF)>>6)|((y&0x200)<<2), with no memory or hardware side effects */
 #define PSX_FN_GetTPage 0x80160274u
 #define func_80160274 GetTPage  /* alias */
@@ -327,6 +347,10 @@
 /* confirmed: Exact 0x13C-byte 12-caller PsyQ-style synchronous CD command wrapper: truncate command to u8, suppress and restore the sync callback, conditionally issue command 1 from status bit 0x10 and command 2 from a command-indexed preflight table, retry the requested IssueCdCommand transaction up to four times, and return 1 on success or 0 after exhaustion */
 #define PSX_FN_CdControl 0x80160F1Cu
 #define func_80160F1C CdControl  /* alias */
+
+/* confirmed: Exact 0x134-byte nine-caller PsyQ asynchronous CD command wrapper: truncate command to u8, suppress/restore the sync callback around synchronous command-1 recovery and command-2 preflight, submit the requested IssueCdCommand with async flag 1 and no result buffer, retry immediate submission failures up to four times, and return boolean acceptance */
+#define PSX_FN_CdControlF 0x80161058u
+#define func_80161058 CdControlF  /* alias */
 
 /* known: 14-caller 332-byte synchronous CD-ROM command owner: truncate a0 to a command byte, pass parameter/result buffers to IssueCdCommand, perform command/status-dependent reset and preflight commands, retry up to four times while suppressing/restoring the CD sync callback at 0x8017B124, and classify exhausted recovery through 0x80167B38 */
 #define PSX_FN_CdControlWithRetry 0x8016118Cu

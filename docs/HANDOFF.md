@@ -968,6 +968,12 @@ unbounded build as a performance test; use focused targets and the bounded
 - `GetTPage` owns `0x80160274..0x801602AF`. Its 15-instruction leaf is the
   canonical Psy-Q four-argument TPAGE bit packer, has 25 direct callers and no
   interior targets, and touches neither memory nor hardware state.
+- `SetSemiTrans` owns `0x8015FD4C..0x8015FD73`. This canonical Psy-Q helper
+  toggles only primitive-code bit 1 at packet byte `+7`. All 57 executable JALs
+  target the entry; none target its three internal branch/return blocks.
+- `Printf` owns `0x8015CF48..0x8015CF57`, the 65-caller BIOS A0/3F formatted
+  output trampoline. It preserves all incoming variadic arguments, contributes
+  only the BIOS function selector, and returns the BIOS result unchanged.
 - `EmitLocalizedFontGlyphPacket` owns `0x8010EAC4..0x8010F247`: it selects
   six-byte glyph metrics and font texture state for height modes 8/9/16/18 and
   extended banks, builds and OT-links one 40-byte `POLY_FT4`, increments the
@@ -992,6 +998,15 @@ unbounded build as a performance test; use focused targets and the bounded
   callback, performs status-bit command-1 and table-driven command-2 preflight,
   retries the requested `IssueCdCommand` transaction up to four times, and
   returns boolean success. It has 12 direct callers and no interior alias.
+- `CdControlF` owns `0x80161058..0x8016118B`: it performs synchronous recovery
+  and preflight with the sync callback suppressed, then restores the callback
+  and submits the requested command through `IssueCdCommand(..., async=1)`.
+  It retries immediate failures four times, returns boolean acceptance, has
+  nine direct callers, and no interior alias.
+- `DrawSync` owns `0x8015D240..0x8015D2A7`: it optionally emits the retained
+  `DrawSync(%d)...` diagnostic for GPU driver types >=2, then calls the active
+  driver's vtable `+0x3C` method with mode and returns its result unchanged.
+  It has 13 direct callers and no interior alias or direct MMIO access.
 - `AccumulateOneIndexedVertexWeight` is its single-step companion at
   `0x8014F814..0x8014F91F`: it performs the same flagged-record lookup and
   fixed 250/200/200 indexed accumulator update once, then decrements positive
@@ -1014,6 +1029,11 @@ unbounded build as a performance test; use focused targets and the bounded
   gate, pops one of two free-index stacks, and initializes a 48-byte type-3
   effect record around a geometry-selected vertex with randomized position,
   motion/intensity fields, lifetime 40, and its source-owner pointer.
+- `ReleaseSoundSlot` owns `0x80121A58..0x80121B3B`, is a frameless leaf with
+  ten direct callers and no interior call targets. It validates a retained
+  slot handle, ownership-checks its primary/secondary queued voices, clears
+  owned voice control/active words and the slot state, then ORs their bits into
+  the deferred audio-backend mask at `0x80175E9C`.
 - `SpawnTrackSectionSurfaceEffects` logically owns
   `0x8014FA4C..0x80150577` despite generated splits at FAE0/FDE0/FF4C/50548.
   Its sole real caller passes a track section and effect flags; it selects a
@@ -1021,3 +1041,9 @@ unbounded build as a performance test; use focused targets and the bounded
   surface positions/directions and submits eight type-2 effects total. The
   apparent `8002B4F0 -> 8014FDE0` JAL is data decoded as code, not a callable
   interior entry.
+- `RegisterSimpleTextureBundleEntries` owns `0x80111E84..0x80111F63` with
+  eight callers and no interior targets. It walks the relocated entries using
+  signed global count `0x801A4B4C`, converts each through the simpler TIM
+  loader at `0x801116A0` with ABR 1, appends nonnull 0x26-byte descriptors to
+  the shared texture table/count, and unconditionally frees the bundle backing
+  allocation. It is the narrow companion to `RegisterTextureBundleEntries`.
