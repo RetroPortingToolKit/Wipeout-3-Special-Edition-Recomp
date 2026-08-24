@@ -12,33 +12,33 @@
 #define PSX_FN_SetSimVblankSkip 0x800EED58u
 #define func_800EED58 SetSimVblankSkip  /* alias */
 
-/* guessed: Per-frame draw; copies DRAWENV w/h to 0x80173A9C/0x80173AA0 */
-#define PSX_FN_FrameDraw 0x8012268Cu
-#define func_8012268C FrameDraw  /* alias */
+/* known: Callable race-view renderer: owns the 376-byte frame at 0x8012268C, runs scene/vehicle/effects/HUD submission and display synchronization, then returns through the split epilogue at 0x801247FC; a0 is the view/player descriptor and a1/a2 are caller-supplied render context values */
+#define PSX_FN_RenderRaceFrame 0x8012268Cu
+#define func_8012268C RenderRaceFrame  /* alias */
 
-/* guessed: Writes camera-space clip coeffs 0x801E2480/2484/2488/25CC from FOV tables */
-#define PSX_FN_SetupFrustumClipBounds 0x8013535Cu
-#define func_8013535C SetupFrustumClipBounds  /* alias */
+/* known: Argument-free 408-byte leaf: select six display/FOV scalars with 0x80173B00, derive viewport and perspective clip coefficients, and write 0x801E14EC/14F0/14F4/2480/2484/2488/25CC */
+#define PSX_FN_RebuildViewportClipCoefficients 0x8013535Cu
+#define func_8013535C RebuildViewportClipCoefficients  /* alias */
 
-/* guessed: Twin of SetupFrustumClipBounds (same clip-coeff stores) */
-#define PSX_FN_SetupFrustumClipBoundsAlt 0x80135B8Cu
-#define func_80135B8C SetupFrustumClipBoundsAlt  /* alias */
+/* known: Six-scalar signed-16 leaf used by RenderRaceFrame: performs the same seven viewport/perspective coefficient stores as 0x8013535C from caller-selected C/B/D/F/A/E inputs */
+#define PSX_FN_RebuildViewportClipCoefficientsFromScalars 0x80135B8Cu
+#define func_80135B8C RebuildViewportClipCoefficientsFromScalars  /* alias */
 
-/* guessed: Walks section objects; jal ProjectPackClipCodesFar */
-#define PSX_FN_SceneObjectVisWalk 0x801415F4u
-#define func_801415F4 SceneObjectVisWalk  /* alias */
+/* known: Single-caller non-leaf: updates active bits on 28-byte object records, prepares the GTE view transform, compacts visible oriented quads through 0x80172E3C, and emits 40-byte GPU POLY_FT4 packets into the current OT */
+#define PSX_FN_BuildVisibleObjectQuadPackets 0x801415F4u
+#define func_801415F4 BuildVisibleObjectQuadPackets  /* alias */
 
-/* guessed: Per-section face-list submit; no FOV test of its own */
-#define PSX_FN_SceneSectionDraw 0x801422FCu
-#define func_801422FC SceneSectionDraw  /* alias */
+/* known: Single-caller section submitter: installs the owner transform, submits an indexed face list via 0x8016FC28, then resolves packed repeated entries and invokes each renderer callback */
+#define PSX_FN_SubmitSceneSectionFaces 0x801422FCu
+#define func_801422FC SubmitSceneSectionFaces  /* alias */
 
 /* confirmed: Software clip vs 4:3 camera planes; widen blocked until gPrimCursor arena grows */
 #define PSX_FN_SceneryFrustumClip 0x80142634u
 #define func_80142634 SceneryFrustumClip  /* alias */
 
-/* guessed: SYSTEM.CNF / EXE entry PC (probe seed) */
-#define PSX_FN_BootEntry 0x80162474u
-#define func_80162474 BootEntry  /* alias */
+/* confirmed: Exact PS-X EXE header entry; two-instruction non-returning trampoline to the expansion-RAM startup loader at 0x800D03B8, not the CRT initialization body */
+#define PSX_FN_PsxExeEntryTrampoline 0x80162474u
+#define func_80162474 PsxExeEntryTrampoline  /* alias */
 
 /* known: Callable leaf with a renderer-private register ABI: trivial-reject four projected vertices, emit/OT-link a POLY_FT4 when all depths >= 125, otherwise tail-transfer to the shared near clipper at 0x80170B5C */
 #define PSX_FN_SubmitTexturedQuad 0x801700C4u
@@ -56,10 +56,14 @@
 #define PSX_FN_TransformAndSubmitMeshPrimitives 0x80171AFCu
 #define func_80171AFC TransformAndSubmitMeshPrimitives  /* alias */
 
-/* guessed: Quad RTPS clip-code packer feeding SceneryPolySubmit */
-#define PSX_FN_ProjectPackClipCodesQuad 0x801727ECu
-#define func_801727EC ProjectPackClipCodesQuad  /* alias */
+/* known: Renderer entry: force a3=0, reuse the shared mesh-render setup, midpoint-subdivide projected primitives, emit variant packet records, and publish the advanced packet pointer */
+#define PSX_FN_SubdivideAndSubmitMeshPrimitives 0x801727E8u
+#define func_801727E8 SubdivideAndSubmitMeshPrimitives  /* alias */
 
-/* guessed: Far/scenery bbox RTPS + AND of 4 corner clip codes; not the 4:3 knife-cut */
-#define PSX_FN_ProjectPackClipCodesFar 0x80172E3Cu
-#define func_80172E3C ProjectPackClipCodesFar  /* alias */
+/* known: Single-caller transform-state adapter: installs the nested transform at input+0x44 through 0x80136078, mirrors GTE TRX/TRY/TRZ into RBK/GBK/BBK, and publishes input+0x14/+0x18/+0x1C to scratchpad 0x1F800000..08 for 0x80172E3C */
+#define PSX_FN_PrepareVisibleQuadTransform 0x80172DDCu
+#define func_80172DDC PrepareVisibleQuadTransform  /* alias */
+
+/* known: Project and screen-clip a strided array of oriented world-space quads into 20-byte scratchpad records; returns visible count, 0, or -1 on the 48-record overflow sentinel */
+#define PSX_FN_BuildVisibleOrientedQuadList 0x80172E3Cu
+#define func_80172E3C BuildVisibleOrientedQuadList  /* alias */

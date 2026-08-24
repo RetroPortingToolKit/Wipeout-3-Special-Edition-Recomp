@@ -7,10 +7,10 @@
 
 [[func]]
 pc = 0x80162474
-name = "BootEntry"
+name = "PsxExeEntryTrampoline"
 emit = false
-status = "guessed"
-note = "SYSTEM.CNF / EXE entry PC (probe seed)"
+status = "confirmed"
+note = "Exact PS-X EXE header entry; two-instruction non-returning trampoline to the expansion-RAM startup loader at 0x800D03B8, not the CRT initialization body"
 
 [[func]]
 pc = 0x801700C4
@@ -53,53 +53,66 @@ status = "known"
 note = "Internal loop within 0x80171AFC, not standalone ABI: trivial-reject/NCLIP/AVSZ, build GPU packets and link OT"
 
 [[func]]
-pc = 0x801727EC
-name = "ProjectPackClipCodesQuad"
+pc = 0x801727E8
+name = "SubdivideAndSubmitMeshPrimitives"
 emit = false
-status = "guessed"
-note = "Quad RTPS clip-code packer feeding SceneryPolySubmit"
+status = "known"
+note = "Renderer entry: force a3=0, reuse the shared mesh-render setup, midpoint-subdivide projected primitives, emit variant packet records, and publish the advanced packet pointer"
+
+[[block]]
+pc = 0x801727EC
+name = "SubdivideMeshPrimitivePrologue"
+status = "known"
+note = "Stack-frame continuation of the ABI entry at 0x801727E8; not independently called and not a quad clip-code packer"
+
+[[func]]
+pc = 0x80172DDC
+name = "PrepareVisibleQuadTransform"
+emit = false
+status = "known"
+note = "Single-caller transform-state adapter: installs the nested transform at input+0x44 through 0x80136078, mirrors GTE TRX/TRY/TRZ into RBK/GBK/BBK, and publishes input+0x14/+0x18/+0x1C to scratchpad 0x1F800000..08 for 0x80172E3C"
 
 [[func]]
 pc = 0x80172E3C
-name = "ProjectPackClipCodesFar"
+name = "BuildVisibleOrientedQuadList"
 emit = false
-status = "guessed"
-note = "Far/scenery bbox RTPS + AND of 4 corner clip codes; not the 4:3 knife-cut"
+status = "known"
+note = "Project and screen-clip a strided array of oriented world-space quads into 20-byte scratchpad records; returns visible count, 0, or -1 on the 48-record overflow sentinel"
 
 [[func]]
 pc = 0x8012268C
-name = "FrameDraw"
+name = "RenderRaceFrame"
 emit = false
-status = "guessed"
-note = "Per-frame draw; copies DRAWENV w/h to 0x80173A9C/0x80173AA0"
+status = "known"
+note = "Callable race-view renderer: owns the 376-byte frame at 0x8012268C, runs scene/vehicle/effects/HUD submission and display synchronization, then returns through the split epilogue at 0x801247FC; a0 is the view/player descriptor and a1/a2 are caller-supplied render context values"
 
 [[func]]
 pc = 0x8013535C
-name = "SetupFrustumClipBounds"
+name = "RebuildViewportClipCoefficients"
 emit = false
-status = "guessed"
-note = "Writes camera-space clip coeffs 0x801E2480/2484/2488/25CC from FOV tables"
+status = "known"
+note = "Argument-free 408-byte leaf: select six display/FOV scalars with 0x80173B00, derive viewport and perspective clip coefficients, and write 0x801E14EC/14F0/14F4/2480/2484/2488/25CC"
 
 [[func]]
 pc = 0x80135B8C
-name = "SetupFrustumClipBoundsAlt"
+name = "RebuildViewportClipCoefficientsFromScalars"
 emit = false
-status = "guessed"
-note = "Twin of SetupFrustumClipBounds (same clip-coeff stores)"
+status = "known"
+note = "Six-scalar signed-16 leaf used by RenderRaceFrame: performs the same seven viewport/perspective coefficient stores as 0x8013535C from caller-selected C/B/D/F/A/E inputs"
 
 [[func]]
 pc = 0x801415F4
-name = "SceneObjectVisWalk"
+name = "BuildVisibleObjectQuadPackets"
 emit = false
-status = "guessed"
-note = "Walks section objects; jal ProjectPackClipCodesFar"
+status = "known"
+note = "Single-caller non-leaf: updates active bits on 28-byte object records, prepares the GTE view transform, compacts visible oriented quads through 0x80172E3C, and emits 40-byte GPU POLY_FT4 packets into the current OT"
 
 [[func]]
 pc = 0x801422FC
-name = "SceneSectionDraw"
+name = "SubmitSceneSectionFaces"
 emit = false
-status = "guessed"
-note = "Per-section face-list submit; no FOV test of its own"
+status = "known"
+note = "Single-caller section submitter: installs the owner transform, submits an indexed face list via 0x8016FC28, then resolves packed repeated entries and invokes each renderer callback"
 
 [[func]]
 pc = 0x80142634
@@ -110,17 +123,17 @@ note = "Software clip vs 4:3 camera planes; widen blocked until gPrimCursor aren
 
 [[site]]
 pc = 0x80142664
-name = "SceneryClipNxLoad"
+name = "SceneryClipAxisCoefficientLoad"
 kind = "lw"
-status = "guessed"
-note = "lw 0x801E25CC (|n|); plane_nx candidate — disabled (packet overflow)"
+status = "known"
+note = "Load shared side-plane axis coefficient from 0x801E25CC; after optional halving it is multiplied by x for left/right clipping and by y for top/bottom clipping"
 
 [[site]]
 pc = 0x80142690
-name = "SceneryClipNyNzLoad"
+name = "SceneryClipVerticalDepthCoefficientLoad"
 kind = "lw"
-status = "guessed"
-note = "lw 0x801E2480 (Y nz); plane_nx candidate — disabled with NxLoad"
+status = "known"
+note = "Load vertical side-plane depth coefficient from 0x801E2480; after optional halving it is multiplied by z in top/bottom clipping"
 
 [[func]]
 pc = 0x800EDFC8
@@ -156,18 +169,18 @@ note = "GPU packet bump pointer (lw/sw -31200 off 0x801A); clipper +40 per emit"
 
 [[object]]
 addr = 0x801E2480
-name = "gClipNzY"
-status = "guessed"
-note = "Y-plane nz; 269/256 of (H>>9)"
+name = "gSceneryClipVerticalDepthCoefficient"
+status = "known"
+note = "Vertical side-plane z coefficient: scale269((F * horizontal) >> 9); SceneryFrustumClip tests verticalDepth*z against axis*y"
 
 [[object]]
 addr = 0x801E2488
-name = "gClipNzX"
-status = "guessed"
-note = "X-plane nz"
+name = "gSceneryClipHorizontalDepthCoefficient"
+status = "known"
+note = "Horizontal side-plane z coefficient: scale269(D >> 1); SceneryFrustumClip tests horizontalDepth*z against axis*x"
 
 [[object]]
 addr = 0x801E25CC
-name = "gClipNCoord"
-status = "guessed"
-note = "Shared |n| for X and Y frustum planes"
+name = "gSceneryClipAxisCoefficient"
+status = "known"
+note = "Shared side-plane axis coefficient B-C; SceneryFrustumClip multiplies it by x for left/right planes and y for top/bottom planes"
