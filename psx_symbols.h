@@ -4,6 +4,10 @@
  */
 #pragma once
 
+/* confirmed: Exact frameless 0xDC-byte by-value aggregate leaf with 22 generated call instances at 18 distinct guest PCs: take point A in a0-a3, point B at caller sp+0x10, and a packed Q12 normal at sp+0x20, then return dot(B-A,n)/Q12NormSquared(n), substituting denominator one when the GTE SQR sum is zero */
+#define PSX_FN_ProjectPointDeltaOntoNormalQ12 0x800ED8ACu
+#define func_800ED8AC ProjectPointDeltaOntoNormalQ12  /* alias */
+
 /* confirmed: VBlank sim gate: counter vs gSimVblankSkip; skip path 0x800EE0F0 */
 #define PSX_FN_SimVblankGate 0x800EDFC8u
 #define func_800EDFC8 SimVblankGate  /* alias */
@@ -11,6 +15,10 @@
 /* confirmed: a0=new skip; returns previous; also queues pad slot invalidate */
 #define PSX_FN_SetSimVblankSkip 0x800EED58u
 #define func_800EED58 SetSimVblankSkip  /* alias */
+
+/* confirmed: Exact 0x4C-byte 22-caller nesting adapter: inspect COP0 Status IEc, increment gInterruptCriticalNesting when interrupts are already disabled, otherwise reset nesting to zero and call the low-level helper that clears Status bits 0 and 10; paired leave routine begins at 0x800EEE64 */
+#define PSX_FN_EnterNestedInterruptCriticalSection 0x800EEE18u
+#define func_800EEE18 EnterNestedInterruptCriticalSection  /* alias */
 
 /* confirmed: Exact argument-free 0x24-byte PRNG leaf: load gRandom15State, replace it with (arithmetic_shift_right(state,1) XOR (state << 3)) modulo 32 bits, and return the new state's low 15 bits; private state begins at 0x12345678; 254 direct JAL callers */
 #define PSX_FN_NextRandom15 0x80104AA0u
@@ -59,6 +67,10 @@
 /* confirmed: Exact 0x1E8-byte custom main/temp heap allocator: align requested bytes upward to four, prefer a free block large enough to split off a 20-byte allocation header plus payload from its tail, otherwise warn and consume an unsplittable free block large enough for the payload; update arena remaining bytes and main-heap low-water mark, return payload at header+12, or null when no block fits; 85 direct JAL sites */
 #define PSX_FN_AllocateHeapBlock 0x8011686Cu
 #define func_8011686C AllocateHeapBlock  /* alias */
+
+/* confirmed: Exact 0x5C-byte 23-caller leaf: snapshot the eight-byte permutation at 0x8016DD60, then return table[index] for mode 1, index+14 for mode 0, index+8 for mode 2, or 1 for every other mode; a2/a3 unused and mode-1 bounds are a caller invariant */
+#define PSX_FN_ResolveModeDependentIndex 0x80117C08u
+#define func_80117C08 ResolveModeDependentIndex  /* alias */
 
 /* confirmed: Exact 0x50C-byte menu-input classifier: accept action 0..11, recognize actions 0..3 from a selected 0x73 analog-pad record when the left-stick axis is at least 93 counts from center, otherwise sum the action's PSX button mask across eligible 0x3A4-byte racer/controller records; 49 direct JAL sites */
 #define PSX_FN_GetMenuActionState 0x8011BDD0u
