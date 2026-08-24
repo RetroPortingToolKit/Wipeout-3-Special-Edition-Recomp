@@ -1825,6 +1825,13 @@ status = "confirmed"
 note = "Exact 0x6C-byte two-caller eight-pointer quad-coordinate permutation: snapshot four signed-halfword coordinate pairs and rotate their 2x2 corner assignment clockwise from [0,1;2,3] to [2,0;3,1]; call-free with no overlay duplicate or interior target"
 
 [[func]]
+pc = 0x801106D0
+name = "AllocatePolyF4Packet"
+emit = false
+status = "confirmed"
+note = "Exact 0x11C-byte four-caller frontend POLY_F4 allocator: reserve 24 bytes from gPrimCursor, initialize SetPolyF4 and caller-selected semitransparency, store four signed-halfword XY pairs and RGB bytes, and return the unlinked packet pointer; no interior target or duplicate"
+
+[[func]]
 pc = 0x80110198
 name = "LoadQuadTextureCoordinates"
 emit = false

@@ -1589,6 +1589,12 @@ unbounded build as a performance test; use focused targets and the bounded
   race/lap records using default time tables, 17 developer names, and cycling
   rank bytes. Five entry-only calls initialize banks 1 and 0, then exercise
   three deliberate sentinel-gated no-ops; no interior target or duplicate.
+- `AllocatePolyF4Packet` owns `0x801106D0..0x801107EB`, with four unique
+  entry-only frontend callers. It advances `gPrimCursor` by 24, initializes a
+  `POLY_F4` plus caller-selected semitransparency, writes four signed-halfword
+  XY pairs and RGB bytes, and returns the still-unlinked packet for the
+  caller's ordering-table splice. Its only callees are confirmed `SetPolyF4`
+  and `SetSemiTrans`; there is no duplicate or interior target.
 - `RotateQuadCoordinatesClockwise` owns `0x80110324..0x8011038F`, with two
   entry-only callers. It snapshots four `(x,y)` pairs and permutes their 2x2
   corner grid from `[0,1;2,3]` to `[2,0;3,1]`, a clockwise quarter-turn; it is
