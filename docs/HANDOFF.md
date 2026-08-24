@@ -1428,11 +1428,15 @@ unbounded build as a performance test; use focused targets and the bounded
   indices, selects `0x801910E0 + index*0x3A4`, and returns true only for byte
   `+0 == 0` and byte `+3 != 0`; unlike the nearby stricter predicate, values
   other than one also satisfy the second test.
-- `EmitTexturedQuadPacket` owns `0x8015B65C..0x8015B7E3`; three calls in one
+- `EmitTexturedScreenQuadPacket` owns `0x8015B65C..0x8015B7E3`; three calls in one
   UI renderer target the entry, with no interior target or overlay duplicate.
   It reserves and OT-links a 40-byte `POLY_FT4`, writes four XY/UV pairs and
   RGB/CLUT state, selects opcode `2C` or semitransparent `2E`, and on the latter
   path derives ABR-1 TPAGE through canonical `GetTPage`.
+- `ClearImage` is the exact canonical GPU wrapper at
+  `0x8015D3C4..0x8015D453`, with six entry-only callers. It runs the shared
+  RECT diagnostic, packs RGB as `0x00BBGGRR`, dispatches operation 8 through
+  the active driver's method/context pair, and propagates the backend result.
 - `ApplyRgbToPrimitiveRecordStream` owns `0x800E8350..0x800E8513`; its six
   generated interior entries are the type 1..8 jump-table cases. Four unique
   callers supply an owner (`count +0x12`, stream `+0x1C`) and RGB bytes. It
@@ -1448,3 +1452,13 @@ unbounded build as a performance test; use focused targets and the bounded
   runtime racer; it stores `min(9 * s16[+0x146], floor(5 * u16[+0x14A] / 4))`
   at `+0x132` and clears `+0x14C/+0x12A`. Seven generated calls include one
   duplicate emission of the `0x8014EC5C` instruction.
+- `DispatchMdecDmaCommand` logically owns `0x8016B264..0x8016B4E3`: the
+  generated `0x10`-byte entry spills `a0..a3`, and the `0x8016B274` body reads
+  those slots as varargs. Six entry-only callers issue selectors 0..3 to
+  select direction, program the shifted count, or launch `(address,size)` with
+  64-word DMA blocking; bounded status waits return `-2` on timeout.
+- `ComputeObjectUpVectorQ12` owns `0x800EA870..0x800EA9AF`. Six unique callers
+  (five base-region owners and one overlay owner) target only the entry. It
+  reads signed object Euler angles at `+0x11E/+0x120/+0x122`, evaluates six
+  recovered Q12 sine/cosine calls, and writes the rotated local `+Y` basis as
+  three signed Q12 words; zero angles produce `(0,4096,0)`.

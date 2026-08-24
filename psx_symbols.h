@@ -16,6 +16,10 @@
 #define PSX_FN_ApplyRgbToPrimitiveRecordStream 0x800E8350u
 #define func_800E8350 ApplyRgbToPrimitiveRecordStream  /* alias */
 
+/* confirmed: Exact 0x140-byte six-caller shared helper: read signed 4096-unit Euler angles at object offsets +0x11E/+0x120/+0x122, evaluate SinQ12FromSignedAngle and CosQ12FromSignedAngle, and write the rotated local +Y basis as three signed Q12 words; six generated calls are six unique guest sites across base and overlay owners, with no interior entry calls */
+#define PSX_FN_ComputeObjectUpVectorQ12 0x800EA870u
+#define func_800EA870 ComputeObjectUpVectorQ12  /* alias */
+
 /* confirmed: Exact 0x920-byte seven-caller track-surface collision owner: select flagged 24-byte geometry records from object halfword +0x34, reject distant candidates, construct adjacent-face plane/intersection tests, gate normal mode through a point-in-face predicate, dispatch object-flag/prior-hit-specific collision responses, and return -1 for rejected range, 0 for no hit, or 1 for a handled hit */
 #define PSX_FN_ResolveObjectTrackSurfaceCollision 0x800ECB6Cu
 #define func_800ECB6C ResolveObjectTrackSurfaceCollision  /* alias */
@@ -457,8 +461,8 @@
 #define func_8015B3CC DispatchRacerEffectSpawn  /* alias */
 
 /* confirmed: Exact 0x188-byte three-caller POLY_FT4 builder: reserve 40 bytes from gPrimCursor, write four signed XY pairs, RGB, texture UV/CLUT state, choose opaque 0x2C or semitransparent 0x2E with ABR-1 GetTPage, then prepend the packet to the active ordering-table bucket at signed depth>>6; no overlay duplicate */
-#define PSX_FN_EmitTexturedQuadPacket 0x8015B65Cu
-#define func_8015B65C EmitTexturedQuadPacket  /* alias */
+#define PSX_FN_EmitTexturedScreenQuadPacket 0x8015B65Cu
+#define func_8015B65C EmitTexturedScreenQuadPacket  /* alias */
 
 /* confirmed: Exact 0x3C-byte signed-angle wrapper: reduce the absolute input modulo 4096, call the private quarter-wave sine lookup, and restore odd symmetry; returns a signed Q12 value in [-4096,4096] and has 91 direct callers */
 #define PSX_FN_SinQ12FromSignedAngle 0x8015C318u
@@ -499,6 +503,10 @@
 /* confirmed: Exact 0x68-byte 13-caller PsyQ GPU synchronization dispatcher: preserve mode a0, optionally emit the retained 'DrawSync(%d)...' diagnostic when GPU driver type >=2, call the active GPU driver's vtable +0x3C sync method with mode, and return its result unchanged */
 #define PSX_FN_DrawSync 0x8015D240u
 #define func_8015D240 DrawSync  /* alias */
+
+/* confirmed: Exact 0x90-byte six-caller canonical PsyQ GPU wrapper: log/validate the RECT through the shared GPU diagnostic helper, pack caller RGB bytes as 0x00BBGGRR, and dispatch operation 8 through the active GPU driver's +8 method with its +0x0C context, propagating the backend result */
+#define PSX_FN_ClearImage 0x8015D3C4u
+#define func_8015D3C4 ClearImage  /* alias */
 
 /* confirmed: Exact 0x60-byte five-caller PsyQ low-level VRAM upload dispatcher: validate/log the RECT with retained 'LoadImage' name, then call the active GPU driver's transfer method at vtable +0x08 as (driver+0x20 context, RECT, operation 8, source words) and return its result unchanged */
 #define PSX_FN_LoadImage2 0x8015D454u
