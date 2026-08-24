@@ -35,7 +35,7 @@ state. Otherwise it performs these operations:
    offset, decrement and publish the top index, and repeat until it reaches
    `-1`. The other two words in each 12-byte record are not read here.
 3. When the lock/suppression word at `0x80178354` is zero, non-final records
-   are returned through `0x80116D1C(arena, arena + offset)`. On the final
+   release reserved heap-prefix space through `0x80116D1C(arena, arena + offset)`. On the final
    record it instead calls `0x80116D1C(arena, NULL)` and clears the suppression
    word; that callee maps null to the arena's initial payload at `arena+0x0C`.
 4. When `0x80178354` is nonzero, the routine still discards all tracker records
@@ -49,9 +49,10 @@ not every possible allocation in the arena. It does not clear record contents.
 - `0x80116DBC` is the allocator's internal free-block insertion/coalescing
   path. This routine uses it only for the separately held pointer at
   `0x80178358`.
-- `0x80116D1C` is the public arena-block release path. It accepts the arena in
-  `a0` and either a payload pointer in `a1`, or null to select `arena+0x0C`, and
-  ultimately delegates to `0x80116DBC`.
+- `0x80116D1C` is the arena-prefix rollback path. It accepts the arena in `a0`
+  and a lower marker in `a1`, synthesizes and frees the newly exposed block,
+  or accepts null to release the arena's initial payload; it ultimately
+  delegates to `0x80116DBC`.
 
 There are three static call instructions in the cleanup body: one to the
 internal path and two mutually exclusive sites to the public path. A single

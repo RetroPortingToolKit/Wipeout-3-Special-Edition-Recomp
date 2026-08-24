@@ -904,6 +904,12 @@ unbounded build as a performance test; use focused targets and the bounded
   compiles/submits `DR_ENV`, caches the 0x5C-byte environment and returns it;
   `SetDefDrawEnv` at `0x8015F844` initializes clip/offset/texture/background
   fields with PAL/NTSC-dependent `dfe`. Both have 20 direct callers.
+- `SetSoundSlotVolume` at `0x801224B4` validates audio enable, signed slot,
+  24-entry bounds and active flag, stores byte volume at slot `+0x1A`, then
+  dispatches the existing backend update; 20 callers.
+- `CopyTransformMatrix` at `0x80135CDC` copies all nine rotation halfwords and
+  three translation words without transposing, deliberately skipping MATRIX
+  padding and containing-transform state; 15 unique guest call sites.
 - `ReleaseAllTrackedTempHeapBlocks` owns `0x8014B96C..0x8014BA3F`. With a
   nonempty top index it releases the pending internal free-list block, pops
   all 12-byte offset records in reverse order, and frees their temp-heap
@@ -919,3 +925,9 @@ unbounded build as a performance test; use focused targets and the bounded
   embedded packet at `+0x1C`, submits 0x40 bytes through the active GPU driver,
   caches the environment at `0x80178F58`, and returns the input pointer. All 20
   direct calls are in the system graphics initializer at `0x800EDD68..DE44`.
+- `FreeHeapBlock` at `0x80116DBC` is the 15-caller DFree implementation: exact
+  payload lookup, free-byte restoration, and forward/backward coalescing with
+  20-byte headers. `ReleaseHeapPrefixToMarker` at `0x80116D1C` is the related
+  four-caller temp-heap rollback wrapper; it exposes reserved prefix space down
+  to a marker (or the initial arena payload for null) and delegates the actual
+  free/coalesce operation.

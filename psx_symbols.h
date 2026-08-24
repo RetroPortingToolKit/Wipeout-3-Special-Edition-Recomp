@@ -72,6 +72,14 @@
 #define PSX_FN_AllocateHeapBlock 0x8011686Cu
 #define func_8011686C AllocateHeapBlock  /* alias */
 
+/* confirmed: Exact 0xA0-byte four-caller arena-prefix release wrapper used by temp-heap rollback: null releases the arena's initial payload and clears gHeapPrefixMarker; a sufficiently lower marker synthesizes a 20-byte allocated block over the newly released prefix, links and frees it through FreeHeapBlock, then publishes the new marker */
+#define PSX_FN_ReleaseHeapPrefixToMarker 0x80116D1Cu
+#define func_80116D1C ReleaseHeapPrefixToMarker  /* alias */
+
+/* confirmed: Exact 0x104-byte 15-caller custom-arena free/coalescer: find a block by exact payload pointer, restore its payload bytes to arena free accounting, merge an adjacent free successor and predecessor while restoring each 20-byte header, or print the retained DFree block-not-found diagnostic */
+#define PSX_FN_FreeHeapBlock 0x80116DBCu
+#define func_80116DBC FreeHeapBlock  /* alias */
+
 /* confirmed: Exact 0x5C-byte 23-caller leaf: snapshot the eight-byte permutation at 0x8016DD60, then return table[index] for mode 1, index+14 for mode 0, index+8 for mode 2, or 1 for every other mode; a2/a3 unused and mode-1 bounds are a caller invariant */
 #define PSX_FN_ResolveModeDependentIndex 0x80117C08u
 #define func_80117C08 ResolveModeDependentIndex  /* alias */
@@ -83,6 +91,10 @@
 /* confirmed: Exact 0x2C0-byte shared audio sink with three direct callers: gate on two audio-enable bytes, allocate one of 24 sound slots, snapshot volume/pan/pitch and Q8 pitch scale, resolve or reserve one/two of 24 voices, initialize 36-byte voice state from a 20-byte resource descriptor, then submit the slot to the active audio backend */
 #define PSX_FN_AllocateAndQueueSoundVoice 0x80121534u
 #define func_80121534 AllocateAndQueueSoundVoice  /* alias */
+
+/* confirmed: Exact 0x64-byte 20-caller audio adapter: truncate a1 to u8, reject disabled audio, slot -1, slot >=24, and inactive slot records; otherwise write volume byte +0x1A in the selected 32-byte record at 0x801D674C and call 0x8012257C to dispatch that slot to the active backend */
+#define PSX_FN_SetSoundSlotVolume 0x801224B4u
+#define func_801224B4 SetSoundSlotVolume  /* alias */
 
 /* known: True 60-byte owner with three callers: truncate a0 to byte a3, load the three global bytes at 0x80175E71/+72/+70 into a0/a1/a2, call 0x801220AC, and return; generated 0x80122654 is a non-callable fallthrough split requiring the prefix's live a3 */
 #define PSX_FN_ApplyGlobalRgbWithAlpha 0x80122650u
@@ -127,6 +139,10 @@
 /* known: Six-scalar signed-16 leaf used by RenderRaceFrame: performs the same seven viewport/perspective coefficient stores as 0x8013535C from caller-selected C/B/D/F/A/E inputs */
 #define PSX_FN_RebuildViewportClipCoefficientsFromScalars 0x80135B8Cu
 #define func_80135B8C RebuildViewportClipCoefficientsFromScalars  /* alias */
+
+/* confirmed: Exact frameless 0x74-byte PSX MATRIX copy leaf with 19 generated call instances at 15 distinct guest PCs: copy all nine rotation halfwords and three 32-bit translation words from a0 to a1, skip padding at +0x12, leave containing-transform state such as +0x40 untouched, and establish no scalar return */
+#define PSX_FN_CopyTransformMatrix 0x80135CDCu
+#define func_80135CDC CopyTransformMatrix  /* alias */
 
 /* known: Two-caller projection/GTE setup: set H from 0x801E14F0, follow +0x44 links to the terminal transform, build MATRIX scratch at 0x1F800010 with its middle rotation row scaled by 0x801E14EC/256 and translation {0,0,0x801E14F4/2}, then install TR and rotation */
 #define PSX_FN_InstallLinkedRenderTransform 0x80136078u
