@@ -48,6 +48,10 @@
 #define PSX_FN_ApplySceneObjectGroupProperty 0x800FA364u
 #define func_800FA364 ApplySceneObjectGroupProperty  /* alias */
 
+/* confirmed: Exact 0xB8-byte six-caller mapper: for each of nine source bytes at a0, linearly find its zero-based index in the byte lookup selected by globals 0x80173A30/0x80173A38 and write that index or zero to a1; then clear eight bytes at 0x8018AE44, record output[0] at +0x24, clear +0x28, and return output[0] */
+#define PSX_FN_BuildNineByteLookupIndexMap 0x801027CCu
+#define func_801027CC BuildNineByteLookupIndexMap  /* alias */
+
 /* confirmed: Exact frameless 0x148-byte seven-caller input decoder: truncate a1 to 16 bits, clear racer record a0's runtime action word at +0x0C, expand packed low bits 0..9 into sparse action bits 4,5,6,7,9,10,11,13,14,15, and return packed bits 10..15 as an unsigned six-bit auxiliary value */
 #define PSX_FN_DecodePackedRacerControls 0x80102E70u
 #define func_80102E70 DecodePackedRacerControls  /* alias */
@@ -163,6 +167,10 @@
 /* confirmed: Exact 0x5C-byte 23-caller leaf: snapshot the eight-byte permutation at 0x8016DD60, then return table[index] for mode 1, index+14 for mode 0, index+8 for mode 2, or 1 for every other mode; a2/a3 unused and mode-1 bounds are a caller invariant */
 #define PSX_FN_ResolveModeDependentIndex 0x80117C08u
 #define func_80117C08 ResolveModeDependentIndex  /* alias */
+
+/* confirmed: Exact 0x8C-byte six-site first-fit allocator used by one resource loader: round payload size up to four bytes, search three 12-byte base/capacity/cursor arena descriptors at 0x801D38B8, prepend the rounded size word, advance the selected cursor, return payload+4, or terminate through BIOS exit(-1) when all arenas are full */
+#define PSX_FN_AllocateFromThreeBumpArenas 0x80117FD0u
+#define func_80117FD0 AllocateFromThreeBumpArenas  /* alias */
 
 /* confirmed: Exact 0x15C-byte nine-caller geometry helper: approximate the length of the three signed 32-bit components after arithmetic >>6 reduction, substitute denominator one for zero, overwrite each component with signed `(component << 6) / reduced_length` (approximately a Q12 unit vector), and expose no semantic scalar return */
 #define PSX_FN_NormalizeVector3Q12InPlace 0x80118FDCu
@@ -475,6 +483,14 @@
 /* confirmed: Exact 0x144-byte seven-caller argument-free PsyQ GPU watchdog: sample VSync(-1), return 0 while the deadline/call-count guard remains healthy, otherwise print retained GPU diagnostics, mask interrupts, reset tracked GPU/DMA state and GP1, restore the prior interrupt mask, and return -1 */
 #define PSX_FN_CheckAndRecoverGpuTimeout 0x8015F360u
 #define func_8015F360 CheckAndRecoverGpuTimeout  /* alias */
+
+/* confirmed: Exact 0x10-byte canonical BIOS B0:0C EnableEvent trampoline: preserve incoming event handle in a0 and caller ra, select service t1=0x0C in the B0-vector jump delay slot, and propagate the BIOS result unchanged; six entry callers, final NOP unreachable padding */
+#define PSX_FN_EnableEvent 0x8015F594u
+#define func_8015F594 EnableEvent  /* alias */
+
+/* confirmed: Exact 0x10-byte canonical BIOS B0:08 OpenEvent trampoline: preserve class/spec/mode/callback in a0..a3 and caller ra, select service t1=8 in the B0-vector jump delay slot, and propagate the event handle unchanged; six entry callers, final NOP unreachable padding */
+#define PSX_FN_OpenEvent 0x8015F5C4u
+#define func_8015F5C4 OpenEvent  /* alias */
 
 /* confirmed: Exact 0x10-byte eight-caller BIOS A0/1B strlen trampoline: preserve the string pointer in a0 and caller ra, select service t1=0x1B in the vector-jump delay slot, and propagate the BIOS unsigned byte count unchanged; final word is unreachable padding */
 #define PSX_FN_Strlen 0x8015F5D4u

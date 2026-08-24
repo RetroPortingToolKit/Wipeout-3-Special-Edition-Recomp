@@ -1406,6 +1406,20 @@ status = "confirmed"
 note = "Exact 0x10-byte canonical BIOS A0:17 strcmp trampoline: preserve the two string pointers in a0/a1 and caller ra, select service t1=0x17 in the vector-jump delay slot, and propagate the signed comparison result unchanged; seven unique entry callers, final NOP is unreachable padding"
 
 [[func]]
+pc = 0x8015F5C4
+name = "OpenEvent"
+emit = false
+status = "confirmed"
+note = "Exact 0x10-byte canonical BIOS B0:08 OpenEvent trampoline: preserve class/spec/mode/callback in a0..a3 and caller ra, select service t1=8 in the B0-vector jump delay slot, and propagate the event handle unchanged; six entry callers, final NOP unreachable padding"
+
+[[func]]
+pc = 0x8015F594
+name = "EnableEvent"
+emit = false
+status = "confirmed"
+note = "Exact 0x10-byte canonical BIOS B0:0C EnableEvent trampoline: preserve incoming event handle in a0 and caller ra, select service t1=0x0C in the B0-vector jump delay slot, and propagate the BIOS result unchanged; six entry callers, final NOP unreachable padding"
+
+[[func]]
 pc = 0x80120988
 name = "CopyAndNormalizeControllerPacket"
 emit = false
@@ -1439,6 +1453,13 @@ name = "ConsumeOneShotFlag80175F90"
 emit = false
 status = "confirmed"
 note = "Logical 0x28-byte argument-free test-and-clear accessor including generated zero-return tail 0x8012C1C4: return 0 without writing when word 0x80175F90 is zero; otherwise clear that word and return 1; seven generated instances are four unique entry callers"
+
+[[func]]
+pc = 0x801027CC
+name = "BuildNineByteLookupIndexMap"
+emit = false
+status = "confirmed"
+note = "Exact 0xB8-byte six-caller mapper: for each of nine source bytes at a0, linearly find its zero-based index in the byte lookup selected by globals 0x80173A30/0x80173A38 and write that index or zero to a1; then clear eight bytes at 0x8018AE44, record output[0] at +0x24, clear +0x28, and return output[0]"
 
 [[func]]
 pc = 0x80169D30
@@ -1488,3 +1509,10 @@ name = "DoesObjectMaskMatchRacerView"
 emit = false
 status = "confirmed"
 note = "Exact 0x70-byte four-caller pure renderer predicate: select the 0x3A4-byte racer record, derive the racer-type-specific low view bit (1 for type byte +2 == 1, otherwise 2), ignore the opposite bit in the object's mask, and require exact equality with the current scene mask at 0x801762CC plus that selected bit"
+
+[[func]]
+pc = 0x80117FD0
+name = "AllocateFromThreeBumpArenas"
+emit = false
+status = "confirmed"
+note = "Exact 0x8C-byte six-site first-fit allocator used by one resource loader: round payload size up to four bytes, search three 12-byte base/capacity/cursor arena descriptors at 0x801D38B8, prepend the rounded size word, advance the selected cursor, return payload+4, or terminate through BIOS exit(-1) when all arenas are full"
