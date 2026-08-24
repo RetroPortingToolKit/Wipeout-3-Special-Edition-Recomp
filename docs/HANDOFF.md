@@ -1246,6 +1246,11 @@ unbounded build as a performance test; use focused targets and the bounded
   referenced by `0x801E1F14`, fills a 48-byte position/vector/parameter record,
   marks it active, and returns 1. Eight unique callers produce nine generated
   instances because `0x8015997C` appears in two overlay variants.
+- `CheckAndRecoverGpuTimeout` owns `0x8015F360..0x8015F4A3`. It samples
+  `VSync(-1)` and a bounded call-count watchdog, normally returning 0; expiry
+  prints GPU diagnostics, masks interrupts, resets tracked GPU/DMA state and
+  GP1, restores I_MASK, and returns -1. Its seven GPU-library callers have no
+  overlay duplicates or interior targets.
 - `SubmitRumbleDecayRequest` owns `0x80134CE8..0x80134D23` with 12 entry-only
   callers. It replaces rumble-state words `+0x0C/+0x10/+0x14` with Q8 motor
   amplitude, signed priority, and Q8 decay only when both the new amplitude
