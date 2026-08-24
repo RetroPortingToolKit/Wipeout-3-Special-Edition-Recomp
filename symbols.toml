@@ -995,6 +995,13 @@ status = "confirmed"
 note = "Internal return suffix of WrapAngle4096Signed for masked inputs <=2048; reached only from the entry branch and has zero direct JAL callers despite generated F/R 8014B6D8 8"
 
 [[func]]
+pc = 0x8014B4F8
+name = "DotProduct3Int32"
+emit = false
+status = "confirmed"
+note = "Exact 0x4C-byte ten-unique-caller six-scalar leaf: return low32(a0*stack10 + a1*stack14 + a2*stack18), with wrapping products/additions; a3 is not part of the formula, though a0..a3 are spilled to the caller argument-save area; no global or hardware effects"
+
+[[func]]
 pc = 0x8014F814
 name = "AccumulateOneIndexedVertexWeight"
 emit = false
@@ -1057,6 +1064,13 @@ status = "confirmed"
 note = "Exact 0x20-byte 12-caller library leaf: snapshot the 16-bit Timer 2 counter at 0x1F801120, store caller threshold to 0x801EEBC4 and the counter snapshot to 0x801EEBC8, and return without configuring hardware or producing a semantic value; paired timeout polling handles wrap and timer mode"
 
 [[func]]
+pc = 0x8016C53C
+name = "HasTimer2TimeoutExpired"
+emit = false
+status = "confirmed"
+note = "Exact 0xA0-byte seven-caller leaf paired with ArmTimer2Timeout: read Timer 2 count, correct one 16-bit wrap with target 0x1F801128 or 0x10000, scale elapsed by >>3 when mode bit 0x200 is clear, and return unsigned elapsed >= threshold saved at 0x801EEBC4; read-only apart from MMIO"
+
+[[func]]
 pc = 0x8014FA4C
 name = "SpawnTrackSectionSurfaceEffects"
 emit = false
@@ -1090,3 +1104,10 @@ name = "SetPolyF4"
 emit = false
 status = "confirmed"
 note = "Exact 0x14-byte 22-caller PsyQ-compatible POLY_F4 initializer: preserve the packet OT link while setting tag length byte to 5 and GP0 command byte to 0x28; machine v0 incidentally retains 0x28 but callers treat the routine as void"
+
+[[func]]
+pc = 0x8014B6E0
+name = "SetVector"
+emit = false
+status = "confirmed"
+note = "Exact 0x1C-byte 16-caller PsyQ-compatible VECTOR setter: copy signed 32-bit x/y/z from a1/a2/a3 to destination offsets 0/4/8, leave the +0xC pad untouched, and return no semantic value"

@@ -1031,6 +1031,11 @@ unbounded build as a performance test; use focused targets and the bounded
   `F/R 8014B6D8 8`, an internal nonnegative return suffix with zero callers.
   There are 17 unique guest call sites; 26 generated instances reflect four
   mutually exclusive copies of three overlay call addresses.
+- `DotProduct3Int32` is the unsplit frameless leaf at
+  `0x8014B4F8..0x8014B543`: it returns the wrapping low-32-bit sum of three
+  signed products supplied as `a0..a2` and stack arguments 5..7, with no scale
+  or saturation. It has ten unique guest callers (12 overlay instances) and no
+  interior target or global/hardware effect.
 - `AccumulateOneIndexedVertexWeight` is its single-step companion at
   `0x8014F814..0x8014F91F`: it performs the same flagged-record lookup and
   fixed 250/200/200 indexed accumulator update once, then decrements positive
@@ -1073,6 +1078,11 @@ unbounded build as a performance test; use focused targets and the bounded
   threshold at `0x801EEBC4` and a 16-bit Timer 2 counter snapshot from
   `0x1F801120` at `0x801EEBC8`; the adjacent poller handles wrap, timer mode,
   and expiry. The arming leaf does not configure hardware or return a value.
+- `HasTimer2TimeoutExpired` owns `0x8016C53C..0x8016C5DB`, is a frameless leaf
+  with seven direct callers and no interior targets. It corrects one Timer 2
+  wrap using target `0x1F801128` (or `0x10000` when zero), applies `>>3` elapsed
+  scaling when mode bit `0x200` is clear, and returns canonical unsigned
+  `elapsed >= threshold` without mutating the saved timeout state.
 - `SpawnTrackSectionSurfaceEffects` logically owns
   `0x8014FA4C..0x80150577` despite generated splits at FAE0/FDE0/FF4C/50548.
   Its sole real caller passes a track section and effect flags; it selects a
@@ -1103,3 +1113,7 @@ unbounded build as a performance test; use focused targets and the bounded
   length 5 to tag byte `+3`, and writes GP0 code `0x28` to command byte `+7`.
   It has 22 callers, all targeting the true entry, and no interior targets;
   callers allocate/advance 24-byte packets and ignore incidental `v0=0x28`.
+- `SetVector` is the exact PsyQ-compatible leaf at
+  `0x8014B6E0..0x8014B6FB`: its 16 callers all target the true entry, and it
+  copies signed 32-bit `x/y/z` arguments to destination offsets `0/4/8` while
+  leaving the VECTOR pad at `+0xC` untouched. It has no semantic return.
