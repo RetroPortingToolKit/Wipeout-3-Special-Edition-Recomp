@@ -1474,3 +1474,10 @@ name = "DecodeAnimationCommandRecord"
 emit = false
 status = "confirmed"
 note = "True 0xF8-byte six-caller owner across the false 0x800E7324 split: sign-extend the caller's 16-bit byte offset into an animation command stream, return the opcode byte at that offset, decode the following 16 unaligned little-endian bytes into four output words, and touch no global state"
+
+[[func]]
+pc = 0x80140E00
+name = "DoesObjectMaskMatchRacerView"
+emit = false
+status = "confirmed"
+note = "Exact 0x70-byte four-caller pure renderer predicate: select the 0x3A4-byte racer record, derive the racer-type-specific low view bit (1 for type byte +2 == 1, otherwise 2), ignore the opposite bit in the object's mask, and require exact equality with the current scene mask at 0x801762CC plus that selected bit"

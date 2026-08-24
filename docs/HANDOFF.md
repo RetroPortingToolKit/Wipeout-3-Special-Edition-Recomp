@@ -1363,3 +1363,8 @@ unbounded build as a performance test; use focused targets and the bounded
   or interior target exists. Its six callers pass an animation stream plus a
   signed 16-bit byte offset. It returns the record opcode and reconstructs the
   following 16 unaligned little-endian bytes as four argument words.
+- `DoesObjectMaskMatchRacerView` is the exact pure predicate at
+  `0x80140E00..0x80140E6F`, with four entry-only renderer callers. It selects
+  low view bit 1 for racer type byte `+2 == 1`, otherwise bit 2, ignores the
+  opposite bit in the object's mask, and requires exact equality with the
+  current scene mask at `0x801762CC` plus the selected bit.
