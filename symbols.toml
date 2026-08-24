@@ -1392,6 +1392,13 @@ status = "confirmed"
 note = "Exact 0x10-byte canonical BIOS A0:18 strncmp trampoline: preserve caller a0/a1/a2 and ra, select service t1=0x18 in the vector-jump delay slot, and propagate the signed comparison result unchanged; seven unique call sites across eight generated instances, with final NOP unreachable padding"
 
 [[func]]
+pc = 0x801671C0
+name = "ChangeClearPad"
+emit = false
+status = "confirmed"
+note = "Exact 0x10-byte canonical BIOS C0:0A ChangeClearPad trampoline: preserve incoming mode in a0 and caller ra, select service t1=0x0A in the C0-vector jump delay slot, and propagate the BIOS result unchanged; seven unique entry callers, final NOP is unreachable padding"
+
+[[func]]
 pc = 0x80120988
 name = "CopyAndNormalizeControllerPacket"
 emit = false
@@ -1413,6 +1420,13 @@ status = "confirmed"
 note = "Exact 0x30-byte canonical Psy-Q VECTOR normalizer wrapper: load three signed 32-bit components from a0, delegate through the private GTE Q12 normalization core at 0x8015FC3C, store the normalized three-word vector to a1, and return without other memory effects; nine generated call instances represent six unique entry callers"
 
 [[func]]
+pc = 0x80112088
+name = "SwapPackedRecordU16FieldsByType"
+emit = false
+status = "confirmed"
+note = "Logical 0x9C-byte four-caller packed-record converter across generated tails 0x801120B4/0x801120EC: dereference the pointer slot at a0, swap the complete two-byte fields at +8 and +12 when type byte +0 is 2, swap fields +4 and +8 when it is 6, and otherwise leave the record unchanged"
+
+[[func]]
 pc = 0x80169D30
 name = "WaitForJoyAckAndClearIrq"
 emit = false
@@ -1432,3 +1446,10 @@ name = "ApplyAnalogControllerCalibration"
 emit = false
 status = "confirmed"
 note = "True 0x3B4-byte frameless owner spanning six false generated splits: resolve logical pad 0..7 through two ports/four multitap slots, accept 0x7300 analog-pad and 0x2300 NegCon-class packets, apply per-pad deadzone/scale calibration with clamping and history updates, mutate axis/pressure bytes in place, and return the packet pointer or null"
+
+[[func]]
+pc = 0x800E7264
+name = "DecodeAnimationCommandRecord"
+emit = false
+status = "confirmed"
+note = "True 0xF8-byte six-caller owner across the false 0x800E7324 split: sign-extend the caller's 16-bit byte offset into an animation command stream, return the opcode byte at that offset, decode the following 16 unaligned little-endian bytes into four output words, and touch no global state"

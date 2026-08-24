@@ -1304,6 +1304,10 @@ unbounded build as a performance test; use focused targets and the bounded
   length bound unchanged and propagate the signed comparison result; its last
   NOP is unreachable padding. Seven unique callers produce eight generated
   instances because `0x800E5E28` is present in two overlay variants.
+- `ChangeClearPad` is the canonical BIOS C0:0A trampoline at
+  `0x801671C0..0x801671CF`. It forwards the incoming mode and BIOS result
+  unchanged; the fourth word is unreachable padding. All seven direct callers
+  target the entry, with no overlay duplicates or interior targets.
 - `CopyAndNormalizeControllerPacket` owns `0x80120988..0x80120A87` with seven
   entry callers. It copies/clears eight raw controller bytes, saves their
   original header at destination `+8`, accepts headers `2300/4100/7300`, and
@@ -1319,6 +1323,11 @@ unbounded build as a performance test; use focused targets and the bounded
   stores three normalized words to the destination. Nine generated instances
   are six unique entry callers; `0x8015FBF4` is only the post-call continuation,
   with no external interior target.
+- `SwapPackedRecordU16FieldsByType` logically owns
+  `0x80112088..0x80112123`, including generated branch tails `0x801120B4` and
+  `0x801120EC`. Through a pointer slot it swaps U16 fields `+8/+12` for type 2
+  or `+4/+8` for type 6 and otherwise does nothing. Eight generated instances
+  are four unique entry callers; neither tail has an independent caller.
 - `WaitForJoyAckAndClearIrq` owns `0x80169D30..0x80169DBF` with seven callers.
   It acknowledges SIO interrupt bit 7 in `I_STAT`, waits for JOY_STAT ACK bit
   7 to clear under the caller-armed Timer 2 deadline, returns zero on timeout,
@@ -1335,3 +1344,8 @@ unbounded build as a performance test; use focused targets and the bounded
   resolves two-port/four-slot multitap packets, calibrates `7300` four-axis or
   `2300` steering/pressure payloads with deadzones, fixed-point scale, clamps,
   and history, then returns the mutated packet pointer or null.
+- `DecodeAnimationCommandRecord` owns `0x800E7264..0x800E735B`; generated
+  `0x800E7324` is a fall-through split, not a callable, and no overlay duplicate
+  or interior target exists. Its six callers pass an animation stream plus a
+  signed 16-bit byte offset. It returns the record opcode and reconstructs the
+  following 16 unaligned little-endian bytes as four argument words.
