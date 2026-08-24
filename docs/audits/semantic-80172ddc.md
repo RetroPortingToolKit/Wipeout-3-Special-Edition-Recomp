@@ -35,10 +35,11 @@ value.  `a1` through `a3` are not inputs.
 
 The routine performs these operations in order:
 
-1. It calls `0x80136078` with `a0 = transform->field_44`.  That helper follows
-   nested `+0x44` links and installs a composed render transform.  Consequently
-   the GTE rotation matrix and translation registers on return describe the
-   nested/parent transform selected by the input record.
+1. It calls `0x80136078` with `a0 = transform->field_44`. That helper follows
+   nested `+0x44` links to the terminal record and installs a
+   projection-adjusted render transform. It does not compose the chain.
+   Consequently the GTE rotation matrix and translation registers on return
+   describe the terminal transform selected by the input record.
 2. It reads GTE control registers 5, 6, and 7 (`TRX`, `TRY`, and `TRZ`) and
    writes the same three words to control registers 13, 14, and 15 (`RBK`,
    `GBK`, and `BBK`).  These are not no-op writes: they copy the translation

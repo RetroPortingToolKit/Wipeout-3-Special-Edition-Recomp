@@ -13,6 +13,55 @@ status = "confirmed"
 note = "Exact PS-X EXE header entry; two-instruction non-returning trampoline to the expansion-RAM startup loader at 0x800D03B8, not the CRT initialization body"
 
 [[func]]
+pc = 0x80116128
+name = "RunRaceSession"
+emit = false
+status = "known"
+note = "Sole-called non-returning race-session owner: initialize race/render/audio state, then run the closed per-frame simulation/view/render loop containing the only call to RenderRaceFrame"
+
+[[func]]
+pc = 0x8016FC28
+name = "DispatchPackedFacePrimitive"
+emit = false
+status = "known"
+note = "Single-caller tail dispatcher: decode a packed face descriptor into a low-10-bit face index, a 1..8 downstream count, and an 8-way renderer/helper-table selection; publish four private callbacks in scratchpad and tail-jump to the selected primitive renderer without emitting a GPU packet itself"
+
+[[func]]
+pc = 0x8016FD34
+name = "SubmitTexturedQuadTriangleFan"
+emit = false
+status = "known"
+note = "Renderer-private callback: common-outcode reject four projected vertices; delegate near geometry to the shared textured-quad clipper, otherwise midpoint-project one edge and OT-link three consecutive 32-byte textured-triangle packets"
+
+[[func]]
+pc = 0x8016FEFC
+name = "SubmitTexturedQuadFirstEdgeFan"
+emit = false
+status = "known"
+note = "Address-taken renderer-private sibling of 0x8016FD34: reject a common-outcode quad, use the shared near clipper below depth 125, or midpoint-project the first input edge and OT-link three consecutive 32-byte textured-triangle packets"
+
+[[func]]
+pc = 0x8016F94C
+name = "ProjectAndSubmitPackedFaceGroups"
+emit = false
+status = "known"
+note = "Renderer-private tail target of 0x8016FC28: for 1..8 consecutive 64-byte face records, project packed vertex pairs through 0x80170254, reject a shared-outcode group, then invoke the scratchpad-selected primitive callback for each 24-byte subrecord and preserve the updated renderer cursors"
+
+[[func]]
+pc = 0x8016FA70
+name = "SubdivideAndSubmitPackedFaceStrip"
+emit = false
+status = "known"
+note = "Renderer-private callback selected by packed-face modes 2, 4, and 5: expand each consecutive 64-byte face record into a projected strip of adjacent vertex pairs, trivial-reject it, split every pair-to-pair quad into four children, and submit those children through the two scratchpad-selected primitive callbacks"
+
+[[func]]
+pc = 0x80170774
+name = "SubdivideTwiceAndSubmitPackedFaceStrip"
+emit = false
+status = "known"
+note = "Renderer-private tail target selected only by packed-face mode 3: project each adjacent-pair quad, perform two midpoint/center subdivision levels, and submit up to sixteen leaf quads through the scratchpad-selected callbacks"
+
+[[func]]
 pc = 0x801700C4
 name = "SubmitTexturedQuad"
 emit = false
@@ -38,6 +87,13 @@ name = "BuildProjectQuadMidpoints"
 emit = false
 status = "known"
 note = "In-place four edge midpoints + quad center; RTPS five vertices and store SXY/SZ/RIGHT|LEFT|BOTTOM|TOP clip fields"
+
+[[func]]
+pc = 0x80170B5C
+name = "ClipAndSubmitNearTexturedQuad"
+emit = false
+status = "known"
+note = "Shared renderer-private tail-call function: marshal four projected vertices plus texture/material state into the 0x801E25D0 clipping workspace, call ClipAndEmitSceneryPrimitive, restore the inherited register context, and return through the original caller's ra"
 
 [[func]]
 pc = 0x80171AFC
@@ -70,7 +126,7 @@ pc = 0x80172DDC
 name = "PrepareVisibleQuadTransform"
 emit = false
 status = "known"
-note = "Single-caller transform-state adapter: installs the nested transform at input+0x44 through 0x80136078, mirrors GTE TRX/TRY/TRZ into RBK/GBK/BBK, and publishes input+0x14/+0x18/+0x1C to scratchpad 0x1F800000..08 for 0x80172E3C"
+note = "Single-caller transform-state adapter: installs the terminal transform in the input+0x44 link chain through 0x80136078, mirrors GTE TRX/TRY/TRZ into RBK/GBK/BBK, and publishes input+0x14/+0x18/+0x1C to scratchpad 0x1F800000..08 for 0x80172E3C"
 
 [[func]]
 pc = 0x80172E3C
@@ -87,6 +143,32 @@ status = "known"
 note = "Callable race-view renderer: owns the 376-byte frame at 0x8012268C, runs scene/vehicle/effects/HUD submission and display synchronization, then returns through the split epilogue at 0x801247FC; a0 is the view/player descriptor and a1/a2 are caller-supplied render context values"
 
 [[func]]
+pc = 0x8012482C
+name = "InitializeRaceRuntimeResources"
+emit = false
+status = "known"
+note = "Argument-free startup initializer called once from 0x80116128: create/configure the shared 80-byte transform object, allocate and publish race-owned work buffers of 5460/736/2880 bytes, initialize dependent race subsystems, register the 0x8016E170 callback, and publish its returned handle"
+
+[[func]]
+pc = 0x80133B64
+name = "InitializeRaceViewportState"
+emit = false
+status = "known"
+note = "Argument-free race/view initializer spanning 0x80133B64..0x80134013: initialize each 0x3A4-byte viewport record, publish the active record, rebuild global clip coefficients, assign racer-to-viewport state, and finish through the split epilogue at 0x80133F60"
+
+[[block]]
+pc = 0x80133D3C
+name = "InitializeRaceViewportAssignments"
+status = "known"
+note = "Internal fallthrough continuation of 0x80133B64, not an ABI entry; assigns viewport/player state and eventually joins the shared epilogue"
+
+[[block]]
+pc = 0x80133F60
+name = "InitializeRaceViewportStateEpilogue"
+status = "known"
+note = "Internal tail of 0x80133B64 reached by branches from both preceding generated ranges; performs final viewport mapping and restores the original 56-byte frame"
+
+[[func]]
 pc = 0x8013535C
 name = "RebuildViewportClipCoefficients"
 emit = false
@@ -99,6 +181,13 @@ name = "RebuildViewportClipCoefficientsFromScalars"
 emit = false
 status = "known"
 note = "Six-scalar signed-16 leaf used by RenderRaceFrame: performs the same seven viewport/perspective coefficient stores as 0x8013535C from caller-selected C/B/D/F/A/E inputs"
+
+[[func]]
+pc = 0x80136078
+name = "InstallLinkedRenderTransform"
+emit = false
+status = "known"
+note = "Two-caller projection/GTE setup: set H from 0x801E14F0, follow +0x44 links to the terminal transform, build MATRIX scratch at 0x1F800010 with its middle rotation row scaled by 0x801E14EC/256 and translation {0,0,0x801E14F4/2}, then install TR and rotation"
 
 [[func]]
 pc = 0x801415F4
@@ -116,10 +205,10 @@ note = "Single-caller section submitter: installs the owner transform, submits a
 
 [[func]]
 pc = 0x80142634
-name = "SceneryFrustumClip"
+name = "ClipAndEmitSceneryPrimitive"
 emit = false
 status = "confirmed"
-note = "Software clip vs 4:3 camera planes; widen blocked until gPrimCursor arena grows"
+note = "No-argument global-workspace renderer: clips a four-vertex scenery primitive against four camera side planes, interpolates geometry/UV/color attributes, triangulates the surviving polygon, and appends FT3/FT4/GT3/GT4 packets (including semitransparent variants) through gPrimCursor"
 
 [[site]]
 pc = 0x80142664

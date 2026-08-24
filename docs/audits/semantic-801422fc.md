@@ -43,10 +43,10 @@ submission descriptor.
    The value selects a signed section index from the halfword table at
    `0x801762DC` and temporarily sets corresponding low bits in
    `0x801762CC`.
-2. `0x80142364..0x8014238C` follows `submit->owner + 0x44` and calls
-   `0x80136078`.  That callee copies a nested transform into the GTE scratch
-   matrix at `0x1F800010`, confirming that this function installs the owner's
-   render transform before submission.
+2. `0x80142364..0x8014238C` loads `submit->owner + 0x44` and calls
+   `0x80136078`. That callee follows the transform's `+0x44` chain to its
+   terminal record, builds a projection-adjusted matrix at `0x1F800010`, and
+   installs it in the GTE before submission.
 3. The first list is selected from `submit->section_table` using the signed
    section index.  Its pointer is read at indexed offset `+0x20` and its signed
    count at indexed offset `+0x2C`.  `0x801423C4..0x801423F8` consumes signed

@@ -626,6 +626,12 @@ unbounded build as a performance test; use focused targets and the bounded
   psxrecomp commit `b3384250`. The detached exact check using this version is
   running with unbuffered durable logs under
   `artifacts/highram-background-check-spooled.*.log`.
+- The spooled run proved that synthesis itself is bounded, then was killed
+  immediately after `Static duplicate recipes removed: 5`: the unresolved
+  matcher still built an index for every aggregate variant before querying the
+  small demand set. The index now admits only the union of requested dispatch
+  addresses (`083d73cd`). A fresh exact run uses durable unbuffered logs under
+  `artifacts/highram-background-check-demanded.*.log`.
 - `0x8012268C` is the sole-called `RenderRaceFrame` owner. Its generated output
   is split, but semantic control continues through `0x8012482B`; it owns race
   scene, vehicles, effects, HUD, and display synchronization.
@@ -658,3 +664,33 @@ unbounded build as a performance test; use focused targets and the bounded
 - The previously guessed clip sites/globals are now known: one shared side-axis
   coefficient plus distinct horizontal and vertical depth coefficients,
   produced by both viewport-coefficient builders and consumed at `0x80142634`.
+- `0x80136078` is `InstallLinkedRenderTransform`: it follows `+0x44` links to
+  the terminal transform (without composing the chain), builds a
+  projection-adjusted scratch matrix, and installs GTE rotation/translation.
+- `0x8016FC28` is `DispatchPackedFacePrimitive`. It decodes the face index,
+  downstream count, and eight-way selector, installs callback words in
+  scratchpad, and tail-jumps; it does not itself emit packets.
+- `0x8016F94C` is `ProjectAndSubmitPackedFaceGroups`, processing 64-byte groups
+  through `ProjectPackedVertexPairs`, common-outcode rejection, and 24-byte
+  callback records. `ProjectPackedVertexPairs` emits an initial pair plus N
+  stepped pairs (N+1 total), correcting the earlier cardinality note.
+- `0x8016FA70` is `SubdivideAndSubmitPackedFaceStrip`; it projects adjacent
+  pairs, rejects groups/quads, and midpoint/center-subdivides accepted quads
+  into four callback submissions. `0x80170774` is its selector-3 two-level
+  counterpart, producing up to sixteen leaf submissions per source quad.
+- Address-taken callbacks `0x8016FD34` and `0x8016FEFC` are complementary
+  textured-quad triangle fans: each projects a different edge midpoint and
+  emits three FT3 packets, while `0x801700C4` emits one FT4.
+- `0x80170B5C` is `ClipAndSubmitNearTexturedQuad`, a marshal/tail-delegation
+  wrapper for the shared `ClipAndEmitSceneryPrimitive` at `0x80142634`. The
+  latter is the 8,276-byte four-plane Sutherland-Hodgman implementation with
+  XYZ/UV/color interpolation and FT3/FT4/GT3/GT4 packet paths.
+- `0x80116128` is the argument-free, non-returning `RunRaceSession`: one-time
+  race/render/audio initialization followed by the closed simulation/view/
+  render loop containing the sole `RenderRaceFrame` call.
+- `0x8012482C` is `InitializeRaceRuntimeResources`, called once by the race
+  session. It creates the shared transform, allocates/publishes three runtime
+  buffers, performs dependent initialization, and registers a callback.
+- `0x80133B64` is `InitializeRaceViewportState`; generated entries at
+  `0x80133D3C` and `0x80133F60` are internal continuation/epilogue blocks, not
+  callable functions. Its logical span continues through `0x80134013`.

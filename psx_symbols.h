@@ -12,9 +12,21 @@
 #define PSX_FN_SetSimVblankSkip 0x800EED58u
 #define func_800EED58 SetSimVblankSkip  /* alias */
 
+/* known: Sole-called non-returning race-session owner: initialize race/render/audio state, then run the closed per-frame simulation/view/render loop containing the only call to RenderRaceFrame */
+#define PSX_FN_RunRaceSession 0x80116128u
+#define func_80116128 RunRaceSession  /* alias */
+
 /* known: Callable race-view renderer: owns the 376-byte frame at 0x8012268C, runs scene/vehicle/effects/HUD submission and display synchronization, then returns through the split epilogue at 0x801247FC; a0 is the view/player descriptor and a1/a2 are caller-supplied render context values */
 #define PSX_FN_RenderRaceFrame 0x8012268Cu
 #define func_8012268C RenderRaceFrame  /* alias */
+
+/* known: Argument-free startup initializer called once from 0x80116128: create/configure the shared 80-byte transform object, allocate and publish race-owned work buffers of 5460/736/2880 bytes, initialize dependent race subsystems, register the 0x8016E170 callback, and publish its returned handle */
+#define PSX_FN_InitializeRaceRuntimeResources 0x8012482Cu
+#define func_8012482C InitializeRaceRuntimeResources  /* alias */
+
+/* known: Argument-free race/view initializer spanning 0x80133B64..0x80134013: initialize each 0x3A4-byte viewport record, publish the active record, rebuild global clip coefficients, assign racer-to-viewport state, and finish through the split epilogue at 0x80133F60 */
+#define PSX_FN_InitializeRaceViewportState 0x80133B64u
+#define func_80133B64 InitializeRaceViewportState  /* alias */
 
 /* known: Argument-free 408-byte leaf: select six display/FOV scalars with 0x80173B00, derive viewport and perspective clip coefficients, and write 0x801E14EC/14F0/14F4/2480/2484/2488/25CC */
 #define PSX_FN_RebuildViewportClipCoefficients 0x8013535Cu
@@ -24,6 +36,10 @@
 #define PSX_FN_RebuildViewportClipCoefficientsFromScalars 0x80135B8Cu
 #define func_80135B8C RebuildViewportClipCoefficientsFromScalars  /* alias */
 
+/* known: Two-caller projection/GTE setup: set H from 0x801E14F0, follow +0x44 links to the terminal transform, build MATRIX scratch at 0x1F800010 with its middle rotation row scaled by 0x801E14EC/256 and translation {0,0,0x801E14F4/2}, then install TR and rotation */
+#define PSX_FN_InstallLinkedRenderTransform 0x80136078u
+#define func_80136078 InstallLinkedRenderTransform  /* alias */
+
 /* known: Single-caller non-leaf: updates active bits on 28-byte object records, prepares the GTE view transform, compacts visible oriented quads through 0x80172E3C, and emits 40-byte GPU POLY_FT4 packets into the current OT */
 #define PSX_FN_BuildVisibleObjectQuadPackets 0x801415F4u
 #define func_801415F4 BuildVisibleObjectQuadPackets  /* alias */
@@ -32,13 +48,33 @@
 #define PSX_FN_SubmitSceneSectionFaces 0x801422FCu
 #define func_801422FC SubmitSceneSectionFaces  /* alias */
 
-/* confirmed: Software clip vs 4:3 camera planes; widen blocked until gPrimCursor arena grows */
-#define PSX_FN_SceneryFrustumClip 0x80142634u
-#define func_80142634 SceneryFrustumClip  /* alias */
+/* confirmed: No-argument global-workspace renderer: clips a four-vertex scenery primitive against four camera side planes, interpolates geometry/UV/color attributes, triangulates the surviving polygon, and appends FT3/FT4/GT3/GT4 packets (including semitransparent variants) through gPrimCursor */
+#define PSX_FN_ClipAndEmitSceneryPrimitive 0x80142634u
+#define func_80142634 ClipAndEmitSceneryPrimitive  /* alias */
 
 /* confirmed: Exact PS-X EXE header entry; two-instruction non-returning trampoline to the expansion-RAM startup loader at 0x800D03B8, not the CRT initialization body */
 #define PSX_FN_PsxExeEntryTrampoline 0x80162474u
 #define func_80162474 PsxExeEntryTrampoline  /* alias */
+
+/* known: Renderer-private tail target of 0x8016FC28: for 1..8 consecutive 64-byte face records, project packed vertex pairs through 0x80170254, reject a shared-outcode group, then invoke the scratchpad-selected primitive callback for each 24-byte subrecord and preserve the updated renderer cursors */
+#define PSX_FN_ProjectAndSubmitPackedFaceGroups 0x8016F94Cu
+#define func_8016F94C ProjectAndSubmitPackedFaceGroups  /* alias */
+
+/* known: Renderer-private callback selected by packed-face modes 2, 4, and 5: expand each consecutive 64-byte face record into a projected strip of adjacent vertex pairs, trivial-reject it, split every pair-to-pair quad into four children, and submit those children through the two scratchpad-selected primitive callbacks */
+#define PSX_FN_SubdivideAndSubmitPackedFaceStrip 0x8016FA70u
+#define func_8016FA70 SubdivideAndSubmitPackedFaceStrip  /* alias */
+
+/* known: Single-caller tail dispatcher: decode a packed face descriptor into a low-10-bit face index, a 1..8 downstream count, and an 8-way renderer/helper-table selection; publish four private callbacks in scratchpad and tail-jump to the selected primitive renderer without emitting a GPU packet itself */
+#define PSX_FN_DispatchPackedFacePrimitive 0x8016FC28u
+#define func_8016FC28 DispatchPackedFacePrimitive  /* alias */
+
+/* known: Renderer-private callback: common-outcode reject four projected vertices; delegate near geometry to the shared textured-quad clipper, otherwise midpoint-project one edge and OT-link three consecutive 32-byte textured-triangle packets */
+#define PSX_FN_SubmitTexturedQuadTriangleFan 0x8016FD34u
+#define func_8016FD34 SubmitTexturedQuadTriangleFan  /* alias */
+
+/* known: Address-taken renderer-private sibling of 0x8016FD34: reject a common-outcode quad, use the shared near clipper below depth 125, or midpoint-project the first input edge and OT-link three consecutive 32-byte textured-triangle packets */
+#define PSX_FN_SubmitTexturedQuadFirstEdgeFan 0x8016FEFCu
+#define func_8016FEFC SubmitTexturedQuadFirstEdgeFan  /* alias */
 
 /* known: Callable leaf with a renderer-private register ABI: trivial-reject four projected vertices, emit/OT-link a POLY_FT4 when all depths >= 125, otherwise tail-transfer to the shared near clipper at 0x80170B5C */
 #define PSX_FN_SubmitTexturedQuad 0x801700C4u
@@ -52,6 +88,14 @@
 #define PSX_FN_BuildProjectQuadMidpoints 0x801704F0u
 #define func_801704F0 BuildProjectQuadMidpoints  /* alias */
 
+/* known: Renderer-private tail target selected only by packed-face mode 3: project each adjacent-pair quad, perform two midpoint/center subdivision levels, and submit up to sixteen leaf quads through the scratchpad-selected callbacks */
+#define PSX_FN_SubdivideTwiceAndSubmitPackedFaceStrip 0x80170774u
+#define func_80170774 SubdivideTwiceAndSubmitPackedFaceStrip  /* alias */
+
+/* known: Shared renderer-private tail-call function: marshal four projected vertices plus texture/material state into the 0x801E25D0 clipping workspace, call ClipAndEmitSceneryPrimitive, restore the inherited register context, and return through the original caller's ra */
+#define PSX_FN_ClipAndSubmitNearTexturedQuad 0x80170B5Cu
+#define func_80170B5C ClipAndSubmitNearTexturedQuad  /* alias */
+
 /* known: Shared body tail-entered by 0x80171AD8/AE4/AF4: transform mesh vertices, pack clip codes, reject/cull primitives, emit GPU packets, and OT-link by depth; v0 is an extra OT selector */
 #define PSX_FN_TransformAndSubmitMeshPrimitives 0x80171AFCu
 #define func_80171AFC TransformAndSubmitMeshPrimitives  /* alias */
@@ -60,7 +104,7 @@
 #define PSX_FN_SubdivideAndSubmitMeshPrimitives 0x801727E8u
 #define func_801727E8 SubdivideAndSubmitMeshPrimitives  /* alias */
 
-/* known: Single-caller transform-state adapter: installs the nested transform at input+0x44 through 0x80136078, mirrors GTE TRX/TRY/TRZ into RBK/GBK/BBK, and publishes input+0x14/+0x18/+0x1C to scratchpad 0x1F800000..08 for 0x80172E3C */
+/* known: Single-caller transform-state adapter: installs the terminal transform in the input+0x44 link chain through 0x80136078, mirrors GTE TRX/TRY/TRZ into RBK/GBK/BBK, and publishes input+0x14/+0x18/+0x1C to scratchpad 0x1F800000..08 for 0x80172E3C */
 #define PSX_FN_PrepareVisibleQuadTransform 0x80172DDCu
 #define func_80172DDC PrepareVisibleQuadTransform  /* alias */
 
