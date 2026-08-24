@@ -164,6 +164,10 @@
 #define PSX_FN_DrawSignedDecimalInteger 0x80110560u
 #define func_80110560 DrawSignedDecimalInteger  /* alias */
 
+/* confirmed: Exact 0x11C-byte four-caller frontend POLY_F4 allocator: reserve 24 bytes from gPrimCursor, initialize SetPolyF4 and caller-selected semitransparency, store four signed-halfword XY pairs and RGB bytes, and return the unlinked packet pointer; no interior target or duplicate */
+#define PSX_FN_AllocatePolyF4Packet 0x801106D0u
+#define func_801106D0 AllocatePolyF4Packet  /* alias */
+
 /* confirmed: Exact 0xA8-byte eight-caller GPU-state emitter: reserve a 12-byte DR_MODE at gPrimCursor, compute TPAGE from caller ABR with tp/x/y zero, build mode with DFE=1 and caller DTD, then prepend the packet to the active ordering-table bucket at signed depth>>6 */
 #define PSX_FN_EmitDrawModePacketToOrderingTable 0x801107ECu
 #define func_801107EC EmitDrawModePacketToOrderingTable  /* alias */
