@@ -2788,3 +2788,19 @@ do not reuse the rejected pre-A/B state or start a second process.
   user pair is plain-PAL), verify in-race/menu UI and FMV transition on PAL8,
   and publish only exact PAL8 path overlays. Keep `PSX_REWIND=0` for all
   performance comparisons. Do not run two exact candidates concurrently.
+
+## PAL8 follow-up guard and live readiness (2026-08-24)
+
+- The canonical non-PGXP PAL8 base was relaunched with `--no-launcher`, an
+  absolute SCPH-1001 BIOS, the isolated `saves-pal8-20260824` directory, and
+  `PSX_REWIND=0`. It restored the PAL8 attract state at
+  `pc=0x80101E64` and remained responsive at roughly `99.5 Hz` / `44.1 kHz`
+  with zero audio underruns or overflows.
+- No PAL8 slot 1 or slot 2 state exists yet. Do not use the plain-PAL
+  `saves/scph1001` pair as PAL8 evidence; fresh PAL8 race-start and replay
+  states remain the required interactive coverage.
+- A forward declaration added for the exact static-overlay watch made
+  `test_dirty_text_continuation_guards.py` slice the declaration instead of
+  `dirty_ram_reset_for_boot()`. The guard now anchors its terminator after the
+  reset implementation (`psxrecomp` commit `3e81ca00`). All five structural
+  guards and eight focused runtime tests pass.
