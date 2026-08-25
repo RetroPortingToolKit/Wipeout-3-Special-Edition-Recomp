@@ -19,11 +19,14 @@
   savestate generation, but its diagnostic build reports severe underruns and
   is not valid performance evidence; use the Release binary for the final
   cadence/audio gate.
-- The debug protocol accepts a load of `state_80162474_slot07.pst`, but both
-  `screenshot_hires` and presented screenshot return `display disabled` after
-  that restore. This is an explicit visual-verification failure/compatibility
-  issue, not evidence that slot 7 is good; investigate state/display restore
-  before completion.
+- The apparent slot-7 `display disabled` result was traced to the debug build
+  rejecting the canonical state before restore: the file carries codegen hash
+  `36F5848C`/ABI 21/codegen 10, while the rebuilt runtime requires
+  `CB7B7863`/ABI 22/codegen 11. The debug command still returned a request
+  receipt, which made this look like a display bug. The serializer correctly
+  rejects stale snapshots; do not weaken that integrity guard. A compatible
+  slot-7 state must be recreated with the current integrated build before the
+  final load/visual gate can pass.
 
 ## Current verified position
 
