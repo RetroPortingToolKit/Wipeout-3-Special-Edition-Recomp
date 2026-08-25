@@ -16,6 +16,11 @@
   (`ok=true`, one candidate, no errors); the only warning is a stale crash
   report from an earlier run.
 
+- After the BIOS-wait watchdog correction and release rebuild, a fresh 15-second
+  slot-11 race soak held 98.5–101.4 FPS at PAL x2/100 Hz with no audio/CD or
+  freeze lines. The freeze-dump directory contains only the pre-fix BIOS-wait
+  reports; no new dump was emitted by the corrected binary.
+
 - A bounded `PSX_CPS=0` legacy-codegen A/B was rejected: after regenerating
   the game corpus and rebuilding Release, the binary exited during frame 1 at
   the BIOS/game handoff (`turbo_loads ENGAGED`) with exit code 1. The default
