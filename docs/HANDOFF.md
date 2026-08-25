@@ -36,6 +36,11 @@
   succeeded (508x256 and 2032x1024). The captured frame is a live race scene,
   proving compatible-state display restore works. Debug cadence/audio counters
   remain instrumentation-contaminated; the Release process is left running.
+- A Release run with `PSX_FPS_TELEMETRY=1` confirms PAL pacing is active but
+  records render-heavy intervals falling from roughly 90--98 FPS to roughly
+  35--47 FPS. This is direct evidence that sustained PAL-100 gameplay/audio
+  performance is still not proven; do not call the slow-motion gate complete
+  from the initial 100-Hz intervals.
 
 ## Current verified position
 
