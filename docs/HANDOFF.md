@@ -28,6 +28,15 @@
   slot-7 state must be recreated with the current integrated build before the
   final load/visual gate can pass.
 
+## Compatible-state runtime probe — 2026-08-25
+
+- To test the current format without touching the user's slot 7, the fresh
+  Release build saved unused slot 11. A current-source debug build loaded that
+  slot with `last_ok=1`, generation 1, and native/supersampled screenshots
+  succeeded (508x256 and 2032x1024). The captured frame is a live race scene,
+  proving compatible-state display restore works. Debug cadence/audio counters
+  remain instrumentation-contaminated; the Release process is left running.
+
 ## Current verified position
 
 ### Clean semantic-decomp pause — 2026-08-24
