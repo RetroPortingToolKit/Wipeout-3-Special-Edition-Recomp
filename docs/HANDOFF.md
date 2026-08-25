@@ -73,6 +73,12 @@
   intervals. This confirms disabling PAL-100 alone does not solve every stall;
   the canonical feature state has been restored afterward.
 
+The earlier 35–55 FPS measurements above used the former
+`cpu_overclock=900` configuration. They are superseded for the current release
+by the controlled `cpu_overclock=200` soak recorded at the top of this file:
+the same compatible race state sustains approximately 100 FPS with the PAL x2
+CRTC and no observed audio/CD error lines.
+
 ## Current verified position
 
 ### Clean semantic-decomp pause — 2026-08-24
