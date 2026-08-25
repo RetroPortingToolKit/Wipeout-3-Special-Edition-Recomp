@@ -56,7 +56,7 @@ idle_skip = true
 renderer = "opengl"
 # Hueponik's MAX-detail path requires the GooseStation-equivalent 900% CPU
 # overclock; PAL x2 remains a separate CRTC/presentation setting.
-cpu_overclock = 900
+cpu_overclock = 200
 # PGXP is intentionally off for WipEout 3 SE. Its recovered geometry is
 # visibly incorrect in races; retain the native GTE/GPU path until title-
 # specific validation proves otherwise.

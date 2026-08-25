@@ -2,6 +2,14 @@
 
 ## Runtime correction checkpoint — 2026-08-25
 
+- A controlled CPU-overclock A/B found the gameplay-speed regression: with the
+  canonical PAL x2/100-Hz path and compatible slot 11, `cpu_overclock=900`
+  sustained only about 35–44 FPS, `400` about 74–95 FPS, while `200` held
+  approximately 99.6–101.2 FPS (1.00x) across the race soak. The 200 setting
+  is now canonical; the run selected PAL x2 at 100.000 Hz and produced no
+  audio/CD error lines. This fixes pacing without enabling turbo or changing
+  the HD renderer path.
+
 - A bounded `PSX_CPS=0` legacy-codegen A/B was rejected: after regenerating
   the game corpus and rebuilding Release, the binary exited during frame 1 at
   the BIOS/game handoff (`turbo_loads ENGAGED`) with exit code 1. The default
