@@ -1,5 +1,19 @@
 # WipEout 3 SE refactor handoff
 
+## Runtime correction checkpoint — 2026-08-25
+
+- The documented Fast Loading path was disabled in `mods/state.toml`. The
+  existing audit evidence showed this accelerated path causing audio underruns
+  and cadence loss; it must not be enabled by default while the PAL gameplay
+  path is being validated.
+- The canonical Release tree was reconfigured after regeneration (the prior
+  Ninja manifest referenced stale generated shards), rebuilt successfully, and
+  produced a fresh `Wipeout_3_Special_Edition__Recompiled.exe` at 03:44:53.
+- The fresh executable launches to the WipEout launcher and opens a sane
+  501x426 launcher window. Full in-game slot-7/audio/cadence visual proof is
+  still the next required checkpoint; do not claim the deliverable complete
+  from launcher startup alone.
+
 ## Current verified position
 
 ### Clean semantic-decomp pause — 2026-08-24

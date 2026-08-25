@@ -32,7 +32,7 @@ enabled = true
 [[feature]]
 package_id = "psx.enhancement.fast-loading"
 id = "fast-loading"
-enabled = true
+enabled = false
 [feature.values]
 multiplier = "4"
 uncapped = "false"
