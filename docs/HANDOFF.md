@@ -41,6 +41,12 @@
   35--47 FPS. This is direct evidence that sustained PAL-100 gameplay/audio
   performance is still not proven; do not call the slow-motion gate complete
   from the initial 100-Hz intervals.
+- A current-source Clang ThinLTO Release A/B on compatible race slot 11
+  improved the measured range only to roughly 35--55 FPS. A controlled run at
+  1x supersampling with HD replacements disabled remained about 44--55 FPS.
+  The limiter is therefore not solved by link optimization or HD presentation
+  scale alone; retain the no-LTO Release binary as the canonical run until a
+  guest/runtime hot-path fix is validated.
 
 ## Current verified position
 
