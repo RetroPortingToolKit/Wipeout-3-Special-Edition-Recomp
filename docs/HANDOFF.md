@@ -2,6 +2,13 @@
 
 ## Runtime correction checkpoint — 2026-08-25
 
+- A bounded `PSX_CPS=0` legacy-codegen A/B was rejected: after regenerating
+  the game corpus and rebuilding Release, the binary exited during frame 1 at
+  the BIOS/game handoff (`turbo_loads ENGAGED`) with exit code 1. The default
+  CPS corpus was regenerated and the canonical no-LTO Release was rebuilt;
+  legacy codegen is not a viable speed fix and must not replace the current
+  runtime path.
+
 - The documented Fast Loading path was disabled in `mods/state.toml`. The
   existing audit evidence showed this accelerated path causing audio underruns
   and cadence loss; it must not be enabled by default while the PAL gameplay
