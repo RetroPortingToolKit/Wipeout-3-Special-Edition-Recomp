@@ -47,6 +47,12 @@
   The limiter is therefore not solved by link optimization or HD presentation
   scale alone; retain the no-LTO Release binary as the canonical run until a
   guest/runtime hot-path fix is validated.
+- The current debug phase profiler localizes approximately 46% of static guest
+  wall samples to `ClipAndEmitSceneryPrimitive` (`0x80142634`), the confirmed
+  four-plane Sutherland--Hodgman scenery clipper. A ThinLTO race A/B with the
+  existing `precise_nclip=false` switch changed the measured range only to
+  about 38--57 FPS, so that switch is not an adequate fix; canonical config
+  remains unchanged and the Release binary is running.
 - A PAL-x1 control run with the PAL-100 feature disabled correctly selected
   50-Hz pacing, but still showed intermittent 26--43 FPS render-heavy title
   intervals. This confirms disabling PAL-100 alone does not solve every stall;
