@@ -19,6 +19,11 @@
   savestate generation, but its diagnostic build reports severe underruns and
   is not valid performance evidence; use the Release binary for the final
   cadence/audio gate.
+- The debug protocol accepts a load of `state_80162474_slot07.pst`, but both
+  `screenshot_hires` and presented screenshot return `display disabled` after
+  that restore. This is an explicit visual-verification failure/compatibility
+  issue, not evidence that slot 7 is good; investigate state/display restore
+  before completion.
 
 ## Current verified position
 
