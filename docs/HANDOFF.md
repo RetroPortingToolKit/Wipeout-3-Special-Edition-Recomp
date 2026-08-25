@@ -13,6 +13,12 @@
   501x426 launcher window. Full in-game slot-7/audio/cadence visual proof is
   still the next required checkpoint; do not claim the deliverable complete
   from launcher startup alone.
+- A no-launcher launch of the fresh Release executable remains responsive for
+  a 20-second soak and opens at 1669x972 on the current desktop. The debug
+  build can load the user's `state_80162474_slot07.pst` and advances the
+  savestate generation, but its diagnostic build reports severe underruns and
+  is not valid performance evidence; use the Release binary for the final
+  cadence/audio gate.
 
 ## Current verified position
 
