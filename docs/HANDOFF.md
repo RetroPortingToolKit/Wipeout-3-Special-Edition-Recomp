@@ -10,6 +10,12 @@
   audio/CD error lines. This fixes pacing without enabling turbo or changing
   the HD renderer path.
 
+- The read-only runtime verifier initially rejected a release launch with no
+  explicit memcard path. Relaunching with `--memcard-dir` pointed at the
+  repository `saves` directory and compatible slot 11 passes the verifier
+  (`ok=true`, one candidate, no errors); the only warning is a stale crash
+  report from an earlier run.
+
 - A bounded `PSX_CPS=0` legacy-codegen A/B was rejected: after regenerating
   the game corpus and rebuilding Release, the binary exited during frame 1 at
   the BIOS/game handoff (`turbo_loads ENGAGED`) with exit code 1. The default
