@@ -1,8 +1,11 @@
 # Reliable widescreen replacement plan
 
-Status: proposed for execution after user approval  
-Build mode: autonomous, with evidence recorded at every gate  
-Primary scope: reliable 4:3/16:9/21:9 presentation with PGXP disabled  
+Status: proposed for execution after user approval
+
+Build mode: autonomous, with evidence recorded at every gate
+
+Primary scope: reliable 4:3/16:9/21:9 presentation with PGXP disabled
+
 Delivery: a new replacement PR; existing PR #7 is reference material only
 
 ## Goal
