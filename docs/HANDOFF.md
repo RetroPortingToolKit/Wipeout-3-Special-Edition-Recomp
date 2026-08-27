@@ -2,12 +2,18 @@
 
 ## Reliable-widescreen checkpoint — 2026-08-27
 
-- The repeated renderer regression was a source-pairing regression, not a new
-  PGXP failure.  The widescreen fixes proven on 2026-08-18 in open PR #7
-  (`codex/wipeout3-ws-precision-stability`) were never merged into this local
-  `master`, while recent builds mixed current generated game code with other
-  runtime trees.  The resulting candidates did not contain one coherent set
-  of title cull patches, exact-sign NCLIP consumers, and present behavior.
+- Open PR #7 (`codex/wipeout3-ws-precision-stability`) is a forensic reference,
+  not the desired product state.  It predates substantial current work (the
+  present/layout path, mod packaging and PAL100 work, savestate fixes, current
+  generated corpus, native-overlay work, and texture-pack/runtime changes), is
+  conflicting, and must not be merged or used as the build base.  Its useful
+  inputs were isolated and tested on the current integrated tree instead.
+- Four ideas from PR #7 remain useful: bounded horizontal cull widening,
+  plane-NX scenery clip widening, the type-4 billboard GTE-FLAG rejection, and
+  exact-sign NCLIP at known title branches.  The old global precise-MAC0
+  behavior was not retained.  Current runtime commit `fed7568f` makes precise
+  NCLIP observational except at configured branch consumers, preserving the
+  guest-visible integer MAC0 semantics added by the newer runtime.
 - The reliable baseline now deliberately leaves all PGXP visual features off:
   `geometry_correction`, `perspective_texturing`, `pgxp_depth`, and
   `pgxp_cpu_mode` are false.  Widescreen is tested independently of PGXP.
@@ -24,8 +30,8 @@
   `b9d48...`, although the size matches.  Do not silently replace the expected
   disc identity; determine whether the current image is a valid alternate dump
   before making that bypass permanent.
-- A coherent nested-runtime Release build completed in
-  `build-dirty-reconcile`, and an instrumented coherent Debug build completed
+- A coherent nested-runtime Release build is current in
+  `build-dirty-reconcile`, and an instrumented coherent Debug build is current
   in `build-current-debug`.  The old slot-0 state was correctly rejected
   (`codegen_hash 4D6E95A2 != 21B21D34`, ABI 21 != 22, codegen 10 != 11), so
   visual acceptance used a fresh boot and a freshly navigated single race.
@@ -40,6 +46,27 @@
   same geometry/HUD coverage.  Durable composed captures are in
   `artifacts/widescreen-reliable-20260827/`, especially
   `restart-t4.png`, `race-motion-3s.png`, and `race-21x9-exact.png`.
+- A second fresh race on Altima VII passed the same current-tree checks.  The
+  16:9 live frame has the craft, track, stadium lights, signs and HUD intact
+  (`altima16-live.png`).  Exact 21:9 remains intact with margin 184 and the
+  expected approximately 4/7 squash (`altima21-exact.png`).  Resizing to 4:3
+  correctly disables widescreen (`active=0`, margin 0, squash 1/1) and produces
+  a centered native frame (`altima4x3.png`).  This covers two tracks plus the
+  native-aspect fallback with PGXP still disabled.
+- Fresh current-format slot 10 was saved at
+  `saves/scph1001/state_80162474_slot10.pst`.  Release loaded it successfully
+  (`resuming pc=0x8015C354`) via `PSX_LOAD_SLOT=10`; a bounded 16-second sample
+  then held 100.0 Hz after an initial 100.7-Hz interval, with PAL x2 explicitly
+  programmed at 100.000 Hz.  The receipt is
+  `artifacts/widescreen-reliable-20260827/release-slot10-final.{out,err}.log`.
+  The slower instrumented Debug numbers are therefore diagnostic overhead,
+  not a Release pacing regression.
+- OS-level Release capture was verified with `PrintWindow` against the exact
+  emulator HWND because another full-screen application prevented foreground
+  screen capture.  `release-printwindow.png` shows the full wide presentation
+  without offset bands.  It is a post-race game-over/replay camera under the
+  track, so use it only as presentation evidence, not geometry evidence; the
+  fresh live-race captures above are the geometry evidence.
 - The misleading earlier frames are now explained: authored menus and attract
   mode stay native 4:3 by design, and the apparent under-track shot was the
   post-race restart/replay camera after the unattended live race had continued
@@ -50,14 +77,19 @@
 1. The owned nested-runtime work is committed as `fed7568f` and pushed to
    `tetrisgm/psxrecomp:codex/wipeout3-reliable-widescreen-runtime`.  Preserve
    the other unstaged runtime experiments; they are not part of that commit.
-2. The root `game.toml`, gitlink, and handoff are committed locally as
-   `12642f9`.  Update or supersede PR #7 from a clean `origin/master`/PR-head
-   base by applying that commit's owned paths; do not push local `master`
-   directly because it is 220 commits ahead and 110 behind `origin/master`.
-3. Recreate a current-format race savestate for faster repeatable coverage,
-   then run at least one outdoor track and a longer 16:9/21:9 moving soak.
-4. Only after this widescreen baseline is stable should PGXP be re-enabled as
-   a separate A/B.  It is not required for this checkpoint.
+2. Root commits `12642f9` and `ccacfd8` contain the selected config/gitlink and
+   prior handoff state.  Local `master` is now 221 commits ahead and 110 behind
+   `origin/master`; do not push it or retarget PR #7.  The PR still to send is
+   a new clean branch from current `origin/master` containing only the selected
+   root paths plus the nested commit, followed by regeneration/build/tests on
+   that clean branch.  Close or supersede PR #7 only after the replacement is
+   available.
+3. Before calling the replacement PR shippable, run a longer controlled moving
+   soak (avoid leaving the race to enter replay), confirm CDDA by listening or
+   a deterministic audio-duration check, and resolve the Track 01 identity
+   mismatch instead of making `--skip-hash-check` permanent.
+4. PGXP is explicitly out of scope for the reliable-widescreen PR.  If desired,
+   re-enable it later as a separate A/B after this baseline is merged.
 
 ## Runtime correction checkpoint — 2026-08-25
 
