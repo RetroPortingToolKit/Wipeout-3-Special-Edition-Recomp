@@ -74,6 +74,11 @@
 
 ### Next concrete work
 
+The authoritative execution sequence is now
+`docs/WIDESCREEN_RELEASE_PLAN.md`.  Do not collapse its clean-baseline,
+media-identity, visual, audio, soak, or fresh-clone gates into a single legacy
+PR cherry-pick.
+
 1. The owned nested-runtime work is committed as `fed7568f` and pushed to
    `tetrisgm/psxrecomp:codex/wipeout3-reliable-widescreen-runtime`.  Preserve
    the other unstaged runtime experiments; they are not part of that commit.
