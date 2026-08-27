@@ -1,5 +1,64 @@
 # WipEout 3 SE refactor handoff
 
+## Reliable-widescreen checkpoint — 2026-08-27
+
+- The repeated renderer regression was a source-pairing regression, not a new
+  PGXP failure.  The widescreen fixes proven on 2026-08-18 in open PR #7
+  (`codex/wipeout3-ws-precision-stability`) were never merged into this local
+  `master`, while recent builds mixed current generated game code with other
+  runtime trees.  The resulting candidates did not contain one coherent set
+  of title cull patches, exact-sign NCLIP consumers, and present behavior.
+- The reliable baseline now deliberately leaves all PGXP visual features off:
+  `geometry_correction`, `perspective_texturing`, `pgxp_depth`, and
+  `pgxp_cpu_mode` are false.  Widescreen is tested independently of PGXP.
+- `game.toml` now carries the proven title-side widescreen corrections: the
+  billboard type-4 GTE-FLAG cull patch, nine exact-sign NCLIP branch sites,
+  two plane-NX sites, 34 bounded horizontal cull widens, and no unconditional
+  near-Z/submitter keep patches.  The present guard is 64 pixels.
+- The nested `psxrecomp` tree now exposes `nclip_exact_sites` end to end and
+  uses a precise NCLIP sign only for configured branches while preserving the
+  guest-visible native MAC0 value.  Focused recompiler/parser and GTE runtime
+  tests pass.
+- Regeneration with the repository's current Track 01 required
+  `--skip-hash-check`: its MD5 is `462dcf...`, not the configured
+  `b9d48...`, although the size matches.  Do not silently replace the expected
+  disc identity; determine whether the current image is a valid alternate dump
+  before making that bypass permanent.
+- A coherent nested-runtime Release build completed in
+  `build-dirty-reconcile`, and an instrumented coherent Debug build completed
+  in `build-current-debug`.  The old slot-0 state was correctly rejected
+  (`codegen_hash 4D6E95A2 != 21B21D34`, ABI 21 != 22, codegen 10 != 11), so
+  visual acceptance used a fresh boot and a freshly navigated single race.
+- Live Talon's Reach acceptance passed with the HD texture pack enabled and
+  PGXP disabled.  At 16:9 the runtime reported `ws.active=1`, `game_mode=1`,
+  `present_native_43=0`, and margin 116.  The composed frame is edge-to-edge;
+  the countdown, billboards/signs, craft, track geometry, and HUD are present,
+  with no giant black presentation bands or overbright effect quads.
+- Live adaptive 21:9 acceptance also passed after resizing the client to an
+  exact 7:3 aspect.  The runtime selected the expected approximately 4/7 GTE
+  squash and margin 184; the moving race frame remained edge-to-edge with the
+  same geometry/HUD coverage.  Durable composed captures are in
+  `artifacts/widescreen-reliable-20260827/`, especially
+  `restart-t4.png`, `race-motion-3s.png`, and `race-21x9-exact.png`.
+- The misleading earlier frames are now explained: authored menus and attract
+  mode stay native 4:3 by design, and the apparent under-track shot was the
+  post-race restart/replay camera after the unattended live race had continued
+  while diagnostics ran.  Neither is evidence of a present-coordinate bug.
+
+### Next concrete work
+
+1. The owned nested-runtime work is committed as `fed7568f` and pushed to
+   `tetrisgm/psxrecomp:codex/wipeout3-reliable-widescreen-runtime`.  Preserve
+   the other unstaged runtime experiments; they are not part of that commit.
+2. Separate the root `game.toml`, gitlink, and handoff change from the already
+   dirty root worktree, then update or supersede PR #7.  The canonical root
+   `master` is currently 219 commits ahead and 110 behind `origin/master`, so
+   do not attempt a direct master push or publish that divergent history.
+3. Recreate a current-format race savestate for faster repeatable coverage,
+   then run at least one outdoor track and a longer 16:9/21:9 moving soak.
+4. Only after this widescreen baseline is stable should PGXP be re-enabled as
+   a separate A/B.  It is not required for this checkpoint.
+
 ## Runtime correction checkpoint — 2026-08-25
 
 - A controlled CPU-overclock A/B found the gameplay-speed regression: with the
@@ -1824,3 +1883,60 @@ unbounded build as a performance test; use focused targets and the bounded
   four RGB triplets, and a flag selecting GP0 `0x38/0x3A`; 942 generated overlay
   emissions collapse to four retained calls in owner `0x80148128`, while
   `0x8014A858/0x8014A85C` are untargeted internal continuations.
+
+## Current reconciliation checkpoint (2026-08-25)
+
+- A clean current-master reconciliation lane now builds and links with freshly
+  generated main, BIOS, and 8 MiB overlay code. The upstream recompiler needed
+  an expanded-RAM parser bound and the static-overlay memo compatibility entry
+  point; those changes remain isolated in the reconciliation worktree.
+- The first visual launch is **not shippable**: 100 Hz pacing worked, but the
+  runtime showed black presentation bands, intermittent geometry, overbright
+  effect quads, and missing scene objects. The old candidate also ran CDDA at
+  the native-VBlank multiple; CDDA compensation is now in the reconciliation
+  lane, but still requires runtime verification.
+- Do not present `build-upstream-reconcile` as the deliverable until the HD
+  texture consumer, PGXP/renderer state, widescreen cull path, and CDDA timing
+  pass the visual/audio gates. No savestate is required for this audit.
+
+- 2026-08-25 visual audit: legacy regenerated 62-shard build reaches PAL x2/100 Hz and 445-entry HD pack, but live capture shows severe presentation failure (large black/gray viewport bands and intermittent geometry); 4:3 temporary config confirms issue is renderer/presentation/generated-runtime mismatch, not savestate. Do not ship this candidate.
+
+- 2026-08-25 follow-up: added video.window_width=1280 to game.toml to prevent stale tiny-drawable startup; direct launch now creates a desktop-sized window, but capture remained black before gameplay, so this is not yet accepted as the renderer fix.
+
+- 2026-08-25 renderer patch: added top-left-to-OpenGL-bottom-left viewport conversion helper in psxrecomp/runtime/src/gpu_gl_renderer.c and routed present/interpolation/edge-fill viewport calls through it. Live captures showed content pinned to lower window band; rebuild was started but CMake generated-source verification did not complete within bounded command window, so runtime verification remains pending.
+
+- 2026-08-25 layout investigation: disabling widescreen and supersampling did not remove the clipped/offset frame, so the defect is upstream of aspect selection (present source/guest display-band mapping). Speculative viewport-origin patch was reverted. Build verifier currently reruns endlessly because its custom target emits no output stamp; existing executable remains pre-instrumentation.
+
+- 2026-08-25 instrumented present_vram: runtime reports drawable=3727x2109 and a valid centered 16:9 content rect 457,0 2812x2109; first guest source was 256x240. This means the viewport math is not the source of the observed crop; the boot/game is still in a 256-wide display mode when captured. Removed instrumentation. Need capture after authenticated menu/race state (slot 7 is available) before changing renderer.
+### 2026-08-25 — removed CPU overclock regression
+
+The controlled runtime launch was reporting 100 FPS at 1.67x and CD audio was
+audibly too fast. The root `game.toml` had `cpu_overclock = 200`, which is not
+needed for PAL100 pacing and advances guest timing independently of the display.
+It is now `cpu_overclock = 100`; PAL100 remains provided by the framerate mod.
+The current dirty reconcile executable was launched against this config and
+entered the normal PAL pacing path. Visual race verification is still pending;
+the earlier slot-7 captures were loading screens, not race frames.
+
+### 2026-08-25 — continuation checkpoint after Codex task failure
+
+- The previous Codex task ended with repeated generic `Bad Request` failures.
+  Local history shows a roughly 315 MB / 15,000-event conversation with
+  repeated compactions; the failures are attributed to stale or invalid
+  compacted task state, not to the game executable or repository. Continue in
+  a fresh task and do not attempt to recover that conversation state.
+- The stray Windows “select an app to open sqlite-readonly” dialog was caused
+  by invoking the extensionless diagnostic helper directly. The valid form is
+  `python C:\Users\Shokunin\dev\stack\bin\sqlite-readonly ...`; no repository
+  or game files were changed by the mistaken invocation.
+- Immediate engineering next step: inspect the current dirty reconciliation
+  state, then perform one bounded rebuild using a path that bypasses the custom
+  generated-source verifier’s endless no-output-stamp rerun.
+- Launch the rebuilt executable with the authenticated menu/race save (slot 7)
+  and wait for an actual race frame. Capture native and high-resolution output
+  plus runtime logs; boot/loading frames showing a 256x240 guest source are not
+  visual evidence.
+- Only after a valid race capture compare against the known-good build and
+  repair the HD/PGXP renderer consumer path, culling, presentation, and CDDA
+  pacing as indicated. Do not ship `build-upstream-reconcile` until the visual
+  and audio gates pass.
