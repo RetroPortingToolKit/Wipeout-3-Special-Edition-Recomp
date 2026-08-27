@@ -50,10 +50,10 @@
 1. The owned nested-runtime work is committed as `fed7568f` and pushed to
    `tetrisgm/psxrecomp:codex/wipeout3-reliable-widescreen-runtime`.  Preserve
    the other unstaged runtime experiments; they are not part of that commit.
-2. Separate the root `game.toml`, gitlink, and handoff change from the already
-   dirty root worktree, then update or supersede PR #7.  The canonical root
-   `master` is currently 219 commits ahead and 110 behind `origin/master`, so
-   do not attempt a direct master push or publish that divergent history.
+2. The root `game.toml`, gitlink, and handoff are committed locally as
+   `12642f9`.  Update or supersede PR #7 from a clean `origin/master`/PR-head
+   base by applying that commit's owned paths; do not push local `master`
+   directly because it is 220 commits ahead and 110 behind `origin/master`.
 3. Recreate a current-format race savestate for faster repeatable coverage,
    then run at least one outdoor track and a longer 16:9/21:9 moving soak.
 4. Only after this widescreen baseline is stable should PGXP be re-enabled as
