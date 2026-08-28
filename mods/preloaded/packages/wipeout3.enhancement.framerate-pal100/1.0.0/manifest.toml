@@ -1,0 +1,29 @@
+format_version = 5
+id = "wipeout3.enhancement.framerate-pal100"
+version = "1.0.0"
+name = "WipEout 3 PAL x2 / 100 Hz host"
+author = "WipEout 3 SE refactor"
+description = "Pairs the declarative PAL title transform with a 100 Hz host CRTC and pacer. Enable wipeout3.enhancement.framerate with build=pal alongside this hook."
+license = "Project integration; the title transform remains attributed to hueponik."
+resolver = "declarative"
+save_compatibility = "isolated"
+
+[[dependency]]
+id = "wipeout3.enhancement.framerate"
+version = "^1.0.14"
+
+[[target]]
+game_id = "SCES-02845"
+disc_sha256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
+exe_sha256 = "0213f5292fa1d995ebe61f42d5dbdb6614e481cb3840ac5f1521c2dfdccc0a4d"
+
+[[feature]]
+id = "framerate-pal100"
+name = "PAL x2 100 Hz host"
+description = "Doubles the programmed PAL CRTC and selects a 100 Hz native host cadence."
+group = "Gameplay"
+default_enabled = false
+
+[[plugin]]
+feature = "framerate-pal100"
+id = "wipeout3.framerate.pal-x2"
