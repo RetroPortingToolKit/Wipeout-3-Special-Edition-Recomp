@@ -9,7 +9,6 @@ save_compatibility = "shared"
 
 [[target]]
 game_id = "SCES-02845"
-disc_sha256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
 
 [[feature]]
 id = "widescreen"
