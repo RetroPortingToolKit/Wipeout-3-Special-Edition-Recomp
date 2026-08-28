@@ -1,0 +1,2 @@
+psxrecomp: runtime cadence: guest=100.00 Hz, spu=44100.0 Hz, cdda=44100.0 Hz
+psxrecomp: no title-owned progression window was observed

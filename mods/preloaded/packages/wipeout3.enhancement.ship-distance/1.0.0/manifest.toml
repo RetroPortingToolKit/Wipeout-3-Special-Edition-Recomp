@@ -1,0 +1,50 @@
+format_version = 5
+id = "wipeout3.enhancement.ship-distance"
+version = "1.0.0"
+name = "Ship Distance"
+author = "WipEout 3 SE Recomp"
+description = "Direct-native Hueponik ship-distance choices on the authenticated stock title; defaults to 65K."
+license = "Project integration; option semantics recovered from hueponik's published patch."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SCES-02845"
+disc_sha256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
+exe_sha256 = "0213f5292fa1d995ebe61f42d5dbdb6614e481cb3840ac5f1521c2dfdccc0a4d"
+
+[[feature]]
+id = "ship-distance"
+name = "Ship Distance"
+description = "Select Hueponik's exact 8 MB ship visibility profile."
+group = "Graphics"
+default_enabled = true
+
+[[option]]
+feature = "ship-distance"
+id = "distance"
+label = "Ship distance"
+description = "65K is Hueponik's maximum 8 MB profile."
+group = "Graphics"
+type = "choice"
+default = "65k"
+
+[[option.choice]]
+value = "stock"
+label = "Stock"
+[[option.choice]]
+value = "24k"
+label = "24K"
+[[option.choice]]
+value = "40k"
+label = "40K"
+[[option.choice]]
+value = "52k"
+label = "52K"
+[[option.choice]]
+value = "65k"
+label = "65K"
+
+[[plugin]]
+feature = "ship-distance"
+id = "wipeout3.enhancement.ship-distance"

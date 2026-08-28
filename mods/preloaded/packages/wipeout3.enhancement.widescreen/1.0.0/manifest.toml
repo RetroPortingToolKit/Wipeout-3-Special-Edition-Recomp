@@ -16,7 +16,7 @@ id = "widescreen"
 name = "Widescreen (Experimental)"
 description = "Enable WipEout 3's experimental widescreen rendering and choose a fixed or resize-driven aspect."
 group = "Display"
-default_enabled = false
+default_enabled = true
 
 [[option]]
 feature = "widescreen"
@@ -71,3 +71,7 @@ when = { aspect = "32:9" }
 feature = "widescreen"
 id = "wipeout3.widescreen.adaptive"
 when = { aspect = "adaptive" }
+
+[[plugin]]
+feature = "widescreen"
+id = "wipeout3.widescreen.billboard-type4-cull"

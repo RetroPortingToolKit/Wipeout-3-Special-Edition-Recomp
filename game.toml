@@ -33,39 +33,59 @@ known_crc32 = [
 seeds = "seeds/ghidra_funcs.txt"
 out_dir = "generated"
 strict = true
-# SimVblankGate: framerate package forces gSimVblankSkip=2 on entry (AOT cadence).
-mod_function_entry_funcs = ["0x800EDFC8"]
+mod_instruction_sites = [
+  "0x800EE290", "0x800EEBF0", "0x800E99C4",
+  "0x800E99D8", "0x800E9A04", "0x801234C0", "0x801234C4",
+  "0x801234DC", "0x801234E8", "0x801234F8", "0x800E4640",
+  "0x800E4650", "0x800E4660", "0x801192E4",
+  "0x8010D8E4",
+  "0x800E2D40", "0x800E2F38", "0x800E2FBC", "0x800E2FE4",
+  "0x800E37F4", "0x800E3860", "0x800E4580", "0x800E45FC",
+  "0x800E460C", "0x800E4628", "0x800E4880", "0x800E4894",
+  "0x800F15DC", "0x800F1D18", "0x80119FC4", "0x8011A010",
+  "0x8011A040", "0x8011A048", "0x8011C2DC", "0x8011DD7C",
+  "0x801234F0", "0x80124AE8", "0x801396CC", "0x8013A600",
+  "0x8013BED0", "0x8013BED8", "0x8013BEE0", "0x8013BEF0",
+  "0x80154088", "0x80159070", "0x80159078", "0x8015908C",
+  "0x80159094", "0x801590A4", "0x801590AC",
+  # Authenticated raw-rate -> private half-phase consumers.
+  "0x800E2F0C", "0x800E4718", "0x800E4760", "0x800E5110",
+  "0x800E73DC", "0x800EFA30", "0x800F0078", "0x800F01B0",
+  "0x800F1DA4", "0x8011A3A8", "0x8011A984", "0x801280AC",
+  "0x80128390", "0x8014CD44", "0x8014EA2C", "0x801505BC",
+  "0x80150950", "0x80151568", "0x80151C44", "0x80151C8C",
+  "0x8015242C", "0x801531D0", "0x801531F4", "0x80153960",
+  "0x80153984", "0x80153E34", "0x80153E98", "0x80153F38",
+  "0x80153F90", "0x8015404C", "0x80154A58", "0x80154E64",
+  "0x801587C8", "0x801589E0", "0x80158CDC", "0x80159224",
+  "0x80159B3C", "0x8015AA88", "0x8015BB74", "0x8015BB98",
+  # Remaining authenticated fixed-selector formula/owner blocks.
+  "0x800E39D4", "0x800E3BB4", "0x800E484C", "0x8011A0BC",
+  "0x8011A0C4", "0x8011A12C", "0x8011A134", "0x8011A650",
+  "0x8012BBF4",
+  # Direct Hueponik visual selectors (stock words remain in RAM and AOT).
+  "0x80130A20",
+  "0x8013085C", "0x8013086C", "0x801308E4", "0x801308FC",
+  "0x80130A0C", "0x80152974", "0x800FA224",
+  # Native type-4 billboard FLAG rejection for widescreen.
+  "0x8013AD58", "0x8013AD6C", "0x8013AD70", "0x8013AD74",
+  # Skip only the five authenticated intro-player JALs. The five earlier
+  # file-table scans remain stock so their LBA initialization is preserved.
+  "0x80100390", "0x80100398", "0x801163C0", "0x801163C8",
+  "0x801163D0", "0x801422F4",
+  # Direct Hueponik title-side 8 MiB handshake.
+  "0x8014BAD0", "0x8015FA80",
+]
 
-# The type-4 billboard path omitted the GTE FLAG rejection used by its three
-# siblings. Wide projection exposes its saturated +/-1024 rail coordinates as
-# giant gray wedges; mirror the sibling mask in otherwise dead instructions.
-[[recompiler.patch]]
-id = "billboard-type4-flag-cull-read"
-address = "0x8013AD58"
-expected = "0x00000000"
-replacement = "0x484DF800"
-note = "cfc2 t5,FLAG after the type-4 RTPS"
+# Fixed-selector PAL100 keeps the authenticated guest text image stock. All
+# exact instruction replacements and all formula/scheduler blocks are trusted
+# instruction-site callbacks. This prevents generated-AOT/RAM mismatches from
+# arming the dirty-code interpreter while still rejecting non-stock words at
+# each replacement callback.
 
-[[recompiler.patch]]
-id = "billboard-type4-flag-cull-mask-hi"
-address = "0x8013AD6C"
-expected = "0x3C031F80"
-replacement = "0x3C038046"
-note = "lui v1,0x8046, matching the sibling reject mask"
-
-[[recompiler.patch]]
-id = "billboard-type4-flag-cull-and"
-address = "0x8013AD70"
-expected = "0x8C630010"
-replacement = "0x01A36824"
-note = "and t5,t5,v1; SZ3 is already live in t4"
-
-[[recompiler.patch]]
-id = "billboard-type4-flag-cull-test"
-address = "0x8013AD74"
-expected = "0x00000000"
-replacement = "0x2DA30001"
-note = "sltiu v1,t5,1; unchanged blez rejects masked GTE errors"
+# Hueponik's visual choices and the widescreen billboard guard are native
+# instruction-site semantics. There are deliberately no generated AOT word
+# replacements: authenticated guest RAM and generated text remain identical.
 
 [runtime]
 # Enables the translation/VRAM-patch layer (translations/*.toml). English
@@ -73,36 +93,15 @@ note = "sltiu v1,t5,1; unchanged blez rejects masked GTE errors"
 language = "en"
 window_title = "Wipeout 3 Special Edition Recompiled"
 memcard_dir = "saves"
-# Record streamed/mod-patched code into overlay_captures.json and run it as
-# native shards instead of the dirty-RAM interpreter. Required here: the
-# framerate package patches the game's code on disc (target = "disc_user"),
-# so none of it matches the AOT image built from the stock SCES_028.45 and
-# it would otherwise interpret forever. See docs/COMPILING_OVERLAYS.md.
-overlay_cache = true
-# Background autocompile (gcc tier). Configuring this ALSO enables autocapture
-# on interp pressure — required to capture the ntscfull8 enhancement code the
-# game writes into the high 8 MB banks (0x781000+) and the runtime-dispatched
-# interior PCs in mod-patched text; neither is seen by the passive CD-DMA
-# capture path. The spawn itself runs on Windows only — on Linux/macOS run the
-# same command by hand after a play session (docs/COMPILING_OVERLAYS.md §1).
-# {TOKENS} instead of paths: the runtime resolves each to an absolute path,
-# searching the install directory before the project root (autocompile.h). The
-# old repo-relative form only worked when the game was launched with the repo
-# root as its working directory — in a shipped bundle every compile failed with
-# "can't open file .../compile_overlays.py" and all mod-patched code stayed on
-# the interpreter (measured: 29.3M interpreted dispatches over 12.9k frames).
-#
-# --captures / --out-dir are deliberately absent: the runtime injects the
-# canonical pair via PSX_OVERLAY_CACHE_DIR / PSX_OVERLAY_CAPTURES so the write
-# cache can never drift from where the loader reads.
-#
-# --flavor 2 is REQUIRED: this title builds PGXP-mandatory (top-level
-# CMakeLists), so the runtime is PSX_OVERLAY_FLAVOR=2 and the loader rejects
-# any shard whose flavor tag differs. The tool defaults to 0, so omitting this
-# silently fills a .._f0 dir this build can never load. (The runtime's own
-# spawn also pins the flavor by env; this keeps hand-runs of the same command
-# honest.)
-overlay_autocompile_cmd = "python3 {COMPILE_OVERLAYS} --game-toml {GAME_TOML} --recompiler {RECOMPILER} --runtime-include {RUNTIME_INCLUDE} --gcc gcc --cps --jobs 8 --flavor 2"
+  # Native title mods keep the authenticated stock executable byte-identical.
+  # The title streams race code over this static address range; cache it as a
+  # native overlay instead of interpreting it at 100 Hz.
+  overlay_cache = true
+  overlay_backend = "gcc"
+  overlay_region_floor = "0x16F000"
+  main_ram_mib = 8
+  openbios = false
+  idle_skip = true
 
 # SIO1 serial link. WipEout 3 SE's 2/3/4P mode is its own libcomb "sio" driver
 # on SIO1 (4P = 2 consoles x 2 splitscreen), so the link needs an actual peer on
@@ -124,7 +123,11 @@ latency_cycles = 0
 
 [video]
 renderer = "opengl"
-window_width = 1280
+# Match the reference build: render internally at 4x, then fit the window to
+# the active desktop (a 4K desktop therefore presents at 4K without hardcoding
+# one monitor mode or forcing exclusive fullscreen). Leaving window_width
+# unset selects the runtime's fit-to-display behavior.
+supersampling = 4
 # Late swaps present immediately (tear) instead of stalling a full refresh —
 # removes the heavy-sim-vblank judder on the 30fps-sim variants. Driver
 # fallback to full vsync if EXT_swap_control_tear is unsupported.
@@ -167,11 +170,10 @@ perspective_texturing = false
 # index and decode cleanly — 79 of them matched real draws in a single race
 # with zero decode failures.
 #
-# Substitution is implemented and on. The four font atlases are held back via
-# exclude.txt in the pack directory: the game draws all of its text from them,
-# and they render invisibly through this path, so replacing them erases every
-# glyph in the game. Everything else in the pack is correct and visibly
-# sharper. See that file for the detail.
+# Substitution is implemented and on. All 20 known font texture/palette keys
+# are active, including both Helvetica atlas sizes and their palette variants.
+# The pack-local exclude.txt is deliberately empty: excluding an atlas makes
+# every glyph using that texture hash fall back to the original bitmap.
 hd_textures = true
 # The pack (and the HD FONT — the F500 atlases are pack entries) lives in the
 # repo disc/ folder, NOT beside whatever cue is loaded. Without this, launching
@@ -179,27 +181,17 @@ hd_textures = true
 # revert to low-res at once. That is exactly what happened.
 hd_texture_dir = "hd_textures"
 
-# CPU overclock, percent of stock.
-#
-# REQUIRES A RETAIL BIOS above ~300%. Measured: with the recompiled OpenBIOS,
-# 400% and up run but never enable the display; with SCPH-1001 recompiled in,
-# 900% and 1000% boot fine. Same binary, same scaling, same mods -- only the
-# BIOS differs. OpenBIOS's boot path does not survive the CPU running ~10x
-# ahead of its devices; the retail kernel does.
-#
-# Switching BIOS is a REGENERATION, not a runtime flag -- this is a static
-# recompilation, so the kernel is compiled in. Passing --bios at runtime still
-# reports image=OPENBIOS. Use:
-#   python psxrecomp/psxrecomp_cli.py generate --config game.toml \
-#          --project-root . --disc <cue> --bios <SCPH1001.BIN>
-#   cmake -S . -B build-release      # re-globs the generated sources
-#   cmake --build build-release
-# Skipping the reconfigure fails with "Recompiled game code is MISSING", which
-# points nowhere near the BIOS. The guest runs as native code, so this
-# scales the per-instruction cycle CHARGE down: more work per CRTC period,
-# while timers, SPU, CDROM and refresh keep their real rates.
-# hueponik's pal100full8 patch requires >900%.
-cpu_overclock = 100
+# CPU budget, percent of stock. Direct PAL100 no longer executes Hueponik's
+# high-RAM replacement engine. 250% preserves enough host/audio headroom for a
+# saturated 100 Hz ultrawide race: renderer-native HUD proof measures 1.00278x
+# wall speed at 21:9 with SPU/CDDA at 44.1 kHz and zero underruns. 300% reaches
+# correct HUD time but underruns at wide aspects; 400% also runs the dense race
+# start slow despite nominal title timing.
+cpu_overclock = 250
+# PAL100's activation plugin owns both CRTC x2 and native 100 Hz pacing. A
+# disabled PAL100 feature therefore leaves the machine at stock PAL cadence.
+# Startup logos are skipped by the title-specific five-callsite intro feature;
+# later FMVs remain enabled so their real-time cadence can be verified.
 
 # Margin artwork is game-owned on the Mods page (Bezel Artwork), not a config
 # knob -- same move as Widescreen below. Left "off" so the package owns the
@@ -517,96 +509,3 @@ link_lobby = true
 # version no dev build advertises, and the server refuses a version mismatch
 # on join). Leave unset for a shipping build.
 # dev_tag = "wipeout-lab"
-
-# 8 MB framerate mod (ntscfull8): the enhancement engine at 0x80780000+ is a
-# detour trampoline farm — patched text sites `j 0x8078xxxx` into stubs that
-# jump straight back. Detour labels are not callable-function boundaries, so
-# runtime dispatch evidence alone cannot seed them (OBSERVED_PC_ONLY); declare
-# them so compile_overlays.py roots each stub (TOML_DECLARED_ENTRY) and the
-# region compiles native instead of interpreting forever. Entries were
-# extracted from j-target scans of the captured patched-text regions.
-[[overlays]]
-load_addr = "0x80780000"
-# CRC of the ntscfull8 engine payload actually captured. This gate is what
-# binds the entry list below to the image; a stale value silently detaches it,
-# compile_overlays reports "seeds: 0 / 80780000 excluded: OBSERVED_PC_ONLY",
-# no shard is ever emitted, and the whole enhancement engine interprets
-# forever — 11.9M interpreted dispatches in one session, with the interpreter's
-# last guard yield sitting inside 0x80781xxx on both link crashes.
-#
-# The raw region CRC is NOT usable as that gate. This region is not pure code:
-# 12 mutable records at a uniform 0xC4 stride from +0x62C carry live state, so
-# the raw CRC differed on every one of 17 consecutive captures (0x21A6D2C3,
-# 0xE2E4E03F, 0x3508976D, … 0xFE247301). Pinning any one of them — 0x8B994BAE,
-# then 0xFE3CBD88 — matched exactly the single capture it was read from and
-# detached on the very next run, which is why the engine kept interpreting
-# despite the entry list being correct all along.
-#
-# bytes_crc_ignore zeroes those mutable heads before hashing, so bytes_crc is
-# the identity of the CODE. Verified: all 17 captures hash to 0x8A7331C5 once
-# masked. Re-derive the entries (not this CRC) if the package version or
-# `build` option changes; the runtime's own shard gate is unaffected either way
-# — overlay_loader.c:cand_crc() already hashes only the shard's code ranges.
-bytes_crc = "0x8A7331C5"
-bytes_crc_ignore = [
-    { start = "0x8078062C", end = "0x80780634" },
-    { start = "0x807806F0", end = "0x807806F8" },
-    { start = "0x807807B4", end = "0x807807BC" },
-    { start = "0x80780878", end = "0x80780880" },
-    { start = "0x8078093C", end = "0x80780944" },
-    { start = "0x80780A00", end = "0x80780A08" },
-    { start = "0x80780AC4", end = "0x80780ACC" },
-    { start = "0x80780B88", end = "0x80780B90" },
-    { start = "0x80780C4C", end = "0x80780C54" },
-    { start = "0x80780D10", end = "0x80780D18" },
-    { start = "0x80780DD4", end = "0x80780DDC" },
-    { start = "0x80780E98", end = "0x80780EA0" },
-]
-entries = [
-    "0x80780000",
-    "0x80780568",
-    "0x807805F0",
-    "0x80780610",
-    "0x80780634",
-    "0x80780648",
-    "0x8078065C",
-    "0x807806F8",
-    "0x8078070C",
-    "0x80780720",
-    "0x807807BC",
-    "0x807807D0",
-    "0x807807E4",
-    "0x80780880",
-    "0x80780894",
-    "0x807808A8",
-    "0x80780944",
-    "0x80780958",
-    "0x8078096C",
-    "0x80780A08",
-    "0x80780A1C",
-    "0x80780A30",
-    "0x80780ACC",
-    "0x80780AE0",
-    "0x80780AF4",
-    "0x80780B90",
-    "0x80780BA4",
-    "0x80780BB8",
-    "0x80780C54",
-    "0x80780C68",
-    "0x80780C7C",
-    "0x80780D18",
-    "0x80780D2C",
-    "0x80780D40",
-    "0x80780DDC",
-    "0x80780DF0",
-    "0x80780E04",
-    "0x80780EA0",
-    "0x80780EB4",
-    "0x80780EC8",
-    "0x80780F5C",
-    "0x80781004",
-    "0x80781464",
-    "0x80781A24",
-    "0x80781A44",
-    "0x80781A64"
-]

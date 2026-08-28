@@ -1,0 +1,25 @@
+format_version = 5
+id = "wipeout3.convenience.skip-intro"
+version = "1.0.0"
+name = "Always Skip Intro"
+author = "WipEout 3 SE Recomp"
+description = "Skips the stock title's five intro-player calls after their file-table scan, preserving resource initialization and leaving later FMVs enabled. Uses authenticated stock SCES-02845 instruction sites; it installs no replacement executable engine."
+license = "Project integration"
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SCES-02845"
+disc_sha256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
+exe_sha256 = "0213f5292fa1d995ebe61f42d5dbdb6614e481cb3840ac5f1521c2dfdccc0a4d"
+
+[[feature]]
+id = "skip-intro"
+name = "Always Skip Intro"
+description = "Skip all five publisher, title, and studio intro movies; later FMVs still play."
+group = "Convenience"
+default_enabled = true
+
+[[plugin]]
+feature = "skip-intro"
+id = "wipeout3.convenience.skip-intro"

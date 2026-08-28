@@ -1,0 +1,2 @@
+psxrecomp: wip3 race clock: object=0x8018A240 start_cs=100 end_cs=300 game_seconds=2.000000 wall_seconds=2.000000 ratio=1.000000 samples=200 zero_steps=100 two_steps=100 average_step_cs=1.000000 eligible=1
+psxrecomp: wip3 race clock: object=0x8018A240 start_cs=300 end_cs=500 game_seconds=2.000000 wall_seconds=4.000000 ratio=0.500000 samples=200 zero_steps=100 two_steps=100 average_step_cs=1.000000 eligible=1

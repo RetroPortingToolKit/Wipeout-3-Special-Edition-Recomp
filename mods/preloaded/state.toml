@@ -1,0 +1,94 @@
+format_version = 2
+
+[[package]]
+id = "psx.enhancement.8mb-ram"
+version = "1.0.0"
+
+[[package]]
+id = "wipeout3.enhancement.hue-8mb-title"
+version = "1.0.0"
+
+[[package]]
+id = "wipeout3.enhancement.framerate-pal100"
+version = "2.0.0"
+
+[[package]]
+id = "wipeout3.enhancement.widescreen"
+version = "1.0.0"
+
+[[package]]
+id = "wipeout3.enhancement.draw-distance-far"
+version = "1.0.0"
+
+[[package]]
+id = "wipeout3.enhancement.ship-lod"
+version = "1.0.0"
+
+[[package]]
+id = "wipeout3.enhancement.ship-distance"
+version = "1.0.0"
+
+[[package]]
+id = "wipeout3.enhancement.birds"
+version = "1.0.0"
+
+[[package]]
+id = "wipeout3.convenience.skip-intro"
+version = "1.0.0"
+
+[[feature]]
+package_id = "psx.enhancement.8mb-ram"
+id = "8mb-ram"
+enabled = true
+
+[[feature]]
+package_id = "wipeout3.enhancement.hue-8mb-title"
+id = "hue-8mb-title"
+enabled = true
+
+[[feature]]
+package_id = "wipeout3.enhancement.framerate-pal100"
+id = "framerate-pal100"
+enabled = true
+[feature.values]
+rate = "100"
+
+[[feature]]
+package_id = "wipeout3.enhancement.widescreen"
+id = "widescreen"
+enabled = true
+[feature.values]
+aspect = "adaptive"
+
+[[feature]]
+package_id = "wipeout3.enhancement.draw-distance-far"
+id = "draw-distance-far"
+enabled = true
+[feature.values]
+distance = "far"
+
+[[feature]]
+package_id = "wipeout3.enhancement.ship-lod"
+id = "ship-lod"
+enabled = true
+[feature.values]
+distance = "max"
+
+[[feature]]
+package_id = "wipeout3.enhancement.ship-distance"
+id = "ship-distance"
+enabled = true
+[feature.values]
+distance = "65k"
+
+[[feature]]
+package_id = "wipeout3.enhancement.birds"
+id = "birds"
+enabled = true
+[feature.values]
+detail = "high"
+
+[[feature]]
+package_id = "wipeout3.convenience.skip-intro"
+id = "skip-intro"
+enabled = true

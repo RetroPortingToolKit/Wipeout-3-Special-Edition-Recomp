@@ -1,0 +1,29 @@
+format_version = 5
+id = "wipeout3.enhancement.hue-8mb-title"
+version = "1.0.0"
+name = "WipEout 3 Native 8 MB Title Support"
+author = "WipEout 3 SE Recomp"
+description = "Direct-native Hueponik 8 MB title handshake for the authenticated stock executable. No replacement engine or hack menu is installed."
+license = "Project integration; semantics recovered from hueponik's published patch."
+resolver = "declarative"
+save_compatibility = "isolated"
+
+[[dependency]]
+id = "psx.enhancement.8mb-ram"
+version = "^1.0.0"
+
+[[target]]
+game_id = "SCES-02845"
+disc_sha256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
+exe_sha256 = "0213f5292fa1d995ebe61f42d5dbdb6614e481cb3840ac5f1521c2dfdccc0a4d"
+
+[[feature]]
+id = "hue-8mb-title"
+name = "Native 8 MB Title Support"
+description = "Enable Hueponik's two exact title-side 8 MB semantics while retaining stock code and excluding Track 4x4."
+group = "Gameplay"
+default_enabled = true
+
+[[plugin]]
+feature = "hue-8mb-title"
+id = "wipeout3.enhancement.hue-8mb-title"

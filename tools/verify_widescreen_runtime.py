@@ -145,7 +145,7 @@ def main() -> int:
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--seconds", type=float, required=True)
     parser.add_argument("--pid", type=int)
-    parser.add_argument("--size", choices=("4x3", "16x9", "21x9"))
+    parser.add_argument("--size", choices=("4x3", "16x9", "21x9", "32x9"))
     parser.add_argument("--moving", action="store_true")
     parser.add_argument("--input-period", type=float, default=10.0)
     parser.add_argument("--buttons")
@@ -169,7 +169,12 @@ def main() -> int:
     if args.size:
         if args.pid is None:
             parser.error("--size requires --pid")
-        sizes = {"4x3": (960, 720), "16x9": (1280, 720), "21x9": (1400, 600)}
+        sizes = {
+            "4x3": (960, 720),
+            "16x9": (1280, 720),
+            "21x9": (1400, 600),
+            "32x9": (1600, 450),
+        }
         window = set_client_size(args.pid, *sizes[args.size])
 
     before = snapshot(args.port)

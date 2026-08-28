@@ -1,0 +1,5 @@
+psxrecomp: runtime cadence: guest=100.00 Hz, spu=44100.0 Hz, cdda=44100.0 Hz
+psxrecomp: wip3 timing: vblanks=100 scheduler_calls=100 logical_ticks=25 race_centiseconds=100 calls_per_vblank=1.0000 ticks_per_vblank=0.2500 wall_seconds=1.000000 vblanks_per_wall_second=100.0000 ticks_per_wall_second=25.0000 race_cs_per_wall_second=100.0000 rate=1 coefficient=0x0862 exact_pal100=1
+psxrecomp: wip3 progression: vblanks=100 max_object_updates=40 ratio=0.4000 unique_objects=8 total_updates=320 first_update_vblank=0 last_update_vblank=98 eligible=1
+psxrecomp: wip3 timing: vblanks=100 scheduler_calls=100 logical_ticks=25 race_centiseconds=100 calls_per_vblank=1.0000 ticks_per_vblank=0.2500 wall_seconds=1.002000 vblanks_per_wall_second=99.8004 ticks_per_wall_second=24.9501 race_cs_per_wall_second=99.8004 rate=1 coefficient=0x0862 exact_pal100=1
+psxrecomp: wip3 progression: vblanks=100 max_object_updates=41 ratio=0.4100 unique_objects=8 total_updates=328 first_update_vblank=0 last_update_vblank=99 eligible=1

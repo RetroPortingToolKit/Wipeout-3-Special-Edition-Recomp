@@ -12,14 +12,16 @@ Build wiring copies `mods/preloaded` next to the game executable as `mods/`.
 Framework hardware mods (8 MB RAM, loading speed) are staged from psxrecomp
 `mods/builtin` first; they appear on this title's Mods page with `game_id = "*"`.
 
-`wipeout3.enhancement.framerate` (1.0.14) is converted from
-[hueponik/wip3out-patches](https://codeberg.org/hueponik/wip3out-patches)
-as a **plain** hueponik overlay plus AOT cadence: **SimVblankGate** entry and
-VBlank plugins force **gSimVblankSkip=2**. Title `Game 60 fps` is CRTC; sim
-should feel ~30 Hz. Enable **8 MB** only for Enhanced/Full.
+The shipping WipEout catalog uses trusted native callbacks against the
+authenticated stock `SCES-02845` executable. `framerate-pal100` provides the
+25/50/100 selector; the title-side 8 MB handshake, widescreen, draw distance,
+ship LOD, ship distance, birds, and startup-media skip are separate direct
+features. Their defaults form the reviewed 8 MB / PAL100 profile.
 
-`wipeout3.enhancement.framerate-120` is the experimental unlocked 120 Hz path
-(conflicts with the package above).
+Do not regenerate or ship a Hueponik xdelta, disc-sector overlay, AOT patch
+manifest, replacement executable, high-RAM menu engine, or Track 4x4 state as
+part of this catalog. The published patch is an analysis oracle only; direct
+packages must resolve to plugins with no disc overlays, derived discs, or
+guest-text writes. See `psxrecomp/docs/MOD_PACKAGES.md` for the manifest format.
 
-Regenerate with `tools/gen_hueponik_framerate_mod.py` after a stock Track 01
-dump is in `disc/`. See `psxrecomp/docs/MOD_PACKAGES.md`.
+Before staging a release, run `py -3 tools/verify_release_mod_hygiene.py`.
