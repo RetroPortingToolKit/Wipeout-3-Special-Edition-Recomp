@@ -1,0 +1,48 @@
+format_version = 5
+id = "wipeout3.enhancement.draw-distance-far"
+version = "1.0.0"
+name = "Draw Distance"
+author = "WipEout 3 SE Recomp"
+description = "Applies Hueponik's exact Low, Stock, Near, Mid, and Far scene-visibility modes directly to the authenticated stock title. No replacement executable engine, overlay, or guest high-RAM code is installed. Track 4x4 remains absent."
+license = "Project integration; option semantics recovered from hueponik's published patch."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "*"
+
+[[feature]]
+id = "draw-distance-far"
+name = "Draw Distance"
+description = "Select Hueponik's exact 8 MB draw-distance profile."
+group = "Graphics"
+default_enabled = true
+
+[[option]]
+feature = "draw-distance-far"
+id = "distance"
+label = "Draw distance"
+description = "Far is Hueponik's maximum profile; Low intentionally omits stock-only entries."
+group = "Graphics"
+type = "choice"
+default = "far"
+
+[[option.choice]]
+value = "low"
+label = "Low"
+[[option.choice]]
+value = "stock"
+label = "Stock"
+[[option.choice]]
+value = "near"
+label = "Near"
+[[option.choice]]
+value = "mid"
+label = "Mid"
+[[option.choice]]
+value = "far"
+label = "Far"
+
+[[plugin]]
+feature = "draw-distance-far"
+id = "wipeout3.enhancement.draw-distance-far"

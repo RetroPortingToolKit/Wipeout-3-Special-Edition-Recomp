@@ -1,0 +1,63 @@
+format_version = 5
+id = "wipeout3.enhancement.framerate-pal100"
+version = "2.0.0"
+name = "WipEout 3 Direct PAL Frame Rate"
+author = "WipEout 3 SE Recomp"
+description = "Native stock-title Hueponik PAL 25/50/100 Hz support. Uses the framework 8 MB RAM mod and does not install Hueponik's replacement executable engine. Visual-detail choices are independent native features."
+license = "Project integration; option semantics recovered from hueponik's published patch."
+resolver = "declarative"
+save_compatibility = "isolated"
+
+[[dependency]]
+id = "psx.enhancement.8mb-ram"
+version = "^1.0.0"
+
+[[target]]
+game_id = "*"
+
+[[feature]]
+id = "framerate-pal100"
+name = "Direct PAL Frame Rate"
+description = "Select authenticated Hueponik 25, 50, or 100 Hz timing. A restart is required after changing the rate."
+group = "Gameplay"
+default_enabled = true
+
+[[option]]
+feature = "framerate-pal100"
+id = "rate"
+label = "Frame Rate"
+description = "Select 25, 50, or 100 Hz. Changes take effect after restarting the game."
+group = "Gameplay"
+type = "choice"
+default = "100"
+
+[[option.choice]]
+value = "25"
+label = "25 Hz"
+
+[[option.choice]]
+value = "50"
+label = "50 Hz"
+
+[[option.choice]]
+value = "100"
+label = "100 Hz"
+
+[[plugin]]
+feature = "framerate-pal100"
+id = "wipeout3.framerate.pal25"
+when = { rate = "25" }
+
+[[plugin]]
+feature = "framerate-pal100"
+id = "wipeout3.framerate.pal50"
+when = { rate = "50" }
+
+[[plugin]]
+feature = "framerate-pal100"
+id = "wipeout3.framerate.pal-x2"
+when = { rate = "100" }
+
+[[plugin]]
+feature = "framerate-pal100"
+id = "wipeout3.framerate.pal100-title"

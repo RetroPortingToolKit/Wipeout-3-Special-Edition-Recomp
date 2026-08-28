@@ -1,0 +1,2 @@
+psxrecomp: WipEout race-clock diagnostics enabled
+psxrecomp: game started

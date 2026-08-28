@@ -1,0 +1,42 @@
+format_version = 5
+id = "wipeout3.enhancement.birds"
+version = "1.0.0"
+name = "Bird Detail"
+author = "WipEout 3 SE Recomp"
+description = "Direct-native Hueponik Low, Stock, and High bird-detail choices on the authenticated stock title; defaults to High."
+license = "Project integration; option semantics recovered from hueponik's published patch."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "*"
+
+[[feature]]
+id = "birds"
+name = "Bird Detail"
+description = "Select Hueponik's exact bird-detail threshold instruction."
+group = "Graphics"
+default_enabled = true
+
+[[option]]
+feature = "birds"
+id = "detail"
+label = "Bird detail"
+description = "High selects Hueponik's highest bird-detail path."
+group = "Graphics"
+type = "choice"
+default = "high"
+
+[[option.choice]]
+value = "low"
+label = "Low"
+[[option.choice]]
+value = "stock"
+label = "Stock"
+[[option.choice]]
+value = "high"
+label = "High"
+
+[[plugin]]
+feature = "birds"
+id = "wipeout3.enhancement.birds"

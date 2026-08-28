@@ -20,6 +20,8 @@
 /isos/
 /saves/
 /prepared_disc/
+/aot/
+/hd_textures/
 /disc/
 .settings/
 
@@ -68,6 +70,7 @@ psx_freeze_heartbeat.json
 starvation_dump.jsonl
 
 # Diagnostic dumps (root-level) — keep catalog / probe trackable
+/artifacts/
 /*.json
 /*.bmp
 /*.png

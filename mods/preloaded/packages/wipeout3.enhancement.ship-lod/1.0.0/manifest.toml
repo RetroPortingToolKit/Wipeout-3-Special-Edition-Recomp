@@ -1,0 +1,99 @@
+format_version = 5
+id = "wipeout3.enhancement.ship-lod"
+version = "1.0.0"
+name = "Ship LOD"
+author = "WipEout 3 SE Recomp"
+description = "Direct-native Hueponik ship level-of-detail choices on the authenticated stock title; defaults to Max."
+license = "Project integration; option semantics recovered from hueponik's published patch."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "*"
+
+[[feature]]
+id = "ship-lod"
+name = "Ship LOD"
+description = "Select Hueponik's exact 8 MB ship high-detail distance."
+group = "Graphics"
+default_enabled = true
+
+[[option]]
+feature = "ship-lod"
+id = "distance"
+label = "High-detail distance"
+description = "Max preserves high-detail ships at every normal distance."
+group = "Graphics"
+type = "choice"
+default = "max"
+
+[[option.choice]]
+value = "0"
+label = "0"
+[[option.choice]]
+value = "600"
+label = "600"
+[[option.choice]]
+value = "stock"
+label = "Stock (1200)"
+[[option.choice]]
+value = "1800"
+label = "1800"
+[[option.choice]]
+value = "2400"
+label = "2400"
+[[option.choice]]
+value = "3000"
+label = "3000"
+[[option.choice]]
+value = "3600"
+label = "3600"
+[[option.choice]]
+value = "4200"
+label = "4200"
+[[option.choice]]
+value = "4800"
+label = "4800"
+[[option.choice]]
+value = "5400"
+label = "5400"
+[[option.choice]]
+value = "6000"
+label = "6000"
+[[option.choice]]
+value = "6600"
+label = "6600"
+[[option.choice]]
+value = "7200"
+label = "7200"
+[[option.choice]]
+value = "7800"
+label = "7800"
+[[option.choice]]
+value = "8400"
+label = "8400"
+[[option.choice]]
+value = "9000"
+label = "9000"
+[[option.choice]]
+value = "9600"
+label = "9600"
+[[option.choice]]
+value = "10200"
+label = "10200"
+[[option.choice]]
+value = "10800"
+label = "10800"
+[[option.choice]]
+value = "11400"
+label = "11400"
+[[option.choice]]
+value = "12000"
+label = "12000"
+[[option.choice]]
+value = "max"
+label = "Max"
+
+[[plugin]]
+feature = "ship-lod"
+id = "wipeout3.enhancement.ship-lod"

@@ -1,0 +1,3 @@
+psxrecomp: WipEout race-clock diagnostics enabled
+psxrecomp: wip3 race clock: object=0x8018A240 start_cs=120 end_cs=200 game_seconds=0.800000 wall_seconds=2.000000 ratio=0.400000 samples=80 zero_steps=40 two_steps=40 average_step_cs=1.000000 eligible=1
+psxrecomp: wip3 race clock: object=0x8018A240 start_cs=200 end_cs=280 game_seconds=0.800000 wall_seconds=2.000000 ratio=0.400000 samples=80 zero_steps=40 two_steps=40 average_step_cs=1.000000 eligible=1

@@ -49,6 +49,7 @@ exec bash "${PACKAGER}" \
   --project-file CMakeLists.txt \
   --project-dir translations \
   --project-dir assets \
+  --project-dir hd_textures \
   --project-dir mods \
   --runtime-dir-optional mods \
   --runtime-dir-optional bezels \
