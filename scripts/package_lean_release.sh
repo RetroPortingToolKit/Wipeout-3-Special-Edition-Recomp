@@ -57,4 +57,5 @@ exec bash "${PACKAGER}" \
   `# here runs on the dirty-RAM interpreter until autocompile catches up (and` \
   `# only if python3 + a C compiler are present). Play the content before` \
   `# packaging so the cache actually covers it.` \
-  --runtime-dir-optional cache
+  --runtime-dir-optional cache \
+  --runtime-dir-optional hd_textures
