@@ -9,7 +9,7 @@ resolver = "declarative"
 save_compatibility = "shared"
 
 [[target]]
-game_id = "SCES-02845"
+game_id = "wipeout3"
 
 [[feature]]
 id = "skip-intro"

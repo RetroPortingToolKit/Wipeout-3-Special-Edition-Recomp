@@ -13,7 +13,7 @@ name = "toolboxio (artwork)"
 url = "https://www.deviantart.com/toolboxio"
 
 [[target]]
-game_id = "SCES-02845"
+game_id = "wipeout3"
 
 # Presentation only -- nothing guest-side is patched. The margins only exist
 # when the game rect does not fill the window, so this shows at 4:3 on a wider
