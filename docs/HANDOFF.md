@@ -7,11 +7,15 @@ The PGXP-free adaptive widescreen title layer is implemented on current
 [mstan/psxrecomp#247](https://github.com/mstan/psxrecomp/pull/247).  Clean
 generation/build, the two-track visual matrix, PAL100/CDDA timing, and controlled
 moving soaks are recorded in `docs/WIDESCREEN_RELEASE_VERIFICATION.md`.
+The reviewed root layer is
+[TechnicallyComputers/Wipeout-3-Special-Edition-Recomp#8](https://github.com/TechnicallyComputers/Wipeout-3-Special-Edition-Recomp/pull/8).
+The obsolete broad proposal, PR #7, is closed with a supersession receipt linking
+both replacement layers.
 
 ## Next concrete step
 
-Review and merge the runtime PR first, then update/merge the root PR so the
-submodule pin resolves from the upstream runtime branch.
+Review and merge runtime PR #247 first, then merge root PR #8 so its submodule
+pin resolves from the upstream runtime branch.
 
 ## Open blockers
 
