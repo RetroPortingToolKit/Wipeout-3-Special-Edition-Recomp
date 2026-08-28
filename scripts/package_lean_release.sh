@@ -49,6 +49,7 @@ exec bash "${PACKAGER}" \
   --project-file CMakeLists.txt \
   --project-dir translations \
   --project-dir assets \
+  --project-dir hd_textures \
   --project-dir mods \
   --runtime-dir-optional mods \
   --runtime-dir-optional bezels \
@@ -57,5 +58,4 @@ exec bash "${PACKAGER}" \
   `# here runs on the dirty-RAM interpreter until autocompile catches up (and` \
   `# only if python3 + a C compiler are present). Play the content before` \
   `# packaging so the cache actually covers it.` \
-  --runtime-dir-optional cache \
-  --runtime-dir-optional hd_textures
+  --runtime-dir-optional cache
