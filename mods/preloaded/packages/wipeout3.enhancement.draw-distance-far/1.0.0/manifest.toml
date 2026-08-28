@@ -9,7 +9,7 @@ resolver = "declarative"
 save_compatibility = "shared"
 
 [[target]]
-game_id = "wipeout3"
+game_id = "*"
 
 [[feature]]
 id = "draw-distance-far"

@@ -13,7 +13,7 @@ id = "psx.enhancement.8mb-ram"
 version = "^1.0.0"
 
 [[target]]
-game_id = "wipeout3"
+game_id = "*"
 
 [[feature]]
 id = "hue-8mb-title"
