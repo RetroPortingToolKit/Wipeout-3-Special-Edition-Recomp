@@ -199,7 +199,7 @@ hd_texture_dir = "hd_textures"
 # scales the per-instruction cycle CHARGE down: more work per CRTC period,
 # while timers, SPU, CDROM and refresh keep their real rates.
 # hueponik's pal100full8 patch requires >900%.
-cpu_overclock = 100
+cpu_overclock = 200
 
 # Margin artwork is game-owned on the Mods page (Bezel Artwork), not a config
 # knob -- same move as Widescreen below. Left "off" so the package owns the
