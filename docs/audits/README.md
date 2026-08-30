@@ -9,6 +9,7 @@ acceptance gates.
 
 ## Runtime, launch, and release evidence
 
+- [Project deep review (2026-08-30)](project-deep-review-2026-08-30.md)
 - [BIOS, disc, and loading paths](boot-cd.md)
 - [Feature-state persistence](feature-state-persistence.md)
 - [Launch activation](launch-activation-audit.md)
