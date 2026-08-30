@@ -87,8 +87,9 @@ Progressive map: `symbols.toml` → `python3 tools/sync_symbols.py` →
 
 ## Framework pins
 
-Submodule gitlinks (`psxrecomp`, optional `recomp-ui`, nested `recomp-net`)
-are authoritative. `framework_pins.txt` is an optional scaffold snapshot;
+Submodule gitlinks (`psxrecomp`, optional `recomp-ui`, and the nested
+`recomp-net` and `retcomm-rbengine`) are authoritative. `framework_pins.txt`
+is an optional scaffold snapshot;
 release CI logs SHAs with `record_pins.sh` but builds whatever the gitlinks
 resolve to. Bump submodules deliberately — do not float on `main`/`master`
 in release CI.

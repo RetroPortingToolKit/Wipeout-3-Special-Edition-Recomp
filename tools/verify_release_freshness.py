@@ -7,8 +7,10 @@ import zipfile
 from pathlib import Path
 
 import tomllib
+from framework_pins import validate_authoritative_framework_pins
 
 BASE_PROFILE_FILES = ("game.toml", "mods/state.toml")
+FRAMEWORK_PINS_FILE = "framework_pins.txt"
 
 
 def _parse_toml(name: str, text: str, origin: str, errors: list[str]) -> dict | None:
@@ -142,7 +144,7 @@ def _read_artifact_files(
             path = release / name
             if path.is_file():
                 try:
-                    files[name] = path.read_text(encoding="utf-8")
+                    files[name] = path.read_bytes().decode("utf-8")
                 except (OSError, UnicodeDecodeError) as exc:
                     errors.append(f"cannot decode staged {name}: {exc}")
         package_root = release / "mods" / "packages"
@@ -162,7 +164,21 @@ def validate_release(artifact: Path, source_root: Path) -> list[str]:
     source, package_refs, source_errors = _source_profile(source_root)
     errors.extend(source_errors)
 
+    source_pins: str | None = None
+    source_pins_path = source_root / FRAMEWORK_PINS_FILE
+    if source_pins_path.is_file():
+        try:
+            source_pins = source_pins_path.read_bytes().decode("utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            errors.append(f"cannot read source {FRAMEWORK_PINS_FILE}: {exc}")
+        else:
+            errors.extend(
+                validate_authoritative_framework_pins(source_pins, source_root)
+            )
+
     source_paths = [source_root / "game.toml", source_root / "mods" / "state.toml"]
+    if source_pins is not None:
+        source_paths.append(source_pins_path)
     preloaded = source_root / "mods" / "preloaded"
     relevant = [path for path in source_paths if path.is_file()]
     if preloaded.is_dir():
@@ -172,11 +188,21 @@ def validate_release(artifact: Path, source_root: Path) -> list[str]:
     elif artifact.stat().st_mtime < max(p.stat().st_mtime for p in relevant):
         errors.append("release artifact predates relevant source/config")
 
-    staged, staged_packages, read_errors = _read_artifact_files(
-        artifact, tuple(source)
-    )
+    artifact_files = tuple(source)
+    if source_pins is not None:
+        artifact_files += (FRAMEWORK_PINS_FILE,)
+    staged, staged_packages, read_errors = _read_artifact_files(artifact, artifact_files)
     errors.extend(read_errors)
     errors.extend(_check_texts(staged, source))
+    if source_pins is not None:
+        staged_pins = staged.get(FRAMEWORK_PINS_FILE)
+        if staged_pins is None:
+            errors.append(f"missing staged {FRAMEWORK_PINS_FILE}")
+        elif staged_pins != source_pins:
+            errors.append(
+                f"staged {FRAMEWORK_PINS_FILE} does not match the current "
+                "source snapshot"
+            )
     expected_packages = set(package_refs)
     if staged_packages is None:
         errors.append("missing staged mods/packages catalog")

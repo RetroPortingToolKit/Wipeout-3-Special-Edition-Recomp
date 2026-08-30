@@ -3,6 +3,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 from zipfile import ZipFile
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -37,6 +38,12 @@ version = "1.0.0"
 [[feature]]
 id = "skip_fmv"
 default_enabled = true
+"""
+PINS = """\
+psxrecomp=1111111 (1111111111111111111111111111111111111111)
+recomp-ui=2222222 (2222222222222222222222222222222222222222)
+recomp-net=3333333 (3333333333333333333333333333333333333333)
+retcomm-rbengine=4444444 (4444444444444444444444444444444444444444)
 """
 
 
@@ -116,6 +123,72 @@ cpu_overclock=200
             )
             zip_file.writestr("psxrecomp/tools/cycle_testrom/game.toml", "[game]\n")
         self.assertEqual(verifier.validate_release(archive, self.root), [])
+
+    @mock.patch.object(verifier, "validate_authoritative_framework_pins", return_value=[])
+    def test_directory_framework_pins_must_match_source(self, _validate_pins):
+        (self.root / "framework_pins.txt").write_text(PINS, encoding="utf-8")
+        (self.release / "framework_pins.txt").write_text(
+            PINS.replace("1111111", "aaaaaaaa", 1), encoding="utf-8"
+        )
+        errors = verifier.validate_release(self.exe, self.root)
+        self.assertTrue(
+            any(
+                "framework_pins.txt" in error and "source snapshot" in error
+                for error in errors
+            )
+        )
+
+    @mock.patch.object(verifier, "validate_authoritative_framework_pins", return_value=[])
+    def test_zip_framework_pins_must_match_source(self, _validate_pins):
+        (self.root / "framework_pins.txt").write_text(PINS, encoding="utf-8")
+        archive = self.root / "release.zip"
+        with ZipFile(archive, "w") as zip_file:
+            zip_file.writestr("game.toml", CONFIG)
+            zip_file.writestr("mods/state.toml", STATE)
+            zip_file.writestr(
+                "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",
+                MANIFEST,
+            )
+            zip_file.writestr(
+                "framework_pins.txt", PINS.replace("2222222", "bbbbbbb", 1)
+            )
+        errors = verifier.validate_release(archive, self.root)
+        self.assertTrue(
+            any(
+                "framework_pins.txt" in error and "source snapshot" in error
+                for error in errors
+            )
+        )
+
+    @mock.patch.object(verifier, "validate_authoritative_framework_pins", return_value=[])
+    def test_zip_matching_framework_pins_passes(self, _validate_pins):
+        source_pins = self.root / "framework_pins.txt"
+        source_pins.write_text(PINS, encoding="utf-8")
+        archive = self.root / "release.zip"
+        with ZipFile(archive, "w") as zip_file:
+            zip_file.writestr("game.toml", CONFIG)
+            zip_file.writestr("mods/state.toml", STATE)
+            zip_file.writestr(
+                "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",
+                MANIFEST,
+            )
+            zip_file.writestr("framework_pins.txt", source_pins.read_bytes())
+        self.assertEqual(verifier.validate_release(archive, self.root), [])
+
+    def test_framework_pins_are_optional(self):
+        self.assertFalse((self.root / "framework_pins.txt").exists())
+        self.assertEqual(verifier.validate_release(self.exe, self.root), [])
+
+    @mock.patch.object(
+        verifier,
+        "validate_authoritative_framework_pins",
+        return_value=["framework pin mismatch for psxrecomp"],
+    )
+    def test_source_framework_pins_must_match_gitlinks(self, _validate_pins):
+        (self.root / "framework_pins.txt").write_text(PINS, encoding="utf-8")
+        (self.release / "framework_pins.txt").write_text(PINS, encoding="utf-8")
+        errors = verifier.validate_release(self.exe, self.root)
+        self.assertIn("framework pin mismatch for psxrecomp", errors)
 
     def test_zip_rejects_ambiguous_profiles(self):
         archive = self.root / "ambiguous.zip"
