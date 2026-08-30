@@ -112,6 +112,40 @@ cpu_overclock=200
             )
         self.assertEqual(verifier.validate_release(archive, self.root), [])
 
+    def test_setup_zip_must_contain_the_complete_rebuild_closure(self):
+        archive = self.root / "setup-host.zip"
+
+        def write_archive(*, complete: bool) -> None:
+            with ZipFile(archive, "w") as zip_file:
+                zip_file.writestr("game.toml", CONFIG)
+                zip_file.writestr("mods/state.toml", STATE)
+                zip_file.writestr(
+                    "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",
+                    MANIFEST,
+                )
+                if complete:
+                    for name in verifier.SETUP_REBUILD_FILES - set(
+                        verifier.BASE_PROFILE_FILES
+                    ):
+                        zip_file.writestr(name, b"fixture")
+                    for directory in verifier.SETUP_REBUILD_DIRS:
+                        zip_file.writestr(f"{directory}/fixture", b"fixture")
+
+        write_archive(complete=False)
+        errors = verifier.validate_release(
+            archive, self.root, require_setup_closure=True
+        )
+        self.assertTrue(any("missing rebuild files" in error for error in errors))
+        self.assertTrue(any("missing rebuild directories" in error for error in errors))
+
+        write_archive(complete=True)
+        self.assertEqual(
+            verifier.validate_release(
+                archive, self.root, require_setup_closure=True
+            ),
+            [],
+        )
+
     def test_zip_ignores_nested_project_profiles(self):
         archive = self.root / "setup-host.zip"
         with ZipFile(archive, "w") as zip_file:

@@ -2,24 +2,13 @@ import re
 import subprocess
 from pathlib import Path
 
+from verify_release_freshness import SETUP_REBUILD_DIRS, SETUP_REBUILD_FILES
+
 ROOT = Path(__file__).resolve().parents[1]
 WRAPPER = ROOT / "scripts/package_setup_release.sh"
 
-REQUIRED_FILES = {
-    "CMakeLists.txt",
-    "VERSION",
-    "assets/psxrecomp.ico",
-    "codegen_setup.c",
-    "codegen_setup.h",
-    "game.toml",
-    "mods/state.toml",
-}
-REQUIRED_DIRS = {
-    "launcher_assets",
-    "mods/preloaded",
-    "seeds",
-    "src/mods",
-}
+REQUIRED_FILES = SETUP_REBUILD_FILES
+REQUIRED_DIRS = SETUP_REBUILD_DIRS
 
 
 def _literal_arguments(option: str) -> set[str]:

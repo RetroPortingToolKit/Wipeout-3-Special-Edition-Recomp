@@ -13,6 +13,20 @@ from framework_pins import validate_authoritative_framework_pins
 BASE_PROFILE_FILES = ("game.toml", "mods/state.toml")
 FRAMEWORK_PINS_FILE = "framework_pins.txt"
 WINDOWS_DRIVE_PREFIX = re.compile(r"^[A-Za-z]:")
+SETUP_REBUILD_FILES = frozenset(
+    {
+        "CMakeLists.txt",
+        "VERSION",
+        "assets/psxrecomp.ico",
+        "codegen_setup.c",
+        "codegen_setup.h",
+        "game.toml",
+        "mods/state.toml",
+    }
+)
+SETUP_REBUILD_DIRS = frozenset(
+    {"launcher_assets", "mods/preloaded", "seeds", "src/mods"}
+)
 
 
 def _normalize_zip_member(name: str, errors: list[str]) -> str | None:
@@ -142,19 +156,22 @@ def _check_texts(staged: dict[str, str], source: dict[str, str]) -> list[str]:
 
 def _read_artifact_files(
     artifact: Path, profile_names: tuple[str, ...]
-) -> tuple[dict[str, str], set[str] | None, list[str]]:
+) -> tuple[dict[str, str], set[str] | None, set[str] | None, list[str]]:
     files: dict[str, str] = {}
     errors: list[str] = []
     staged_packages: set[str] | None = None
+    staged_members: set[str] | None = None
     if artifact.suffix.lower() == ".zip":
         try:
             with zipfile.ZipFile(artifact) as archive:
                 matches = {name: [] for name in profile_names}
                 staged_packages = set()
+                staged_members = set()
                 for name in archive.namelist():
                     normalized = _normalize_zip_member(name, errors)
                     if normalized is None:
                         continue
+                    staged_members.add(normalized)
                     parts = normalized.split("/")
                     if len(parts) >= 3 and parts[:2] == ["mods", "packages"]:
                         staged_packages.add(parts[2])
@@ -183,10 +200,32 @@ def _read_artifact_files(
         package_root = release / "mods" / "packages"
         if package_root.is_dir():
             staged_packages = {path.name for path in package_root.iterdir() if path.is_dir()}
-    return files, staged_packages, errors
+    return files, staged_packages, staged_members, errors
 
 
-def validate_release(artifact: Path, source_root: Path) -> list[str]:
+def _check_setup_rebuild_closure(staged_members: set[str] | None) -> list[str]:
+    if staged_members is None:
+        return ["setup rebuild closure requires a ZIP artifact"]
+
+    errors: list[str] = []
+    missing_files = sorted(SETUP_REBUILD_FILES - staged_members)
+    if missing_files:
+        errors.append("setup archive is missing rebuild files: " + ", ".join(missing_files))
+    missing_dirs = sorted(
+        directory
+        for directory in SETUP_REBUILD_DIRS
+        if not any(name.startswith(f"{directory}/") for name in staged_members)
+    )
+    if missing_dirs:
+        errors.append(
+            "setup archive is missing rebuild directories: " + ", ".join(missing_dirs)
+        )
+    return errors
+
+
+def validate_release(
+    artifact: Path, source_root: Path, *, require_setup_closure: bool = False
+) -> list[str]:
     """Return failures; an empty list certifies the artifact."""
     errors: list[str] = []
     if not artifact.is_file() or artifact.suffix.lower() not in {".exe", ".zip"}:
@@ -224,8 +263,12 @@ def validate_release(artifact: Path, source_root: Path) -> list[str]:
     artifact_files = tuple(source)
     if source_pins is not None:
         artifact_files += (FRAMEWORK_PINS_FILE,)
-    staged, staged_packages, read_errors = _read_artifact_files(artifact, artifact_files)
+    staged, staged_packages, staged_members, read_errors = _read_artifact_files(
+        artifact, artifact_files
+    )
     errors.extend(read_errors)
+    if require_setup_closure:
+        errors.extend(_check_setup_rebuild_closure(staged_members))
     errors.extend(_check_texts(staged, source))
     if source_pins is not None:
         staged_pins = staged.get(FRAMEWORK_PINS_FILE)
@@ -253,8 +296,17 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("artifact", type=Path)
     parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument(
+        "--require-setup-closure",
+        action="store_true",
+        help="require the ZIP to contain every title rebuild input",
+    )
     args = parser.parse_args(argv)
-    errors = validate_release(args.artifact, args.source_root)
+    errors = validate_release(
+        args.artifact,
+        args.source_root,
+        require_setup_closure=args.require_setup_closure,
+    )
     if errors:
         print("FAIL release freshness")
         print("\n".join(f"- {error}" for error in errors))

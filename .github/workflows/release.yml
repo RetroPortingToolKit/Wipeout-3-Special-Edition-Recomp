@@ -570,7 +570,8 @@ jobs:
             exit 1
           fi
           for archive in "${archives[@]}"; do
-            python tools/verify_release_freshness.py "${archive}" --source-root .
+            python tools/verify_release_freshness.py "${archive}" --source-root . \
+              --require-setup-closure
           done
 
       - name: Upload artifact
@@ -622,7 +623,8 @@ jobs:
             exit 1
           fi
           for archive in "${archives[@]}"; do
-            python tools/verify_release_freshness.py "${archive}" --source-root .
+            python tools/verify_release_freshness.py "${archive}" --source-root . \
+              --require-setup-closure
           done
 
       - name: Ensure release tag exists

@@ -40,6 +40,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertEqual(
             self.text.count("python tools/verify_release_freshness.py"), 2
         )
+        self.assertEqual(self.text.count("--require-setup-closure"), 2)
 
     def test_publish_checkout_includes_recursive_submodules(self):
         release_job = self.text.split("\n  release:\n", 1)[1]
