@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import zipfile
 from pathlib import Path
@@ -11,6 +12,37 @@ from framework_pins import validate_authoritative_framework_pins
 
 BASE_PROFILE_FILES = ("game.toml", "mods/state.toml")
 FRAMEWORK_PINS_FILE = "framework_pins.txt"
+WINDOWS_DRIVE_PREFIX = re.compile(r"^[A-Za-z]:")
+
+
+def _normalize_zip_member(name: str, errors: list[str]) -> str | None:
+    """Return a safe archive-relative member name, or record why it is unsafe."""
+
+    normalized = name.replace("\\", "/")
+    if normalized.startswith("/"):
+        errors.append(f"ZIP contains unsafe absolute member path: {name!r}")
+        return None
+
+    # ZIP producers commonly spell archive-root entries with one leading `./`.
+    # Preserve that compatibility, including duplicate-candidate detection, but
+    # do not recursively strip path syntax.
+    normalized = normalized.removeprefix("./")
+    if normalized.startswith("/"):
+        errors.append(f"ZIP contains unsafe absolute member path: {name!r}")
+        return None
+
+    if WINDOWS_DRIVE_PREFIX.match(normalized):
+        errors.append(f"ZIP contains unsafe drive-prefixed member path: {name!r}")
+        return None
+
+    parts = normalized.split("/")
+    if ".." in parts:
+        errors.append(f"ZIP contains unsafe parent-traversal member path: {name!r}")
+        return None
+    if "." in parts:
+        errors.append(f"ZIP contains unsafe non-canonical member path: {name!r}")
+        return None
+    return normalized
 
 
 def _parse_toml(name: str, text: str, origin: str, errors: list[str]) -> dict | None:
@@ -120,11 +152,12 @@ def _read_artifact_files(
                 matches = {name: [] for name in profile_names}
                 staged_packages = set()
                 for name in archive.namelist():
-                    normalized = name.replace("\\", "/").lstrip("./")
+                    normalized = _normalize_zip_member(name, errors)
+                    if normalized is None:
+                        continue
                     parts = normalized.split("/")
-                    for index in range(len(parts) - 2):
-                        if parts[index : index + 2] == ["mods", "packages"]:
-                            staged_packages.add(parts[index + 2])
+                    if len(parts) >= 3 and parts[:2] == ["mods", "packages"]:
+                        staged_packages.add(parts[2])
                     for profile_name in profile_names:
                         if normalized == profile_name:
                             matches[profile_name].append(name)

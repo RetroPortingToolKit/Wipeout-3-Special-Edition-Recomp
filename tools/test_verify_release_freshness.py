@@ -203,6 +203,75 @@ cpu_overclock=200
         errors = verifier.validate_release(archive, self.root)
         self.assertTrue(any("multiple candidates for game.toml" in error for error in errors))
 
+    def test_zip_rejects_rooted_and_drive_prefixed_profiles(self):
+        unsafe_names = (
+            "/game.toml",
+            r"\game.toml",
+            ".//game.toml",
+            "C:/game.toml",
+            r"C:\game.toml",
+        )
+        for index, unsafe_name in enumerate(unsafe_names):
+            with self.subTest(name=unsafe_name):
+                archive = self.root / f"unsafe-root-{index}.zip"
+                with ZipFile(archive, "w") as zip_file:
+                    zip_file.writestr(unsafe_name, CONFIG)
+                    zip_file.writestr("mods/state.toml", STATE)
+                    zip_file.writestr(
+                        "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",
+                        MANIFEST,
+                    )
+                errors = verifier.validate_release(archive, self.root)
+                self.assertTrue(any("unsafe" in error for error in errors))
+                self.assertIn("missing staged game.toml", errors)
+
+    def test_zip_rejects_parent_component_inside_member_path(self):
+        archive = self.root / "unsafe-internal-traversal.zip"
+        unsafe_name = "nested/../game.toml"
+        with ZipFile(archive, "w") as zip_file:
+            zip_file.writestr(unsafe_name, CONFIG)
+            zip_file.writestr("mods/state.toml", STATE)
+            zip_file.writestr(
+                "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",
+                MANIFEST,
+            )
+        errors = verifier.validate_release(archive, self.root)
+        self.assertTrue(
+            any("unsafe" in error and repr(unsafe_name) in error for error in errors)
+        )
+        self.assertIn("missing staged game.toml", errors)
+
+    @mock.patch.object(verifier, "validate_authoritative_framework_pins", return_value=[])
+    def test_traversal_prefixed_profiles_cannot_satisfy_contract(self, _validate_pins):
+        (self.root / "framework_pins.txt").write_text(PINS, encoding="utf-8")
+        manifest_name = (
+            "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml"
+        )
+        cases = (
+            ("game.toml", "../game.toml", CONFIG),
+            ("mods/state.toml", r"..\mods\state.toml", STATE),
+            (manifest_name, f"../{manifest_name}", MANIFEST),
+            ("framework_pins.txt", r"..\framework_pins.txt", PINS),
+        )
+        for index, (profile_name, unsafe_name, contents) in enumerate(cases):
+            with self.subTest(profile=profile_name, name=unsafe_name):
+                archive = self.root / f"unsafe-traversal-{index}.zip"
+                members = {
+                    "game.toml": CONFIG,
+                    "mods/state.toml": STATE,
+                    manifest_name: MANIFEST,
+                    "framework_pins.txt": PINS,
+                }
+                members.pop(profile_name)
+                members[unsafe_name] = contents
+                with ZipFile(archive, "w") as zip_file:
+                    for name, text in members.items():
+                        zip_file.writestr(name, text)
+
+                errors = verifier.validate_release(archive, self.root)
+                self.assertTrue(any("unsafe" in error for error in errors))
+                self.assertIn(f"missing staged {profile_name}", errors)
+
     def test_invalid_staged_toml_fails_closed(self):
         (self.release / "game.toml").write_text("[video\n", encoding="utf-8")
         errors = verifier.validate_release(self.exe, self.root)
