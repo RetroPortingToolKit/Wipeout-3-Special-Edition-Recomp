@@ -41,6 +41,14 @@ class ReleaseWorkflowTests(unittest.TestCase):
             self.text.count("python tools/verify_release_freshness.py"), 2
         )
 
+    def test_publish_checkout_includes_recursive_submodules(self):
+        release_job = self.text.split("\n  release:\n", 1)[1]
+        checkout_step = release_job.split(
+            "\n      - name: Download all artifacts", 1
+        )[0]
+        self.assertIn("uses: actions/checkout@v4", checkout_step)
+        self.assertRegex(checkout_step, r"(?m)^          submodules: recursive$")
+
 
 if __name__ == "__main__":
     unittest.main()

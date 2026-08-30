@@ -591,6 +591,7 @@ jobs:
       - name: Checkout (for tagging on workflow_dispatch)
         uses: actions/checkout@v4
         with:
+          submodules: recursive
           fetch-depth: 0
 
       - name: Download all artifacts
