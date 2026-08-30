@@ -31,23 +31,23 @@ Historical record: [Handoff through 2026-08-28](archive/HANDOFF-through-2026-08-
 - `dist/wse-0.1.0-codex-deep-audit-windows-x64-20260830.zip` passed the final
   freshness/source-closure verifier with 1,953 canonical members. Its SHA-256 is
   `984f12a4472bd9292bfbfc2ebfc9d54d8098830e1f305355b0c7d904d2423d06`.
+- Framework revision `4ccc6be1` is reachable from
+  `fork/feat/ws-cull-widen` after a normal fast-forward push to the nested fork.
 - The current compatible gameplay receipt remains CPU 200 / PGXP off: about
   99.8 FPS / 1.00x for roughly 77 seconds, with PAL x2 presentation near the
   expected 50 FPS. This is prior acceptance evidence, not a new long soak.
 
 ## Next concrete step
 
-Deliver the nested framework history to a reachable integration ref first, then
-reconcile the title's divergent `master` with `origin/master` in a clean lane.
-After that integration, repeat the final source-closure check and the remaining
-runtime acceptance gates before any public release.
+Reconcile the title's divergent `master` with `origin/master` in a clean
+integration lane, using the now-reachable framework pin. After that integration,
+repeat the final source-closure check and the remaining runtime acceptance gates
+before any public release.
 
 ## Open blockers
 
 - Root `master` is hundreds of commits ahead and 110 behind `origin/master`;
   neither a normal push nor a force push is safe.
-- The pinned nested commit is not contained in a remote-tracking branch. Pushing
-  the root alone would publish a submodule revision other users cannot fetch.
 - Track 01 disc identity still needs resolution without making
   `--skip-hash-check` permanent.
 - A longer controlled moving-race soak and deterministic or listened CDDA proof
@@ -66,7 +66,7 @@ runtime acceptance gates before any public release.
   controlled evidence supersedes them.
 - Treat PR #7 as forensic reference only; do not merge, rebase, or build from
   it.
-- Do not push divergent branches, force-update refs, or discard unrelated
+- Do not push the divergent root branch, force-update refs, or discard unrelated
   root/nested worktree changes.
 - Do not restore unconditional diagnostic rings, broad plug-in source globs,
   inert compile-definition-only RAM behavior, or dead high-RAM generators.

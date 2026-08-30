@@ -277,10 +277,10 @@ toolchain. The optional Beetle acceptance target could not run because
 ## Delivery state
 
 The changes were committed in small, focused increments in both repositories.
-At the end of the review both local branches remain intentionally divergent from
-their upstream histories; a normal root push cannot fast-forward and a force
-push would risk canonical history. In addition, the root pins a nested commit
-that is not present on a remote-tracking branch, so pushing the title alone
-would publish an unretrievable submodule revision. No push or public release was
-performed. Integration must first deliver the nested history, then reconcile
-the title's 110 remote commits without rewriting or discarding local work.
+The nested framework branch was delivered by a normal fast-forward push to
+`tetrisgm/psxrecomp` at `fork/feat/ws-cull-widen`, making revision `4ccc6be1`
+fetchable. The root remains intentionally divergent from `origin/master`; a
+normal root push cannot fast-forward and a force push would risk canonical
+history. No root push or public release was performed. Integration must
+reconcile the title's 110 remote commits without rewriting or discarding local
+work.
