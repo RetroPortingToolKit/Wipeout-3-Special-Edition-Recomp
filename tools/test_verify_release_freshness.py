@@ -29,17 +29,35 @@ package_id = "wipeout3.enhancement.skip-fmv"
 id = "skip_fmv"
 enabled = true
 """
+MANIFEST = """\
+format_version = 5
+id = "wipeout3.enhancement.skip-fmv"
+version = "1.0.0"
+
+[[feature]]
+id = "skip_fmv"
+default_enabled = true
+"""
 
 
 class ReleaseFreshnessTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
-        (self.root / "mods/preloaded/packages").mkdir(parents=True)
+        source_package = (
+            self.root
+            / "mods/preloaded/packages/wipeout3.enhancement.skip-fmv/1.0.0"
+        )
+        source_package.mkdir(parents=True)
+        (source_package / "manifest.toml").write_text(MANIFEST, encoding="utf-8")
         (self.root / "game.toml").write_text(CONFIG, encoding="utf-8")
         (self.root / "mods/state.toml").write_text(STATE, encoding="utf-8")
         self.release = self.root / "release"
-        (self.release / "mods").mkdir(parents=True)
+        release_package = (
+            self.release / "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0"
+        )
+        release_package.mkdir(parents=True)
+        (release_package / "manifest.toml").write_text(MANIFEST, encoding="utf-8")
         (self.release / "game.toml").write_text(CONFIG, encoding="utf-8")
         (self.release / "mods/state.toml").write_text(STATE, encoding="utf-8")
         self.exe = self.release / "game.exe"
@@ -81,6 +99,10 @@ cpu_overclock=200
         with ZipFile(archive, "w") as zip_file:
             zip_file.writestr("game.toml", CONFIG)
             zip_file.writestr("mods/state.toml", STATE)
+            zip_file.writestr(
+                "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",
+                MANIFEST,
+            )
         self.assertEqual(verifier.validate_release(archive, self.root), [])
 
     def test_zip_rejects_ambiguous_profiles(self):
@@ -89,6 +111,10 @@ cpu_overclock=200
             zip_file.writestr("one/game.toml", CONFIG)
             zip_file.writestr("two/game.toml", CONFIG)
             zip_file.writestr("mods/state.toml", STATE)
+            zip_file.writestr(
+                "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",
+                MANIFEST,
+            )
         errors = verifier.validate_release(archive, self.root)
         self.assertTrue(any("multiple candidates for game.toml" in error for error in errors))
 
@@ -96,6 +122,22 @@ cpu_overclock=200
         (self.release / "game.toml").write_text("[video\n", encoding="utf-8")
         errors = verifier.validate_release(self.exe, self.root)
         self.assertTrue(any("cannot parse staged game.toml" in error for error in errors))
+
+    def test_package_manifests_must_match_source(self):
+        manifest = (
+            self.release
+            / "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml"
+        )
+        manifest.write_text(MANIFEST.replace("default_enabled = true", "default_enabled = false"), encoding="utf-8")
+        errors = verifier.validate_release(self.exe, self.root)
+        self.assertTrue(any("manifest.toml" in error and "source profile" in error for error in errors))
+
+    def test_package_catalog_must_match_source(self):
+        unexpected = self.release / "mods/packages/legacy.package/1.0.0"
+        unexpected.mkdir(parents=True)
+        (unexpected / "manifest.toml").write_text(MANIFEST, encoding="utf-8")
+        errors = verifier.validate_release(self.exe, self.root)
+        self.assertTrue(any("unexpected" in error and "legacy.package" in error for error in errors))
 
 
 if __name__ == "__main__":

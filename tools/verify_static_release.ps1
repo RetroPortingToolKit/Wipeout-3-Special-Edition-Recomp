@@ -15,86 +15,17 @@ $cacheText = Get-Content -Raw -LiteralPath $cache
 $buildGraph = Join-Path $build 'build.ninja'
 if (-not (Test-Path -LiteralPath $buildGraph)) { throw "Missing generated build graph: $buildGraph" }
 $buildGraphText = Get-Content -Raw -LiteralPath $buildGraph
-$config = Join-Path $build 'game.toml'
-if (-not (Test-Path -LiteralPath $config)) { throw "Missing staged game.toml: $build" }
-$configText = Get-Content -Raw -LiteralPath $config
-if ($configText -notmatch '(?m)^openbios\s*=\s*false\r?$') {
-    throw 'OpenBIOS is not explicitly disabled in the staged game config.'
+
+$sourceRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+$profileVerifier = Join-Path $PSScriptRoot 'verify_release_freshness.py'
+if (-not (Test-Path -LiteralPath $profileVerifier)) {
+    throw "Missing release profile verifier: $profileVerifier"
 }
-if ($configText -notmatch '(?m)^bios_hle\s*=\s*true\r?$') {
-    throw 'BIOS intro skip is not explicitly enabled in the staged game config.'
+& python $profileVerifier $exe.FullName --source-root $sourceRoot
+if ($LASTEXITCODE -ne 0) {
+    throw 'Staged release profile does not match the current source profile.'
 }
-if ($configText -notmatch '(?m)^supersampling\s*=\s*4\r?$') {
-    throw 'The clean release does not carry the required 4x supersampling baseline.'
-}
-if ($configText -notmatch '(?m)^hd_textures\s*=\s*true\r?$') {
-    throw 'HD texture replacement is not enabled in the remaster configuration.'
-}
-if ($configText -notmatch '(?m)^cpu_overclock\s*=\s*900\r?$') {
-    throw 'The release does not carry the required 900% CPU overclock.'
-}
-foreach ($setting in @('geometry_correction', 'perspective_texturing', 'pgxp_depth', 'pgxp_cpu_mode')) {
-    if ($configText -notmatch ('(?m)^' + [regex]::Escape($setting) + '\s*=\s*false\r?$')) {
-        throw "PGXP must remain disabled for WipEout 3 SE: $setting"
-    }
-}
-if ($configText -notmatch '(?m)^offer_ultrawide\s*=\s*true\r?$') {
-    throw 'Widescreen configuration does not offer ultrawide output.'
-}
-if ($configText -notmatch '(?m)^auto_skip_fmv\s*=\s*true\r?$') {
-    throw 'FMV skipping is not enabled in the remaster configuration.'
-}
-$skipManifest = Join-Path $build 'mods/packages/psx.enhancement.skip-fmv/1.0.0/manifest.toml'
-if (-not (Test-Path -LiteralPath $skipManifest)) { throw "Missing staged skip-opening manifest: $skipManifest" }
-if ((Get-Content -Raw -LiteralPath $skipManifest) -notmatch '(?m)^default_enabled\s*=\s*false\r?$') {
-    throw 'Skip-opening-sequence is enabled by default; it must remain user-controlled.'
-}
-$pgxpManifest = Join-Path $build 'mods/packages/psx.enhancement.pgxp/1.0.0/manifest.toml'
-if (-not (Test-Path -LiteralPath $pgxpManifest)) { throw "Missing staged PGXP manifest: $pgxpManifest" }
-if ((Get-Content -Raw -LiteralPath $pgxpManifest) -notmatch '(?m)^default_enabled\s*=\s*false\r?$') {
-    throw 'PGXP precision is enabled by default despite the title-specific visual failure.'
-}
-$fr120 = Join-Path $build 'mods/packages/wipeout3.enhancement.framerate-120/1.0.0/manifest.toml'
-if (Test-Path -LiteralPath $fr120) {
-    if ((Get-Content -Raw -LiteralPath $fr120) -match '(?m)^default_enabled\s*=\s*true\r?$') {
-        throw 'Experimental NTSC-120 package is enabled by default for a PAL release.'
-    }
-}
-$pal100 = Join-Path $build 'mods/packages/wipeout3.enhancement.framerate-pal100/1.0.0/manifest.toml'
-if (-not (Test-Path -LiteralPath $pal100)) { throw "Missing staged PAL x2 manifest: $pal100" }
-if ((Get-Content -Raw -LiteralPath $pal100) -notmatch '(?m)^default_enabled\s*=\s*true\r?$') {
-    throw 'PAL x2 / 100 Hz is not enabled by default; the release requirement is automatic 100 Hz for the authenticated PAL title.'
-}
-$allowedPackages = @{
-    'psx.enhancement.8mb-ram' = $true
-    'psx.enhancement.fast-loading' = $true
-    'psx.enhancement.pgxp' = $true
-    'psx.enhancement.skip-fmv' = $true
-    'wipeout3.enhancement.framerate-pal100' = $true
-    'wipeout3.enhancement.widescreen' = $true
-}
-$packageRoot = Join-Path $build 'mods/packages'
-if (-not (Test-Path -LiteralPath $packageRoot)) { throw "Missing staged package root: $packageRoot" }
-$stagedPackages = @(Get-ChildItem -LiteralPath $packageRoot -Directory | Select-Object -ExpandProperty Name)
-foreach ($package in $stagedPackages) {
-    if (-not $allowedPackages.ContainsKey($package)) {
-        throw "Retired, legacy, experimental, or duplicate package staged: $package"
-    }
-}
-foreach ($package in $allowedPackages.Keys) {
-    if ($stagedPackages -notcontains $package) { throw "Required active package is missing from staging: $package" }
-}
-$retiredRoot = Join-Path $build 'mods/retired-packages'
-if (Test-Path -LiteralPath $retiredRoot) { throw "Retired package payload staged: $retiredRoot" }
-$state = Join-Path $build 'mods/state.toml'
-if (-not (Test-Path -LiteralPath $state)) { throw "Missing staged mod state: $state" }
-$stateText = Get-Content -Raw -LiteralPath $state
-if ($stateText -notmatch '(?ms)\[\[feature\]\]\s*package_id\s*=\s*"wipeout3\.enhancement\.framerate-pal100".*?\benabled\s*=\s*true\b') {
-    throw 'PAL x2 / 100 Hz is not enabled in staged mods/state.toml.'
-}
-if ($stateText -notmatch '(?ms)\[\[feature\]\]\s*package_id\s*=\s*"psx\.enhancement\.pgxp".*?\benabled\s*=\s*false\b') {
-    throw 'PGXP is not disabled in staged mods/state.toml.'
-}
+
 if ($cacheText -notmatch '(?m)^PSX_SETUP_WIZARD:BOOL=OFF\r?$') {
     throw 'Setup wizard is enabled or not explicitly disabled.'
 }
@@ -103,6 +34,17 @@ if ($cacheText -notmatch '(?m)^PSXRECOMP_BIOS_STEMS:STRING=SCPH1001\r?$') {
 }
 if ($buildGraphText -match '(?i)(psx_interpreter\.c|psx_interpreter\.c\.obj)') {
     throw 'Release build graph links the real interpreter; native builds must use stub_interpreter.c.'
+}
+$sourceCmake = Get-Content -Raw -LiteralPath (Join-Path $sourceRoot 'CMakeLists.txt')
+$ramContract = [regex]::Match(
+    $sourceCmake,
+    'PSX_MAIN_RAM_BYTES=(?<bytes>[^\s\)]+)'
+)
+if ($ramContract.Success) {
+    $expectedDefine = 'PSX_MAIN_RAM_BYTES=' + $ramContract.Groups['bytes'].Value
+    if ($buildGraphText -notmatch [regex]::Escape($expectedDefine)) {
+        throw "Release build graph does not compile the source RAM contract: $expectedDefine"
+    }
 }
 
 $staged = Get-ChildItem -LiteralPath $build -Recurse -File

@@ -17,16 +17,6 @@ function Require-Path([string]$RelativePath, [string]$Description) {
     }
 }
 
-function Require-EnabledPackage([string]$PackageId) {
-    $statePath = Join-Path $root 'mods/state.toml'
-    $state = Get-Content -LiteralPath $statePath -Raw
-    $escaped = [regex]::Escape($PackageId)
-    $pattern = '(?ms)\[\[feature\]\]\s*package_id\s*=\s*"' + $escaped + '".*?\benabled\s*=\s*true\b'
-    if ($state -notmatch $pattern) {
-        $failures.Add("package is not enabled in mods/state.toml: $PackageId")
-    }
-}
-
 Require-Path $ExeName 'portable executable'
 Require-Path 'psx_game_version.txt' 'version stamp'
 Require-Path 'game.toml' 'game configuration'
@@ -48,59 +38,15 @@ if (Test-Path -LiteralPath $retired) {
     $failures.Add('release contains development-only mods/retired-packages')
 }
 
-$statePath = Join-Path $root 'mods/state.toml'
-if (Test-Path -LiteralPath $statePath) {
-    @(
-        'psx.enhancement.8mb-ram'
-        'psx.enhancement.fast-loading'
-        'psx.enhancement.skip-fmv'
-        'wipeout3.enhancement.framerate-pal100'
-        'wipeout3.enhancement.widescreen'
-    ) | ForEach-Object { Require-EnabledPackage $_ }
-
-    $pgxpPattern = '(?ms)\[\[feature\]\]\s*package_id\s*=\s*"psx\.enhancement\.pgxp".*?\benabled\s*=\s*false\b'
-    if ((Get-Content -LiteralPath $statePath -Raw) -notmatch $pgxpPattern) {
-        $failures.Add('PGXP must be disabled in mods/state.toml for WipEout 3 SE')
-    }
-
-    $expectedPackages = @{
-        'psx.enhancement.8mb-ram' = $true
-        'psx.enhancement.fast-loading' = $true
-        'psx.enhancement.pgxp' = $true
-        'psx.enhancement.skip-fmv' = $true
-        'wipeout3.enhancement.framerate-pal100' = $true
-        'wipeout3.enhancement.widescreen' = $true
-    }
-    $packageDir = Join-Path $root 'mods/packages'
-    if (Test-Path -LiteralPath $packageDir) {
-        $stagedPackages = @(Get-ChildItem -LiteralPath $packageDir -Directory)
-        foreach ($packageId in $expectedPackages.Keys) {
-            if (($stagedPackages | Where-Object Name -eq $packageId).Count -eq 0) {
-                $failures.Add("release is missing required active package: $packageId")
-            }
-        }
-        $stagedPackages | ForEach-Object {
-            if (-not $expectedPackages.ContainsKey($_.Name)) {
-                $failures.Add("release contains an unconfigured mod package: $($_.Name)")
-            }
-        }
-        $nestedLegacy = Get-ChildItem -LiteralPath $packageDir -Recurse -Directory |
-            Where-Object { $_.Name -match '(?i)(ntsc|120|legacy|retired|duplicate)' }
-        foreach ($directory in $nestedLegacy) {
-            $failures.Add("release contains a retired/legacy package path: $($directory.FullName)")
-        }
-    }
-}
-
-# The high-detail profile must be explicit: a missing state file otherwise
-# silently falls back to retail 2 MB RAM even when the executable is present.
-$profileVerifier = Join-Path $PSScriptRoot 'verify_8mb_profile.py'
+$sourceRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+$profileVerifier = Join-Path $PSScriptRoot 'verify_release_freshness.py'
+$exePath = Join-Path $root $ExeName
 if (-not (Test-Path -LiteralPath $profileVerifier)) {
-    $failures.Add("missing 8 MB profile verifier: $profileVerifier")
-} else {
-    & python $profileVerifier $root
+    $failures.Add("missing release profile verifier: $profileVerifier")
+} elseif (Test-Path -LiteralPath $exePath) {
+    & python $profileVerifier $exePath --source-root $sourceRoot
     if ($LASTEXITCODE -ne 0) {
-        $failures.Add('shipped 8 MB + 900% profile verification failed')
+        $failures.Add('shipped source-profile verification failed')
     }
 }
 
@@ -118,5 +64,5 @@ if ($failures.Count -gt 0) {
 }
 
 Write-Output "PASS: portable one-folder release layout verified: $root"
-Write-Output 'PASS: executable, assets/fonts, assets/img, bezels, active mods, and enabled defaults are present'
+Write-Output 'PASS: executable, assets, bezels, packages, and source-owned defaults are present'
 Write-Output 'PASS: developer BIOS/disc/settings sidecars and retired mod payloads are absent'

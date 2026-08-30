@@ -8,7 +8,7 @@ from pathlib import Path
 
 import tomllib
 
-PROFILE_FILES = ("game.toml", "mods/state.toml")
+BASE_PROFILE_FILES = ("game.toml", "mods/state.toml")
 
 
 def _parse_toml(name: str, text: str, origin: str, errors: list[str]) -> dict | None:
@@ -23,11 +23,74 @@ def _parse_toml(name: str, text: str, origin: str, errors: list[str]) -> dict | 
     return value
 
 
+def _package_refs(state: dict, origin: str, errors: list[str]) -> dict[str, str]:
+    packages = state.get("package")
+    if not isinstance(packages, list) or not packages:
+        errors.append(f"{origin} mods/state.toml has no package catalog")
+        return {}
+
+    refs: dict[str, str] = {}
+    for index, package in enumerate(packages):
+        if not isinstance(package, dict):
+            errors.append(f"{origin} package entry {index} is not a TOML table")
+            continue
+        package_id = package.get("id")
+        version = package.get("version")
+        if not isinstance(package_id, str) or not package_id:
+            errors.append(f"{origin} package entry {index} has no id")
+            continue
+        if not isinstance(version, str) or not version:
+            errors.append(f"{origin} package {package_id} has no version")
+            continue
+        if package_id in refs:
+            errors.append(f"{origin} package catalog repeats {package_id}")
+            continue
+        refs[package_id] = version
+    return refs
+
+
+def _source_profile(source_root: Path) -> tuple[dict[str, str], dict[str, str], list[str]]:
+    files: dict[str, str] = {}
+    errors: list[str] = []
+    source_paths = {name: source_root / Path(name) for name in BASE_PROFILE_FILES}
+    for name, path in source_paths.items():
+        try:
+            files[name] = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            errors.append(f"cannot read source {name}: {exc}")
+
+    state_text = files.get("mods/state.toml")
+    if state_text is None:
+        return files, {}, errors
+    state = _parse_toml("mods/state.toml", state_text, "source", errors)
+    if state is None:
+        return files, {}, errors
+    package_refs = _package_refs(state, "source", errors)
+    for package_id, version in package_refs.items():
+        relative = Path(package_id) / version / "manifest.toml"
+        candidates = (
+            source_root / "mods" / "preloaded" / "packages" / relative,
+            source_root / "psxrecomp" / "mods" / "builtin" / "packages" / relative,
+        )
+        matches = [path for path in candidates if path.is_file()]
+        profile_name = f"mods/packages/{relative.as_posix()}"
+        if len(matches) != 1:
+            errors.append(
+                f"source package {package_id} {version} has {len(matches)} manifest candidates"
+            )
+            continue
+        try:
+            files[profile_name] = matches[0].read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            errors.append(f"cannot read source {profile_name}: {exc}")
+    return files, package_refs, errors
+
+
 def _check_texts(staged: dict[str, str], source: dict[str, str]) -> list[str]:
     """Require staged defaults to be structurally identical to source defaults."""
 
     errors: list[str] = []
-    for name in PROFILE_FILES:
+    for name in source:
         staged_text = staged.get(name)
         source_text = source.get(name)
         if staged_text is None:
@@ -43,16 +106,24 @@ def _check_texts(staged: dict[str, str], source: dict[str, str]) -> list[str]:
     return errors
 
 
-def _read_artifact_files(artifact: Path) -> tuple[dict[str, str], list[str]]:
+def _read_artifact_files(
+    artifact: Path, profile_names: tuple[str, ...]
+) -> tuple[dict[str, str], set[str] | None, list[str]]:
     files: dict[str, str] = {}
     errors: list[str] = []
+    staged_packages: set[str] | None = None
     if artifact.suffix.lower() == ".zip":
         try:
             with zipfile.ZipFile(artifact) as archive:
-                matches = {name: [] for name in PROFILE_FILES}
+                matches = {name: [] for name in profile_names}
+                staged_packages = set()
                 for name in archive.namelist():
                     normalized = name.replace("\\", "/").lstrip("./")
-                    for profile_name in PROFILE_FILES:
+                    parts = normalized.split("/")
+                    for index in range(len(parts) - 2):
+                        if parts[index : index + 2] == ["mods", "packages"]:
+                            staged_packages.add(parts[index + 2])
+                    for profile_name in profile_names:
                         if normalized == profile_name or normalized.endswith(f"/{profile_name}"):
                             matches[profile_name].append(name)
                 for profile_name, names in matches.items():
@@ -67,14 +138,17 @@ def _read_artifact_files(artifact: Path) -> tuple[dict[str, str], list[str]]:
             errors.append(f"cannot inspect ZIP: {exc}")
     else:
         release = artifact.parent
-        for name in PROFILE_FILES:
+        for name in profile_names:
             path = release / name
             if path.is_file():
                 try:
                     files[name] = path.read_text(encoding="utf-8")
-                except UnicodeDecodeError as exc:
+                except (OSError, UnicodeDecodeError) as exc:
                     errors.append(f"cannot decode staged {name}: {exc}")
-    return files, errors
+        package_root = release / "mods" / "packages"
+        if package_root.is_dir():
+            staged_packages = {path.name for path in package_root.iterdir() if path.is_dir()}
+    return files, staged_packages, errors
 
 
 def validate_release(artifact: Path, source_root: Path) -> list[str]:
@@ -85,12 +159,12 @@ def validate_release(artifact: Path, source_root: Path) -> list[str]:
     if not source_root.is_dir():
         return ["source root must be an existing directory"]
 
-    source_paths = {
-        "game.toml": source_root / "game.toml",
-        "mods/state.toml": source_root / "mods" / "state.toml",
-    }
+    source, package_refs, source_errors = _source_profile(source_root)
+    errors.extend(source_errors)
+
+    source_paths = [source_root / "game.toml", source_root / "mods" / "state.toml"]
     preloaded = source_root / "mods" / "preloaded"
-    relevant = [path for path in source_paths.values() if path.is_file()]
+    relevant = [path for path in source_paths if path.is_file()]
     if preloaded.is_dir():
         relevant.extend(path for path in preloaded.rglob("*") if path.is_file())
     if not relevant:
@@ -98,17 +172,22 @@ def validate_release(artifact: Path, source_root: Path) -> list[str]:
     elif artifact.stat().st_mtime < max(p.stat().st_mtime for p in relevant):
         errors.append("release artifact predates relevant source/config")
 
-    source: dict[str, str] = {}
-    for name, path in source_paths.items():
-        if not path.is_file():
-            continue
-        try:
-            source[name] = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError) as exc:
-            errors.append(f"cannot read source {name}: {exc}")
-
-    staged, read_errors = _read_artifact_files(artifact)
-    return errors + read_errors + _check_texts(staged, source)
+    staged, staged_packages, read_errors = _read_artifact_files(
+        artifact, tuple(source)
+    )
+    errors.extend(read_errors)
+    errors.extend(_check_texts(staged, source))
+    expected_packages = set(package_refs)
+    if staged_packages is None:
+        errors.append("missing staged mods/packages catalog")
+    elif staged_packages != expected_packages:
+        missing = sorted(expected_packages - staged_packages)
+        unexpected = sorted(staged_packages - expected_packages)
+        if missing:
+            errors.append("staged package catalog is missing: " + ", ".join(missing))
+        if unexpected:
+            errors.append("staged package catalog is unexpected: " + ", ".join(unexpected))
+    return errors
 
 
 def main(argv: list[str] | None = None) -> int:
