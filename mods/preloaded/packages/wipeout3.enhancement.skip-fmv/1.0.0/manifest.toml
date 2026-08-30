@@ -1,0 +1,22 @@
+format_version = 5
+id = "wipeout3.enhancement.skip-fmv"
+version = "1.0.0"
+name = "Skip WipEout 3 FMVs"
+author = "WipEout 3 Special Edition Recomp"
+description = "Skip the opening and attract-mode FMVs using the generic runtime detector."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SCES-02845"
+
+[[feature]]
+id = "skip_fmv"
+name = "Skip FMVs"
+description = "Skip detected FMV presentation on boot."
+group = "Quality of life"
+default_enabled = true
+
+[[plugin]]
+feature = "skip_fmv"
+id = "wipeout3.skip_fmv"

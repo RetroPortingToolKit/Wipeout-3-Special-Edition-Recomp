@@ -93,10 +93,10 @@ renderer = "opengl"
 window_width = 1280
 # Hueponik's MAX-detail path requires the GooseStation-equivalent 900% CPU
 # overclock; PAL x2 remains a separate CRTC/presentation setting.
-# Keep the guest CPU at its retail rate.  PAL100 pacing is provided by the
-# framerate enhancement; overclocking the emulated CPU makes CD audio and
-# gameplay run faster than the display cadence.
-cpu_overclock = 100
+# Keep the verified 200% guest CPU setting. PAL100 pacing is provided by the
+# framerate enhancement; the guest/display cadence remains independently
+# limited to the authenticated 100 Hz PAL x2 mode.
+cpu_overclock = 200
 # PGXP is intentionally off for WipEout 3 SE. Its recovered geometry is
 # visibly incorrect in races; retain the native GTE/GPU path until title-
 # specific validation proves otherwise.

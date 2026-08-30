@@ -8,48 +8,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(PSXRECOMP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/psxrecomp" CACHE PATH
     "Path to psxrecomp")
 
-# High-RAM overlay generation consumes captured retail-game bytes, so it must
-# remain an explicit local operation rather than part of configure or the
-# default build.  A clean checkout can always configure without the private
-# capture corpus; requesting this target without its prerequisites fails
-# closed in tools/generate_highram_overlay.py with an actionable diagnostic.
-set(WIPEOUT3_HIGHRAM_CAPTURES "" CACHE FILEPATH
-    "Private high-RAM overlay capture JSON used by generate-highram-overlay")
-set(WIPEOUT3_HIGHRAM_OUTPUT
-    "${CMAKE_CURRENT_SOURCE_DIR}/generated/overlays_highram.c" CACHE FILEPATH
-    "Generated high-RAM static overlay translation unit")
-find_program(WIPEOUT3_HIGHRAM_PYTHON NAMES python3 python py)
-set(_WIPEOUT3_HIGHRAM_GENERATOR
-    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_highram_overlay.py")
-
-if(WIPEOUT3_HIGHRAM_CAPTURES STREQUAL "")
-    add_custom_target(generate-highram-overlay
-        COMMAND "${CMAKE_COMMAND}" -E echo
-            "ERROR: set -DWIPEOUT3_HIGHRAM_CAPTURES=<private-overlay-capture.json> before requesting generate-highram-overlay."
-        COMMAND "${CMAKE_COMMAND}" -E false
-        VERBATIM)
-elseif(WIPEOUT3_HIGHRAM_PYTHON AND EXISTS "${_WIPEOUT3_HIGHRAM_GENERATOR}")
-    add_custom_target(generate-highram-overlay
-        COMMAND "${WIPEOUT3_HIGHRAM_PYTHON}"
-            "${_WIPEOUT3_HIGHRAM_GENERATOR}"
-            --capture "${WIPEOUT3_HIGHRAM_CAPTURES}"
-            --output "${WIPEOUT3_HIGHRAM_OUTPUT}"
-        COMMENT "Generating bounded high-RAM native overlay dispatch"
-        VERBATIM)
-elseif(NOT EXISTS "${_WIPEOUT3_HIGHRAM_GENERATOR}")
-    add_custom_target(generate-highram-overlay
-        COMMAND "${CMAKE_COMMAND}" -E echo
-            "ERROR: generate-highram-overlay requires ${_WIPEOUT3_HIGHRAM_GENERATOR}."
-        COMMAND "${CMAKE_COMMAND}" -E false
-        VERBATIM)
-else()
-    add_custom_target(generate-highram-overlay
-        COMMAND "${CMAKE_COMMAND}" -E echo
-            "ERROR: generate-highram-overlay requires a Python 3 interpreter (python3, python, or py)."
-        COMMAND "${CMAKE_COMMAND}" -E false
-        VERBATIM)
-endif()
-
 # --- Standalone product surfaces -------------------------------------------
 # Scaffold prompts / flags fill these. Without recomp-ui, PSX_RECOMP_UI is OFF.
 # Setup-host CI requires WIZARD_CMAKE_BLOCK / ENABLE_SETUP_WIZARD (FORCE_SETUP_HOST
@@ -65,7 +23,7 @@ set(PSX_REWIND OFF CACHE BOOL
 option(PSX_ENABLE_LTO
     "Enable LTO for the full-detail recompiled runtime" ON)
 set(PSX_SETUP_WIZARD OFF CACHE BOOL
-    "Advertise first-run setup wizard + Generate & rebuild in recomp-ui" FORCE)
+    "Advertise first-run setup wizard + Generate & rebuild in recomp-ui")
 # WipEout 3 is a retail-BIOS product: never link or stage OpenBIOS.
 set(PSXRECOMP_BIOS_STEMS "SCPH1001" CACHE STRING
     "Retail BIOS backend required for WipEout 3" FORCE)
@@ -75,11 +33,16 @@ set(PSXRECOMP_BIOS_STEM "SCPH1001" CACHE STRING
 # packages that are not part of that catalog (for example CD-speed, NTSC, or
 # duplicate experimental variants) out of the one-folder release entirely.
 set(PSX_BUILTIN_MOD_ALLOWLIST
-    "psx.enhancement.8mb-ram;psx.enhancement.fast-loading;psx.enhancement.pgxp;psx.enhancement.skip-fmv")
+    "psx.enhancement.fast-loading;psx.enhancement.pgxp")
 include("${PSXRECOMP_ROOT}/runtime/runtime.cmake")
 
-file(GLOB WIPEOUT3_MOD_PLUGIN_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/mods/*.c")
+# Compile only plug-ins referenced by the shipped title manifests. Research
+# generators may leave retired variants under src/mods; a glob would silently
+# turn those files into product behavior.
+set(WIPEOUT3_MOD_PLUGIN_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/mods/wipeout3_framerate_100_plugin.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/mods/wipeout3_skip_fmv_plugin.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/mods/wipeout3_widescreen_plugin.c")
 
 psxrecomp_add_game_runtime(psx-runtime
     # PGXP is not optional for this title. WipEout 3 renders at up to 16x
@@ -105,11 +68,20 @@ psxrecomp_add_game_runtime(psx-runtime
     # them; without it the runtime correctly rejects the original AOT image
     # but falls through to the interpreter for every relocated call.
     GAME_OVERLAY_STATIC_C "${CMAKE_CURRENT_SOURCE_DIR}/generated/overlays_static.c"
-    GAME_OVERLAY_EXTRA_STATIC_C "${CMAKE_CURRENT_SOURCE_DIR}/generated/overlays_highram.c"
     CODEGEN_SETUP_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/codegen_setup.c"
         ${WIPEOUT3_MOD_PLUGIN_SOURCES}
 )
+
+# WipEout 3 is an authenticated expanded-RAM title.  The generic upstream
+# runtime now exposes the retail/expanded geometry contract; selecting 8 MiB
+# here is title policy and keeps the framework default faithful at 2 MiB.
+foreach(_WIPEOUT3_RUNTIME_TARGET IN ITEMS psx-runtime psx-runtime-pgxp)
+    if(TARGET ${_WIPEOUT3_RUNTIME_TARGET})
+        target_compile_definitions(${_WIPEOUT3_RUNTIME_TARGET} PRIVATE
+            PSX_MAIN_RAM_BYTES=0x00800000u)
+    endif()
+endforeach()
 
 # Stage runtime configs next to the exe for direct build/ launches. Only copy
 # files that exist — never fail POST_BUILD when game_options.toml is absent.
