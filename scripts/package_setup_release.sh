@@ -56,6 +56,7 @@ exec bash "${PACKAGER}" \
   --disc-hint "your legally owned Wipeout 3 Special Edition disc" \
   --project-file CMakeLists.txt \
   --project-file game.toml \
+  --project-file game_options.toml \
   --project-file VERSION \
   --project-file codegen_setup.c \
   --project-file codegen_setup.h \

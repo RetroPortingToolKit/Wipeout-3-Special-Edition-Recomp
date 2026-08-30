@@ -3,16 +3,23 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
+import unicodedata
 import zipfile
 from pathlib import Path
 
 import tomllib
 from framework_pins import validate_authoritative_framework_pins
 
-BASE_PROFILE_FILES = ("game.toml", "mods/state.toml")
+BASE_PROFILE_FILES = ("game.toml", "game_options.toml", "mods/state.toml")
 FRAMEWORK_PINS_FILE = "framework_pins.txt"
 WINDOWS_DRIVE_PREFIX = re.compile(r"^[A-Za-z]:")
+WINDOWS_RESERVED_NAMES = frozenset(
+    {"aux", "con", "nul", "prn"}
+    | {f"com{index}" for index in range(1, 10)}
+    | {f"lpt{index}" for index in range(1, 10)}
+)
 SETUP_REBUILD_FILES = frozenset(
     {
         "CMakeLists.txt",
@@ -22,13 +29,17 @@ SETUP_REBUILD_FILES = frozenset(
         "codegen_setup.c",
         "codegen_setup.h",
         "game.toml",
+        "game_options.toml",
         "mods/state.toml",
     }
 )
 SETUP_REBUILD_DIRS = frozenset(
     {"bezels", "launcher_assets", "mods/preloaded", "seeds", "src/mods"}
 )
+SETUP_REBUILD_TREES = frozenset({"psxrecomp", "recomp-ui"})
 OPTIONAL_SETUP_REBUILD_FILES = frozenset({"catalog_identity.json"})
+SETUP_TREE_EXTRA_FILES = frozenset({"psxrecomp/retcomm-sdk.json"})
+SETUP_TREE_EXTRA_PREFIXES = ("psxrecomp/recompiler/build/",)
 
 
 def _normalize_zip_member(name: str, errors: list[str]) -> str | None:
@@ -52,13 +63,73 @@ def _normalize_zip_member(name: str, errors: list[str]) -> str | None:
         return None
 
     parts = normalized.split("/")
-    if ".." in parts:
+    path_parts = parts[:-1] if parts[-1:] == [""] else parts
+    if not path_parts or "" in path_parts:
+        errors.append(f"ZIP contains unsafe repeated path separator: {name!r}")
+        return None
+    if ".." in path_parts:
         errors.append(f"ZIP contains unsafe parent-traversal member path: {name!r}")
         return None
-    if "." in parts:
+    if "." in path_parts:
         errors.append(f"ZIP contains unsafe non-canonical member path: {name!r}")
         return None
+    for part in path_parts:
+        if any(ord(char) < 32 for char in part):
+            errors.append(f"ZIP contains unsafe control character in member path: {name!r}")
+            return None
+        if part.endswith((" ", ".")):
+            errors.append(f"ZIP contains unsafe Windows-trimmed member path: {name!r}")
+            return None
+        if ":" in part:
+            errors.append(f"ZIP contains unsafe colon in member path: {name!r}")
+            return None
+        if part.split(".", 1)[0].casefold() in WINDOWS_RESERVED_NAMES:
+            errors.append(f"ZIP contains unsafe Windows device member path: {name!r}")
+            return None
     return normalized
+
+
+def _zip_member_map(
+    archive: zipfile.ZipFile, errors: list[str]
+) -> dict[str, list[str]]:
+    """Collect safe names and reject extraction-equivalent collisions globally."""
+
+    members: dict[str, list[str]] = {}
+    canonical: dict[str, list[tuple[str, bool]]] = {}
+    for name in archive.namelist():
+        normalized = _normalize_zip_member(name, errors)
+        if normalized is None:
+            continue
+        members.setdefault(normalized, []).append(name)
+        is_directory = normalized.endswith("/")
+        path = normalized.removesuffix("/")
+        key = unicodedata.normalize("NFC", path).casefold()
+        canonical.setdefault(key, []).append((name, is_directory))
+
+    for entries in canonical.values():
+        if len(entries) > 1:
+            errors.append(
+                "ZIP contains extraction-colliding members: "
+                + ", ".join(name for name, _is_directory in entries)
+            )
+
+    file_keys = {
+        key
+        for key, entries in canonical.items()
+        if any(not is_directory for _name, is_directory in entries)
+    }
+    conflicts: set[tuple[str, str]] = set()
+    for key, entries in canonical.items():
+        parts = key.split("/")
+        for index in range(1, len(parts)):
+            parent = "/".join(parts[:index])
+            if parent in file_keys:
+                conflicts.add((canonical[parent][0][0], entries[0][0]))
+    for parent, child in sorted(conflicts):
+        errors.append(
+            f"ZIP contains file/directory prefix conflict: {parent!r}, {child!r}"
+        )
+    return members
 
 
 def _parse_toml(name: str, text: str, origin: str, errors: list[str]) -> dict | None:
@@ -169,17 +240,15 @@ def _read_artifact_files(
                 matches = {name: [] for name in profile_names}
                 staged_packages = set()
                 staged_members = set()
-                for name in archive.namelist():
-                    normalized = _normalize_zip_member(name, errors)
-                    if normalized is None:
-                        continue
+                member_map = _zip_member_map(archive, errors)
+                for normalized, names in member_map.items():
                     staged_members.add(normalized)
                     parts = normalized.split("/")
                     if len(parts) >= 3 and parts[:2] == ["mods", "packages"]:
                         staged_packages.add(parts[2])
                     for profile_name in profile_names:
                         if normalized == profile_name:
-                            matches[profile_name].append(name)
+                            matches[profile_name].extend(names)
                 for profile_name, names in matches.items():
                     if len(names) > 1:
                         errors.append(
@@ -205,6 +274,77 @@ def _read_artifact_files(
     return files, staged_packages, staged_members, errors
 
 
+def _git_tracked_source_paths(
+    root: Path,
+    pathspecs: tuple[str, ...],
+    label: str,
+    errors: list[str],
+    *,
+    recurse_submodules: bool = False,
+    clean_pathspecs: tuple[str, ...] | None = None,
+) -> list[Path] | None:
+    """Return clean tracked paths, or None only for an intentionally vendored tree."""
+
+    git_marker = root / ".git"
+    if not (
+        git_marker.is_file()
+        or git_marker.is_dir()
+        or git_marker.is_symlink()
+    ):
+        return None
+
+    try:
+        probe = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"],
+            check=False,
+            capture_output=True,
+        )
+    except OSError as exc:
+        errors.append(f"cannot inspect Git-backed setup source {label}: {exc}")
+        return []
+    if probe.returncode != 0 or probe.stdout.strip() != b"true":
+        errors.append(f"cannot inspect Git-backed setup source: {label}")
+        return []
+
+    if clean_pathspecs is None:
+        clean_pathspecs = pathspecs
+    for diff_args in (("diff", "--quiet"), ("diff", "--cached", "--quiet")):
+        if not clean_pathspecs:
+            break
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                *diff_args,
+                "--ignore-submodules=none",
+                "--",
+                *clean_pathspecs,
+            ],
+            check=False,
+            capture_output=True,
+        )
+        if result.returncode == 1:
+            errors.append(f"source setup rebuild input has dirty tracked files: {label}")
+        elif result.returncode != 0:
+            errors.append(f"cannot inspect source setup rebuild input: {label}")
+
+    command = ["git", "-C", str(root), "ls-files", "-z"]
+    if recurse_submodules:
+        command.append("--recurse-submodules")
+    command.extend(("--", *pathspecs))
+    result = subprocess.run(command, check=False, capture_output=True)
+    if result.returncode != 0:
+        errors.append(f"cannot enumerate source setup rebuild input: {label}")
+        return []
+    try:
+        names = result.stdout.decode("utf-8").split("\0")
+    except UnicodeDecodeError as exc:
+        errors.append(f"cannot decode source setup rebuild input {label}: {exc}")
+        return []
+    return [root / Path(name) for name in names if name]
+
+
 def _source_setup_rebuild_files(
     source_root: Path,
 ) -> tuple[dict[str, bytes], list[str]]:
@@ -216,25 +356,91 @@ def _source_setup_rebuild_files(
         for name in OPTIONAL_SETUP_REBUILD_FILES
         if (source_root / name).is_file()
     )
+    title_pathspecs = tuple(sorted(required_files | SETUP_REBUILD_DIRS))
+    title_paths = _git_tracked_source_paths(
+        source_root,
+        title_pathspecs,
+        "title project",
+        errors,
+        clean_pathspecs=tuple(
+            path for path in title_pathspecs if path != "VERSION"
+        ),
+    )
+    if title_paths is None:
+        title_paths = [source_root / name for name in sorted(required_files)]
+        for directory in sorted(SETUP_REBUILD_DIRS):
+            root = source_root / directory
+            if root.is_dir():
+                title_paths.extend(path for path in root.rglob("*") if path.is_file())
+
+    tracked_title_names = {
+        path.relative_to(source_root).as_posix()
+        for path in title_paths
+        if path.is_relative_to(source_root)
+    }
     for name in sorted(required_files):
         path = source_root / name
         if not path.is_file():
             errors.append(f"source setup rebuild file is missing: {name}")
+        elif name not in tracked_title_names:
+            errors.append(f"source setup rebuild file is not tracked: {name}")
+    for directory in sorted(SETUP_REBUILD_DIRS):
+        if not (source_root / directory).is_dir():
+            errors.append(f"source setup rebuild directory is missing: {directory}")
+
+    for path in sorted(set(title_paths)):
+        if not path.is_file():
+            errors.append(
+                "tracked source setup rebuild input is missing: "
+                + path.relative_to(source_root).as_posix()
+            )
+            continue
+        name = path.relative_to(source_root).as_posix()
+        if name not in required_files and not any(
+            name.startswith(f"{directory}/") for directory in SETUP_REBUILD_DIRS
+        ):
             continue
         try:
             files[name] = path.read_bytes()
         except OSError as exc:
             errors.append(f"cannot read source setup rebuild file {name}: {exc}")
 
-    for directory in sorted(SETUP_REBUILD_DIRS):
-        root = source_root / directory
+    for tree in sorted(SETUP_REBUILD_TREES):
+        root = source_root / tree
         if not root.is_dir():
-            errors.append(f"source setup rebuild directory is missing: {directory}")
+            errors.append(f"source setup rebuild tree is missing: {tree}")
             continue
-        for path in sorted(root.rglob("*")):
+
+        paths = _git_tracked_source_paths(
+            root,
+            (".",),
+            tree,
+            errors,
+            recurse_submodules=True,
+        )
+        if paths is None:
+            paths = []
+            for path in root.rglob("*"):
+                relative = path.relative_to(root)
+                if any(
+                    part in {".git", "__pycache__", "build"}
+                    or part.startswith("build-")
+                    for part in relative.parts
+                ):
+                    continue
+                if tree == "psxrecomp" and relative.parts[:1] == ("generated",):
+                    continue
+                if path.is_file():
+                    paths.append(path)
+
+        for path in sorted(paths):
             if not path.is_file():
+                errors.append(
+                    f"tracked source setup rebuild input is missing: "
+                    f"{tree}/{path.relative_to(root).as_posix()}"
+                )
                 continue
-            name = path.relative_to(source_root).as_posix()
+            name = f"{tree}/{path.relative_to(root).as_posix()}"
             try:
                 files[name] = path.read_bytes()
             except OSError as exc:
@@ -253,13 +459,18 @@ def _check_setup_rebuild_closure(
     missing_files = sorted(expected - staged_members)
     if missing_files:
         errors.append("setup archive is missing rebuild files: " + ", ".join(missing_files))
+    closure_prefixes = SETUP_REBUILD_DIRS | SETUP_REBUILD_TREES
     actual_directory_files = {
         name
         for name in staged_members
         if not name.endswith("/")
-        and any(name.startswith(f"{directory}/") for directory in SETUP_REBUILD_DIRS)
+        and any(name.startswith(f"{directory}/") for directory in closure_prefixes)
     }
-    unexpected_files = sorted(actual_directory_files - expected)
+    unexpected_files = sorted(
+        name
+        for name in actual_directory_files - expected - SETUP_TREE_EXTRA_FILES
+        if not any(name.startswith(prefix) for prefix in SETUP_TREE_EXTRA_PREFIXES)
+    )
     if unexpected_files:
         errors.append(
             "setup archive contains unexpected rebuild files: "
@@ -269,10 +480,7 @@ def _check_setup_rebuild_closure(
     normalized_names: dict[str, list[str]] = {}
     try:
         with zipfile.ZipFile(artifact) as archive:
-            for name in archive.namelist():
-                normalized = _normalize_zip_member(name, [])
-                if normalized is not None:
-                    normalized_names.setdefault(normalized, []).append(name)
+            normalized_names = _zip_member_map(archive, [])
             for name, source_bytes in source_files.items():
                 candidates = normalized_names.get(name, [])
                 if len(candidates) > 1:
@@ -314,7 +522,7 @@ def validate_release(
                 validate_authoritative_framework_pins(source_pins, source_root)
             )
 
-    source_paths = [source_root / "game.toml", source_root / "mods" / "state.toml"]
+    source_paths = [source_root / Path(name) for name in BASE_PROFILE_FILES]
     if source_pins is not None:
         source_paths.append(source_pins_path)
     preloaded = source_root / "mods" / "preloaded"

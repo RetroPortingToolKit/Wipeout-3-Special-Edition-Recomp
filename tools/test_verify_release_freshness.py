@@ -2,6 +2,7 @@ import os
 import sys
 import tempfile
 import unittest
+import warnings
 from pathlib import Path
 from unittest import mock
 from zipfile import ZipFile
@@ -17,6 +18,10 @@ supersampling = 4
 
 [runtime]
 overlay_cache = false
+"""
+OPTIONS = """\
+[launcher]
+renderer_labels = ["Software", "OpenGL", "Vulkan"]
 """
 STATE = """\
 format_version = 2
@@ -58,6 +63,7 @@ class ReleaseFreshnessTests(unittest.TestCase):
         source_package.mkdir(parents=True)
         (source_package / "manifest.toml").write_text(MANIFEST, encoding="utf-8")
         (self.root / "game.toml").write_text(CONFIG, encoding="utf-8")
+        (self.root / "game_options.toml").write_text(OPTIONS, encoding="utf-8")
         (self.root / "mods/state.toml").write_text(STATE, encoding="utf-8")
         self.release = self.root / "release"
         release_package = (
@@ -66,6 +72,7 @@ class ReleaseFreshnessTests(unittest.TestCase):
         release_package.mkdir(parents=True)
         (release_package / "manifest.toml").write_text(MANIFEST, encoding="utf-8")
         (self.release / "game.toml").write_text(CONFIG, encoding="utf-8")
+        (self.release / "game_options.toml").write_text(OPTIONS, encoding="utf-8")
         (self.release / "mods/state.toml").write_text(STATE, encoding="utf-8")
         self.exe = self.release / "game.exe"
         self.exe.write_bytes(b"exe")
@@ -89,6 +96,22 @@ class ReleaseFreshnessTests(unittest.TestCase):
         self.assertTrue(any("game.toml" in error and "source profile" in error for error in errors))
         self.assertTrue(any("mods/state.toml" in error and "source profile" in error for error in errors))
 
+    def test_game_options_must_be_present_and_match_source(self):
+        (self.release / "game_options.toml").unlink()
+        errors = verifier.validate_release(self.exe, self.root)
+        self.assertIn("missing staged game_options.toml", errors)
+
+        (self.release / "game_options.toml").write_text(
+            OPTIONS.replace("Vulkan", "Metal"), encoding="utf-8"
+        )
+        errors = verifier.validate_release(self.exe, self.root)
+        self.assertTrue(
+            any(
+                "game_options.toml" in error and "source profile" in error
+                for error in errors
+            )
+        )
+
     def test_toml_layout_differences_do_not_fail(self):
         reordered = """\
 [runtime]
@@ -105,6 +128,7 @@ cpu_overclock=200
         archive = self.root / "release.zip"
         with ZipFile(archive, "w") as zip_file:
             zip_file.writestr("game.toml", CONFIG)
+            zip_file.writestr("game_options.toml", OPTIONS)
             zip_file.writestr("mods/state.toml", STATE)
             zip_file.writestr(
                 "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",
@@ -122,6 +146,14 @@ cpu_overclock=200
             path = self.root / directory / "payload.bin"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(f"source:{directory}\n".encode())
+        embedded = {
+            "psxrecomp/runtime/runtime.cmake": b"source:runtime.cmake\n",
+            "recomp-ui/src/ui.cpp": b"source:ui.cpp\n",
+        }
+        for name, contents in embedded.items():
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(contents)
 
         source_files: dict[str, bytes] = {}
         for name in verifier.SETUP_REBUILD_FILES:
@@ -132,6 +164,7 @@ cpu_overclock=200
                     source_files[path.relative_to(self.root).as_posix()] = (
                         path.read_bytes()
                     )
+        source_files.update(embedded)
 
         def write_archive(
             *,
@@ -147,6 +180,7 @@ cpu_overclock=200
                         )
                 else:
                     zip_file.writestr("game.toml", CONFIG)
+                    zip_file.writestr("game_options.toml", OPTIONS)
                     zip_file.writestr("mods/state.toml", STATE)
                 zip_file.writestr(
                     "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",
@@ -175,16 +209,34 @@ cpu_overclock=200
         )
         self.assertTrue(any("codegen_setup.c" in error for error in errors))
 
+        write_archive(complete=True, stale="psxrecomp/runtime/runtime.cmake")
+        errors = verifier.validate_release(
+            archive, self.root, require_setup_closure=True
+        )
+        self.assertTrue(any("psxrecomp/runtime/runtime.cmake" in error for error in errors))
+
         write_archive(complete=True, unexpected=True)
         errors = verifier.validate_release(
             archive, self.root, require_setup_closure=True
         )
         self.assertTrue(any("src/mods/retired.c" in error for error in errors))
 
+    def test_git_backed_setup_source_probe_failure_fails_closed(self):
+        (self.root / ".git").write_text("gitdir: missing\n", encoding="utf-8")
+        failed_probe = mock.Mock(returncode=128, stdout=b"", stderr=b"broken")
+        errors: list[str] = []
+        with mock.patch.object(verifier.subprocess, "run", return_value=failed_probe):
+            paths = verifier._git_tracked_source_paths(
+                self.root, ("game.toml",), "title project", errors
+            )
+        self.assertEqual(paths, [])
+        self.assertTrue(any("cannot inspect Git-backed" in error for error in errors))
+
     def test_zip_ignores_nested_project_profiles(self):
         archive = self.root / "setup-host.zip"
         with ZipFile(archive, "w") as zip_file:
             zip_file.writestr("game.toml", CONFIG)
+            zip_file.writestr("game_options.toml", OPTIONS)
             zip_file.writestr("mods/state.toml", STATE)
             zip_file.writestr(
                 "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",
@@ -213,6 +265,7 @@ cpu_overclock=200
         archive = self.root / "release.zip"
         with ZipFile(archive, "w") as zip_file:
             zip_file.writestr("game.toml", CONFIG)
+            zip_file.writestr("game_options.toml", OPTIONS)
             zip_file.writestr("mods/state.toml", STATE)
             zip_file.writestr(
                 "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",
@@ -236,6 +289,7 @@ cpu_overclock=200
         archive = self.root / "release.zip"
         with ZipFile(archive, "w") as zip_file:
             zip_file.writestr("game.toml", CONFIG)
+            zip_file.writestr("game_options.toml", OPTIONS)
             zip_file.writestr("mods/state.toml", STATE)
             zip_file.writestr(
                 "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",
@@ -263,6 +317,7 @@ cpu_overclock=200
         archive = self.root / "ambiguous.zip"
         with ZipFile(archive, "w") as zip_file:
             zip_file.writestr("game.toml", CONFIG)
+            zip_file.writestr("game_options.toml", OPTIONS)
             zip_file.writestr("./game.toml", CONFIG)
             zip_file.writestr("mods/state.toml", STATE)
             zip_file.writestr(
@@ -309,6 +364,52 @@ cpu_overclock=200
             any("unsafe" in error and repr(unsafe_name) in error for error in errors)
         )
         self.assertIn("missing staged game.toml", errors)
+
+    def test_zip_rejects_extraction_equivalent_member_collisions(self):
+        cases = (
+            (
+                "case-fold",
+                (("src/mods/payload.bin", b"good"),
+                 ("SRC/MODS/PAYLOAD.BIN", b"bad")),
+                "extraction-colliding",
+            ),
+            (
+                "repeated-separator",
+                (("runtime/payload.dll", b"good"),
+                 ("runtime//payload.dll", b"bad")),
+                "repeated path separator",
+            ),
+            (
+                "duplicate",
+                (("Wipeout.exe", b"good"), ("Wipeout.exe", b"bad")),
+                "extraction-colliding",
+            ),
+            (
+                "file-prefix",
+                (("game.toml/child", b"bad"),),
+                "file/directory prefix conflict",
+            ),
+        )
+        for index, (label, members, expected) in enumerate(cases):
+            with self.subTest(case=label):
+                archive = self.root / f"collision-{index}.zip"
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", UserWarning)
+                    with ZipFile(archive, "w") as zip_file:
+                        zip_file.writestr("game.toml", CONFIG)
+                        zip_file.writestr("game_options.toml", OPTIONS)
+                        zip_file.writestr("mods/state.toml", STATE)
+                        zip_file.writestr(
+                            "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",
+                            MANIFEST,
+                        )
+                        for name, contents in members:
+                            zip_file.writestr(name, contents)
+                errors = verifier.validate_release(archive, self.root)
+                self.assertTrue(
+                    any(expected in error for error in errors),
+                    errors,
+                )
 
     @mock.patch.object(verifier, "validate_authoritative_framework_pins", return_value=[])
     def test_traversal_prefixed_profiles_cannot_satisfy_contract(self, _validate_pins):
