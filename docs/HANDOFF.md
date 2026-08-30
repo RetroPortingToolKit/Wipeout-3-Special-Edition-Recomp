@@ -46,7 +46,7 @@ before any public release.
 
 ## Open blockers
 
-- Root `master` is hundreds of commits ahead and 110 behind `origin/master`;
+- Root `master` is hundreds of commits ahead and 112 behind `origin/master`;
   neither a normal push nor a force push is safe.
 - Track 01 disc identity still needs resolution without making
   `--skip-hash-check` permanent.
