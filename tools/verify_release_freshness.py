@@ -1,59 +1,45 @@
-"""Fail-closed freshness and default contract for a portable release artifact."""
+"""Fail-closed freshness and source-profile contract for a release artifact."""
 from __future__ import annotations
 
 import argparse
-import os
-import re
 import sys
 import zipfile
 from pathlib import Path
 
+import tomllib
 
-REQUIRED_PACKAGES = frozenset({
-    "psx.enhancement.8mb-ram",
-    "psx.enhancement.fast-loading",
-    "psx.enhancement.skip-fmv",
-    "wipeout3.enhancement.framerate-pal100",
-    "wipeout3.enhancement.widescreen",
-})
-REQUIRED_CONFIG = {
-    "cpu_overclock": "900",
-    "geometry_correction": "false",
-    "perspective_texturing": "false",
-    "pgxp_depth": "false",
-    "pgxp_cpu_mode": "false",
-    "offer_ultrawide": "true",
-    "hd_textures": "true",
-    "supersampling": "4",
-}
+PROFILE_FILES = ("game.toml", "mods/state.toml")
 
 
-def _enabled_packages(state: str) -> set[str]:
-    found: set[str] = set()
-    for block in re.findall(r"\[\[feature\]\](.*?)(?=\[\[feature\]\]|\Z)", state, re.S):
-        package = re.search(r'^\s*package_id\s*=\s*"([^"]+)"', block, re.M)
-        enabled = re.search(r"^\s*enabled\s*=\s*true\s*$", block, re.M)
-        if package and enabled:
-            found.add(package.group(1))
-    return found
+def _parse_toml(name: str, text: str, origin: str, errors: list[str]) -> dict | None:
+    try:
+        value = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as exc:
+        errors.append(f"cannot parse {origin} {name}: {exc}")
+        return None
+    if not isinstance(value, dict):
+        errors.append(f"{origin} {name} is not a TOML table")
+        return None
+    return value
 
 
-def _check_texts(files: dict[str, str]) -> list[str]:
+def _check_texts(staged: dict[str, str], source: dict[str, str]) -> list[str]:
+    """Require staged defaults to be structurally identical to source defaults."""
+
     errors: list[str] = []
-    config = files.get("game.toml")
-    state = files.get("mods/state.toml")
-    if config is None:
-        errors.append("missing staged game.toml")
-    else:
-        for key, value in REQUIRED_CONFIG.items():
-            if not re.search(rf"^\s*{re.escape(key)}\s*=\s*{re.escape(value)}\s*$", config, re.M):
-                errors.append(f"game.toml lacks current default {key} = {value}")
-    if state is None:
-        errors.append("missing staged mods/state.toml")
-    else:
-        actual = _enabled_packages(state)
-        if actual != REQUIRED_PACKAGES:
-            errors.append("enabled package catalog does not match the required WipEout profile")
+    for name in PROFILE_FILES:
+        staged_text = staged.get(name)
+        source_text = source.get(name)
+        if staged_text is None:
+            errors.append(f"missing staged {name}")
+            continue
+        if source_text is None:
+            errors.append(f"missing source {name}")
+            continue
+        staged_value = _parse_toml(name, staged_text, "staged", errors)
+        source_value = _parse_toml(name, source_text, "source", errors)
+        if staged_value is not None and source_value is not None and staged_value != source_value:
+            errors.append(f"staged {name} does not match the current source profile")
     return errors
 
 
@@ -63,17 +49,25 @@ def _read_artifact_files(artifact: Path) -> tuple[dict[str, str], list[str]]:
     if artifact.suffix.lower() == ".zip":
         try:
             with zipfile.ZipFile(artifact) as archive:
+                matches = {name: [] for name in PROFILE_FILES}
                 for name in archive.namelist():
                     normalized = name.replace("\\", "/").lstrip("./")
-                    if normalized.endswith("game.toml"):
-                        files["game.toml"] = archive.read(name).decode()
-                    elif normalized.endswith("mods/state.toml"):
-                        files["mods/state.toml"] = archive.read(name).decode()
+                    for profile_name in PROFILE_FILES:
+                        if normalized == profile_name or normalized.endswith(f"/{profile_name}"):
+                            matches[profile_name].append(name)
+                for profile_name, names in matches.items():
+                    if len(names) > 1:
+                        errors.append(
+                            f"ZIP contains multiple candidates for {profile_name}: "
+                            + ", ".join(names)
+                        )
+                    elif names:
+                        files[profile_name] = archive.read(names[0]).decode("utf-8")
         except (OSError, zipfile.BadZipFile, UnicodeDecodeError) as exc:
             errors.append(f"cannot inspect ZIP: {exc}")
     else:
         release = artifact.parent
-        for name in ("game.toml", "mods/state.toml"):
+        for name in PROFILE_FILES:
             path = release / name
             if path.is_file():
                 try:
@@ -91,17 +85,30 @@ def validate_release(artifact: Path, source_root: Path) -> list[str]:
     if not source_root.is_dir():
         return ["source root must be an existing directory"]
 
-    source_files = [source_root / "game.toml", source_root / "mods" / "preloaded"]
-    relevant = [p for p in source_files if p.is_file()]
-    if source_files[1].is_dir():
-        relevant.extend(p for p in source_files[1].rglob("*") if p.is_file())
+    source_paths = {
+        "game.toml": source_root / "game.toml",
+        "mods/state.toml": source_root / "mods" / "state.toml",
+    }
+    preloaded = source_root / "mods" / "preloaded"
+    relevant = [path for path in source_paths.values() if path.is_file()]
+    if preloaded.is_dir():
+        relevant.extend(path for path in preloaded.rglob("*") if path.is_file())
     if not relevant:
         errors.append("relevant source/config files are missing")
     elif artifact.stat().st_mtime < max(p.stat().st_mtime for p in relevant):
         errors.append("release artifact predates relevant source/config")
 
-    files, read_errors = _read_artifact_files(artifact)
-    return errors + read_errors + _check_texts(files)
+    source: dict[str, str] = {}
+    for name, path in source_paths.items():
+        if not path.is_file():
+            continue
+        try:
+            source[name] = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            errors.append(f"cannot read source {name}: {exc}")
+
+    staged, read_errors = _read_artifact_files(artifact)
+    return errors + read_errors + _check_texts(staged, source)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -114,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
         print("FAIL release freshness")
         print("\n".join(f"- {error}" for error in errors))
         return 1
-    print("PASS release freshness: current source/config and required defaults verified")
+    print("PASS release freshness: current source/config profile verified")
     return 0
 
 
