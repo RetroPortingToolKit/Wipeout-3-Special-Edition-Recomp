@@ -62,7 +62,7 @@ on:
       - 'v*'
 
 concurrency:
-  group: wse-release-${{ github.event_name }}-${{ github.ref }}-${{ github.run_id }}
+  group: wse-release-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -90,15 +90,22 @@ jobs:
       - name: Normalize version / tag
         id: meta
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          INPUT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
+          INPUT_PUBLISH: ${{ github.event.inputs.publish }}
+          INPUT_REUSE_EMITTERS: ${{ github.event.inputs.reuse_cached_emitters }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            RAW="${{ github.event.inputs.version }}"
-            BUMP="${{ github.event.inputs.bump || 'patch' }}"
-            PUBLISH="${{ github.event.inputs.publish }}"
-            REUSE="${{ github.event.inputs.reuse_cached_emitters }}"
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            RAW="${INPUT_VERSION}"
+            BUMP="${INPUT_BUMP}"
+            PUBLISH="${INPUT_PUBLISH}"
+            REUSE="${INPUT_REUSE_EMITTERS}"
           else
-            RAW="${{ github.ref_name }}"
+            RAW="${REF_NAME}"
             BUMP="patch"
             PUBLISH="true"
             REUSE="true"
@@ -138,7 +145,7 @@ jobs:
             fi
             TAG="v${VER}"
           fi
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && \
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]] && \
              git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null 2>&1; then
             echo "::error::tag ${TAG} already exists — bump again or pass an explicit version"
             exit 1
@@ -530,142 +537,48 @@ jobs:
           echo "lobby pin ok: ${BUILT} (${STAMP})"
 
       - name: Package setup zip
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
+          RUNNER_OS: ${{ runner.os }}
         run: |
           set -euo pipefail
           chmod +x scripts/package_setup_release.sh
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then
             export PSXRECOMP_RUNTIME_BIN_DIR=/mingw64/bin
             export BPE_RUNTIME_BIN_DIR=/mingw64/bin
           fi
           export RELEASE_VERSION
           # Lean zip (no embedded toolchain/). RetComM / wizard download
           # cmake-clang-v1; pass --embed-toolchain only for offline-first packs.
-          scripts/package_setup_release.sh build-ci "${{ matrix.artifact }}" build-recompiler
+          scripts/package_setup_release.sh build-ci "${ARTIFACT}" build-recompiler
           ls -la dist/
 
-      - name: Package player (lean) zip
-        run: |
-          set -euo pipefail
-          chmod +x scripts/package_lean_release.sh
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            export PSXRECOMP_RUNTIME_BIN_DIR=/mingw64/bin
-            export BPE_RUNTIME_BIN_DIR=/mingw64/bin
-          fi
-          export RELEASE_VERSION
-          # Play-only package: game + precompiled overlay shards + the overlay
-          # autocompile prerequisites. No source tree, no SDK, no wizard.
-          scripts/package_lean_release.sh build-ci "${{ matrix.artifact }}" build-recompiler
-          ls -la dist/
+      - name: Setup Python for release verification
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-      # A bundle that cannot compile overlays silently runs every mod-patched
-      # region on the dirty-RAM interpreter for the life of the install (a
-      # shipped build was measured at 29.3M interpreted dispatches over 12.9k
-      # frames because compile_overlays.py was not in the zip). The packager
-      # asserts this at stage time; re-assert it on the ACTUAL zip contents so
-      # no packaging refactor can reship the regression.
-      - name: Verify bundle prerequisites
-        shell: bash
+      - name: Verify packaged release freshness
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
         run: |
           set -euo pipefail
-          fail=0
-          for zip in dist/wse-*-${{ matrix.artifact }}.zip dist/wse-*-${{ matrix.artifact }}-lean.zip; do
-            [[ -f "${zip}" ]] || continue
-            echo "== ${zip}"
-            list="$(unzip -Z1 "${zip}")"
-            for req in \
-              'psxrecomp/tools/compile_overlays.py' \
-              'psxrecomp/runtime/include/overlay_api.h'
-            do
-              if ! grep -qxF "${req}" <<<"${list}"; then
-                echo "   MISSING: ${req}" >&2
-                fail=1
-              fi
-            done
-            if ! grep -qE '^psxrecomp/recompiler/build/psxrecomp-game(\.exe)?$' <<<"${list}"; then
-              echo "   MISSING: psxrecomp/recompiler/build/psxrecomp-game" >&2
-              fail=1
-            fi
-            shards="$(grep -cE '^cache/.*\.so$|^cache/.*\.dll$' <<<"${list}" || true)"
-            ranges="$(grep -cE '^cache/.*\.ranges$' <<<"${list}" || true)"
-            echo "   shards=${shards} ranges=${ranges}"
-            if [[ "${shards}" -gt 0 && "${shards}" -ne "${ranges}" ]]; then
-              echo "   MISMATCH: every shard needs its .ranges sidecar" >&2
-              fail=1
-            fi
-            # Build-time transients must never ship (stale locks confuse a
-            # player install and waste bundle space).
-            if grep -qE '\.pair-lock$|\.pair-txn\.json$' <<<"${list}"; then
-              echo "   LEAKED build transients (.pair-lock/.pair-txn.json)" >&2
-              fail=1
-            fi
-            # Generated/retained C is dev-box triage output, not a runtime input
-            # (the loader reads .so + .ranges only). compile_overlays.py keeps a
-            # failed fragment's C on audit failure deliberately, and one build
-            # left 786 files / 326 MB in the cache — 10x the shards themselves.
-            if grep -qE '^cache/.*\.c$' <<<"${list}"; then
-              echo "   LEAKED generated C in cache/ ($(grep -cE '^cache/.*\.c$' <<<"${list}") files)" >&2
-              fail=1
-            fi
-            if grep -qE '^cache/.*\.(lock|lock\.invocation)$' <<<"${list}"; then
-              echo "   LEAKED build locks in cache/" >&2
-              fail=1
-            fi
-            # Codegen-hash agreement. Presence is not enough: the overlay cache
-            # path embeds a content hash of the emitter sources, so a cache (or
-            # an emitter) built before the last emitter change is silently
-            # unloadable — the loader scans a directory that does not exist,
-            # registers nothing, and every mod-patched region interprets at the
-            # documented 10-30x frame cost. That shipped once: bundles carried
-            # cg10_79105b41 caches and a 79105b41-baked emitter against a
-            # 7a17c3b1 runtime, measured at 13.1M interpreted dispatches over
-            # 3,623 frames. Compare all three against the header the bundle
-            # itself ships.
-            tmp="$(mktemp -d)"
-            unzip -qo "${zip}" 'psxrecomp/runtime/include/overlay_codegen_hash.h' \
-                               'psxrecomp/recompiler/build/psxrecomp-game' -d "${tmp}" || true
-            want="$(sed -nE 's/.*PSX_OVERLAY_CODEGEN_HASH[[:space:]]+0x([0-9a-fA-F]{8})u?.*/\1/p' \
-                    "${tmp}/psxrecomp/runtime/include/overlay_codegen_hash.h" 2>/dev/null | head -1)"
-            if [[ -z "${want}" ]]; then
-              echo "   UNREADABLE: overlay_codegen_hash.h (cannot verify cache tag)" >&2
-              fail=1
-            else
-              echo "   runtime codegen hash=${want}"
-              tags="$(grep -oE '^cache/[^/]+/(gcc|tcc)/[^/]+/cg[0-9]+_[0-9a-f]{8}_[^/]+' <<<"${list}" \
-                      | sed 's#.*/##' | sort -u || true)"
-              for tag in ${tags}; do
-                if [[ "${tag}" != *"_${want}_"* ]]; then
-                  echo "   ORPHANED CACHE: ${tag} cannot load (runtime wants ${want})" >&2
-                  fail=1
-                fi
-              done
-              emit="${tmp}/psxrecomp/recompiler/build/psxrecomp-game"
-              if [[ -x "${emit}" ]]; then
-                baked="$("${emit}" --codegen-hash 2>/dev/null | head -1 | tr -d '[:space:]')"
-                if [[ "${baked}" != "${want}" ]]; then
-                  echo "   STALE EMITTER: bakes ${baked:-<none>}, runtime wants ${want}" >&2
-                  echo "   (autocompile on an install would hard-fail its staleness guard)" >&2
-                  fail=1
-                fi
-              fi
-            fi
-            rm -rf "${tmp}"
-          done
-          [[ "${fail}" -eq 0 ]] || {
-            echo "Bundle prerequisite check FAILED — overlay autocompile would be" >&2
-            echo "impossible on an install and mod-patched code would stay interpreted." >&2
+          shopt -s nullglob
+          archives=(dist/wse-*-"${ARTIFACT}".zip)
+          if [[ "${#archives[@]}" -eq 0 ]]; then
+            echo "::error::no packaged ZIP found for ${ARTIFACT}"
             exit 1
-          }
-          echo "bundle prerequisites OK"
+          fi
+          for archive in "${archives[@]}"; do
+            python tools/verify_release_freshness.py "${archive}" --source-root .
+          done
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           # Artifact name uses the title zip prefix (e.g. bpe, motk).
           name: wse-${{ matrix.artifact }}
-          # Both shapes: the setup-host zip and the play-only (-lean) zip.
-          path: |
-            dist/wse-*-${{ matrix.artifact }}.zip
-            dist/wse-*-${{ matrix.artifact }}-lean.zip
+          path: dist/wse-*-${{ matrix.artifact }}.zip
           if-no-files-found: error
           retention-days: 30
 
@@ -692,6 +605,24 @@ jobs:
           mkdir -p dist
           find artifacts -type f -name 'wse-*.zip' -exec cp -v {} dist/ \;
           ls -la dist/
+
+      - name: Setup Python for release verification
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify downloaded release freshness
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          archives=(dist/wse-*.zip)
+          if [[ "${#archives[@]}" -eq 0 ]]; then
+            echo "::error::no downloaded release ZIPs found"
+            exit 1
+          fi
+          for archive in "${archives[@]}"; do
+            python tools/verify_release_freshness.py "${archive}" --source-root .
+          done
 
       - name: Ensure release tag exists
         if: github.event_name == 'workflow_dispatch'
