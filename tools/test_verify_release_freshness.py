@@ -114,29 +114,52 @@ cpu_overclock=200
 
     def test_setup_zip_must_contain_the_complete_rebuild_closure(self):
         archive = self.root / "setup-host.zip"
+        for name in verifier.SETUP_REBUILD_FILES - set(verifier.BASE_PROFILE_FILES):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(f"source:{name}\n".encode())
+        for directory in verifier.SETUP_REBUILD_DIRS:
+            path = self.root / directory / "payload.bin"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(f"source:{directory}\n".encode())
 
-        def write_archive(*, complete: bool) -> None:
+        source_files: dict[str, bytes] = {}
+        for name in verifier.SETUP_REBUILD_FILES:
+            source_files[name] = (self.root / name).read_bytes()
+        for directory in verifier.SETUP_REBUILD_DIRS:
+            for path in (self.root / directory).rglob("*"):
+                if path.is_file():
+                    source_files[path.relative_to(self.root).as_posix()] = (
+                        path.read_bytes()
+                    )
+
+        def write_archive(
+            *,
+            complete: bool,
+            stale: str | None = None,
+            unexpected: bool = False,
+        ) -> None:
             with ZipFile(archive, "w") as zip_file:
-                zip_file.writestr("game.toml", CONFIG)
-                zip_file.writestr("mods/state.toml", STATE)
+                if complete:
+                    for name, contents in source_files.items():
+                        zip_file.writestr(
+                            name, b"stale" if name == stale else contents
+                        )
+                else:
+                    zip_file.writestr("game.toml", CONFIG)
+                    zip_file.writestr("mods/state.toml", STATE)
                 zip_file.writestr(
                     "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",
                     MANIFEST,
                 )
-                if complete:
-                    for name in verifier.SETUP_REBUILD_FILES - set(
-                        verifier.BASE_PROFILE_FILES
-                    ):
-                        zip_file.writestr(name, b"fixture")
-                    for directory in verifier.SETUP_REBUILD_DIRS:
-                        zip_file.writestr(f"{directory}/fixture", b"fixture")
+                if unexpected:
+                    zip_file.writestr("src/mods/retired.c", b"stale")
 
         write_archive(complete=False)
         errors = verifier.validate_release(
             archive, self.root, require_setup_closure=True
         )
         self.assertTrue(any("missing rebuild files" in error for error in errors))
-        self.assertTrue(any("missing rebuild directories" in error for error in errors))
 
         write_archive(complete=True)
         self.assertEqual(
@@ -145,6 +168,18 @@ cpu_overclock=200
             ),
             [],
         )
+
+        write_archive(complete=True, stale="codegen_setup.c")
+        errors = verifier.validate_release(
+            archive, self.root, require_setup_closure=True
+        )
+        self.assertTrue(any("codegen_setup.c" in error for error in errors))
+
+        write_archive(complete=True, unexpected=True)
+        errors = verifier.validate_release(
+            archive, self.root, require_setup_closure=True
+        )
+        self.assertTrue(any("src/mods/retired.c" in error for error in errors))
 
     def test_zip_ignores_nested_project_profiles(self):
         archive = self.root / "setup-host.zip"

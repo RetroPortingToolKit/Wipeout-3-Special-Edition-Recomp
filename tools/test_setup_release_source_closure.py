@@ -7,8 +7,24 @@ from verify_release_freshness import SETUP_REBUILD_DIRS, SETUP_REBUILD_FILES
 ROOT = Path(__file__).resolve().parents[1]
 WRAPPER = ROOT / "scripts/package_setup_release.sh"
 
-REQUIRED_FILES = SETUP_REBUILD_FILES
-REQUIRED_DIRS = SETUP_REBUILD_DIRS
+REQUIRED_FILES = {
+    "CMakeLists.txt",
+    "README.md",
+    "VERSION",
+    "assets/psxrecomp.ico",
+    "codegen_setup.c",
+    "codegen_setup.h",
+    "game.toml",
+    "mods/state.toml",
+}
+REQUIRED_DIRS = {
+    "bezels",
+    "launcher_assets",
+    "mods/preloaded",
+    "seeds",
+    "src/mods",
+}
+PROJECT_DIRS = REQUIRED_DIRS - {"bezels"}
 
 
 def _literal_arguments(option: str) -> set[str]:
@@ -21,7 +37,12 @@ def test_setup_archive_contains_title_rebuild_inputs() -> None:
     packaged_dirs = _literal_arguments("--project-dir")
 
     assert REQUIRED_FILES <= packaged_files
-    assert REQUIRED_DIRS <= packaged_dirs
+    assert PROJECT_DIRS <= packaged_dirs
+
+
+def test_verifier_rebuild_contract_is_independently_complete() -> None:
+    assert SETUP_REBUILD_FILES == REQUIRED_FILES
+    assert SETUP_REBUILD_DIRS == REQUIRED_DIRS
 
 
 def test_literal_rebuild_inputs_exist_and_are_tracked() -> None:

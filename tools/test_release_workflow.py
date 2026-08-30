@@ -60,7 +60,9 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("submodules: recursive", validate_job)
         self.assertIn("python -m pytest", validate_job)
         self.assertIn("-DBUILD_TESTING=ON", validate_job)
-        self.assertIn("ctest --test-dir build-validation", validate_job)
+        self.assertIn(
+            "ctest --test-dir build-validation --no-tests=error", validate_job
+        )
         self.assertIn("needs: [prepare, validate]", build_job)
 
 

@@ -187,7 +187,7 @@ jobs:
       - name: Run framework regression tests
         run: |
           cmake --build build-validation --parallel 4
-          ctest --test-dir build-validation --output-on-failure
+          ctest --test-dir build-validation --no-tests=error --output-on-failure
 
   build:
     name: ${{ matrix.artifact }}

@@ -17,6 +17,7 @@ SETUP_REBUILD_FILES = frozenset(
     {
         "CMakeLists.txt",
         "VERSION",
+        "README.md",
         "assets/psxrecomp.ico",
         "codegen_setup.c",
         "codegen_setup.h",
@@ -25,8 +26,9 @@ SETUP_REBUILD_FILES = frozenset(
     }
 )
 SETUP_REBUILD_DIRS = frozenset(
-    {"launcher_assets", "mods/preloaded", "seeds", "src/mods"}
+    {"bezels", "launcher_assets", "mods/preloaded", "seeds", "src/mods"}
 )
+OPTIONAL_SETUP_REBUILD_FILES = frozenset({"catalog_identity.json"})
 
 
 def _normalize_zip_member(name: str, errors: list[str]) -> str | None:
@@ -203,23 +205,87 @@ def _read_artifact_files(
     return files, staged_packages, staged_members, errors
 
 
-def _check_setup_rebuild_closure(staged_members: set[str] | None) -> list[str]:
+def _source_setup_rebuild_files(
+    source_root: Path,
+) -> tuple[dict[str, bytes], list[str]]:
+    files: dict[str, bytes] = {}
+    errors: list[str] = []
+    required_files = set(SETUP_REBUILD_FILES)
+    required_files.update(
+        name
+        for name in OPTIONAL_SETUP_REBUILD_FILES
+        if (source_root / name).is_file()
+    )
+    for name in sorted(required_files):
+        path = source_root / name
+        if not path.is_file():
+            errors.append(f"source setup rebuild file is missing: {name}")
+            continue
+        try:
+            files[name] = path.read_bytes()
+        except OSError as exc:
+            errors.append(f"cannot read source setup rebuild file {name}: {exc}")
+
+    for directory in sorted(SETUP_REBUILD_DIRS):
+        root = source_root / directory
+        if not root.is_dir():
+            errors.append(f"source setup rebuild directory is missing: {directory}")
+            continue
+        for path in sorted(root.rglob("*")):
+            if not path.is_file():
+                continue
+            name = path.relative_to(source_root).as_posix()
+            try:
+                files[name] = path.read_bytes()
+            except OSError as exc:
+                errors.append(f"cannot read source setup rebuild file {name}: {exc}")
+    return files, errors
+
+
+def _check_setup_rebuild_closure(
+    artifact: Path, source_root: Path, staged_members: set[str] | None
+) -> list[str]:
     if staged_members is None:
         return ["setup rebuild closure requires a ZIP artifact"]
 
-    errors: list[str] = []
-    missing_files = sorted(SETUP_REBUILD_FILES - staged_members)
+    source_files, errors = _source_setup_rebuild_files(source_root)
+    expected = set(source_files)
+    missing_files = sorted(expected - staged_members)
     if missing_files:
         errors.append("setup archive is missing rebuild files: " + ", ".join(missing_files))
-    missing_dirs = sorted(
-        directory
-        for directory in SETUP_REBUILD_DIRS
-        if not any(name.startswith(f"{directory}/") for name in staged_members)
-    )
-    if missing_dirs:
+    actual_directory_files = {
+        name
+        for name in staged_members
+        if not name.endswith("/")
+        and any(name.startswith(f"{directory}/") for directory in SETUP_REBUILD_DIRS)
+    }
+    unexpected_files = sorted(actual_directory_files - expected)
+    if unexpected_files:
         errors.append(
-            "setup archive is missing rebuild directories: " + ", ".join(missing_dirs)
+            "setup archive contains unexpected rebuild files: "
+            + ", ".join(unexpected_files)
         )
+
+    normalized_names: dict[str, list[str]] = {}
+    try:
+        with zipfile.ZipFile(artifact) as archive:
+            for name in archive.namelist():
+                normalized = _normalize_zip_member(name, [])
+                if normalized is not None:
+                    normalized_names.setdefault(normalized, []).append(name)
+            for name, source_bytes in source_files.items():
+                candidates = normalized_names.get(name, [])
+                if len(candidates) > 1:
+                    errors.append(
+                        f"setup archive contains multiple candidates for rebuild input "
+                        f"{name}: " + ", ".join(candidates)
+                    )
+                elif candidates and archive.read(candidates[0]) != source_bytes:
+                    errors.append(
+                        f"setup archive rebuild input does not match source: {name}"
+                    )
+    except (OSError, zipfile.BadZipFile) as exc:
+        errors.append(f"cannot inspect setup rebuild closure: {exc}")
     return errors
 
 
@@ -268,7 +334,9 @@ def validate_release(
     )
     errors.extend(read_errors)
     if require_setup_closure:
-        errors.extend(_check_setup_rebuild_closure(staged_members))
+        errors.extend(
+            _check_setup_rebuild_closure(artifact, source_root, staged_members)
+        )
     errors.extend(_check_texts(staged, source))
     if source_pins is not None:
         staged_pins = staged.get(FRAMEWORK_PINS_FILE)
