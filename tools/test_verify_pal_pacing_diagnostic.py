@@ -1,3 +1,5 @@
+import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -36,9 +38,36 @@ def test_classifies_52_to_79_hz_as_over_budget_work():
         receipt(gameplay_updates=769, backend_swaps=769, audio_frames=338_000,
                 max_work_ms=13.0, audio_underruns=4)
     )
-    assert errors == []
+    assert any("title gate/update rate" in item for item in errors)
+    assert any("gameplay presentation" in item for item in errors)
+    assert any("audio production" in item for item in errors)
+    assert any("audio_underruns" in item for item in errors)
     assert any("52-79 Hz" in item for item in diagnosis)
     assert any("audio underruns" in item for item in diagnosis)
+
+
+def test_cli_rejects_off_target_receipt(tmp_path):
+    receipt_path = tmp_path / "off-target.json"
+    receipt_path.write_text(
+        json.dumps(
+            receipt(
+                gameplay_updates=769,
+                backend_swaps=769,
+                audio_frames=338_000,
+                audio_underruns=4,
+            )
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [sys.executable, str(Path(__file__).with_name("verify_pal_pacing_diagnostic.py")),
+         str(receipt_path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "FAIL PAL pacing diagnostic" in result.stdout
 
 
 def test_rejects_double_blocking_and_unbounded_debt():

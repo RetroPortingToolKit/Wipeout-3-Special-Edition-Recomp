@@ -47,17 +47,19 @@ def validate(receipt):
     swap_rate = _rate(receipt["backend_swaps"], elapsed)
     audio_rate = _rate(receipt["audio_frames"], elapsed)
     if not 99.0 <= vblank_rate <= 101.0:
+        errors.append(f"guest VBlank must be ~100 Hz, got {vblank_rate:.1f}")
         diagnosis.append(f"guest under-speed: VBlank {vblank_rate:.1f} Hz")
     if not 99.0 <= gameplay_rate <= 101.0:
-        diagnosis.append(f"title gate/update rate is not 100 Hz: {gameplay_rate:.1f} Hz")
+        errors.append(f"title gate/update rate must be ~100 Hz, got {gameplay_rate:.1f}")
     if receipt.get("fmv") is True:
         if not 49.0 <= swap_rate <= 51.0:
             errors.append(f"PAL FMV backend swaps must be ~50 Hz, got {swap_rate:.1f}")
     elif not 99.0 <= swap_rate <= 101.0:
-        diagnosis.append(f"gameplay presentation is not 100 Hz: {swap_rate:.1f} Hz")
+        errors.append(f"gameplay presentation must be ~100 Hz, got {swap_rate:.1f}")
     if not 43_700 <= audio_rate <= 44_500:
-        diagnosis.append(f"audio production is not ~44.1 kHz: {audio_rate:.1f} Hz")
+        errors.append(f"audio production must be ~44.1 kHz, got {audio_rate:.1f} Hz")
     if receipt.get("audio_underruns", 0) != 0:
+        errors.append("audio_underruns must be zero")
         diagnosis.append("audio underruns accompany the pacing deficit")
 
     budget_ms = 1000.0 / receipt["target_hz"]
