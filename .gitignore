@@ -68,6 +68,9 @@ psx_freeze_heartbeat.json
 starvation_dump.jsonl
 
 # Diagnostic dumps (root-level) — keep catalog / probe trackable
+/artifacts/
+/*.err
+/*.out
 /*.json
 /*.bmp
 /*.png
