@@ -155,9 +155,43 @@ jobs:
           echo "publish=${PUBLISH}" >>"$GITHUB_OUTPUT"
           echo "reuse_emitters=${REUSE}" >>"$GITHUB_OUTPUT"
           echo "Using version ${VER} (tag ${TAG}), publish=${PUBLISH}, reuse_emitters=${REUSE}"
+
+  validate:
+    name: Regression suite
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run title regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check pytest
+          mapfile -t tests < <(git ls-files 'tools/test_*.py')
+          python -m pytest -q -p no:cacheprovider -- "${tests[@]}"
+
+      - name: Configure framework regression tests
+        run: >-
+          cmake -S psxrecomp/recompiler -B build-validation -G Ninja
+          -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+
+      - name: Run framework regression tests
+        run: |
+          cmake --build build-validation --parallel 4
+          ctest --test-dir build-validation --output-on-failure
+
   build:
     name: ${{ matrix.artifact }}
-    needs: prepare
+    needs: [prepare, validate]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

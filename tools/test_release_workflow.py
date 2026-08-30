@@ -50,6 +50,19 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("uses: actions/checkout@v4", checkout_step)
         self.assertRegex(checkout_step, r"(?m)^          submodules: recursive$")
 
+    def test_regression_suite_gates_release_builds(self):
+        validate_job = self.text.split("\n  validate:\n", 1)[1].split(
+            "\n  build:\n", 1
+        )[0]
+        build_job = self.text.split("\n  build:\n", 1)[1].split(
+            "\n  release:\n", 1
+        )[0]
+        self.assertIn("submodules: recursive", validate_job)
+        self.assertIn("python -m pytest", validate_job)
+        self.assertIn("-DBUILD_TESTING=ON", validate_job)
+        self.assertIn("ctest --test-dir build-validation", validate_job)
+        self.assertIn("needs: [prepare, validate]", build_job)
+
 
 if __name__ == "__main__":
     unittest.main()
