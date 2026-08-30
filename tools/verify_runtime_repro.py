@@ -243,6 +243,13 @@ def audit_markers(marker_root: str | Path, run_start_epoch: float | None) -> Aud
     # evidence for a previous run and must not poison a new audit.
     for dump_path in sorted(root.glob("psx_freeze_dump_*.json")):
         try:
+            modified_epoch = dump_path.stat().st_mtime
+        except OSError as exc:
+            errors.append(f"cannot stat freeze dump {dump_path}: {exc}")
+            continue
+        if modified_epoch < run_start_epoch:
+            continue
+        try:
             dump = json.loads(dump_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             errors.append(f"invalid freeze dump {dump_path}: {exc}")

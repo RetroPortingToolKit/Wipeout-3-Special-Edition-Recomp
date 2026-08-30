@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -84,6 +85,24 @@ def test_marker_audit_detects_current_freeze_dump(tmp_path):
     result = verify.audit_markers(tmp_path, now - 1)
     assert not result.ok
     assert any("spin_freeze" in error for error in result.errors)
+
+
+def test_marker_audit_ignores_malformed_dump_that_predates_run(tmp_path):
+    now = time.time()
+    stale = tmp_path / "psx_freeze_dump_psx-runtime_stale.json"
+    stale.write_text("{not-json", encoding="utf-8")
+    os.utime(stale, (now - 100, now - 100))
+    result = verify.audit_markers(tmp_path, now - 1)
+    assert result.ok
+
+
+def test_marker_audit_rejects_malformed_dump_from_current_run(tmp_path):
+    now = time.time()
+    current = tmp_path / "psx_freeze_dump_psx-runtime_current.json"
+    current.write_text("{not-json", encoding="utf-8")
+    result = verify.audit_markers(tmp_path, now - 1)
+    assert not result.ok
+    assert any("invalid freeze dump" in error for error in result.errors)
 
 
 def test_marker_audit_requires_run_boundary(tmp_path):
