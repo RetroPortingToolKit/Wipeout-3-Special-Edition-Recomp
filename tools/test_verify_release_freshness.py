@@ -105,11 +105,23 @@ cpu_overclock=200
             )
         self.assertEqual(verifier.validate_release(archive, self.root), [])
 
+    def test_zip_ignores_nested_project_profiles(self):
+        archive = self.root / "setup-host.zip"
+        with ZipFile(archive, "w") as zip_file:
+            zip_file.writestr("game.toml", CONFIG)
+            zip_file.writestr("mods/state.toml", STATE)
+            zip_file.writestr(
+                "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",
+                MANIFEST,
+            )
+            zip_file.writestr("psxrecomp/tools/cycle_testrom/game.toml", "[game]\n")
+        self.assertEqual(verifier.validate_release(archive, self.root), [])
+
     def test_zip_rejects_ambiguous_profiles(self):
         archive = self.root / "ambiguous.zip"
         with ZipFile(archive, "w") as zip_file:
-            zip_file.writestr("one/game.toml", CONFIG)
-            zip_file.writestr("two/game.toml", CONFIG)
+            zip_file.writestr("game.toml", CONFIG)
+            zip_file.writestr("./game.toml", CONFIG)
             zip_file.writestr("mods/state.toml", STATE)
             zip_file.writestr(
                 "mods/packages/wipeout3.enhancement.skip-fmv/1.0.0/manifest.toml",

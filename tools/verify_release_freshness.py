@@ -124,7 +124,7 @@ def _read_artifact_files(
                         if parts[index : index + 2] == ["mods", "packages"]:
                             staged_packages.add(parts[index + 2])
                     for profile_name in profile_names:
-                        if normalized == profile_name or normalized.endswith(f"/{profile_name}"):
+                        if normalized == profile_name:
                             matches[profile_name].append(name)
                 for profile_name, names in matches.items():
                     if len(names) > 1:
