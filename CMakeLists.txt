@@ -40,6 +40,7 @@ include("${PSXRECOMP_ROOT}/runtime/runtime.cmake")
 # generators may leave retired variants under src/mods; a glob would silently
 # turn those files into product behavior.
 set(WIPEOUT3_MOD_PLUGIN_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/mods/wipeout3_bezel_plugin.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mods/wipeout3_framerate_100_plugin.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mods/wipeout3_skip_fmv_plugin.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mods/wipeout3_widescreen_plugin.c")
