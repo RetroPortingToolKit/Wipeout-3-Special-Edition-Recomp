@@ -23,13 +23,15 @@ mod lifecycle, AOT overlay cycle retirement, code-generation cache identity,
 standalone/product target separation, malformed-DLL probing, and source-driven
 release validation.
 
-The project is not free of bloat. The working directory contains 111.51 GiB
-outside `.git`; 2,258 freeze artifacts larger than 1 MiB account for
-102.54 GiB. Those files are ignored and ownership-sensitive, so this review
-bounded future retention instead of deleting them. The largest runtime source
-files remain monoliths, several live overlay tables should be measured before
-further compression, and the local Release toolchain provides neither Vulkan
-nor LTO.
+The project is not free of bloat. At review time the working directory contained
+111.51 GiB outside .git; 2,258 freeze artifacts larger than 1 MiB accounted
+for 102.54 GiB. The review initially bounded future retention without deleting
+ownership-sensitive evidence. After explicit authorization on 2026-08-31, a
+literal-path cleanup permanently removed all 14,046 psx_freeze_dump* files,
+110,467,515,672 bytes (102.88 GiB), and verified that zero remained. The largest
+runtime source files remain monoliths, several live overlay tables should be
+measured before further compression, and the local Release toolchain provides
+neither Vulkan nor LTO.
 
 ## Scope and method
 
@@ -151,6 +153,14 @@ by orders of magnitude. The files predate or belong to active investigations;
 deleting them would be an ownership decision, not a refactor, so this review
 left them intact and stopped future unbounded accumulation.
 
+Post-review cleanup on 2026-08-31 supplied that explicit authorization. It
+resolved every target inside the workspace, rejected tracked files and
+directories, and deleted only filenames matching psx_freeze_dump*. The wider
+match included small dumps excluded from the earlier greater-than-1-MiB audit,
+so the final result was 14,046 files and 110,467,515,672 bytes (102.88 GiB), with
+zero matching files remaining. The deletion was permanent; unrelated build and
+diagnostic artifacts were not removed.
+
 ## Performance analysis and changes
 
 The refactors improve startup/resident pressure and remove release hot-path
@@ -257,19 +267,16 @@ toolchain. The optional Beetle acceptance target could not run because
 
 ## Residual findings and next increments
 
-1. **Ignored artifact ownership:** establish an explicit retention/archive rule,
-   then remove the 102.54 GiB freeze corpus through a recoverable, reviewed
-   operation. Do not treat a broad delete as routine cleanup.
-2. **Runtime decomposition:** split `main.cpp` and `debug_server.c` along tested
+1. **Runtime decomposition:** split `main.cpp` and `debug_server.c` along tested
    launcher/protocol/diagnostic seams.
-3. **Overlay capacity:** add high-water telemetry to representative title soaks
+2. **Overlay capacity:** add high-water telemetry to representative title soaks
    before reducing the remaining live tables.
-4. **Toolchain capability:** make Vulkan and LTO availability explicit release
+3. **Toolchain capability:** make Vulkan and LTO availability explicit release
    prerequisites if those capabilities are required; the present configuration
    silently falls back or disables them.
-5. **Vendor policy:** decide whether source-release completeness requires the
+4. **Vendor policy:** decide whether source-release completeness requires the
    full vendored test corpus before attempting repository-weight reduction.
-6. **Acceptance coverage:** complete a longer moving-race soak, deterministic or
+5. **Acceptance coverage:** complete a longer moving-race soak, deterministic or
    listened CDDA proof, and the disc-identity resolution before public release.
    The disabled DualShock and card tests also retain known behavioral failures;
    making their protocols pass is separate from restoring their build coverage.

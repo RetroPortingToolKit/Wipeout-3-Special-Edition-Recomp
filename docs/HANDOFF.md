@@ -1,6 +1,6 @@
 # Handoff
 
-Updated: 2026-08-30
+Updated: 2026-08-31
 
 Scope: completed deep code, bloat, performance, test, and release-path review on
 the canonical root `master` worktree and its pinned `psxrecomp` framework.
@@ -33,6 +33,9 @@ Historical record: [Handoff through 2026-08-28](archive/HANDOFF-through-2026-08-
   `984f12a4472bd9292bfbfc2ebfc9d54d8098830e1f305355b0c7d904d2423d06`.
 - Framework revision `4ccc6be1` is reachable from
   `fork/feat/ws-cull-widen` after a normal fast-forward push to the nested fork.
+- The explicitly authorized freeze-corpus cleanup permanently removed 14,046
+  psx_freeze_dump* files totaling 110,467,515,672 bytes (102.88 GiB). A
+  post-delete scan found zero matching dumps; unrelated artifacts were retained.
 - The current compatible gameplay receipt remains CPU 200 / PGXP off: about
   99.8 FPS / 1.00x for roughly 77 seconds, with PAL x2 presentation near the
   expected 50 FPS. This is prior acceptance evidence, not a new long soak.
@@ -88,8 +91,8 @@ before any public release.
 
 - Rebuilding after every small refactor: focused static/unit/configuration tests
   were used until an integrated build could prove the final state once.
-- Deleting the 102.54 GiB ignored freeze corpus during review: ownership and
-  retention authorization must be established before recoverable cleanup.
+- Deleting other ignored build/log artifacts: the freeze-dump authorization did
+  not extend to unrelated diagnostic evidence or build trees.
 - Pruning the 11.22 MiB vendored test/doc corpus without an upstream/vendor
   policy: it is repository weight, not shipped runtime weight.
 - Treating old 900%/100% CPU, PGXP-on, stale package, or stale build receipts as
