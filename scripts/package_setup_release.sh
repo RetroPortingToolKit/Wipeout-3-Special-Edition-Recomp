@@ -69,6 +69,7 @@ exec bash "${PACKAGER}" \
   --project-dir assets \
   --project-dir mods \
   --project-dir src/mods \
+  --project-dir mods/preloaded \
   --runtime-dir-optional mods \
   --runtime-dir-optional bezels \
   `# Precompiled overlay shards ("shared head start", docs/EXECUTION_MODEL.md).` \
