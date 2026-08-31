@@ -65,7 +65,7 @@ exec bash "${PACKAGER}" \
   --project-dir launcher_assets \
   --project-dir translations \
   --project-dir assets \
-  --project-dir mods 
+  --project-dir mods \
   --project-dir src/mods \
   --runtime-dir-optional mods \
   --runtime-dir-optional bezels \
