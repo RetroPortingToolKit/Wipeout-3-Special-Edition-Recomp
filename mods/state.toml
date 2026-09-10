@@ -1,0 +1,53 @@
+format_version = 2
+
+[[package]]
+id = "psx.enhancement.fast-loading"
+version = "1.0.0"
+
+[[package]]
+id = "psx.enhancement.pgxp"
+version = "1.0.0"
+
+[[package]]
+id = "wipeout3.enhancement.skip-fmv"
+version = "1.0.0"
+
+[[package]]
+id = "wipeout3.enhancement.framerate-pal100"
+version = "1.0.0"
+
+[[package]]
+id = "wipeout3.enhancement.widescreen"
+version = "1.0.0"
+
+[[feature]]
+package_id = "psx.enhancement.fast-loading"
+id = "fast-loading"
+enabled = false
+[feature.values]
+multiplier = "4"
+uncapped = "false"
+
+[[feature]]
+package_id = "psx.enhancement.pgxp"
+id = "pgxp"
+enabled = false
+[feature.values]
+cpu_mode = "false"
+
+[[feature]]
+package_id = "wipeout3.enhancement.skip-fmv"
+id = "skip_fmv"
+enabled = true
+
+[[feature]]
+package_id = "wipeout3.enhancement.framerate-pal100"
+id = "framerate-pal100"
+enabled = true
+
+[[feature]]
+package_id = "wipeout3.enhancement.widescreen"
+id = "widescreen"
+enabled = true
+[feature.values]
+aspect = "adaptive"

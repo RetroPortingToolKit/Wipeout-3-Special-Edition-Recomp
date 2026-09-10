@@ -1,6 +1,8 @@
 # Preloaded mods
 
-Ship reviewed, default-disabled packages here:
+The release catalog contains only the title-owned PAL x2/100 Hz and widescreen
+packages. The current WipEout profile in `mods/state.toml` also selects the
+framework-owned 8 MB RAM, PGXP, Fast Loading, and Skip FMV packages.
 
 ```text
 packages/<package-id>/<version>/
@@ -8,18 +10,9 @@ packages/<package-id>/<version>/
   …
 ```
 
-Build wiring copies `mods/preloaded` next to the game executable as `mods/`.
-Framework hardware mods (8 MB RAM, loading speed) are staged from psxrecomp
-`mods/builtin` first; they appear on this title's Mods page with `game_id = "*"`.
-
-`wipeout3.enhancement.framerate` (1.0.14) is converted from
-[hueponik/wip3out-patches](https://codeberg.org/hueponik/wip3out-patches)
-as a **plain** hueponik overlay plus AOT cadence: **SimVblankGate** entry and
-VBlank plugins force **gSimVblankSkip=2**. Title `Game 60 fps` is CRTC; sim
-should feel ~30 Hz. Enable **8 MB** only for Enhanced/Full.
-
-`wipeout3.enhancement.framerate-120` is the experimental unlocked 120 Hz path
-(conflicts with the package above).
-
-Regenerate with `tools/gen_hueponik_framerate_mod.py` after a stock Track 01
-dump is in `disc/`. See `psxrecomp/docs/MOD_PACKAGES.md`.
+Build wiring copies `mods/preloaded` next to the game executable as `mods/` and
+stages framework packages from `psxrecomp/mods/builtin`. Retired NTSC/120 Hz,
+legacy framerate, and CD-speed packages are not release inputs. The PAL x2
+package authenticates the user-provided media and supplies only the runtime
+host timing hook; it does not redistribute or approximate Hueponik's disc
+transformation.

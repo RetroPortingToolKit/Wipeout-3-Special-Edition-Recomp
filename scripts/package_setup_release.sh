@@ -33,6 +33,16 @@ if [[ -f "${ROOT}/framework_pins.txt" ]]; then
   EXTRA_PROJECT+=(--project-file framework_pins.txt)
 fi
 
+# Keep the wrapper zero-configuration for the checkout layout used by this
+# project. Older generated wrappers default to build-recompiler, while a
+# normal local checkout keeps the already-built emitters in the framework
+# submodule.
+if [[ "${RECOMPILER_BUILD}" == "build-recompiler" &&
+      ! -d "${ROOT}/${RECOMPILER_BUILD}" &&
+      -d "${ROOT}/psxrecomp/recompiler/build" ]]; then
+  RECOMPILER_BUILD="psxrecomp/recompiler/build"
+fi
+
 cd "${ROOT}"
 exec bash "${PACKAGER}" \
   --root "${ROOT}" \
@@ -46,15 +56,20 @@ exec bash "${PACKAGER}" \
   --disc-hint "your legally owned Wipeout 3 Special Edition disc" \
   --project-file CMakeLists.txt \
   --project-file game.toml \
+  --project-file game_options.toml \
   --project-file VERSION \
   --project-file codegen_setup.c \
   --project-file codegen_setup.h \
   --project-file README.md \
+  --project-file assets/psxrecomp.ico \
+  --project-file mods/state.toml \
   --project-dir seeds \
   --project-dir launcher_assets \
   --project-dir translations \
   --project-dir assets \
   --project-dir mods \
+  --project-dir src/mods \
+  --project-dir mods/preloaded \
   --runtime-dir-optional mods \
   --runtime-dir-optional bezels \
   `# Precompiled overlay shards ("shared head start", docs/EXECUTION_MODEL.md).` \

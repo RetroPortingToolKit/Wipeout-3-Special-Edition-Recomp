@@ -1,0 +1,87 @@
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+from verify_pal_pacing_diagnostic import validate
+
+
+def receipt(**overrides):
+    value = {
+        "elapsed_s": 10.0,
+        "target_hz": 100,
+        "pal_crtc_multiplier": 2,
+        "native_pal_x2": True,
+        "wall_pacer": True,
+        "swap_interval": 0,
+        "vblank": 1000,
+        "gameplay_updates": 1000,
+        "backend_swaps": 1000,
+        "audio_frames": 441000,
+        "audio_underruns": 0,
+        "max_work_ms": 8.0,
+        "max_debt_periods": 2,
+    }
+    value.update(overrides)
+    return value
+
+
+def test_pass_separates_100_hz_gameplay_and_44_1khz_audio():
+    errors, diagnosis = validate(receipt())
+    assert errors == []
+    assert diagnosis == []
+
+
+def test_classifies_52_to_79_hz_as_over_budget_work():
+    errors, diagnosis = validate(
+        receipt(gameplay_updates=769, backend_swaps=769, audio_frames=338_000,
+                max_work_ms=13.0, audio_underruns=4)
+    )
+    assert any("title gate/update rate" in item for item in errors)
+    assert any("gameplay presentation" in item for item in errors)
+    assert any("audio production" in item for item in errors)
+    assert any("audio_underruns" in item for item in errors)
+    assert any("52-79 Hz" in item for item in diagnosis)
+    assert any("audio underruns" in item for item in diagnosis)
+
+
+def test_cli_rejects_off_target_receipt(tmp_path):
+    receipt_path = tmp_path / "off-target.json"
+    receipt_path.write_text(
+        json.dumps(
+            receipt(
+                gameplay_updates=769,
+                backend_swaps=769,
+                audio_frames=338_000,
+                audio_underruns=4,
+            )
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [sys.executable, str(Path(__file__).with_name("verify_pal_pacing_diagnostic.py")),
+         str(receipt_path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "FAIL PAL pacing diagnostic" in result.stdout
+
+
+def test_rejects_double_blocking_and_unbounded_debt():
+    errors, _ = validate(receipt(swap_interval=1, max_debt_periods=13))
+    assert any("double-blocking" in item for item in errors)
+    assert any("bounded 12-period" in item for item in errors)
+
+
+def test_requires_observed_zero_swap_interval_for_native_pal_x2():
+    errors, _ = validate(receipt(swap_interval=None))
+    assert any("reported effective swap_interval 0" in item for item in errors)
+
+
+def test_fmv_requires_50_hz_backend_swaps_but_100_hz_guest():
+    errors, diagnosis = validate(receipt(fmv=True, backend_swaps=500))
+    assert errors == []
+    assert diagnosis == []

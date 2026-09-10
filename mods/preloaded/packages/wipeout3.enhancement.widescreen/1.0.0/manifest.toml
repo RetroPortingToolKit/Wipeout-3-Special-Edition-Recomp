@@ -9,14 +9,14 @@ save_compatibility = "shared"
 
 [[target]]
 game_id = "SCES-02845"
-disc_sha256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
+disc_sha256 = "397b8a30f401bbd9d12904d6054946474ce4746bdf19565a8db534d65ba179e1"
 
 [[feature]]
 id = "widescreen"
-name = "Widescreen (Experimental)"
-description = "Enable WipEout 3's experimental widescreen rendering and choose a fixed or resize-driven aspect."
+name = "Widescreen"
+description = "Enable WipEout 3's game-specific widescreen rendering and choose a fixed or resize-driven aspect."
 group = "Display"
-default_enabled = false
+default_enabled = true
 
 [[option]]
 feature = "widescreen"

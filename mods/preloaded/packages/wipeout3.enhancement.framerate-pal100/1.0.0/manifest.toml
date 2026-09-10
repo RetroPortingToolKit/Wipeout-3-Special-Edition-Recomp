@@ -1,0 +1,25 @@
+format_version = 5
+id = "wipeout3.enhancement.framerate-pal100"
+version = "1.0.0"
+name = "WipEout 3 PAL x2 / 100 Hz"
+author = "WipEout 3 SE refactor"
+description = "Activates the authenticated PAL x2 title transformation and GooseStation-compatible 100 Hz gameplay timing. The title transformation remains in the user-provided media; this package does not redistribute a disc, BIOS, or patch payload."
+license = "Project integration; title transformation remains user-media derived."
+resolver = "declarative"
+save_compatibility = "isolated"
+
+[[target]]
+game_id = "SCES-02845"
+disc_sha256 = "397b8a30f401bbd9d12904d6054946474ce4746bdf19565a8db534d65ba179e1"
+exe_sha256 = "7004d1400015fe1466131fa3f31b529cc6e544d30efe7cbfadc69dcb34b3d7ac"
+
+[[feature]]
+id = "framerate-pal100"
+name = "PAL x2 100 Hz"
+description = "The required 100 Hz gameplay mode for the authenticated PAL title build."
+group = "Gameplay"
+default_enabled = true
+
+[[plugin]]
+feature = "framerate-pal100"
+id = "wipeout3.framerate.pal-x2"
