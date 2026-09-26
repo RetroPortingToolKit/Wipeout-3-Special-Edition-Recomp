@@ -8,5 +8,5 @@ Collected via: https://awesome-wipeout.github.io/
 Included: ag-systems, assegai, auricom, feisar, goteki-45, icaras,
           piranha, qirex.
 
-Set [video] bezel in game.toml to a team name ("qirex"), to "random" for a
-team chosen once per launch, or to a path for your own image.
+Enable Bezel Artwork on the Mods page and pick a team mark, or "Random" for
+a mark chosen once per launch.

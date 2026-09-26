@@ -1,0 +1,73 @@
+format_version = 5
+id = "wipeout3.enhancement.frame-interpolation"
+version = "1.0.0"
+name = "WipEout 3 Frame Rate"
+author = "mstan"
+description = "Presentation-only frame blending up to your display's refresh rate. Game logic, timers, and audio stay at their stock cadence."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SCES-02845"
+disc_sha256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
+
+[[feature]]
+id = "frame-interpolation"
+name = "High Frame Rate (Frame Blending)"
+description = "Disabled by default. Blends completed game frames at the selected presentation rate, using motion-adaptive blending to limit ghosting at speed. Does not speed up the race, timers, or audio. This is not motion-vector frame generation. Requires the OpenGL renderer."
+group = "Frame Rate"
+default_enabled = false
+
+[[option]]
+feature = "frame-interpolation"
+id = "rate"
+label = "Presentation rate"
+description = "Follow the display for even cadence, or choose a fixed rate. The game simulation is untouched."
+group = "Frame Rate"
+type = "choice"
+default = "display"
+
+[[option.choice]]
+value = "60"
+label = "60 FPS"
+
+[[option.choice]]
+value = "120"
+label = "120 FPS"
+
+[[option.choice]]
+value = "144"
+label = "144 FPS"
+
+[[option.choice]]
+value = "165"
+label = "165 FPS"
+
+[[option.choice]]
+value = "display"
+label = "Display refresh (Recommended)"
+
+[[plugin]]
+feature = "frame-interpolation"
+id = "wipeout3.frame-interpolation.60"
+when = { rate = "60" }
+
+[[plugin]]
+feature = "frame-interpolation"
+id = "wipeout3.frame-interpolation.120"
+when = { rate = "120" }
+
+[[plugin]]
+feature = "frame-interpolation"
+id = "wipeout3.frame-interpolation.144"
+when = { rate = "144" }
+
+[[plugin]]
+feature = "frame-interpolation"
+id = "wipeout3.frame-interpolation.165"
+when = { rate = "165" }
+
+[[plugin]]
+feature = "frame-interpolation"
+id = "wipeout3.frame-interpolation.display"
+when = { rate = "display" }

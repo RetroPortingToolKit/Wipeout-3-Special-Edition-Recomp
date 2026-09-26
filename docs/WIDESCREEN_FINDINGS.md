@@ -225,12 +225,9 @@ even though they overlap.
 
 ## 5. Smaller gotchas worth knowing
 
-- **`ntsc120full8` requires the 8 MB RAM mod.** Without it the game fail-fasts
-  with `unknown dispatch: addr=0x000000B0`. The manifest documents the
-  requirement ("Enhanced/Full need 8 MB RAM"); the runtime does not enforce it.
 - **`frame_interpolation` in `settings.toml` is ignored on this title** — the
   runtime reports "Frame interpolation is mod-owned for this title; ignoring the
-  legacy Settings value". So the framerate mod is the only route to 120 Hz here.
+  legacy Settings value". Frame pacing is mod-owned here.
 - **`ws_aspect` cannot A/B the squash on this title.**
   `refresh_widescreen_projection()` runs on every present and re-pushes the
   mod-selected aspect, overwriting it. `WIDESCREEN.md`'s suggested workflow
@@ -244,8 +241,7 @@ even though they overlap.
 - **`--no-launcher` is required to use the TCP debug server.** With the launcher
   shown, `debug_server_init` has not run yet, so port 4370 is closed until PLAY.
 - **Never hand anyone a `PSX_DEBUG_TOOLS=ON` build to play.** It compiles in
-  per-block recording; measured here as roughly a 5x guest slowdown. Invisible at
-  60 Hz, catastrophic with the 120 Hz mod.
+  per-block recording; measured here as roughly a 5x guest slowdown.
 
 ---
 
