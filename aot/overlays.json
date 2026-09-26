@@ -1,6 +1,7 @@
 {
   "schema": "psxrecomp AOT methods v1",
   "game_id": "SCES-02845",
+  "static_output": "generated/overlays_static.c",
   "disc_hashes": {
     "sha256": "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
   },
