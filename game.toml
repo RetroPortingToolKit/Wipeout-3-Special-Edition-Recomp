@@ -49,6 +49,10 @@ memcard_dir = "saves"
 # it would otherwise interpret forever. See docs/COMPILING_OVERLAYS.md.
 overlay_cache = true
 
+# NTSC Mode is a hidden, default-on feature: never list it (or any hidden
+# feature) in the launcher, and keep Enable/Disable all off it.
+hide_hidden_mod_features = true
+
 # SIO1 serial link. WipEout 3 SE's 2/3/4P mode is its own libcomb "sio" driver
 # on SIO1 (4P = 2 consoles x 2 splitscreen), so the link needs an actual peer on
 # the wire. Without this the register file still responds and the game programs
