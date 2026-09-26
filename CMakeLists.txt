@@ -48,12 +48,14 @@ psxrecomp_add_game_runtime(psx-runtime
     # the launcher's Mods page.
     PRELOADED_MODS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/mods/preloaded"
     # Build-time native code for verified images no static EXE function covers:
-    # aot/overlays.json names the framerate package's ntscfull8 engine, which
-    # its patched boot EXE copies to 0x80780000. Generate with
+    # aot/overlays.json names the front-end menu overlay that MenuControl
+    # decodes from NFE.PB to 0x800BF800 (stock disc and framerate-package
+    # disc), and the framerate package's ntscfull8 engine, which its patched
+    # boot EXE copies to 0x80780000. Generate with
     #   py -3 psxrecomp/tools/aot_overlay_pipeline.py static --profile aot/overlays.json
     #     --game-toml game.toml --recompiler <psxrecomp-game> --work-dir <tmp>
     #     --out-dir generated --gcc gcc --cps
-    # Inert when absent; the engine then runs on the dirty-RAM interpreter.
+    # Inert when absent; that code then runs on the dirty-RAM interpreter.
     GAME_OVERLAY_STATIC_C "${CMAKE_CURRENT_SOURCE_DIR}/generated/overlays_static.c"
     CODEGEN_SETUP_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/codegen_setup.c"
