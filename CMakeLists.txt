@@ -47,11 +47,18 @@ psxrecomp_add_game_runtime(psx-runtime
     # <exe-dir>/mods/bundled; every feature stays disabled until selected on
     # the launcher's Mods page.
     PRELOADED_MODS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/mods/preloaded"
+    # Framework builtins this title does not ship (absent from mods/bundled
+    # and every release): the generic file-picker bezel, which
+    # wipeout3.enhancement.bezel's team-mark artwork replaces, and host-paced
+    # fast loading.
+    EXCLUDE_BUILTIN_MODS
+        psx.enhancement.fast-loading
+        psx.presentation.bezel
     # Build-time native code for verified images no static EXE function covers:
     # aot/overlays.json names the front-end menu overlay that MenuControl
-    # decodes from NFE.PB to 0x800BF800 (stock disc and framerate-package
-    # disc), and the framerate package's ntscfull8 engine, which its patched
-    # boot EXE copies to 0x80780000. The profile's static_output names this
+    # decodes from NFE.PB to 0x800BF800, once from the stock disc and once
+    # from NTSC Mode's patched disc (hueponik's ntsc build patches that
+    # menu). The profile's static_output names this
     # file, so `psxrecomp_cli.py generate` builds it from the player's disc
     # (runtime.cmake refuses a mismatch and warns at configure when it is
     # absent; that code then runs on the dirty-RAM interpreter).

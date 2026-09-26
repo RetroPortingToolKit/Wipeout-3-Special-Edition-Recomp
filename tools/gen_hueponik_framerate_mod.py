@@ -1,9 +1,30 @@
 #!/usr/bin/env python3
-"""Convert hueponik WipEout 3 SE xdelta patches into declarative .psxmod packages.
+"""Convert hueponik's WipEout 3 SE NTSC xdelta into the "NTSC Mode" package.
 
-derived_disc VCDIFF is conversion scaffolding only. This writes native
-main_exe patches (so the recompiled boot EXE is dirtied) and disc_user
-overlays (so later CD reads see the same edits).
+derived_disc VCDIFF is conversion scaffolding only. Every changed Track 01
+sector becomes one guarded disc_user overlay. That includes the boot EXE's own
+sectors: the BIOS loads SCES_028.45 through CD reads, which the runtime serves
+through those overlays, so the EXE edits are encoded exactly ONCE.
+
+Until 1.1.0 the EXE edits were ALSO emitted as main_exe patches guarded by the
+stock bytes. The overlay had already changed those bytes by the time the
+runtime checked the guards after the BIOS load, so every plan was rejected at
+0x80010098 ("expected-byte guard failed; booting unmodified") and the patches
+never applied -- the overlay was doing all the work (bead beads-btt8.6).
+
+hueponik publishes six builds (ntsc/pal x stock/8/full8). Since 1.3.0 the
+package ships ONE: the plain `ntsc` build (60 Hz, stock 2 MB RAM), which
+hueponik's README recommends for real PSX / non-overclocked emulators ("30fps
+instead of 25fps"). It is a single hidden, default-on feature ("NTSC Mode")
+with no options and no [[requirement]].
+
+1.2.0 shipped the two FULL builds (ntscfull8 / palfull8) behind a Region option
+with an unconditional 8 MB [[requirement]]. hueponik targets >=500% overclock
+for those; measured 2026-09-26 at stock clock (GP1 display-flip ring, guest
+time, 175 s races): stock 25.0 fps, ntscfull8 18.9 / palfull8 19.3 fps (12-25
+by scene, flips every 3-4 vblanks), so they were dropped (beads-btt8.6). The
+"8" builds also need 8 MB + overclock and are not packaged; plain `pal` is
+not packaged either.
 
 Source: https://codeberg.org/hueponik/wip3out-patches
 """
@@ -26,15 +47,21 @@ EXE_HEADER = 2048
 LOAD_ADDRESS = 0x80010000
 DISC_SHA256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
 EXE_SHA256 = "0213f5292fa1d995ebe61f42d5dbdb6614e481cb3840ac5f1521c2dfdccc0a4d"
-PATCH_BASE = "https://codeberg.org/hueponik/wip3out-patches/raw/branch/master"
-VARIANTS = (
-    ("ntsc", "ntsc_track01.xdelta3", "NTSC 30 fps (stock 2 MB)"),
-    ("ntsc8", "ntsc8_track01.xdelta3", "NTSC 30 fps enhanced (needs 8 MB RAM)"),
-    ("ntscfull8", "ntscfull8_track01.xdelta3", "NTSC 30 fps full (needs 8 MB RAM)"),
-    ("pal", "pal_track01.xdelta3", "PAL 25 fps (stock 2 MB)"),
-    ("pal8", "pal8_track01.xdelta3", "PAL 25 fps enhanced (needs 8 MB RAM)"),
-    ("palfull8", "palfull8_track01.xdelta3", "PAL 25 fps full (needs 8 MB RAM)"),
-)
+# Pinned: upstream master moved on and, from ac46a5dc ("Collapse number of
+# patches"), no longer carries the 8 MB builds. This is the last commit with
+# all six xdeltas; the committed assets reproduce from it.
+PATCH_COMMIT = "1a630b055c415f62019f5bf3da2a3a0b2a846470"
+PATCH_BASE = f"https://codeberg.org/hueponik/wip3out-patches/raw/commit/{PATCH_COMMIT}"
+# The one hueponik build packaged: (build, xdelta). The build name survives
+# only as the asset directory.
+BUILD = "ntsc"
+BUILD_PATCH = "ntsc_track01.xdelta3"
+# Feature id. Deliberately NOT 1.2.0's "framerate": that feature was visible
+# and opt-in, so a state.toml written then can hold `enabled = false`, which
+# would override default_enabled forever -- and a hidden feature is not shown
+# while disabled, so the player could never switch it back on.
+FEATURE_ID = "ntsc"
+PKG_VERSION = "1.3.0"
 EXE_GAP = 64
 # hueponik unlocks every-vblank sim (2→1 skip + dt). Real PSX/DuckStation stay
 # GPU-bound near 25/30 fps; recomp's GPU is instant so that unlock chipmunks
@@ -134,14 +161,6 @@ def byte_runs(stock: bytes, patched: bytes, gap: int) -> list[tuple[int, int]]:
     return runs
 
 
-def hex_block(data: bytes) -> str:
-    rows = []
-    for off in range(0, len(data), 32):
-        chunk = data[off : off + 32]
-        rows.append(" ".join(f"{b:02x}" for b in chunk))
-    return '"""\n' + "\n".join(rows) + '\n"""'
-
-
 def download(url: str, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     print(f"download {url}", file=sys.stderr)
@@ -154,22 +173,18 @@ def apply_xdelta(stock: Path, patch: Path, dest: Path) -> None:
     subprocess.check_call(cmd)
 
 
-def toml_escape(text: str) -> str:
-    return text.replace("\\", "\\\\").replace('"', '\\"')
-
-
 def emit_variant_ops(
     lines: list[str],
     out_dir: Path,
     assets: Path,
     feature: str,
-    value: str,
+    build: str,
     meta: dict,
 ) -> None:
-    variant_dir = assets / value
+    variant_dir = assets / build
     variant_dir.mkdir()
     for lba, count, payload, expected_digest, digest in meta["overlays"]:
-        rel = f"assets/{value}/user_{lba:05d}_{count:02d}.overlay"
+        rel = f"assets/{build}/user_{lba:05d}_{count:02d}.overlay"
         (out_dir / rel).write_bytes(payload)
         offset = lba * USER
         lines += [
@@ -180,40 +195,26 @@ def emit_variant_ops(
             f'file = "{rel}"',
             f'sha256 = "{digest}"',
             f'expected_sha256 = "{expected_digest}"',
-            f'when = {{ build = "{value}" }}',
-            "",
-        ]
-    for addr, expected, replacement in meta["exe_patches"]:
-        lines += [
-            "[[patch]]",
-            f'feature = "{feature}"',
-            'target = "main_exe"',
-            f"address = 0x{addr:08X}",
-            f"expected = {hex_block(expected)}",
-            f"replace = {hex_block(replacement)}",
-            f'when = {{ build = "{value}" }}',
             "",
         ]
 
 
-def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
+def emit_package_60(out_dir: Path, meta: dict) -> None:
     if out_dir.exists():
         shutil.rmtree(out_dir)
     assets = out_dir / "assets"
     assets.mkdir(parents=True)
 
     lines: list[str] = [
-        "format_version = 5",
+        "format_version = 7",
         f'id = "{PKG_60}"',
-        'version = "1.0.14"',
-        'name = "WipEout 3 NTSC / Framerate"',
+        f'version = "{PKG_VERSION}"',
+        'name = "WipEout 3 NTSC Mode"',
         'author = "hueponik"',
-        "description = \"Converted from hueponik SCES-02845 xdelta patches "
-        "(plain unlock + AOT skip=2 at SimVblankGate). NTSC keeps "
-        "SetVideoMode(NTSC) / 60 Hz CRTC and hueponik's 50→60 timing scales. "
-        "Gate entry + VBlank plugins force gSimVblankSkip=2 so AOT runs "
-        "every-other-vblank (~30 fps); title Game 60 fps is CRTC, not sim. "
-        "PAL ~25 fps. Enhanced/Full need 8 MB (not with stock 2 MB builds).\"",
+        "description = \"Converted from hueponik's SCES-02845 xdelta patches: "
+        "his plain NTSC build (60 Hz, stock 2 MB RAM), which he recommends for "
+        "an unmodified PlayStation (30 fps instead of 25). Measured here: "
+        "races hold 30 fps (stock 25) at normal game speed.\"",
         'license = "See upstream patch author. Conversion is a sparse native overlay of that work."',
         'source_name = "hueponik/wip3out-patches"',
         'source_url = "https://codeberg.org/hueponik/wip3out-patches"',
@@ -230,56 +231,48 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
         f'exe_sha256 = "{EXE_SHA256}"',
         "",
         "[[feature]]",
-        'id = "framerate"',
-        'name = "NTSC / Framerate"',
-        'description = """Plain hueponik NTSC/PAL plus AOT skip=2 at '
-        'SimVblankGate (~30/25 fps). Enable 8 MB only for Enhanced/Full."""',
+        f'id = "{FEATURE_ID}"',
+        'name = "NTSC Mode"',
+        'description = "Runs the game in NTSC mode (60 Hz) using hueponik\'s '
+        'NTSC patch: races hold 30 frames per second instead of the stock 25, '
+        'at normal game speed."',
         'group = "Gameplay"',
-        "default_enabled = false",
+        "hidden = true",
+        "default_enabled = true",
         "",
         "[[plugin]]",
-        'feature = "framerate"',
+        f'feature = "{FEATURE_ID}"',
         'id = "wipeout3.framerate.skip2-on"',
         "",
         "[[plugin]]",
-        'feature = "framerate"',
+        f'feature = "{FEATURE_ID}"',
         'id = "wipeout3.framerate.skip2"',
         "",
         "[[plugin]]",
-        'feature = "framerate"',
+        f'feature = "{FEATURE_ID}"',
         'id = "wipeout3.framerate.skip2-entry"',
         "",
-        "[[option]]",
-        'feature = "framerate"',
-        'id = "build"',
-        'label = "Build"',
-        'description = "NTSC 30 fps or PAL 25 fps. Enhanced/Full need 8 MB RAM."',
-        'group = "Gameplay"',
-        'type = "choice"',
-        'default = "ntsc"',
-        "",
     ]
-    for value, _, label in VARIANTS:
-        lines += [
-            "[[option.choice]]",
-            f'value = "{value}"',
-            f'label = "{toml_escape(label)}"',
-            "",
-        ]
 
-    for value, meta in variants.items():
-        emit_variant_ops(lines, out_dir, assets, "framerate", value, meta)
+    emit_variant_ops(lines, out_dir, assets, FEATURE_ID, BUILD, meta)
 
-    (out_dir / "manifest.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # Generated output: LF on every host, so the manifest hash (which the AOT
+    # profile pins) does not depend on where the generator ran.
+    (out_dir / "manifest.toml").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     (out_dir / "NOTICE.md").write_text(
         "Game edits come from hueponik's WipEout 3 Special Edition patches:\n"
         "https://codeberg.org/hueponik/wip3out-patches\n\n"
         "This package does not redistribute the disc. It stores sparse guarded "
-        "writes converted from the published xdelta against a verified SCES-02845 "
-        "Track 01 dump. 1.0.14 keeps plain hueponik and forces gSimVblankSkip=2 "
-        "from SimVblankGate entry (pre-CPS) plus VBlank backup so AOT cannot "
-        "lose a skip=1 stomp race. Title Game 60 fps is CRTC vblanks.\n",
+        "disc overlays converted from the published xdelta against a verified "
+        "SCES-02845 Track 01 dump; the boot EXE's edits arrive through the same "
+        "overlays when the BIOS loads it. The wipeout3.framerate.skip2* plugins "
+        "force gSimVblankSkip=2 from SimVblankGate entry (pre-CPS) plus a VBlank "
+        f"backup. {PKG_VERSION} ships only hueponik's plain NTSC build "
+        f"({BUILD}: 60 Hz, stock 2 MB RAM) as one hidden, default-on feature; "
+        "the 8 MB full builds and the Region option of 1.2.0 are gone.\n",
         encoding="utf-8",
+        newline="\n",
     )
 
 
@@ -351,16 +344,18 @@ def materialize_variant(
         overlays.append(
             (lba, count, payload, sha256_bytes(expected), sha256_bytes(payload))
         )
+    # The boot EXE's edits are delivered by the overlays over its sectors (the
+    # BIOS loads it with CD reads). Prove that instead of re-encoding them as
+    # main_exe patches, which is what made every pre-1.1.0 plan fail its
+    # expected-byte guards (beads-btt8.6).
+    loaded = bytearray(stock_user)
+    for lba, count, payload, _expected, _digest in overlays:
+        loaded[lba * USER : lba * USER + count * USER] = payload
     patched_exe = patched_user[exe_off : exe_off + len(exe)]
-    exe_patches = []
-    for off, size in byte_runs(exe, patched_exe, EXE_GAP):
-        if off + size <= EXE_HEADER:
-            continue
-        start = max(off, EXE_HEADER)
-        end = off + size
-        addr = LOAD_ADDRESS + (start - EXE_HEADER)
-        exe_patches.append((addr, exe[start:end], patched_exe[start:end]))
-    return {"overlays": overlays, "exe_patches": exe_patches}
+    if bytes(loaded[exe_off : exe_off + len(exe)]) != patched_exe:
+        raise SystemExit("disc overlays do not reproduce the patched boot EXE")
+    exe_edits = byte_runs(exe, patched_exe, EXE_GAP)
+    return {"overlays": overlays, "exe_edit_runs": len(exe_edits)}
 
 
 def convert_variant_60(
@@ -400,7 +395,7 @@ def main() -> int:
     parser.add_argument(
         "--out-60",
         type=Path,
-        default=root / "mods" / "preloaded" / "packages" / PKG_60 / "1.0.14",
+        default=root / "mods" / "preloaded" / "packages" / PKG_60 / PKG_VERSION,
     )
     args = parser.parse_args()
     if not args.stock.is_file() or not args.exe.is_file():
@@ -417,32 +412,28 @@ def main() -> int:
     exe = args.exe.read_bytes()
     args.cache.mkdir(parents=True, exist_ok=True)
 
-    # Ensure every NTSC/PAL xdelta is applied once.
-    patched_paths: dict[str, Path] = {}
-    for value, patch_name, _label in VARIANTS:
-        patch = args.cache / patch_name
-        if not patch.is_file():
-            download(f"{PATCH_BASE}/{patch_name}", patch)
-        patched = args.cache / f"{value}_track01.bin"
-        if not patched.is_file():
-            apply_xdelta(args.stock, patch, patched)
-        patched_paths[value] = patched
+    # Apply the NTSC xdelta once.
+    patch = args.cache / BUILD_PATCH
+    if not patch.is_file():
+        download(f"{PATCH_BASE}/{BUILD_PATCH}", patch)
+    patched = args.cache / f"{BUILD}_track01.bin"
+    if not patched.is_file():
+        apply_xdelta(args.stock, patch, patched)
 
-    converted_60 = {}
-    for value, _patch_name, _label in VARIANTS:
-        converted_60[value] = convert_variant_60(
-            stock_raw,
-            stock_user,
-            exe,
-            patched_paths[value].read_bytes(),
-            force_ntsc_video=value.startswith("ntsc"),
-        )
-        print(
-            f"{value}: overlays={len(converted_60[value]['overlays'])} "
-            f"exe_patches={len(converted_60[value]['exe_patches'])}",
-            file=sys.stderr,
-        )
-    emit_package_60(args.out_60, converted_60)
+    converted = convert_variant_60(
+        stock_raw,
+        stock_user,
+        exe,
+        patched.read_bytes(),
+        force_ntsc_video=True,
+    )
+    print(
+        f"{BUILD}: overlays={len(converted['overlays'])} "
+        f"boot-EXE edit runs carried by those overlays="
+        f"{converted['exe_edit_runs']}",
+        file=sys.stderr,
+    )
+    emit_package_60(args.out_60, converted)
     print(args.out_60)
 
     return 0

@@ -59,10 +59,10 @@ exec bash "${PACKAGER}" \
   --runtime-dir-optional bezels \
   `# Precompiled overlay shards ("shared head start", docs/EXECUTION_MODEL.md).` \
   `# WipEout 3's framerate package patches the boot EXE on disc, so none of the` \
-  `# patched text — nor the 0x80780000 enhancement engine — matches the AOT` \
-  `# image; without a warm cache every one of those regions runs through the` \
-  `# dirty-RAM interpreter. A fast desktop absorbs that, a 15 W laptop does not,` \
-  `# which read as "the 8 MB mod is slow" on weaker hardware. Ship what this` \
-  `# machine has already compiled so players start native instead of cold.` \
+  `# patched text matches the AOT image; without a warm cache every one of` \
+  `# those regions runs through the dirty-RAM interpreter. A fast desktop` \
+  `# absorbs that, a 15 W laptop does not (1.2.0's 8 MB full builds read as` \
+  `# "the mod is slow" on weaker hardware). Ship what this machine has already` \
+  `# compiled so players start native instead of cold.` \
   --runtime-dir-optional cache \
   "${EXTRA_PROJECT[@]}"
