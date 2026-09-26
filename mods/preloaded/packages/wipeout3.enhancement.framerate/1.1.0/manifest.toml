@@ -1,0 +1,2094 @@
+format_version = 5
+id = "wipeout3.enhancement.framerate"
+version = "1.1.0"
+name = "WipEout 3 NTSC / PAL Mode"
+author = "hueponik"
+description = "Converted from hueponik's SCES-02845 xdelta patches. NTSC runs the game in the 60 Hz NTSC video mode with hueponik's 50-to-60 Hz timing scales, racing at about 30 frames per second as on an NTSC console; PAL keeps the 50 Hz mode at about 25. Extras Enhanced and Full are hueponik's 8 MB builds: they need 8 MB Main RAM, and 8 MB Main RAM should stay off with Extras None."
+license = "See upstream patch author. Conversion is a sparse native overlay of that work."
+source_name = "hueponik/wip3out-patches"
+source_url = "https://codeberg.org/hueponik/wip3out-patches"
+resolver = "declarative"
+save_compatibility = "isolated"
+
+[[author_link]]
+name = "hueponik"
+url = "https://codeberg.org/hueponik/wip3out-patches"
+
+[[target]]
+game_id = "SCES-02845"
+disc_sha256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
+exe_sha256 = "0213f5292fa1d995ebe61f42d5dbdb6614e481cb3840ac5f1521c2dfdccc0a4d"
+
+[[feature]]
+id = "framerate"
+name = "NTSC / PAL Mode"
+description = """hueponik's region conversion: NTSC (60 Hz video, about 30 frames per second in a race) or PAL (50 Hz, about 25). Extras Enhanced and Full need 8 MB Main RAM; leave 8 MB Main RAM off with Extras None. Pairs with Frame Blending to present those frames at your display rate."""
+group = "Gameplay"
+default_enabled = false
+
+[[plugin]]
+feature = "framerate"
+id = "wipeout3.framerate.skip2-on"
+
+[[plugin]]
+feature = "framerate"
+id = "wipeout3.framerate.skip2"
+
+[[plugin]]
+feature = "framerate"
+id = "wipeout3.framerate.skip2-entry"
+
+[[option]]
+feature = "framerate"
+id = "region"
+label = "Region"
+description = "NTSC: 60 Hz video, about 30 frames per second in a race. PAL: 50 Hz, about 25."
+group = "Gameplay"
+type = "choice"
+default = "ntsc"
+
+[[option.choice]]
+value = "ntsc"
+label = "NTSC (60 Hz)"
+
+[[option.choice]]
+value = "pal"
+label = "PAL (50 Hz)"
+
+[[option]]
+feature = "framerate"
+id = "extras"
+label = "Extras"
+description = "hueponik's 8 MB builds. Enhanced and Full need 8 MB Main RAM; None is the stock 2 MB game and should run with 8 MB Main RAM off."
+group = "Gameplay"
+type = "choice"
+default = "none"
+
+[[option.choice]]
+value = "none"
+label = "None (stock 2 MB)"
+
+[[option.choice]]
+value = "enhanced"
+label = "Enhanced (needs 8 MB Main RAM)"
+
+[[option.choice]]
+value = "full"
+label = "Full (needs 8 MB Main RAM)"
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 8192
+file = "assets/ntsc/user_00004_01.overlay"
+sha256 = "81aa2fb0b78e8204ab09094d4376c1efd5579ff275b04c9a05ab6bf54bef899e"
+expected_sha256 = "3add2a2971b8490115b2196a8700be7697cdc7498b9f585d771acbec3132a7ea"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 53248
+file = "assets/ntsc/user_00026_01.overlay"
+sha256 = "0010f59901aef70173873be81d68e4fc4122f0bccb46127af4cf26e2d19b6f10"
+expected_sha256 = "6431a996fb3bafb8c1eb8679deee70c24aa8e391a9cdbffe844cb20fb5c88b7a"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 126976
+file = "assets/ntsc/user_00062_38.overlay"
+sha256 = "7dcee8d31f06aa1a24675717502b53f71ac06c439c24dd073c750b76a0ca11ac"
+expected_sha256 = "6d9c1a342768422bd634203ff722c9d6ff07166148cc4ca811e1bdf12c4a721c"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 77547520
+file = "assets/ntsc/user_37865_01.overlay"
+sha256 = "0010f59901aef70173873be81d68e4fc4122f0bccb46127af4cf26e2d19b6f10"
+expected_sha256 = "6431a996fb3bafb8c1eb8679deee70c24aa8e391a9cdbffe844cb20fb5c88b7a"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 77621248
+file = "assets/ntsc/user_37901_38.overlay"
+sha256 = "957b17117b447cf5fbf810882a415bde47c31c93042c0009369e891adcf295dd"
+expected_sha256 = "02157d38fab7293e6ca5c07502e930833c6433810962efb968441261f0247d76"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78409728
+file = "assets/ntsc/user_38286_05.overlay"
+sha256 = "46bd76df7710bc09dabe951ca67d6e5669cf8eb9cb2351d301a6dc5daa88958a"
+expected_sha256 = "539614b56e47286c621dc0f79ad037ebefb4fc92356453f69fb29540ae422ac5"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78422016
+file = "assets/ntsc/user_38292_01.overlay"
+sha256 = "bb51441e76b95f60eb753bedefec3f34a6c41e6bed3e27518b0f9fc3058ee754"
+expected_sha256 = "87a36496ca8af4e9045008f5f3e96bde5267fe7fc5c3a38f4f970e106e1bb3df"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78428160
+file = "assets/ntsc/user_38295_01.overlay"
+sha256 = "b0adaf0c978d167e953a6bdb49599ad24de287fcdff545c5d9fd3b45de92af36"
+expected_sha256 = "bae29d81b461f6dbd284ce91a1b516138082a885915b44a0579dbe62df7e48be"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78438400
+file = "assets/ntsc/user_38300_01.overlay"
+sha256 = "d1d40af6cd94348b2b60f926a6516f7207565b025c868e3ca7bceeb0f6b1cb53"
+expected_sha256 = "f4c27d53292b30cbb75e6914c36539686c73c0b45721e39f7908768330afada7"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78448640
+file = "assets/ntsc/user_38305_02.overlay"
+sha256 = "8c7a8925c235b94fb5ebe6e22f6868f34cfefeeb0e38c24e58834277f299a4a0"
+expected_sha256 = "ddd8ae171b26854e9e044bcdbc72934c980f8df457220125aeaa00dcf2a5ae06"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78454784
+file = "assets/ntsc/user_38308_01.overlay"
+sha256 = "66cbb32a266fdac524e456058427132c316956d179979bc2204a8aaa0e0f15bb"
+expected_sha256 = "9071495ecc359aa91d85829cec04aa35dc5c56d015b66f2f1373059a3313ee7d"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78467072
+file = "assets/ntsc/user_38314_04.overlay"
+sha256 = "2d9852a0a05f7a54dc8839be72ae7a099883f3199b37d143cd82dd1e7d4ffa7e"
+expected_sha256 = "835712e6e46bc137bfc051d82db2d2e52044539e605190564378530696ba2380"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78505984
+file = "assets/ntsc/user_38333_01.overlay"
+sha256 = "aba383e771969d8ff13e61f622d8e5017dd55ca4d5a4a4cc44a5ffec6ba99e4e"
+expected_sha256 = "63aa618aa87a24aa35874887fb5aae85b34e6edfdce764458af602ec9b6bc06c"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78559232
+file = "assets/ntsc/user_38359_01.overlay"
+sha256 = "f874532ddf3d3f89b34415b8aaf808146944c07ab56906f526328a82a4a20280"
+expected_sha256 = "8857ecc13fabe68affd59f6183ee8082a12fafc9449a29ad36b49430372c88fa"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78583808
+file = "assets/ntsc/user_38371_02.overlay"
+sha256 = "f87ed63e583b74f2246f3d10be3ccc1229613ae82bb4cd37a3c815b53f798b65"
+expected_sha256 = "7f997991fa3a9817fed026d1aead4e742cbb2232eef0599493ad60512db15ec6"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78618624
+file = "assets/ntsc/user_38388_02.overlay"
+sha256 = "0fd1667799a15dfb6017776820e7b827420d0bf8b6f82835896b9c9971af7424"
+expected_sha256 = "ff717f09897c94429bf4f306933368f8b693c5b27ad7869a2808f77965754be0"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78632960
+file = "assets/ntsc/user_38395_01.overlay"
+sha256 = "e2a3af8cc2d5471591686447aed3852427458a2c5f353cdc88c141ffa8b30938"
+expected_sha256 = "b1094b152ad0c90569b2fa1a77a4c2f56441bb5ee23dfdbcbd38efa6d08d3802"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78645248
+file = "assets/ntsc/user_38401_01.overlay"
+sha256 = "126a26a6f82ed2730cd85c46dbf158e1c4974737c6d28f64344858ca1ef6ebde"
+expected_sha256 = "92ac1ab94eaf9ece2c53562e12ec272f956ae249022d09930ccf02dabb1bc938"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78673920
+file = "assets/ntsc/user_38415_02.overlay"
+sha256 = "26f0aa3667925727a65ae930e6484294c27a1240f9a7fa64c021fd7fe1ccb34d"
+expected_sha256 = "0dc8167a4074ff55ccc4642cc839aedc1a6dd222944ea9fe23b8a6759ea21c87"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78680064
+file = "assets/ntsc/user_38418_01.overlay"
+sha256 = "0f2444a8058d1a87a7e86ad660479827066ac8763a632ebd5e252babd00573fc"
+expected_sha256 = "e02733e7036e1852bec353a05af5e993fb7769ee18a9f7d9319a7c9ace952a22"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78694400
+file = "assets/ntsc/user_38425_01.overlay"
+sha256 = "986bc29516372d0867c077c71391a99b1f2975aaf5d2a8bf79d50668b193b21b"
+expected_sha256 = "a53c46306f2afc755f420c0da6a2daa48dc38eed88847a63424448a556471844"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78704640
+file = "assets/ntsc/user_38430_03.overlay"
+sha256 = "9b71cde432af70cee0f456e3b6ca5e7d2f11a09307e53ebe0cb217d104cca30f"
+expected_sha256 = "e023773a7393c488cfdbe321728a4402a74a8f66434918230e8e2df90e4807d0"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78764032
+file = "assets/ntsc/user_38459_01.overlay"
+sha256 = "c4476a4923125a1fa1218a8ba68e807a00a8d568cdcc36a20796575c8ded185e"
+expected_sha256 = "57237d2a6e299be7e90faaf9b5fe8878b61cac7ba4a0006e009278f5c45d0569"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78768128
+file = "assets/ntsc/user_38461_01.overlay"
+sha256 = "f8710b6bb69a946663c124469cdbe1da2496457b1d0f606f256f25d6857d0b8f"
+expected_sha256 = "40e8dddc2616295c7b6c710e00844d2b61da4f13f46f23adc7afaf7b73ce0f10"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78774272
+file = "assets/ntsc/user_38464_01.overlay"
+sha256 = "610685dec93245c4196082750fced4e1e7eac6100c18fa1c8eb641e3f3c17d85"
+expected_sha256 = "e251c940e6a4ad7306449de22ca0f52b2ad9bac23ebb1af2ffe611f2da5d6334"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78839808
+file = "assets/ntsc/user_38496_01.overlay"
+sha256 = "bdc56ba81ff5bb2373359dd3db40489226c604b8da97dce8fd2e36b78f17be2e"
+expected_sha256 = "24d92eb3abc216b81e6545208f5f323377258b677107adf7479e0ad60bba82b3"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78874624
+file = "assets/ntsc/user_38513_01.overlay"
+sha256 = "3245192b31f4aadd618455835c39be9980085237aa69d9ed8c008cc3727dd1f3"
+expected_sha256 = "f556447ae5a69a4ca1e809fd4fdb1a2c196ee584c8b3b2b2573cd88d0b63a991"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78891008
+file = "assets/ntsc/user_38521_01.overlay"
+sha256 = "b4e999ebc90f3f0685754b44e90a197df51b11aa24c6be25049ff6010e9ff57c"
+expected_sha256 = "58822feadc4631b0e56424f26c32ffe444b9cc1759b2f161af0a688f1886c2f5"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78895104
+file = "assets/ntsc/user_38523_01.overlay"
+sha256 = "e7e3ba9eda40703f3341aa5cec46e185b63acfa8c1c3e32c6cda7d77332ce357"
+expected_sha256 = "6c1116e2bf7d855fd9a40fe71fefc097117c6441ffc5eed1c40d6a71075892b8"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78913536
+file = "assets/ntsc/user_38532_01.overlay"
+sha256 = "f18481aac695b3deaa1be8743cf5d4251d58b2c84041b5fd772df722bdeb9d3f"
+expected_sha256 = "61101f4061b4641139aae5efcd41a25dd04131ee7bd7468d3be40aa92a579718"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78921728
+file = "assets/ntsc/user_38536_01.overlay"
+sha256 = "cdced3d9842c083f09015a30a490dea0b5eb22da87a48eb2549c6593d7299d64"
+expected_sha256 = "9fc1e65d76846fa0e55fbf9f3528dd19b80f1b34e15a1c93c453f1adfdbe93e5"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78948352
+file = "assets/ntsc/user_38549_01.overlay"
+sha256 = "77ff6f9b02ef8c976ab2d03b29b7656442e47bfe3ab7a9b64bc3b999480b5ce7"
+expected_sha256 = "95db4d36174085e829e9238df1f9c3e18552dd4e8979c7ac0615a596b9b7646b"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79007744
+file = "assets/ntsc/user_38578_02.overlay"
+sha256 = "b5710f63e41de5e2315d2738d1b6d4c5b092daba831a4876a73051ecad238d92"
+expected_sha256 = "1f6404095f01cb5e63e581512df3344a5d4979bad6972f45cc19987bf7c8a3b5"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79022080
+file = "assets/ntsc/user_38585_01.overlay"
+sha256 = "51437b949d90b6c538727a70c266aa20d44d362aa61801c7bc920eb3458d06ca"
+expected_sha256 = "f8ecaf794dddcf2e7d54d7657e76ca430d97a62e84c58777f793d90ac875ee81"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79036416
+file = "assets/ntsc/user_38592_01.overlay"
+sha256 = "cce4f077ef0dcee11d75181eea381e1f68e54dbd2d5133f96f3299939222a656"
+expected_sha256 = "4e682a171f723de5b60a03c38e41b255bac6bd7f2365c13b778a99704c6772a8"
+when = { region = "ntsc", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 8192
+file = "assets/ntsc8/user_00004_01.overlay"
+sha256 = "81aa2fb0b78e8204ab09094d4376c1efd5579ff275b04c9a05ab6bf54bef899e"
+expected_sha256 = "3add2a2971b8490115b2196a8700be7697cdc7498b9f585d771acbec3132a7ea"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 53248
+file = "assets/ntsc8/user_00026_01.overlay"
+sha256 = "0010f59901aef70173873be81d68e4fc4122f0bccb46127af4cf26e2d19b6f10"
+expected_sha256 = "6431a996fb3bafb8c1eb8679deee70c24aa8e391a9cdbffe844cb20fb5c88b7a"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 126976
+file = "assets/ntsc8/user_00062_38.overlay"
+sha256 = "246287de6be951ce2c3512b126e12ce9d808b889405f5b31ba7a079495aafba9"
+expected_sha256 = "6d9c1a342768422bd634203ff722c9d6ff07166148cc4ca811e1bdf12c4a721c"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 77547520
+file = "assets/ntsc8/user_37865_01.overlay"
+sha256 = "0010f59901aef70173873be81d68e4fc4122f0bccb46127af4cf26e2d19b6f10"
+expected_sha256 = "6431a996fb3bafb8c1eb8679deee70c24aa8e391a9cdbffe844cb20fb5c88b7a"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 77621248
+file = "assets/ntsc8/user_37901_38.overlay"
+sha256 = "df6b4064e8b523cc76f865a7ad1ea571c7e2a1d9ae3affc7aa8e2a1d17cd53f3"
+expected_sha256 = "02157d38fab7293e6ca5c07502e930833c6433810962efb968441261f0247d76"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78333952
+file = "assets/ntsc8/user_38249_05.overlay"
+sha256 = "e95d8995ff58f125bcdd104cd9e6d25dc8096648aebf06c9ebde2b24497140e0"
+expected_sha256 = "b515a242ea1a98e9908f6166e6383fa587ee96471ba081a9360160a08d25da8b"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78409728
+file = "assets/ntsc8/user_38286_05.overlay"
+sha256 = "46bd76df7710bc09dabe951ca67d6e5669cf8eb9cb2351d301a6dc5daa88958a"
+expected_sha256 = "539614b56e47286c621dc0f79ad037ebefb4fc92356453f69fb29540ae422ac5"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78422016
+file = "assets/ntsc8/user_38292_01.overlay"
+sha256 = "bb51441e76b95f60eb753bedefec3f34a6c41e6bed3e27518b0f9fc3058ee754"
+expected_sha256 = "87a36496ca8af4e9045008f5f3e96bde5267fe7fc5c3a38f4f970e106e1bb3df"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78428160
+file = "assets/ntsc8/user_38295_01.overlay"
+sha256 = "b0adaf0c978d167e953a6bdb49599ad24de287fcdff545c5d9fd3b45de92af36"
+expected_sha256 = "bae29d81b461f6dbd284ce91a1b516138082a885915b44a0579dbe62df7e48be"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78438400
+file = "assets/ntsc8/user_38300_01.overlay"
+sha256 = "d1d40af6cd94348b2b60f926a6516f7207565b025c868e3ca7bceeb0f6b1cb53"
+expected_sha256 = "f4c27d53292b30cbb75e6914c36539686c73c0b45721e39f7908768330afada7"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78448640
+file = "assets/ntsc8/user_38305_02.overlay"
+sha256 = "8c7a8925c235b94fb5ebe6e22f6868f34cfefeeb0e38c24e58834277f299a4a0"
+expected_sha256 = "ddd8ae171b26854e9e044bcdbc72934c980f8df457220125aeaa00dcf2a5ae06"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78454784
+file = "assets/ntsc8/user_38308_02.overlay"
+sha256 = "9b8fc4bcc1d09af87165555a5c37a407efee36fa7690aa1966673f09e30e2858"
+expected_sha256 = "3c644c9e2d3c1f5364e84933557889db490b909edb35b427650e357d190415f5"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78467072
+file = "assets/ntsc8/user_38314_04.overlay"
+sha256 = "2d9852a0a05f7a54dc8839be72ae7a099883f3199b37d143cd82dd1e7d4ffa7e"
+expected_sha256 = "835712e6e46bc137bfc051d82db2d2e52044539e605190564378530696ba2380"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78487552
+file = "assets/ntsc8/user_38324_01.overlay"
+sha256 = "db2876bba552b30b1bc79d58b46a3975085cedd086d9919b58adccf385f0e0ff"
+expected_sha256 = "92494e1fef2df0bcf3552166ae30b42cc550a6f7f2a082d74501af00ac9e3a85"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78501888
+file = "assets/ntsc8/user_38331_01.overlay"
+sha256 = "923fb02b8d50d312757a59bdd3b8ae9329de1d9e32fd66558528741065930844"
+expected_sha256 = "542d42fc4c62f53fd4dc398fe101f1f4e12e2ae7ecaef5d7dd9290abe8916baa"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78505984
+file = "assets/ntsc8/user_38333_01.overlay"
+sha256 = "63d951e3f89c7630d827274dd8a48b0bbc2360f38f06fc88cf71ef8300411101"
+expected_sha256 = "63aa618aa87a24aa35874887fb5aae85b34e6edfdce764458af602ec9b6bc06c"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78559232
+file = "assets/ntsc8/user_38359_01.overlay"
+sha256 = "f874532ddf3d3f89b34415b8aaf808146944c07ab56906f526328a82a4a20280"
+expected_sha256 = "8857ecc13fabe68affd59f6183ee8082a12fafc9449a29ad36b49430372c88fa"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78583808
+file = "assets/ntsc8/user_38371_02.overlay"
+sha256 = "f87ed63e583b74f2246f3d10be3ccc1229613ae82bb4cd37a3c815b53f798b65"
+expected_sha256 = "7f997991fa3a9817fed026d1aead4e742cbb2232eef0599493ad60512db15ec6"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78618624
+file = "assets/ntsc8/user_38388_02.overlay"
+sha256 = "0fd1667799a15dfb6017776820e7b827420d0bf8b6f82835896b9c9971af7424"
+expected_sha256 = "ff717f09897c94429bf4f306933368f8b693c5b27ad7869a2808f77965754be0"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78632960
+file = "assets/ntsc8/user_38395_01.overlay"
+sha256 = "e2a3af8cc2d5471591686447aed3852427458a2c5f353cdc88c141ffa8b30938"
+expected_sha256 = "b1094b152ad0c90569b2fa1a77a4c2f56441bb5ee23dfdbcbd38efa6d08d3802"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78645248
+file = "assets/ntsc8/user_38401_01.overlay"
+sha256 = "126a26a6f82ed2730cd85c46dbf158e1c4974737c6d28f64344858ca1ef6ebde"
+expected_sha256 = "92ac1ab94eaf9ece2c53562e12ec272f956ae249022d09930ccf02dabb1bc938"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78673920
+file = "assets/ntsc8/user_38415_02.overlay"
+sha256 = "5d22903d88d85f93f7cc5de4bc628ab1a3c7835e2dd02b818fa42a05eb16cc3f"
+expected_sha256 = "0dc8167a4074ff55ccc4642cc839aedc1a6dd222944ea9fe23b8a6759ea21c87"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78680064
+file = "assets/ntsc8/user_38418_01.overlay"
+sha256 = "0f2444a8058d1a87a7e86ad660479827066ac8763a632ebd5e252babd00573fc"
+expected_sha256 = "e02733e7036e1852bec353a05af5e993fb7769ee18a9f7d9319a7c9ace952a22"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78694400
+file = "assets/ntsc8/user_38425_01.overlay"
+sha256 = "986bc29516372d0867c077c71391a99b1f2975aaf5d2a8bf79d50668b193b21b"
+expected_sha256 = "a53c46306f2afc755f420c0da6a2daa48dc38eed88847a63424448a556471844"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78704640
+file = "assets/ntsc8/user_38430_03.overlay"
+sha256 = "9b71cde432af70cee0f456e3b6ca5e7d2f11a09307e53ebe0cb217d104cca30f"
+expected_sha256 = "e023773a7393c488cfdbe321728a4402a74a8f66434918230e8e2df90e4807d0"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78729216
+file = "assets/ntsc8/user_38442_01.overlay"
+sha256 = "1a9ae6aef5da3922852306ad7f7e7ca9fa6b7ab66b250c8c83adee736e095664"
+expected_sha256 = "f2f340965a195700d09fbcdac024113a3795bd6c35ff428c12fe58ab79bf3fe7"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78743552
+file = "assets/ntsc8/user_38449_01.overlay"
+sha256 = "c2085421c07729090b19fcf1c965fa87dd9305f8d076e01e2032005afdbfbf0a"
+expected_sha256 = "160d109d5b4a441805bf06f2a05481e19024ecc6d7754135a08a4fbaf34e32fb"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78764032
+file = "assets/ntsc8/user_38459_01.overlay"
+sha256 = "c4476a4923125a1fa1218a8ba68e807a00a8d568cdcc36a20796575c8ded185e"
+expected_sha256 = "57237d2a6e299be7e90faaf9b5fe8878b61cac7ba4a0006e009278f5c45d0569"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78768128
+file = "assets/ntsc8/user_38461_01.overlay"
+sha256 = "f8710b6bb69a946663c124469cdbe1da2496457b1d0f606f256f25d6857d0b8f"
+expected_sha256 = "40e8dddc2616295c7b6c710e00844d2b61da4f13f46f23adc7afaf7b73ce0f10"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78774272
+file = "assets/ntsc8/user_38464_01.overlay"
+sha256 = "610685dec93245c4196082750fced4e1e7eac6100c18fa1c8eb641e3f3c17d85"
+expected_sha256 = "e251c940e6a4ad7306449de22ca0f52b2ad9bac23ebb1af2ffe611f2da5d6334"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78800896
+file = "assets/ntsc8/user_38477_01.overlay"
+sha256 = "6fb0ed380ae9f64988291b6199f382776c31d43eb33a7153b4211985d587103b"
+expected_sha256 = "564a1ab7f8288c2def1b869812dfcdfc862a1b5bb247650d769c9d89baef13e4"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78813184
+file = "assets/ntsc8/user_38483_01.overlay"
+sha256 = "dfce9534b355a02d018fc7757f56108f8c6e19aff57fb933c00ce74e8076656f"
+expected_sha256 = "19d66e9785fa47c23b390dcc3cccfd681572079dcd161434a6706d041df86cc2"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78825472
+file = "assets/ntsc8/user_38489_03.overlay"
+sha256 = "c085728015d79233662af190d2400210ba66dece2921cf028c687229b43ac978"
+expected_sha256 = "92b333bc020a2f091f52f1d1e2f62a3d9ac4916bb96dee1ca3fffc9415c145ec"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78839808
+file = "assets/ntsc8/user_38496_01.overlay"
+sha256 = "bdc56ba81ff5bb2373359dd3db40489226c604b8da97dce8fd2e36b78f17be2e"
+expected_sha256 = "24d92eb3abc216b81e6545208f5f323377258b677107adf7479e0ad60bba82b3"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78868480
+file = "assets/ntsc8/user_38510_01.overlay"
+sha256 = "7db6459fde8ae8dc11f43d763b59293606be212c83316641d9f19f2231020701"
+expected_sha256 = "547ce8c0aeac9ac3461ee82e6cfa918fd6f620ff7339766456b1f506172d325d"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78874624
+file = "assets/ntsc8/user_38513_01.overlay"
+sha256 = "3245192b31f4aadd618455835c39be9980085237aa69d9ed8c008cc3727dd1f3"
+expected_sha256 = "f556447ae5a69a4ca1e809fd4fdb1a2c196ee584c8b3b2b2573cd88d0b63a991"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78891008
+file = "assets/ntsc8/user_38521_01.overlay"
+sha256 = "b4e999ebc90f3f0685754b44e90a197df51b11aa24c6be25049ff6010e9ff57c"
+expected_sha256 = "58822feadc4631b0e56424f26c32ffe444b9cc1759b2f161af0a688f1886c2f5"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78895104
+file = "assets/ntsc8/user_38523_01.overlay"
+sha256 = "e7e3ba9eda40703f3341aa5cec46e185b63acfa8c1c3e32c6cda7d77332ce357"
+expected_sha256 = "6c1116e2bf7d855fd9a40fe71fefc097117c6441ffc5eed1c40d6a71075892b8"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78913536
+file = "assets/ntsc8/user_38532_01.overlay"
+sha256 = "f18481aac695b3deaa1be8743cf5d4251d58b2c84041b5fd772df722bdeb9d3f"
+expected_sha256 = "61101f4061b4641139aae5efcd41a25dd04131ee7bd7468d3be40aa92a579718"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78921728
+file = "assets/ntsc8/user_38536_01.overlay"
+sha256 = "cdced3d9842c083f09015a30a490dea0b5eb22da87a48eb2549c6593d7299d64"
+expected_sha256 = "9fc1e65d76846fa0e55fbf9f3528dd19b80f1b34e15a1c93c453f1adfdbe93e5"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78931968
+file = "assets/ntsc8/user_38541_01.overlay"
+sha256 = "b42bf6bb2937eb3c630399967134aad39eeedf31238d5bdea0ef225a330a3a88"
+expected_sha256 = "dd7657f6d4d7ff1e0de22998f535e0aa1d4175a6a33189c8834589fb13453809"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78948352
+file = "assets/ntsc8/user_38549_01.overlay"
+sha256 = "77ff6f9b02ef8c976ab2d03b29b7656442e47bfe3ab7a9b64bc3b999480b5ce7"
+expected_sha256 = "95db4d36174085e829e9238df1f9c3e18552dd4e8979c7ac0615a596b9b7646b"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78989312
+file = "assets/ntsc8/user_38569_03.overlay"
+sha256 = "a841530d884c060891ecd2281c8d198e9b9d06abe64977cef62002a8c997803f"
+expected_sha256 = "377f4f4473b87c459d272e58b91ebc776da6f93fbb730f2e9749c8da1ef7ff36"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78999552
+file = "assets/ntsc8/user_38574_01.overlay"
+sha256 = "0fc562e42a7def9f15acaec3db0fc0d3716ec2766f522e2e29506614a90f326d"
+expected_sha256 = "89fdcd30d7f0e931494459716bb6ed4798cdc1d2e4a84647db23517ea0b35815"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79007744
+file = "assets/ntsc8/user_38578_02.overlay"
+sha256 = "aab17a9eca5d2d1f76b8d984690446278fdb54edd8f8e5b4a9675d149670eb0b"
+expected_sha256 = "1f6404095f01cb5e63e581512df3344a5d4979bad6972f45cc19987bf7c8a3b5"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79022080
+file = "assets/ntsc8/user_38585_01.overlay"
+sha256 = "51437b949d90b6c538727a70c266aa20d44d362aa61801c7bc920eb3458d06ca"
+expected_sha256 = "f8ecaf794dddcf2e7d54d7657e76ca430d97a62e84c58777f793d90ac875ee81"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79036416
+file = "assets/ntsc8/user_38592_01.overlay"
+sha256 = "4a9272a1e6337a3cfae6ba99579b00a59fa907fefc5ccd22545e711b8aa8aaa1"
+expected_sha256 = "4e682a171f723de5b60a03c38e41b255bac6bd7f2365c13b778a99704c6772a8"
+when = { region = "ntsc", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 8192
+file = "assets/ntscfull8/user_00004_01.overlay"
+sha256 = "81aa2fb0b78e8204ab09094d4376c1efd5579ff275b04c9a05ab6bf54bef899e"
+expected_sha256 = "3add2a2971b8490115b2196a8700be7697cdc7498b9f585d771acbec3132a7ea"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 53248
+file = "assets/ntscfull8/user_00026_01.overlay"
+sha256 = "0010f59901aef70173873be81d68e4fc4122f0bccb46127af4cf26e2d19b6f10"
+expected_sha256 = "6431a996fb3bafb8c1eb8679deee70c24aa8e391a9cdbffe844cb20fb5c88b7a"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 126976
+file = "assets/ntscfull8/user_00062_38.overlay"
+sha256 = "246287de6be951ce2c3512b126e12ce9d808b889405f5b31ba7a079495aafba9"
+expected_sha256 = "6d9c1a342768422bd634203ff722c9d6ff07166148cc4ca811e1bdf12c4a721c"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 77547520
+file = "assets/ntscfull8/user_37865_01.overlay"
+sha256 = "0010f59901aef70173873be81d68e4fc4122f0bccb46127af4cf26e2d19b6f10"
+expected_sha256 = "6431a996fb3bafb8c1eb8679deee70c24aa8e391a9cdbffe844cb20fb5c88b7a"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 77621248
+file = "assets/ntscfull8/user_37901_38.overlay"
+sha256 = "df6b4064e8b523cc76f865a7ad1ea571c7e2a1d9ae3affc7aa8e2a1d17cd53f3"
+expected_sha256 = "02157d38fab7293e6ca5c07502e930833c6433810962efb968441261f0247d76"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78333952
+file = "assets/ntscfull8/user_38249_05.overlay"
+sha256 = "d8770e0c97d86fe7f1106dc1abc6e930415e980a8f73c0193a1ac03bac9d3b0c"
+expected_sha256 = "b515a242ea1a98e9908f6166e6383fa587ee96471ba081a9360160a08d25da8b"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78409728
+file = "assets/ntscfull8/user_38286_05.overlay"
+sha256 = "46bd76df7710bc09dabe951ca67d6e5669cf8eb9cb2351d301a6dc5daa88958a"
+expected_sha256 = "539614b56e47286c621dc0f79ad037ebefb4fc92356453f69fb29540ae422ac5"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78422016
+file = "assets/ntscfull8/user_38292_01.overlay"
+sha256 = "bb51441e76b95f60eb753bedefec3f34a6c41e6bed3e27518b0f9fc3058ee754"
+expected_sha256 = "87a36496ca8af4e9045008f5f3e96bde5267fe7fc5c3a38f4f970e106e1bb3df"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78428160
+file = "assets/ntscfull8/user_38295_01.overlay"
+sha256 = "b0adaf0c978d167e953a6bdb49599ad24de287fcdff545c5d9fd3b45de92af36"
+expected_sha256 = "bae29d81b461f6dbd284ce91a1b516138082a885915b44a0579dbe62df7e48be"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78438400
+file = "assets/ntscfull8/user_38300_01.overlay"
+sha256 = "d1d40af6cd94348b2b60f926a6516f7207565b025c868e3ca7bceeb0f6b1cb53"
+expected_sha256 = "f4c27d53292b30cbb75e6914c36539686c73c0b45721e39f7908768330afada7"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78448640
+file = "assets/ntscfull8/user_38305_02.overlay"
+sha256 = "8c7a8925c235b94fb5ebe6e22f6868f34cfefeeb0e38c24e58834277f299a4a0"
+expected_sha256 = "ddd8ae171b26854e9e044bcdbc72934c980f8df457220125aeaa00dcf2a5ae06"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78454784
+file = "assets/ntscfull8/user_38308_02.overlay"
+sha256 = "9b8fc4bcc1d09af87165555a5c37a407efee36fa7690aa1966673f09e30e2858"
+expected_sha256 = "3c644c9e2d3c1f5364e84933557889db490b909edb35b427650e357d190415f5"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78467072
+file = "assets/ntscfull8/user_38314_04.overlay"
+sha256 = "2d9852a0a05f7a54dc8839be72ae7a099883f3199b37d143cd82dd1e7d4ffa7e"
+expected_sha256 = "835712e6e46bc137bfc051d82db2d2e52044539e605190564378530696ba2380"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78487552
+file = "assets/ntscfull8/user_38324_01.overlay"
+sha256 = "db2876bba552b30b1bc79d58b46a3975085cedd086d9919b58adccf385f0e0ff"
+expected_sha256 = "92494e1fef2df0bcf3552166ae30b42cc550a6f7f2a082d74501af00ac9e3a85"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78501888
+file = "assets/ntscfull8/user_38331_01.overlay"
+sha256 = "923fb02b8d50d312757a59bdd3b8ae9329de1d9e32fd66558528741065930844"
+expected_sha256 = "542d42fc4c62f53fd4dc398fe101f1f4e12e2ae7ecaef5d7dd9290abe8916baa"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78505984
+file = "assets/ntscfull8/user_38333_01.overlay"
+sha256 = "63d951e3f89c7630d827274dd8a48b0bbc2360f38f06fc88cf71ef8300411101"
+expected_sha256 = "63aa618aa87a24aa35874887fb5aae85b34e6edfdce764458af602ec9b6bc06c"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78559232
+file = "assets/ntscfull8/user_38359_01.overlay"
+sha256 = "f874532ddf3d3f89b34415b8aaf808146944c07ab56906f526328a82a4a20280"
+expected_sha256 = "8857ecc13fabe68affd59f6183ee8082a12fafc9449a29ad36b49430372c88fa"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78583808
+file = "assets/ntscfull8/user_38371_02.overlay"
+sha256 = "f87ed63e583b74f2246f3d10be3ccc1229613ae82bb4cd37a3c815b53f798b65"
+expected_sha256 = "7f997991fa3a9817fed026d1aead4e742cbb2232eef0599493ad60512db15ec6"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78618624
+file = "assets/ntscfull8/user_38388_02.overlay"
+sha256 = "0fd1667799a15dfb6017776820e7b827420d0bf8b6f82835896b9c9971af7424"
+expected_sha256 = "ff717f09897c94429bf4f306933368f8b693c5b27ad7869a2808f77965754be0"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78632960
+file = "assets/ntscfull8/user_38395_01.overlay"
+sha256 = "e2a3af8cc2d5471591686447aed3852427458a2c5f353cdc88c141ffa8b30938"
+expected_sha256 = "b1094b152ad0c90569b2fa1a77a4c2f56441bb5ee23dfdbcbd38efa6d08d3802"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78645248
+file = "assets/ntscfull8/user_38401_01.overlay"
+sha256 = "126a26a6f82ed2730cd85c46dbf158e1c4974737c6d28f64344858ca1ef6ebde"
+expected_sha256 = "92ac1ab94eaf9ece2c53562e12ec272f956ae249022d09930ccf02dabb1bc938"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78673920
+file = "assets/ntscfull8/user_38415_02.overlay"
+sha256 = "5d22903d88d85f93f7cc5de4bc628ab1a3c7835e2dd02b818fa42a05eb16cc3f"
+expected_sha256 = "0dc8167a4074ff55ccc4642cc839aedc1a6dd222944ea9fe23b8a6759ea21c87"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78680064
+file = "assets/ntscfull8/user_38418_01.overlay"
+sha256 = "0f2444a8058d1a87a7e86ad660479827066ac8763a632ebd5e252babd00573fc"
+expected_sha256 = "e02733e7036e1852bec353a05af5e993fb7769ee18a9f7d9319a7c9ace952a22"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78694400
+file = "assets/ntscfull8/user_38425_01.overlay"
+sha256 = "986bc29516372d0867c077c71391a99b1f2975aaf5d2a8bf79d50668b193b21b"
+expected_sha256 = "a53c46306f2afc755f420c0da6a2daa48dc38eed88847a63424448a556471844"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78704640
+file = "assets/ntscfull8/user_38430_03.overlay"
+sha256 = "9b71cde432af70cee0f456e3b6ca5e7d2f11a09307e53ebe0cb217d104cca30f"
+expected_sha256 = "e023773a7393c488cfdbe321728a4402a74a8f66434918230e8e2df90e4807d0"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78729216
+file = "assets/ntscfull8/user_38442_01.overlay"
+sha256 = "5c5e6546e9ecaa20aaa60b72da9b0f6c9063eb14bb570ab49901e017c04ed759"
+expected_sha256 = "f2f340965a195700d09fbcdac024113a3795bd6c35ff428c12fe58ab79bf3fe7"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78743552
+file = "assets/ntscfull8/user_38449_01.overlay"
+sha256 = "c2085421c07729090b19fcf1c965fa87dd9305f8d076e01e2032005afdbfbf0a"
+expected_sha256 = "160d109d5b4a441805bf06f2a05481e19024ecc6d7754135a08a4fbaf34e32fb"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78764032
+file = "assets/ntscfull8/user_38459_01.overlay"
+sha256 = "c4476a4923125a1fa1218a8ba68e807a00a8d568cdcc36a20796575c8ded185e"
+expected_sha256 = "57237d2a6e299be7e90faaf9b5fe8878b61cac7ba4a0006e009278f5c45d0569"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78768128
+file = "assets/ntscfull8/user_38461_01.overlay"
+sha256 = "f8710b6bb69a946663c124469cdbe1da2496457b1d0f606f256f25d6857d0b8f"
+expected_sha256 = "40e8dddc2616295c7b6c710e00844d2b61da4f13f46f23adc7afaf7b73ce0f10"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78774272
+file = "assets/ntscfull8/user_38464_01.overlay"
+sha256 = "610685dec93245c4196082750fced4e1e7eac6100c18fa1c8eb641e3f3c17d85"
+expected_sha256 = "e251c940e6a4ad7306449de22ca0f52b2ad9bac23ebb1af2ffe611f2da5d6334"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78800896
+file = "assets/ntscfull8/user_38477_01.overlay"
+sha256 = "6fb0ed380ae9f64988291b6199f382776c31d43eb33a7153b4211985d587103b"
+expected_sha256 = "564a1ab7f8288c2def1b869812dfcdfc862a1b5bb247650d769c9d89baef13e4"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78813184
+file = "assets/ntscfull8/user_38483_01.overlay"
+sha256 = "dfce9534b355a02d018fc7757f56108f8c6e19aff57fb933c00ce74e8076656f"
+expected_sha256 = "19d66e9785fa47c23b390dcc3cccfd681572079dcd161434a6706d041df86cc2"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78825472
+file = "assets/ntscfull8/user_38489_03.overlay"
+sha256 = "c085728015d79233662af190d2400210ba66dece2921cf028c687229b43ac978"
+expected_sha256 = "92b333bc020a2f091f52f1d1e2f62a3d9ac4916bb96dee1ca3fffc9415c145ec"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78839808
+file = "assets/ntscfull8/user_38496_01.overlay"
+sha256 = "bdc56ba81ff5bb2373359dd3db40489226c604b8da97dce8fd2e36b78f17be2e"
+expected_sha256 = "24d92eb3abc216b81e6545208f5f323377258b677107adf7479e0ad60bba82b3"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78868480
+file = "assets/ntscfull8/user_38510_01.overlay"
+sha256 = "24bf08fc59ec0ea8c875b13d77866d6e656325aef31ed51b77426493d2a868b4"
+expected_sha256 = "547ce8c0aeac9ac3461ee82e6cfa918fd6f620ff7339766456b1f506172d325d"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78874624
+file = "assets/ntscfull8/user_38513_01.overlay"
+sha256 = "3245192b31f4aadd618455835c39be9980085237aa69d9ed8c008cc3727dd1f3"
+expected_sha256 = "f556447ae5a69a4ca1e809fd4fdb1a2c196ee584c8b3b2b2573cd88d0b63a991"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78891008
+file = "assets/ntscfull8/user_38521_01.overlay"
+sha256 = "b4e999ebc90f3f0685754b44e90a197df51b11aa24c6be25049ff6010e9ff57c"
+expected_sha256 = "58822feadc4631b0e56424f26c32ffe444b9cc1759b2f161af0a688f1886c2f5"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78895104
+file = "assets/ntscfull8/user_38523_01.overlay"
+sha256 = "e7e3ba9eda40703f3341aa5cec46e185b63acfa8c1c3e32c6cda7d77332ce357"
+expected_sha256 = "6c1116e2bf7d855fd9a40fe71fefc097117c6441ffc5eed1c40d6a71075892b8"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78913536
+file = "assets/ntscfull8/user_38532_01.overlay"
+sha256 = "f18481aac695b3deaa1be8743cf5d4251d58b2c84041b5fd772df722bdeb9d3f"
+expected_sha256 = "61101f4061b4641139aae5efcd41a25dd04131ee7bd7468d3be40aa92a579718"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78921728
+file = "assets/ntscfull8/user_38536_01.overlay"
+sha256 = "cdced3d9842c083f09015a30a490dea0b5eb22da87a48eb2549c6593d7299d64"
+expected_sha256 = "9fc1e65d76846fa0e55fbf9f3528dd19b80f1b34e15a1c93c453f1adfdbe93e5"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78931968
+file = "assets/ntscfull8/user_38541_01.overlay"
+sha256 = "b42bf6bb2937eb3c630399967134aad39eeedf31238d5bdea0ef225a330a3a88"
+expected_sha256 = "dd7657f6d4d7ff1e0de22998f535e0aa1d4175a6a33189c8834589fb13453809"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78948352
+file = "assets/ntscfull8/user_38549_01.overlay"
+sha256 = "77ff6f9b02ef8c976ab2d03b29b7656442e47bfe3ab7a9b64bc3b999480b5ce7"
+expected_sha256 = "95db4d36174085e829e9238df1f9c3e18552dd4e8979c7ac0615a596b9b7646b"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78989312
+file = "assets/ntscfull8/user_38569_03.overlay"
+sha256 = "a841530d884c060891ecd2281c8d198e9b9d06abe64977cef62002a8c997803f"
+expected_sha256 = "377f4f4473b87c459d272e58b91ebc776da6f93fbb730f2e9749c8da1ef7ff36"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78999552
+file = "assets/ntscfull8/user_38574_01.overlay"
+sha256 = "0fc562e42a7def9f15acaec3db0fc0d3716ec2766f522e2e29506614a90f326d"
+expected_sha256 = "89fdcd30d7f0e931494459716bb6ed4798cdc1d2e4a84647db23517ea0b35815"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79007744
+file = "assets/ntscfull8/user_38578_02.overlay"
+sha256 = "aab17a9eca5d2d1f76b8d984690446278fdb54edd8f8e5b4a9675d149670eb0b"
+expected_sha256 = "1f6404095f01cb5e63e581512df3344a5d4979bad6972f45cc19987bf7c8a3b5"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79022080
+file = "assets/ntscfull8/user_38585_01.overlay"
+sha256 = "51437b949d90b6c538727a70c266aa20d44d362aa61801c7bc920eb3458d06ca"
+expected_sha256 = "f8ecaf794dddcf2e7d54d7657e76ca430d97a62e84c58777f793d90ac875ee81"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79036416
+file = "assets/ntscfull8/user_38592_01.overlay"
+sha256 = "3cf3fc5fcf671dfdb2aac76265b480b33005f1b1591fb525afde0d2b9728de38"
+expected_sha256 = "4e682a171f723de5b60a03c38e41b255bac6bd7f2365c13b778a99704c6772a8"
+when = { region = "ntsc", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 53248
+file = "assets/pal/user_00026_01.overlay"
+sha256 = "0010f59901aef70173873be81d68e4fc4122f0bccb46127af4cf26e2d19b6f10"
+expected_sha256 = "6431a996fb3bafb8c1eb8679deee70c24aa8e391a9cdbffe844cb20fb5c88b7a"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 126976
+file = "assets/pal/user_00062_38.overlay"
+sha256 = "3776d72c529b3d7c8c1270dfdf5344f8bee35030f6eda73bf97fbf444bdd1ed5"
+expected_sha256 = "6d9c1a342768422bd634203ff722c9d6ff07166148cc4ca811e1bdf12c4a721c"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 77547520
+file = "assets/pal/user_37865_01.overlay"
+sha256 = "0010f59901aef70173873be81d68e4fc4122f0bccb46127af4cf26e2d19b6f10"
+expected_sha256 = "6431a996fb3bafb8c1eb8679deee70c24aa8e391a9cdbffe844cb20fb5c88b7a"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 77621248
+file = "assets/pal/user_37901_38.overlay"
+sha256 = "7f6ad79347fe406859f6946843a0018c095b7476ef0b6b18baf06b70a4ad7e4a"
+expected_sha256 = "02157d38fab7293e6ca5c07502e930833c6433810962efb968441261f0247d76"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78409728
+file = "assets/pal/user_38286_05.overlay"
+sha256 = "4deb7c554bb5fd639c4deae0b9529ca306d367b622623b2abbc0d6ecde26ab9e"
+expected_sha256 = "539614b56e47286c621dc0f79ad037ebefb4fc92356453f69fb29540ae422ac5"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78422016
+file = "assets/pal/user_38292_01.overlay"
+sha256 = "bb51441e76b95f60eb753bedefec3f34a6c41e6bed3e27518b0f9fc3058ee754"
+expected_sha256 = "87a36496ca8af4e9045008f5f3e96bde5267fe7fc5c3a38f4f970e106e1bb3df"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78428160
+file = "assets/pal/user_38295_01.overlay"
+sha256 = "b0adaf0c978d167e953a6bdb49599ad24de287fcdff545c5d9fd3b45de92af36"
+expected_sha256 = "bae29d81b461f6dbd284ce91a1b516138082a885915b44a0579dbe62df7e48be"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78438400
+file = "assets/pal/user_38300_01.overlay"
+sha256 = "d1d40af6cd94348b2b60f926a6516f7207565b025c868e3ca7bceeb0f6b1cb53"
+expected_sha256 = "f4c27d53292b30cbb75e6914c36539686c73c0b45721e39f7908768330afada7"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78505984
+file = "assets/pal/user_38333_01.overlay"
+sha256 = "aba383e771969d8ff13e61f622d8e5017dd55ca4d5a4a4cc44a5ffec6ba99e4e"
+expected_sha256 = "63aa618aa87a24aa35874887fb5aae85b34e6edfdce764458af602ec9b6bc06c"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78645248
+file = "assets/pal/user_38401_01.overlay"
+sha256 = "126a26a6f82ed2730cd85c46dbf158e1c4974737c6d28f64344858ca1ef6ebde"
+expected_sha256 = "92ac1ab94eaf9ece2c53562e12ec272f956ae249022d09930ccf02dabb1bc938"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78673920
+file = "assets/pal/user_38415_02.overlay"
+sha256 = "c9fe10cf7456e7e15a098a04aa6a8cbb3c6c1a97e9fc620cacb323daad71215f"
+expected_sha256 = "0dc8167a4074ff55ccc4642cc839aedc1a6dd222944ea9fe23b8a6759ea21c87"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78680064
+file = "assets/pal/user_38418_01.overlay"
+sha256 = "0f2444a8058d1a87a7e86ad660479827066ac8763a632ebd5e252babd00573fc"
+expected_sha256 = "e02733e7036e1852bec353a05af5e993fb7769ee18a9f7d9319a7c9ace952a22"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78708736
+file = "assets/pal/user_38432_01.overlay"
+sha256 = "44247e40dc3632b33c80494f931d62fa2fcad51c7875093c4dee10083fdc8468"
+expected_sha256 = "7105822255778c15b5809142cf219d068c009d4c4d950bf46813460d43b7d62f"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78764032
+file = "assets/pal/user_38459_01.overlay"
+sha256 = "c4476a4923125a1fa1218a8ba68e807a00a8d568cdcc36a20796575c8ded185e"
+expected_sha256 = "57237d2a6e299be7e90faaf9b5fe8878b61cac7ba4a0006e009278f5c45d0569"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78768128
+file = "assets/pal/user_38461_01.overlay"
+sha256 = "f8710b6bb69a946663c124469cdbe1da2496457b1d0f606f256f25d6857d0b8f"
+expected_sha256 = "40e8dddc2616295c7b6c710e00844d2b61da4f13f46f23adc7afaf7b73ce0f10"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78774272
+file = "assets/pal/user_38464_01.overlay"
+sha256 = "610685dec93245c4196082750fced4e1e7eac6100c18fa1c8eb641e3f3c17d85"
+expected_sha256 = "e251c940e6a4ad7306449de22ca0f52b2ad9bac23ebb1af2ffe611f2da5d6334"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78839808
+file = "assets/pal/user_38496_01.overlay"
+sha256 = "bdc56ba81ff5bb2373359dd3db40489226c604b8da97dce8fd2e36b78f17be2e"
+expected_sha256 = "24d92eb3abc216b81e6545208f5f323377258b677107adf7479e0ad60bba82b3"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78874624
+file = "assets/pal/user_38513_01.overlay"
+sha256 = "3245192b31f4aadd618455835c39be9980085237aa69d9ed8c008cc3727dd1f3"
+expected_sha256 = "f556447ae5a69a4ca1e809fd4fdb1a2c196ee584c8b3b2b2573cd88d0b63a991"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78895104
+file = "assets/pal/user_38523_01.overlay"
+sha256 = "e7e3ba9eda40703f3341aa5cec46e185b63acfa8c1c3e32c6cda7d77332ce357"
+expected_sha256 = "6c1116e2bf7d855fd9a40fe71fefc097117c6441ffc5eed1c40d6a71075892b8"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78921728
+file = "assets/pal/user_38536_01.overlay"
+sha256 = "cdced3d9842c083f09015a30a490dea0b5eb22da87a48eb2549c6593d7299d64"
+expected_sha256 = "9fc1e65d76846fa0e55fbf9f3528dd19b80f1b34e15a1c93c453f1adfdbe93e5"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78948352
+file = "assets/pal/user_38549_01.overlay"
+sha256 = "77ff6f9b02ef8c976ab2d03b29b7656442e47bfe3ab7a9b64bc3b999480b5ce7"
+expected_sha256 = "95db4d36174085e829e9238df1f9c3e18552dd4e8979c7ac0615a596b9b7646b"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79007744
+file = "assets/pal/user_38578_02.overlay"
+sha256 = "8f739102f4079bbaa0a9db34ff1d5b085180b3999a471dca0e2be60b3aea266d"
+expected_sha256 = "1f6404095f01cb5e63e581512df3344a5d4979bad6972f45cc19987bf7c8a3b5"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79036416
+file = "assets/pal/user_38592_01.overlay"
+sha256 = "c363fb62c4d1ffdc847a11bb8a3fb53345dab38976109436e20cfa11e3b14f87"
+expected_sha256 = "4e682a171f723de5b60a03c38e41b255bac6bd7f2365c13b778a99704c6772a8"
+when = { region = "pal", extras = "none" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 53248
+file = "assets/pal8/user_00026_01.overlay"
+sha256 = "0010f59901aef70173873be81d68e4fc4122f0bccb46127af4cf26e2d19b6f10"
+expected_sha256 = "6431a996fb3bafb8c1eb8679deee70c24aa8e391a9cdbffe844cb20fb5c88b7a"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 126976
+file = "assets/pal8/user_00062_38.overlay"
+sha256 = "72a9a7be16f6812892d1894d751c49f7be769e19f2da7bc5765a8164b27f2cef"
+expected_sha256 = "6d9c1a342768422bd634203ff722c9d6ff07166148cc4ca811e1bdf12c4a721c"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 77547520
+file = "assets/pal8/user_37865_01.overlay"
+sha256 = "0010f59901aef70173873be81d68e4fc4122f0bccb46127af4cf26e2d19b6f10"
+expected_sha256 = "6431a996fb3bafb8c1eb8679deee70c24aa8e391a9cdbffe844cb20fb5c88b7a"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 77621248
+file = "assets/pal8/user_37901_38.overlay"
+sha256 = "1f2c6784cdfbbbbf196c87302fe8d8b9333cbea9e8ded79ff2bd84f53211fe84"
+expected_sha256 = "02157d38fab7293e6ca5c07502e930833c6433810962efb968441261f0247d76"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78333952
+file = "assets/pal8/user_38249_05.overlay"
+sha256 = "5a6fc6cd3c87a7dd3e9bd72bb842393d124182180d36fa984abd6c16a893a030"
+expected_sha256 = "b515a242ea1a98e9908f6166e6383fa587ee96471ba081a9360160a08d25da8b"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78409728
+file = "assets/pal8/user_38286_05.overlay"
+sha256 = "4deb7c554bb5fd639c4deae0b9529ca306d367b622623b2abbc0d6ecde26ab9e"
+expected_sha256 = "539614b56e47286c621dc0f79ad037ebefb4fc92356453f69fb29540ae422ac5"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78422016
+file = "assets/pal8/user_38292_01.overlay"
+sha256 = "bb51441e76b95f60eb753bedefec3f34a6c41e6bed3e27518b0f9fc3058ee754"
+expected_sha256 = "87a36496ca8af4e9045008f5f3e96bde5267fe7fc5c3a38f4f970e106e1bb3df"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78428160
+file = "assets/pal8/user_38295_01.overlay"
+sha256 = "b0adaf0c978d167e953a6bdb49599ad24de287fcdff545c5d9fd3b45de92af36"
+expected_sha256 = "bae29d81b461f6dbd284ce91a1b516138082a885915b44a0579dbe62df7e48be"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78438400
+file = "assets/pal8/user_38300_01.overlay"
+sha256 = "d1d40af6cd94348b2b60f926a6516f7207565b025c868e3ca7bceeb0f6b1cb53"
+expected_sha256 = "f4c27d53292b30cbb75e6914c36539686c73c0b45721e39f7908768330afada7"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78454784
+file = "assets/pal8/user_38308_02.overlay"
+sha256 = "076dcc2255abf6d0d547fc1e92e004fc0db1aa7a6b43ea1cf239179dc3d4536e"
+expected_sha256 = "3c644c9e2d3c1f5364e84933557889db490b909edb35b427650e357d190415f5"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78487552
+file = "assets/pal8/user_38324_01.overlay"
+sha256 = "db2876bba552b30b1bc79d58b46a3975085cedd086d9919b58adccf385f0e0ff"
+expected_sha256 = "92494e1fef2df0bcf3552166ae30b42cc550a6f7f2a082d74501af00ac9e3a85"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78501888
+file = "assets/pal8/user_38331_01.overlay"
+sha256 = "923fb02b8d50d312757a59bdd3b8ae9329de1d9e32fd66558528741065930844"
+expected_sha256 = "542d42fc4c62f53fd4dc398fe101f1f4e12e2ae7ecaef5d7dd9290abe8916baa"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78505984
+file = "assets/pal8/user_38333_01.overlay"
+sha256 = "63d951e3f89c7630d827274dd8a48b0bbc2360f38f06fc88cf71ef8300411101"
+expected_sha256 = "63aa618aa87a24aa35874887fb5aae85b34e6edfdce764458af602ec9b6bc06c"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78645248
+file = "assets/pal8/user_38401_01.overlay"
+sha256 = "126a26a6f82ed2730cd85c46dbf158e1c4974737c6d28f64344858ca1ef6ebde"
+expected_sha256 = "92ac1ab94eaf9ece2c53562e12ec272f956ae249022d09930ccf02dabb1bc938"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78673920
+file = "assets/pal8/user_38415_02.overlay"
+sha256 = "3bccca6369951a1440f47aa4a70690fdad54a43b5489b3b7553705e261f4052e"
+expected_sha256 = "0dc8167a4074ff55ccc4642cc839aedc1a6dd222944ea9fe23b8a6759ea21c87"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78680064
+file = "assets/pal8/user_38418_01.overlay"
+sha256 = "0f2444a8058d1a87a7e86ad660479827066ac8763a632ebd5e252babd00573fc"
+expected_sha256 = "e02733e7036e1852bec353a05af5e993fb7769ee18a9f7d9319a7c9ace952a22"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78708736
+file = "assets/pal8/user_38432_01.overlay"
+sha256 = "44247e40dc3632b33c80494f931d62fa2fcad51c7875093c4dee10083fdc8468"
+expected_sha256 = "7105822255778c15b5809142cf219d068c009d4c4d950bf46813460d43b7d62f"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78729216
+file = "assets/pal8/user_38442_01.overlay"
+sha256 = "1a9ae6aef5da3922852306ad7f7e7ca9fa6b7ab66b250c8c83adee736e095664"
+expected_sha256 = "f2f340965a195700d09fbcdac024113a3795bd6c35ff428c12fe58ab79bf3fe7"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78743552
+file = "assets/pal8/user_38449_01.overlay"
+sha256 = "c2085421c07729090b19fcf1c965fa87dd9305f8d076e01e2032005afdbfbf0a"
+expected_sha256 = "160d109d5b4a441805bf06f2a05481e19024ecc6d7754135a08a4fbaf34e32fb"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78764032
+file = "assets/pal8/user_38459_01.overlay"
+sha256 = "c4476a4923125a1fa1218a8ba68e807a00a8d568cdcc36a20796575c8ded185e"
+expected_sha256 = "57237d2a6e299be7e90faaf9b5fe8878b61cac7ba4a0006e009278f5c45d0569"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78768128
+file = "assets/pal8/user_38461_01.overlay"
+sha256 = "f8710b6bb69a946663c124469cdbe1da2496457b1d0f606f256f25d6857d0b8f"
+expected_sha256 = "40e8dddc2616295c7b6c710e00844d2b61da4f13f46f23adc7afaf7b73ce0f10"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78774272
+file = "assets/pal8/user_38464_01.overlay"
+sha256 = "610685dec93245c4196082750fced4e1e7eac6100c18fa1c8eb641e3f3c17d85"
+expected_sha256 = "e251c940e6a4ad7306449de22ca0f52b2ad9bac23ebb1af2ffe611f2da5d6334"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78800896
+file = "assets/pal8/user_38477_01.overlay"
+sha256 = "6fb0ed380ae9f64988291b6199f382776c31d43eb33a7153b4211985d587103b"
+expected_sha256 = "564a1ab7f8288c2def1b869812dfcdfc862a1b5bb247650d769c9d89baef13e4"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78813184
+file = "assets/pal8/user_38483_01.overlay"
+sha256 = "dfce9534b355a02d018fc7757f56108f8c6e19aff57fb933c00ce74e8076656f"
+expected_sha256 = "19d66e9785fa47c23b390dcc3cccfd681572079dcd161434a6706d041df86cc2"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78825472
+file = "assets/pal8/user_38489_03.overlay"
+sha256 = "c085728015d79233662af190d2400210ba66dece2921cf028c687229b43ac978"
+expected_sha256 = "92b333bc020a2f091f52f1d1e2f62a3d9ac4916bb96dee1ca3fffc9415c145ec"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78839808
+file = "assets/pal8/user_38496_01.overlay"
+sha256 = "bdc56ba81ff5bb2373359dd3db40489226c604b8da97dce8fd2e36b78f17be2e"
+expected_sha256 = "24d92eb3abc216b81e6545208f5f323377258b677107adf7479e0ad60bba82b3"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78868480
+file = "assets/pal8/user_38510_01.overlay"
+sha256 = "7db6459fde8ae8dc11f43d763b59293606be212c83316641d9f19f2231020701"
+expected_sha256 = "547ce8c0aeac9ac3461ee82e6cfa918fd6f620ff7339766456b1f506172d325d"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78874624
+file = "assets/pal8/user_38513_01.overlay"
+sha256 = "3245192b31f4aadd618455835c39be9980085237aa69d9ed8c008cc3727dd1f3"
+expected_sha256 = "f556447ae5a69a4ca1e809fd4fdb1a2c196ee584c8b3b2b2573cd88d0b63a991"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78895104
+file = "assets/pal8/user_38523_01.overlay"
+sha256 = "e7e3ba9eda40703f3341aa5cec46e185b63acfa8c1c3e32c6cda7d77332ce357"
+expected_sha256 = "6c1116e2bf7d855fd9a40fe71fefc097117c6441ffc5eed1c40d6a71075892b8"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78921728
+file = "assets/pal8/user_38536_01.overlay"
+sha256 = "cdced3d9842c083f09015a30a490dea0b5eb22da87a48eb2549c6593d7299d64"
+expected_sha256 = "9fc1e65d76846fa0e55fbf9f3528dd19b80f1b34e15a1c93c453f1adfdbe93e5"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78931968
+file = "assets/pal8/user_38541_01.overlay"
+sha256 = "b42bf6bb2937eb3c630399967134aad39eeedf31238d5bdea0ef225a330a3a88"
+expected_sha256 = "dd7657f6d4d7ff1e0de22998f535e0aa1d4175a6a33189c8834589fb13453809"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78948352
+file = "assets/pal8/user_38549_01.overlay"
+sha256 = "77ff6f9b02ef8c976ab2d03b29b7656442e47bfe3ab7a9b64bc3b999480b5ce7"
+expected_sha256 = "95db4d36174085e829e9238df1f9c3e18552dd4e8979c7ac0615a596b9b7646b"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78989312
+file = "assets/pal8/user_38569_03.overlay"
+sha256 = "a841530d884c060891ecd2281c8d198e9b9d06abe64977cef62002a8c997803f"
+expected_sha256 = "377f4f4473b87c459d272e58b91ebc776da6f93fbb730f2e9749c8da1ef7ff36"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78999552
+file = "assets/pal8/user_38574_01.overlay"
+sha256 = "0fc562e42a7def9f15acaec3db0fc0d3716ec2766f522e2e29506614a90f326d"
+expected_sha256 = "89fdcd30d7f0e931494459716bb6ed4798cdc1d2e4a84647db23517ea0b35815"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79007744
+file = "assets/pal8/user_38578_02.overlay"
+sha256 = "843bc152dde923467622983d91b6d85a5ea6cafdfef668231b6e3baab97288b3"
+expected_sha256 = "1f6404095f01cb5e63e581512df3344a5d4979bad6972f45cc19987bf7c8a3b5"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79036416
+file = "assets/pal8/user_38592_01.overlay"
+sha256 = "4a9272a1e6337a3cfae6ba99579b00a59fa907fefc5ccd22545e711b8aa8aaa1"
+expected_sha256 = "4e682a171f723de5b60a03c38e41b255bac6bd7f2365c13b778a99704c6772a8"
+when = { region = "pal", extras = "enhanced" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 53248
+file = "assets/palfull8/user_00026_01.overlay"
+sha256 = "0010f59901aef70173873be81d68e4fc4122f0bccb46127af4cf26e2d19b6f10"
+expected_sha256 = "6431a996fb3bafb8c1eb8679deee70c24aa8e391a9cdbffe844cb20fb5c88b7a"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 126976
+file = "assets/palfull8/user_00062_38.overlay"
+sha256 = "72a9a7be16f6812892d1894d751c49f7be769e19f2da7bc5765a8164b27f2cef"
+expected_sha256 = "6d9c1a342768422bd634203ff722c9d6ff07166148cc4ca811e1bdf12c4a721c"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 77547520
+file = "assets/palfull8/user_37865_01.overlay"
+sha256 = "0010f59901aef70173873be81d68e4fc4122f0bccb46127af4cf26e2d19b6f10"
+expected_sha256 = "6431a996fb3bafb8c1eb8679deee70c24aa8e391a9cdbffe844cb20fb5c88b7a"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 77621248
+file = "assets/palfull8/user_37901_38.overlay"
+sha256 = "1f2c6784cdfbbbbf196c87302fe8d8b9333cbea9e8ded79ff2bd84f53211fe84"
+expected_sha256 = "02157d38fab7293e6ca5c07502e930833c6433810962efb968441261f0247d76"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78333952
+file = "assets/palfull8/user_38249_05.overlay"
+sha256 = "898f52160a3fe47ea590efb64d72d1cd0fa878da3840bddc074b9deca09e913b"
+expected_sha256 = "b515a242ea1a98e9908f6166e6383fa587ee96471ba081a9360160a08d25da8b"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78409728
+file = "assets/palfull8/user_38286_05.overlay"
+sha256 = "4deb7c554bb5fd639c4deae0b9529ca306d367b622623b2abbc0d6ecde26ab9e"
+expected_sha256 = "539614b56e47286c621dc0f79ad037ebefb4fc92356453f69fb29540ae422ac5"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78422016
+file = "assets/palfull8/user_38292_01.overlay"
+sha256 = "bb51441e76b95f60eb753bedefec3f34a6c41e6bed3e27518b0f9fc3058ee754"
+expected_sha256 = "87a36496ca8af4e9045008f5f3e96bde5267fe7fc5c3a38f4f970e106e1bb3df"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78428160
+file = "assets/palfull8/user_38295_01.overlay"
+sha256 = "b0adaf0c978d167e953a6bdb49599ad24de287fcdff545c5d9fd3b45de92af36"
+expected_sha256 = "bae29d81b461f6dbd284ce91a1b516138082a885915b44a0579dbe62df7e48be"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78438400
+file = "assets/palfull8/user_38300_01.overlay"
+sha256 = "d1d40af6cd94348b2b60f926a6516f7207565b025c868e3ca7bceeb0f6b1cb53"
+expected_sha256 = "f4c27d53292b30cbb75e6914c36539686c73c0b45721e39f7908768330afada7"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78454784
+file = "assets/palfull8/user_38308_02.overlay"
+sha256 = "076dcc2255abf6d0d547fc1e92e004fc0db1aa7a6b43ea1cf239179dc3d4536e"
+expected_sha256 = "3c644c9e2d3c1f5364e84933557889db490b909edb35b427650e357d190415f5"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78487552
+file = "assets/palfull8/user_38324_01.overlay"
+sha256 = "db2876bba552b30b1bc79d58b46a3975085cedd086d9919b58adccf385f0e0ff"
+expected_sha256 = "92494e1fef2df0bcf3552166ae30b42cc550a6f7f2a082d74501af00ac9e3a85"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78501888
+file = "assets/palfull8/user_38331_01.overlay"
+sha256 = "923fb02b8d50d312757a59bdd3b8ae9329de1d9e32fd66558528741065930844"
+expected_sha256 = "542d42fc4c62f53fd4dc398fe101f1f4e12e2ae7ecaef5d7dd9290abe8916baa"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78505984
+file = "assets/palfull8/user_38333_01.overlay"
+sha256 = "63d951e3f89c7630d827274dd8a48b0bbc2360f38f06fc88cf71ef8300411101"
+expected_sha256 = "63aa618aa87a24aa35874887fb5aae85b34e6edfdce764458af602ec9b6bc06c"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78645248
+file = "assets/palfull8/user_38401_01.overlay"
+sha256 = "126a26a6f82ed2730cd85c46dbf158e1c4974737c6d28f64344858ca1ef6ebde"
+expected_sha256 = "92ac1ab94eaf9ece2c53562e12ec272f956ae249022d09930ccf02dabb1bc938"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78673920
+file = "assets/palfull8/user_38415_02.overlay"
+sha256 = "3bccca6369951a1440f47aa4a70690fdad54a43b5489b3b7553705e261f4052e"
+expected_sha256 = "0dc8167a4074ff55ccc4642cc839aedc1a6dd222944ea9fe23b8a6759ea21c87"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78680064
+file = "assets/palfull8/user_38418_01.overlay"
+sha256 = "0f2444a8058d1a87a7e86ad660479827066ac8763a632ebd5e252babd00573fc"
+expected_sha256 = "e02733e7036e1852bec353a05af5e993fb7769ee18a9f7d9319a7c9ace952a22"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78708736
+file = "assets/palfull8/user_38432_01.overlay"
+sha256 = "44247e40dc3632b33c80494f931d62fa2fcad51c7875093c4dee10083fdc8468"
+expected_sha256 = "7105822255778c15b5809142cf219d068c009d4c4d950bf46813460d43b7d62f"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78729216
+file = "assets/palfull8/user_38442_01.overlay"
+sha256 = "5c5e6546e9ecaa20aaa60b72da9b0f6c9063eb14bb570ab49901e017c04ed759"
+expected_sha256 = "f2f340965a195700d09fbcdac024113a3795bd6c35ff428c12fe58ab79bf3fe7"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78743552
+file = "assets/palfull8/user_38449_01.overlay"
+sha256 = "c2085421c07729090b19fcf1c965fa87dd9305f8d076e01e2032005afdbfbf0a"
+expected_sha256 = "160d109d5b4a441805bf06f2a05481e19024ecc6d7754135a08a4fbaf34e32fb"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78764032
+file = "assets/palfull8/user_38459_01.overlay"
+sha256 = "c4476a4923125a1fa1218a8ba68e807a00a8d568cdcc36a20796575c8ded185e"
+expected_sha256 = "57237d2a6e299be7e90faaf9b5fe8878b61cac7ba4a0006e009278f5c45d0569"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78768128
+file = "assets/palfull8/user_38461_01.overlay"
+sha256 = "f8710b6bb69a946663c124469cdbe1da2496457b1d0f606f256f25d6857d0b8f"
+expected_sha256 = "40e8dddc2616295c7b6c710e00844d2b61da4f13f46f23adc7afaf7b73ce0f10"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78774272
+file = "assets/palfull8/user_38464_01.overlay"
+sha256 = "610685dec93245c4196082750fced4e1e7eac6100c18fa1c8eb641e3f3c17d85"
+expected_sha256 = "e251c940e6a4ad7306449de22ca0f52b2ad9bac23ebb1af2ffe611f2da5d6334"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78800896
+file = "assets/palfull8/user_38477_01.overlay"
+sha256 = "6fb0ed380ae9f64988291b6199f382776c31d43eb33a7153b4211985d587103b"
+expected_sha256 = "564a1ab7f8288c2def1b869812dfcdfc862a1b5bb247650d769c9d89baef13e4"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78813184
+file = "assets/palfull8/user_38483_01.overlay"
+sha256 = "dfce9534b355a02d018fc7757f56108f8c6e19aff57fb933c00ce74e8076656f"
+expected_sha256 = "19d66e9785fa47c23b390dcc3cccfd681572079dcd161434a6706d041df86cc2"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78825472
+file = "assets/palfull8/user_38489_03.overlay"
+sha256 = "c085728015d79233662af190d2400210ba66dece2921cf028c687229b43ac978"
+expected_sha256 = "92b333bc020a2f091f52f1d1e2f62a3d9ac4916bb96dee1ca3fffc9415c145ec"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78839808
+file = "assets/palfull8/user_38496_01.overlay"
+sha256 = "bdc56ba81ff5bb2373359dd3db40489226c604b8da97dce8fd2e36b78f17be2e"
+expected_sha256 = "24d92eb3abc216b81e6545208f5f323377258b677107adf7479e0ad60bba82b3"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78868480
+file = "assets/palfull8/user_38510_01.overlay"
+sha256 = "24bf08fc59ec0ea8c875b13d77866d6e656325aef31ed51b77426493d2a868b4"
+expected_sha256 = "547ce8c0aeac9ac3461ee82e6cfa918fd6f620ff7339766456b1f506172d325d"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78874624
+file = "assets/palfull8/user_38513_01.overlay"
+sha256 = "3245192b31f4aadd618455835c39be9980085237aa69d9ed8c008cc3727dd1f3"
+expected_sha256 = "f556447ae5a69a4ca1e809fd4fdb1a2c196ee584c8b3b2b2573cd88d0b63a991"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78895104
+file = "assets/palfull8/user_38523_01.overlay"
+sha256 = "e7e3ba9eda40703f3341aa5cec46e185b63acfa8c1c3e32c6cda7d77332ce357"
+expected_sha256 = "6c1116e2bf7d855fd9a40fe71fefc097117c6441ffc5eed1c40d6a71075892b8"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78921728
+file = "assets/palfull8/user_38536_01.overlay"
+sha256 = "cdced3d9842c083f09015a30a490dea0b5eb22da87a48eb2549c6593d7299d64"
+expected_sha256 = "9fc1e65d76846fa0e55fbf9f3528dd19b80f1b34e15a1c93c453f1adfdbe93e5"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78931968
+file = "assets/palfull8/user_38541_01.overlay"
+sha256 = "b42bf6bb2937eb3c630399967134aad39eeedf31238d5bdea0ef225a330a3a88"
+expected_sha256 = "dd7657f6d4d7ff1e0de22998f535e0aa1d4175a6a33189c8834589fb13453809"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78948352
+file = "assets/palfull8/user_38549_01.overlay"
+sha256 = "77ff6f9b02ef8c976ab2d03b29b7656442e47bfe3ab7a9b64bc3b999480b5ce7"
+expected_sha256 = "95db4d36174085e829e9238df1f9c3e18552dd4e8979c7ac0615a596b9b7646b"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78989312
+file = "assets/palfull8/user_38569_03.overlay"
+sha256 = "a841530d884c060891ecd2281c8d198e9b9d06abe64977cef62002a8c997803f"
+expected_sha256 = "377f4f4473b87c459d272e58b91ebc776da6f93fbb730f2e9749c8da1ef7ff36"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 78999552
+file = "assets/palfull8/user_38574_01.overlay"
+sha256 = "0fc562e42a7def9f15acaec3db0fc0d3716ec2766f522e2e29506614a90f326d"
+expected_sha256 = "89fdcd30d7f0e931494459716bb6ed4798cdc1d2e4a84647db23517ea0b35815"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79007744
+file = "assets/palfull8/user_38578_02.overlay"
+sha256 = "843bc152dde923467622983d91b6d85a5ea6cafdfef668231b6e3baab97288b3"
+expected_sha256 = "1f6404095f01cb5e63e581512df3344a5d4979bad6972f45cc19987bf7c8a3b5"
+when = { region = "pal", extras = "full" }
+
+[[overlay]]
+feature = "framerate"
+target = "disc_user"
+offset = 79036416
+file = "assets/palfull8/user_38592_01.overlay"
+sha256 = "3cf3fc5fcf671dfdb2aac76265b480b33005f1b1591fb525afde0d2b9728de38"
+expected_sha256 = "4e682a171f723de5b60a03c38e41b255bac6bd7f2365c13b778a99704c6772a8"
+when = { region = "pal", extras = "full" }
+

@@ -8,13 +8,14 @@
   "mod_packages": [
     {
       "name": "framerate-ntscfull8",
-      "manifest": "mods/preloaded/packages/wipeout3.enhancement.framerate/1.0.14/manifest.toml",
-      "manifest_sha256": "2d125a975f571c2e6b169660ae4bc104a16c698049ddf4d97bda42d84bc81601",
+      "manifest": "mods/preloaded/packages/wipeout3.enhancement.framerate/1.1.0/manifest.toml",
+      "manifest_sha256": "1b1f2cd053a99f64f08b9e69e51b7d9d73e57e5fd6f7796487a0ca3bd37ed806",
       "id": "wipeout3.enhancement.framerate",
-      "version": "1.0.14",
+      "version": "1.1.0",
       "features": {
         "framerate": {
-          "build": "ntscfull8"
+          "region": "ntsc",
+          "extras": "full"
         }
       },
       "plugins": [

@@ -1,9 +1,20 @@
 #!/usr/bin/env python3
-"""Convert hueponik WipEout 3 SE xdelta patches into declarative .psxmod packages.
+"""Convert hueponik WipEout 3 SE xdelta patches into the "NTSC / PAL Mode" package.
 
-derived_disc VCDIFF is conversion scaffolding only. This writes native
-main_exe patches (so the recompiled boot EXE is dirtied) and disc_user
-overlays (so later CD reads see the same edits).
+derived_disc VCDIFF is conversion scaffolding only. Every changed Track 01
+sector becomes one guarded disc_user overlay. That includes the boot EXE's own
+sectors: the BIOS loads SCES_028.45 through CD reads, which the runtime serves
+through those overlays, so the EXE edits are encoded exactly ONCE.
+
+Until 1.1.0 the EXE edits were ALSO emitted as main_exe patches guarded by the
+stock bytes. The overlay had already changed those bytes by the time the
+runtime checked the guards after the BIOS load, so every plan was rejected at
+0x80010098 ("expected-byte guard failed; booting unmodified") and the patches
+never applied -- the overlay was doing all the work (bead beads-btt8.6).
+
+The six hueponik builds are two independent choices:
+  region = ntsc | pal              (60 Hz NTSC conversion, or 50 Hz PAL)
+  extras = none | enhanced | full  (stock 2 MB, or hueponik's 8 MB builds)
 
 Source: https://codeberg.org/hueponik/wip3out-patches
 """
@@ -27,14 +38,26 @@ LOAD_ADDRESS = 0x80010000
 DISC_SHA256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
 EXE_SHA256 = "0213f5292fa1d995ebe61f42d5dbdb6614e481cb3840ac5f1521c2dfdccc0a4d"
 PATCH_BASE = "https://codeberg.org/hueponik/wip3out-patches/raw/branch/master"
+# (hueponik build, xdelta, region, extras). The build name survives only as the
+# asset directory, so the payload files keep the names they had in 1.0.14.
 VARIANTS = (
-    ("ntsc", "ntsc_track01.xdelta3", "NTSC 30 fps (stock 2 MB)"),
-    ("ntsc8", "ntsc8_track01.xdelta3", "NTSC 30 fps enhanced (needs 8 MB RAM)"),
-    ("ntscfull8", "ntscfull8_track01.xdelta3", "NTSC 30 fps full (needs 8 MB RAM)"),
-    ("pal", "pal_track01.xdelta3", "PAL 25 fps (stock 2 MB)"),
-    ("pal8", "pal8_track01.xdelta3", "PAL 25 fps enhanced (needs 8 MB RAM)"),
-    ("palfull8", "palfull8_track01.xdelta3", "PAL 25 fps full (needs 8 MB RAM)"),
+    ("ntsc", "ntsc_track01.xdelta3", "ntsc", "none"),
+    ("ntsc8", "ntsc8_track01.xdelta3", "ntsc", "enhanced"),
+    ("ntscfull8", "ntscfull8_track01.xdelta3", "ntsc", "full"),
+    ("pal", "pal_track01.xdelta3", "pal", "none"),
+    ("pal8", "pal8_track01.xdelta3", "pal", "enhanced"),
+    ("palfull8", "palfull8_track01.xdelta3", "pal", "full"),
 )
+REGIONS = (
+    ("ntsc", "NTSC (60 Hz)"),
+    ("pal", "PAL (50 Hz)"),
+)
+EXTRAS = (
+    ("none", "None (stock 2 MB)"),
+    ("enhanced", "Enhanced (needs 8 MB Main RAM)"),
+    ("full", "Full (needs 8 MB Main RAM)"),
+)
+PKG_VERSION = "1.1.0"
 EXE_GAP = 64
 # hueponik unlocks every-vblank sim (2→1 skip + dt). Real PSX/DuckStation stay
 # GPU-bound near 25/30 fps; recomp's GPU is instant so that unlock chipmunks
@@ -134,14 +157,6 @@ def byte_runs(stock: bytes, patched: bytes, gap: int) -> list[tuple[int, int]]:
     return runs
 
 
-def hex_block(data: bytes) -> str:
-    rows = []
-    for off in range(0, len(data), 32):
-        chunk = data[off : off + 32]
-        rows.append(" ".join(f"{b:02x}" for b in chunk))
-    return '"""\n' + "\n".join(rows) + '\n"""'
-
-
 def download(url: str, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     print(f"download {url}", file=sys.stderr)
@@ -163,13 +178,15 @@ def emit_variant_ops(
     out_dir: Path,
     assets: Path,
     feature: str,
-    value: str,
+    build: str,
+    region: str,
+    extras: str,
     meta: dict,
 ) -> None:
-    variant_dir = assets / value
+    variant_dir = assets / build
     variant_dir.mkdir()
     for lba, count, payload, expected_digest, digest in meta["overlays"]:
-        rel = f"assets/{value}/user_{lba:05d}_{count:02d}.overlay"
+        rel = f"assets/{build}/user_{lba:05d}_{count:02d}.overlay"
         (out_dir / rel).write_bytes(payload)
         offset = lba * USER
         lines += [
@@ -180,18 +197,17 @@ def emit_variant_ops(
             f'file = "{rel}"',
             f'sha256 = "{digest}"',
             f'expected_sha256 = "{expected_digest}"',
-            f'when = {{ build = "{value}" }}',
+            f'when = {{ region = "{region}", extras = "{extras}" }}',
             "",
         ]
-    for addr, expected, replacement in meta["exe_patches"]:
+
+
+def emit_choices(lines: list[str], choices) -> None:
+    for value, label in choices:
         lines += [
-            "[[patch]]",
-            f'feature = "{feature}"',
-            'target = "main_exe"',
-            f"address = 0x{addr:08X}",
-            f"expected = {hex_block(expected)}",
-            f"replace = {hex_block(replacement)}",
-            f'when = {{ build = "{value}" }}',
+            "[[option.choice]]",
+            f'value = "{value}"',
+            f'label = "{toml_escape(label)}"',
             "",
         ]
 
@@ -205,15 +221,15 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
     lines: list[str] = [
         "format_version = 5",
         f'id = "{PKG_60}"',
-        'version = "1.0.14"',
-        'name = "WipEout 3 NTSC / Framerate"',
+        f'version = "{PKG_VERSION}"',
+        'name = "WipEout 3 NTSC / PAL Mode"',
         'author = "hueponik"',
-        "description = \"Converted from hueponik SCES-02845 xdelta patches "
-        "(plain unlock + AOT skip=2 at SimVblankGate). NTSC keeps "
-        "SetVideoMode(NTSC) / 60 Hz CRTC and hueponik's 50→60 timing scales. "
-        "Gate entry + VBlank plugins force gSimVblankSkip=2 so AOT runs "
-        "every-other-vblank (~30 fps); title Game 60 fps is CRTC, not sim. "
-        "PAL ~25 fps. Enhanced/Full need 8 MB (not with stock 2 MB builds).\"",
+        "description = \"Converted from hueponik's SCES-02845 xdelta patches. "
+        "NTSC runs the game in the 60 Hz NTSC video mode with hueponik's "
+        "50-to-60 Hz timing scales, racing at about 30 frames per second as on "
+        "an NTSC console; PAL keeps the 50 Hz mode at about 25. Extras Enhanced "
+        "and Full are hueponik's 8 MB builds: they need 8 MB Main RAM, and "
+        "8 MB Main RAM should stay off with Extras None.\"",
         'license = "See upstream patch author. Conversion is a sparse native overlay of that work."',
         'source_name = "hueponik/wip3out-patches"',
         'source_url = "https://codeberg.org/hueponik/wip3out-patches"',
@@ -231,9 +247,12 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
         "",
         "[[feature]]",
         'id = "framerate"',
-        'name = "NTSC / Framerate"',
-        'description = """Plain hueponik NTSC/PAL plus AOT skip=2 at '
-        'SimVblankGate (~30/25 fps). Enable 8 MB only for Enhanced/Full."""',
+        'name = "NTSC / PAL Mode"',
+        'description = """hueponik\'s region conversion: NTSC (60 Hz video, '
+        'about 30 frames per second in a race) or PAL (50 Hz, about 25). '
+        'Extras Enhanced and Full need 8 MB Main RAM; leave 8 MB Main RAM off '
+        'with Extras None. Pairs with Frame Blending to present those frames at '
+        'your display rate."""',
         'group = "Gameplay"',
         "default_enabled = false",
         "",
@@ -251,35 +270,52 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
         "",
         "[[option]]",
         'feature = "framerate"',
-        'id = "build"',
-        'label = "Build"',
-        'description = "NTSC 30 fps or PAL 25 fps. Enhanced/Full need 8 MB RAM."',
+        'id = "region"',
+        'label = "Region"',
+        'description = "NTSC: 60 Hz video, about 30 frames per second in a race. '
+        'PAL: 50 Hz, about 25."',
         'group = "Gameplay"',
         'type = "choice"',
         'default = "ntsc"',
         "",
     ]
-    for value, _, label in VARIANTS:
-        lines += [
-            "[[option.choice]]",
-            f'value = "{value}"',
-            f'label = "{toml_escape(label)}"',
-            "",
-        ]
+    emit_choices(lines, REGIONS)
+    lines += [
+        "[[option]]",
+        'feature = "framerate"',
+        'id = "extras"',
+        'label = "Extras"',
+        'description = "hueponik\'s 8 MB builds. Enhanced and Full need 8 MB Main '
+        'RAM; None is the stock 2 MB game and should run with 8 MB Main RAM off."',
+        'group = "Gameplay"',
+        'type = "choice"',
+        'default = "none"',
+        "",
+    ]
+    emit_choices(lines, EXTRAS)
 
-    for value, meta in variants.items():
-        emit_variant_ops(lines, out_dir, assets, "framerate", value, meta)
+    for build, _patch_name, region, extras in VARIANTS:
+        emit_variant_ops(lines, out_dir, assets, "framerate", build, region,
+                         extras, variants[build])
 
-    (out_dir / "manifest.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # Generated output: LF on every host, so the manifest hash (which the AOT
+    # profile pins) does not depend on where the generator ran.
+    (out_dir / "manifest.toml").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     (out_dir / "NOTICE.md").write_text(
         "Game edits come from hueponik's WipEout 3 Special Edition patches:\n"
         "https://codeberg.org/hueponik/wip3out-patches\n\n"
         "This package does not redistribute the disc. It stores sparse guarded "
-        "writes converted from the published xdelta against a verified SCES-02845 "
-        "Track 01 dump. 1.0.14 keeps plain hueponik and forces gSimVblankSkip=2 "
-        "from SimVblankGate entry (pre-CPS) plus VBlank backup so AOT cannot "
-        "lose a skip=1 stomp race. Title Game 60 fps is CRTC vblanks.\n",
+        "disc overlays converted from the published xdelta against a verified "
+        "SCES-02845 Track 01 dump; the boot EXE's edits arrive through the same "
+        "overlays when the BIOS loads it. The wipeout3.framerate.skip2* plugins "
+        "force gSimVblankSkip=2 from SimVblankGate entry (pre-CPS) plus a VBlank "
+        "backup so the race keeps hueponik's every-other-vblank cadence. "
+        f"{PKG_VERSION} splits the six builds into Region (NTSC/PAL) and Extras "
+        "(None/Enhanced/Full) and stops encoding the EXE edits a second time as "
+        "main_exe patches.\n",
         encoding="utf-8",
+        newline="\n",
     )
 
 
@@ -351,16 +387,18 @@ def materialize_variant(
         overlays.append(
             (lba, count, payload, sha256_bytes(expected), sha256_bytes(payload))
         )
+    # The boot EXE's edits are delivered by the overlays over its sectors (the
+    # BIOS loads it with CD reads). Prove that instead of re-encoding them as
+    # main_exe patches, which is what made every pre-1.1.0 plan fail its
+    # expected-byte guards (beads-btt8.6).
+    loaded = bytearray(stock_user)
+    for lba, count, payload, _expected, _digest in overlays:
+        loaded[lba * USER : lba * USER + count * USER] = payload
     patched_exe = patched_user[exe_off : exe_off + len(exe)]
-    exe_patches = []
-    for off, size in byte_runs(exe, patched_exe, EXE_GAP):
-        if off + size <= EXE_HEADER:
-            continue
-        start = max(off, EXE_HEADER)
-        end = off + size
-        addr = LOAD_ADDRESS + (start - EXE_HEADER)
-        exe_patches.append((addr, exe[start:end], patched_exe[start:end]))
-    return {"overlays": overlays, "exe_patches": exe_patches}
+    if bytes(loaded[exe_off : exe_off + len(exe)]) != patched_exe:
+        raise SystemExit("disc overlays do not reproduce the patched boot EXE")
+    exe_edits = byte_runs(exe, patched_exe, EXE_GAP)
+    return {"overlays": overlays, "exe_edit_runs": len(exe_edits)}
 
 
 def convert_variant_60(
@@ -400,7 +438,7 @@ def main() -> int:
     parser.add_argument(
         "--out-60",
         type=Path,
-        default=root / "mods" / "preloaded" / "packages" / PKG_60 / "1.0.14",
+        default=root / "mods" / "preloaded" / "packages" / PKG_60 / PKG_VERSION,
     )
     args = parser.parse_args()
     if not args.stock.is_file() or not args.exe.is_file():
@@ -419,7 +457,7 @@ def main() -> int:
 
     # Ensure every NTSC/PAL xdelta is applied once.
     patched_paths: dict[str, Path] = {}
-    for value, patch_name, _label in VARIANTS:
+    for value, patch_name, _region, _extras in VARIANTS:
         patch = args.cache / patch_name
         if not patch.is_file():
             download(f"{PATCH_BASE}/{patch_name}", patch)
@@ -429,7 +467,7 @@ def main() -> int:
         patched_paths[value] = patched
 
     converted_60 = {}
-    for value, _patch_name, _label in VARIANTS:
+    for value, _patch_name, region, extras in VARIANTS:
         converted_60[value] = convert_variant_60(
             stock_raw,
             stock_user,
@@ -438,8 +476,10 @@ def main() -> int:
             force_ntsc_video=value.startswith("ntsc"),
         )
         print(
-            f"{value}: overlays={len(converted_60[value]['overlays'])} "
-            f"exe_patches={len(converted_60[value]['exe_patches'])}",
+            f"{value} (region={region} extras={extras}): "
+            f"overlays={len(converted_60[value]['overlays'])} "
+            f"boot-EXE edit runs carried by those overlays="
+            f"{converted_60[value]['exe_edit_runs']}",
             file=sys.stderr,
         )
     emit_package_60(args.out_60, converted_60)
