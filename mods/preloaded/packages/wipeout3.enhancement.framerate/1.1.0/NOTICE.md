@@ -1,4 +1,0 @@
-Game edits come from hueponik's WipEout 3 Special Edition patches:
-https://codeberg.org/hueponik/wip3out-patches
-
-This package does not redistribute the disc. It stores sparse guarded disc overlays converted from the published xdelta against a verified SCES-02845 Track 01 dump; the boot EXE's edits arrive through the same overlays when the BIOS loads it. The wipeout3.framerate.skip2* plugins force gSimVblankSkip=2 from SimVblankGate entry (pre-CPS) plus a VBlank backup so the race keeps hueponik's every-other-vblank cadence. 1.1.0 splits the six builds into Region (NTSC/PAL) and Extras (None/Enhanced/Full) and stops encoding the EXE edits a second time as main_exe patches. Enhanced and Full declare [[requirement]]s on psx.enhancement.8mb-ram, so the 8 MB main-RAM map is active exactly while one of them is selected.

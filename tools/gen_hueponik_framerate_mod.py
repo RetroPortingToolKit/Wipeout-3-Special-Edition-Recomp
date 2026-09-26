@@ -12,14 +12,24 @@ runtime checked the guards after the BIOS load, so every plan was rejected at
 0x80010098 ("expected-byte guard failed; booting unmodified") and the patches
 never applied -- the overlay was doing all the work (bead beads-btt8.6).
 
-The six hueponik builds are two independent choices:
-  region = ntsc | pal              (60 Hz NTSC conversion, or 50 Hz PAL)
-  extras = none | enhanced | full  (stock 2 MB, or hueponik's 8 MB builds)
+hueponik publishes six builds (ntsc/pal x stock/8/full8). The package ships
+only the two FULL builds, one per Region option:
+  region = ntsc -> ntscfull8   (60 Hz NTSC conversion)
+  region = pal  -> palfull8    (50 Hz PAL)
+The stock-2 MB and "8" builds are not packaged (1.2.0 dropped the Extras
+option that picked them).
 
-Enhanced and Full need the framework's 8 MB main-RAM feature. The manifest says
-so with [[requirement]] entries (package format 7), so choosing one of them
-switches that hidden feature on for the session and None runs retail 2 MB --
-the player never toggles, or sees, 8 MB Main RAM.
+Both full builds need the framework's 8 MB main-RAM feature. The manifest says
+so with one unconditional [[requirement]] (package format 7): enabling NTSC /
+PAL Mode switches that hidden feature on for the session -- the player never
+toggles, or sees, 8 MB Main RAM.
+
+Measured 2026-09-26 (GP1 display-flip ring, guest time, 175 s races): stock 25.0
+fps; ntscfull8 18.9 / palfull8 19.3 fps (12-25 by scene, CPU-bound at stock
+clock: flips every 3-4 vblanks). Removing the skip2 plugins changes nothing
+(19.0 / 19.5). NTSC game speed ~= fps/30 (80% at 24 fps) because the runtime
+keeps 50 Hz VBlanks for this PAL disc; PAL speed is correct. The descriptions
+below say so instead of promising 30/25 fps (beads-btt8.6).
 
 Source: https://codeberg.org/hueponik/wip3out-patches
 """
@@ -44,34 +54,24 @@ DISC_SHA256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
 EXE_SHA256 = "0213f5292fa1d995ebe61f42d5dbdb6614e481cb3840ac5f1521c2dfdccc0a4d"
 # Pinned: upstream master moved on and, from ac46a5dc ("Collapse number of
 # patches"), no longer carries the 8 MB builds. This is the last commit with
-# all six xdeltas and the one the committed 1.1.0 assets reproduce from.
+# all six xdeltas; the committed assets reproduce from it.
 PATCH_COMMIT = "1a630b055c415f62019f5bf3da2a3a0b2a846470"
 PATCH_BASE = f"https://codeberg.org/hueponik/wip3out-patches/raw/commit/{PATCH_COMMIT}"
-# (hueponik build, xdelta, region, extras). The build name survives only as the
-# asset directory, so the payload files keep the names they had in 1.0.14.
+# (hueponik build, xdelta, region). The build name survives only as the asset
+# directory.
 VARIANTS = (
-    ("ntsc", "ntsc_track01.xdelta3", "ntsc", "none"),
-    ("ntsc8", "ntsc8_track01.xdelta3", "ntsc", "enhanced"),
-    ("ntscfull8", "ntscfull8_track01.xdelta3", "ntsc", "full"),
-    ("pal", "pal_track01.xdelta3", "pal", "none"),
-    ("pal8", "pal8_track01.xdelta3", "pal", "enhanced"),
-    ("palfull8", "palfull8_track01.xdelta3", "pal", "full"),
+    ("ntscfull8", "ntscfull8_track01.xdelta3", "ntsc"),
+    ("palfull8", "palfull8_track01.xdelta3", "pal"),
 )
 REGIONS = (
-    ("ntsc", "NTSC (60 Hz)"),
-    ("pal", "PAL (50 Hz)"),
+    ("ntsc", "NTSC"),
+    ("pal", "PAL"),
 )
-EXTRAS = (
-    ("none", "None (stock 2 MB)"),
-    ("enhanced", "Enhanced (uses 8 MB RAM)"),
-    ("full", "Full (uses 8 MB RAM)"),
-)
-# Extras values that are hueponik's 8 MB builds, and the framework feature
-# they require (mods/builtin/packages/psx.enhancement.8mb-ram).
-EXTRAS_8MB = ("enhanced", "full")
+# The framework feature both full builds require
+# (mods/builtin/packages/psx.enhancement.8mb-ram).
 RAM_8MB_PACKAGE = "psx.enhancement.8mb-ram"
 RAM_8MB_FEATURE = "8mb-ram"
-PKG_VERSION = "1.1.0"
+PKG_VERSION = "1.2.0"
 EXE_GAP = 64
 # hueponik unlocks every-vblank sim (2→1 skip + dt). Real PSX/DuckStation stay
 # GPU-bound near 25/30 fps; recomp's GPU is instant so that unlock chipmunks
@@ -194,7 +194,6 @@ def emit_variant_ops(
     feature: str,
     build: str,
     region: str,
-    extras: str,
     meta: dict,
 ) -> None:
     variant_dir = assets / build
@@ -211,7 +210,7 @@ def emit_variant_ops(
             f'file = "{rel}"',
             f'sha256 = "{digest}"',
             f'expected_sha256 = "{expected_digest}"',
-            f'when = {{ region = "{region}", extras = "{extras}" }}',
+            f'when = {{ region = "{region}" }}',
             "",
         ]
 
@@ -238,12 +237,13 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
         f'version = "{PKG_VERSION}"',
         'name = "WipEout 3 NTSC / PAL Mode"',
         'author = "hueponik"',
-        "description = \"Converted from hueponik's SCES-02845 xdelta patches. "
-        "NTSC runs the game in the 60 Hz NTSC video mode with hueponik's "
-        "50-to-60 Hz timing scales, racing at about 30 frames per second as on "
-        "an NTSC console; PAL keeps the 50 Hz mode at about 25. Extras Enhanced "
-        "and Full are hueponik's 8 MB builds and switch on 8 MB main RAM "
-        "automatically; Extras None is the stock 2 MB game.\"",
+        "description = \"Converted from hueponik's SCES-02845 xdelta patches: "
+        "his full 8 MB builds (8 MB main RAM switches on automatically). NTSC "
+        "puts the game in the NTSC video mode with hueponik's 60 Hz timing; PAL "
+        "keeps the 50 Hz mode. hueponik targets a heavily overclocked CPU, which "
+        "this build does not have: measured races run at 12 to 25 frames per "
+        "second (the stock game holds 25), and in NTSC the race also runs slower "
+        "than real time whenever the frame rate drops.\"",
         'license = "See upstream patch author. Conversion is a sparse native overlay of that work."',
         'source_name = "hueponik/wip3out-patches"',
         'source_url = "https://codeberg.org/hueponik/wip3out-patches"',
@@ -262,10 +262,11 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
         "[[feature]]",
         'id = "framerate"',
         'name = "NTSC / PAL Mode"',
-        'description = """hueponik\'s region conversion: NTSC (60 Hz video, '
-        'about 30 frames per second in a race) or PAL (50 Hz, about 25). '
-        'Extras Enhanced and Full use 8 MB RAM, switched on automatically. Pairs '
-        'with Frame Blending to present those frames at your display rate."""',
+        'description = """hueponik\'s full build in NTSC or PAL mode. Uses 8 MB '
+        'RAM, switched on automatically. Races run at 12 to 25 frames per '
+        'second here, never faster than the stock game; in NTSC the race also '
+        'runs below real-time speed when frames drop (about 80% at 24 frames '
+        'per second). PAL keeps correct game speed."""',
         'group = "Gameplay"',
         "default_enabled = false",
         "",
@@ -285,44 +286,29 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
         'feature = "framerate"',
         'id = "region"',
         'label = "Region"',
-        'description = "NTSC: 60 Hz video, about 30 frames per second in a race. '
-        'PAL: 50 Hz, about 25."',
+        'description = "NTSC: NTSC video mode with hueponik\'s 60 Hz timing; the '
+        'race runs slow when frames drop. PAL: 50 Hz, correct game speed."',
         'group = "Gameplay"',
         'type = "choice"',
         'default = "ntsc"',
         "",
     ]
     emit_choices(lines, REGIONS)
+    # Both full builds need the framework's 8 MB map. The [[requirement]]
+    # activates that hidden feature whenever NTSC / PAL Mode is on (a package
+    # [[dependency]] would enable it even with the feature off), and fails the
+    # launch loudly if a build ever lacks the package.
     lines += [
-        "[[option]]",
+        "[[requirement]]",
         'feature = "framerate"',
-        'id = "extras"',
-        'label = "Extras"',
-        'description = "hueponik\'s 8 MB builds. Enhanced and Full use 8 MB main '
-        'RAM, which switches on automatically; None is the stock 2 MB game."',
-        'group = "Gameplay"',
-        'type = "choice"',
-        'default = "none"',
+        f'package = "{RAM_8MB_PACKAGE}"',
+        f'requires_feature = "{RAM_8MB_FEATURE}"',
         "",
     ]
-    emit_choices(lines, EXTRAS)
-    # The 8 MB builds need the framework's 8 MB map. A [[requirement]] (not a
-    # package [[dependency]], which would apply with Extras None too) activates
-    # the hidden feature only while one of these values is selected, and fails
-    # the launch loudly if a build ever lacks the package.
-    for extras in EXTRAS_8MB:
-        lines += [
-            "[[requirement]]",
-            'feature = "framerate"',
-            f'package = "{RAM_8MB_PACKAGE}"',
-            f'requires_feature = "{RAM_8MB_FEATURE}"',
-            f'when = {{ extras = "{extras}" }}',
-            "",
-        ]
 
-    for build, _patch_name, region, extras in VARIANTS:
+    for build, _patch_name, region in VARIANTS:
         emit_variant_ops(lines, out_dir, assets, "framerate", build, region,
-                         extras, variants[build])
+                         variants[build])
 
     # Generated output: LF on every host, so the manifest hash (which the AOT
     # profile pins) does not depend on where the generator ran.
@@ -336,12 +322,12 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
         "SCES-02845 Track 01 dump; the boot EXE's edits arrive through the same "
         "overlays when the BIOS loads it. The wipeout3.framerate.skip2* plugins "
         "force gSimVblankSkip=2 from SimVblankGate entry (pre-CPS) plus a VBlank "
-        "backup so the race keeps hueponik's every-other-vblank cadence. "
-        f"{PKG_VERSION} splits the six builds into Region (NTSC/PAL) and Extras "
-        "(None/Enhanced/Full) and stops encoding the EXE edits a second time as "
-        "main_exe patches. Enhanced and Full declare [[requirement]]s on "
-        f"{RAM_8MB_PACKAGE}, so the 8 MB main-RAM map is active exactly while "
-        "one of them is selected.\n",
+        "backup (measured: the full builds already hold gSimVblankSkip at 2 "
+        "without them, and real frame rate is the same either way). "
+        f"{PKG_VERSION} ships only hueponik's two full builds (ntscfull8, "
+        "palfull8), picked by Region, and declares one unconditional "
+        f"[[requirement]] on {RAM_8MB_PACKAGE}, so the 8 MB main-RAM map is "
+        "active whenever NTSC / PAL Mode is on.\n",
         encoding="utf-8",
         newline="\n",
     )
@@ -485,7 +471,7 @@ def main() -> int:
 
     # Ensure every NTSC/PAL xdelta is applied once.
     patched_paths: dict[str, Path] = {}
-    for value, patch_name, _region, _extras in VARIANTS:
+    for value, patch_name, _region in VARIANTS:
         patch = args.cache / patch_name
         if not patch.is_file():
             download(f"{PATCH_BASE}/{patch_name}", patch)
@@ -495,7 +481,7 @@ def main() -> int:
         patched_paths[value] = patched
 
     converted_60 = {}
-    for value, _patch_name, region, extras in VARIANTS:
+    for value, _patch_name, region in VARIANTS:
         converted_60[value] = convert_variant_60(
             stock_raw,
             stock_user,
@@ -504,7 +490,7 @@ def main() -> int:
             force_ntsc_video=value.startswith("ntsc"),
         )
         print(
-            f"{value} (region={region} extras={extras}): "
+            f"{value} (region={region}): "
             f"overlays={len(converted_60[value]['overlays'])} "
             f"boot-EXE edit runs carried by those overlays="
             f"{converted_60[value]['exe_edit_runs']}",

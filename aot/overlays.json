@@ -8,14 +8,33 @@
   "mod_packages": [
     {
       "name": "framerate-ntscfull8",
-      "manifest": "mods/preloaded/packages/wipeout3.enhancement.framerate/1.1.0/manifest.toml",
-      "manifest_sha256": "caf391938771f245f3b613812620f0e7b71a03c3d12aea1579f1fce89815275e",
+      "manifest": "mods/preloaded/packages/wipeout3.enhancement.framerate/1.2.0/manifest.toml",
+      "manifest_sha256": "b53a45b77c55e7368fe130d3bad0e2b304132038641c693931508971492431b5",
       "id": "wipeout3.enhancement.framerate",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "features": {
         "framerate": {
-          "region": "ntsc",
-          "extras": "full"
+          "region": "ntsc"
+        }
+      },
+      "plugins": [
+        "wipeout3.framerate.skip2",
+        "wipeout3.framerate.skip2-entry",
+        "wipeout3.framerate.skip2-on"
+      ],
+      "requirements": [
+        "psx.enhancement.8mb-ram/8mb-ram"
+      ]
+    },
+    {
+      "name": "framerate-palfull8",
+      "manifest": "mods/preloaded/packages/wipeout3.enhancement.framerate/1.2.0/manifest.toml",
+      "manifest_sha256": "b53a45b77c55e7368fe130d3bad0e2b304132038641c693931508971492431b5",
+      "id": "wipeout3.enhancement.framerate",
+      "version": "1.2.0",
+      "features": {
+        "framerate": {
+          "region": "pal"
         }
       },
       "plugins": [
@@ -283,6 +302,146 @@
         "0x80115CC8": "0x30421FFF",
         "0x80115CE0": "0x0107102A"
       }
+    },
+    {
+      "method": "words",
+      "mod_package": "framerate-palfull8",
+      "file": "SCES_028.45",
+      "file_offset": "0x800",
+      "base": "0x80010000",
+      "reason": "Patched boot entry jumps to a loop copying 0x790 words from 0x800D03B8 to 0x80780000, then zeroes the source and resumes the original entry.",
+      "values": {
+        "0x80162474": "0x0805D521",
+        "0x80175484": "0x3C048078",
+        "0x80175488": "0x3C05800D",
+        "0x8017548C": "0x34A503B8",
+        "0x80175490": "0x34060790",
+        "0x80175494": "0x8CA20000",
+        "0x80175498": "0x24A50004",
+        "0x8017549C": "0xAC820000",
+        "0x801754A0": "0x24840004",
+        "0x801754A4": "0x24C6FFFF",
+        "0x801754A8": "0x14C0FFFA"
+      }
+    },
+    {
+      "method": "words",
+      "mod_package": "framerate-palfull8",
+      "file": "SCES_028.45",
+      "file_offset": "0x800",
+      "base": "0x80010000",
+      "reason": "Same loader under the framerate package (its patched EXE leaves it unchanged): MenuControl opens pack \"c:\\wipeout3\\nfe.pb\" (string at 0x8016DDC8), allocates 0x800BF800..*(0x801793F4) from the main heap and aborts unless it starts exactly at 0x800BF800 and the top member (index count-1 = 5) fits, has PackGet(0) decode that member into a temporary buffer, memcpys PackSize() bytes to 0x800BF800 via A0:2A, pops it and calls 0x800E0220, 0x800DF8A4, 0x800BF800, 0x800DF694 (x5) and 0x800DC0B0. No relocation.",
+      "values": {
+        "0x801179C4": "0x3C048017",
+        "0x801179C8": "0x2484DDC8",
+        "0x801179F4": "0x0C052EBB",
+        "0x80117A04": "0x3C10800C",
+        "0x80117A10": "0x2610F800",
+        "0x80117A18": "0x0C045A1B",
+        "0x80117A24": "0x12700004",
+        "0x80117A38": "0x0C052E0C",
+        "0x80117A3C": "0x00002021",
+        "0x80117A40": "0x0C052F0C",
+        "0x80117A64": "0x02602021",
+        "0x80117A68": "0x02402821",
+        "0x80117A6C": "0x0C0573CE",
+        "0x80117A70": "0x02003021",
+        "0x80117A74": "0x0C052E5B",
+        "0x80117A90": "0x0C038088",
+        "0x80117A98": "0x0C037E29",
+        "0x80117AA0": "0x0C02FE00",
+        "0x80117AB0": "0x0C037DA5",
+        "0x80117AC0": "0x0C037DA5",
+        "0x80117AD0": "0x0C037DA5",
+        "0x80117AE0": "0x0C037DA5",
+        "0x80117AF0": "0x0C037DA5",
+        "0x80117B04": "0x0C03702C",
+        "0x8015CF38": "0x240A00A0",
+        "0x8015CF3C": "0x01400008",
+        "0x8015CF40": "0x2409002A",
+        "0x8016DDC8": "0x775C3A63",
+        "0x8016DDCC": "0x6F657069",
+        "0x8016DDD0": "0x5C337475",
+        "0x8016DDD4": "0x2E65666E",
+        "0x8016DDD8": "0x00006270"
+      }
+    },
+    {
+      "method": "words",
+      "mod_package": "framerate-palfull8",
+      "file": "SCES_028.45",
+      "file_offset": "0x800",
+      "base": "0x80010000",
+      "reason": "Same loader under the framerate package (its patched EXE leaves it unchanged): Pack reader: member count at file +0x50, 12-byte {offset, size, stored} descriptors at +0x58 read top-down from index count-1; size == stored is used verbatim, otherwise ExpandData(pack+offset, dst).",
+      "values": {
+        "0x8014BB54": "0x24820050",
+        "0x8014BB5C": "0x24830058",
+        "0x8014BB64": "0x8C820050",
+        "0x8014BB6C": "0x2442FFFF",
+        "0x8014B864": "0x00051040",
+        "0x8014B868": "0x00451021",
+        "0x8014B86C": "0x8C8397FC",
+        "0x8014B870": "0x00021080",
+        "0x8014B878": "0x00431021",
+        "0x8014B87C": "0x8C510004",
+        "0x8014B880": "0x8C430008",
+        "0x8014B884": "0x8C520000",
+        "0x8014B888": "0x1223001A",
+        "0x8014B8E4": "0x0C0456C7",
+        "0x8014B8E8": "0x00922021"
+      }
+    },
+    {
+      "method": "words",
+      "mod_package": "framerate-palfull8",
+      "file": "SCES_028.45",
+      "file_offset": "0x800",
+      "base": "0x80010000",
+      "reason": "Same loader under the framerate package (its patched EXE leaves it unchanged): First open reads no file: the preload flag at 0x80178354 starts at 1, so PackOpen uses the pack already at the main heap base, which boot sets to 0x80010000, the start of this EXE's image (file offset 0x800); popping a pack's last member clears the flag, and later opens FileRead the named file to the heap base.",
+      "values": {
+        "0x8011615C": "0x3C16801A",
+        "0x80116334": "0x3C028001",
+        "0x8011633C": "0x24420000",
+        "0x80116340": "0xAEC2862C",
+        "0x80178354": "0x00000001",
+        "0x8014BAEC": "0x3C028018",
+        "0x8014BAF0": "0x8C438354",
+        "0x8014BB08": "0x1460000A",
+        "0x8014BB10": "0x0C03E0CB",
+        "0x8014BB18": "0x02002021",
+        "0x8014BB1C": "0x8E25862C",
+        "0x8014BB20": "0x0C03E0D6",
+        "0x8014BB3C": "0x8E24862C",
+        "0x8014BA04": "0xAE008354",
+        "0x8014BBFC": "0xAE008354"
+      }
+    },
+    {
+      "method": "words",
+      "mod_package": "framerate-palfull8",
+      "file": "SCES_028.45",
+      "file_offset": "0x800",
+      "base": "0x80010000",
+      "reason": "Same loader under the framerate package (its patched EXE leaves it unchanged): lzss.c ExpandData: uninitialized 0x2000-byte window, position starts at 1, MSB-first bit reader; flag 1 = 8-bit literal, flag 0 = 13-bit position (0 ends the stream) + 4-bit count copying count+3 bytes.",
+      "values": {
+        "0x80115B3C": "0x24052000",
+        "0x80115B44": "0x0C045A95",
+        "0x80115B6C": "0x24050080",
+        "0x80115B70": "0x240A0001",
+        "0x80115B78": "0x14A20004",
+        "0x80115B80": "0x92290000",
+        "0x80115B8C": "0x00052842",
+        "0x80115B9C": "0x10400019",
+        "0x80115BA0": "0x24030080",
+        "0x80115BF8": "0x30CA1FFF",
+        "0x80115C04": "0x24031000",
+        "0x80115C4C": "0x11600029",
+        "0x80115C50": "0x24030008",
+        "0x80115C94": "0x3C030002",
+        "0x80115C9C": "0x00024403",
+        "0x80115CC8": "0x30421FFF",
+        "0x80115CE0": "0x0107102A"
+      }
     }
   ],
   "images": [
@@ -422,8 +581,87 @@
           "reason": "Stored model data, handed to 0x80111AF8/0x80111DA0 by the menu overlay at 0x800DC2EC/0x800DC30C."
         }
       ]
+    },
+    {
+      "method": "fixed_address_extents",
+      "mod_package": "framerate-palfull8",
+      "allow_missing": true,
+      "extents": [
+        {
+          "file": "SCES_028.45",
+          "file_offset": "0x800",
+          "base": "0x80010000",
+          "address": "0x800D03B8",
+          "size": "0x1E40",
+          "load_addr": "0x80780000",
+          "sha256": "f44bd2ffcaba45975316cb3f5a8e531e7e988492d83438ed28d003247eeae362",
+          "transfer_entries": {
+            "from": "mod_package_writes",
+            "count": 46
+          }
+        }
+      ]
+    },
+    {
+      "method": "indexed_lzss_members",
+      "mod_package": "framerate-palfull8",
+      "file": "WIPEOUT3/NFE.PB",
+      "identical_copies": [
+        {
+          "file": "SCES_028.45",
+          "file_offset": "0x800",
+          "size": "0x2484C",
+          "reason": "The copy linked at 0x80010000 that the first open after boot uses in place of the disc file."
+        }
+      ],
+      "count_offset": "0x50",
+      "table_offset": "0x58",
+      "alignment": 4,
+      "lzss": {
+        "position_bits": 13,
+        "length_bits": 4,
+        "min_match": 3,
+        "initial_position": 1
+      },
+      "count": 6,
+      "members": [
+        {
+          "index": 5,
+          "load_addr": "0x800BF800",
+          "decoded_sha256": "f1bd911053d41bd6e7cda288d24e9278d469bf492e82d7f7718fa243a193c284",
+          "entries": [
+            "0x800BF800",
+            "0x800DC0B0",
+            "0x800DF694",
+            "0x800DF8A4",
+            "0x800E0220"
+          ]
+        }
+      ],
+      "excluded_members": [
+        {
+          "index": 0,
+          "reason": "Credits text (\"PRODUCER...\"), copied to a heap buffer by the menu overlay at 0x800E0260."
+        },
+        {
+          "index": 1,
+          "reason": "TIM image, handed to the texture loader 0x80141E5C by the menu overlay at 0x800C0450/0x800C0470."
+        },
+        {
+          "index": 2,
+          "reason": "TIM image, handed to the texture loader 0x80141E5C by the menu overlay at 0x800C0450/0x800C0470."
+        },
+        {
+          "index": 3,
+          "reason": "Stored model data, handed to 0x80111AF8/0x80111DA0 by the menu overlay at 0x800DC2EC/0x800DC30C."
+        },
+        {
+          "index": 4,
+          "reason": "Stored model data, handed to 0x80111AF8/0x80111DA0 by the menu overlay at 0x800DC2EC/0x800DC30C."
+        }
+      ]
     }
   ],
-  "expected_records": 3,
+  "expected_records": 5,
   "strict_bounds": true
 }
