@@ -16,6 +16,11 @@ The six hueponik builds are two independent choices:
   region = ntsc | pal              (60 Hz NTSC conversion, or 50 Hz PAL)
   extras = none | enhanced | full  (stock 2 MB, or hueponik's 8 MB builds)
 
+Enhanced and Full need the framework's 8 MB main-RAM feature. The manifest says
+so with [[requirement]] entries (package format 7), so choosing one of them
+switches that hidden feature on for the session and None runs retail 2 MB --
+the player never toggles, or sees, 8 MB Main RAM.
+
 Source: https://codeberg.org/hueponik/wip3out-patches
 """
 
@@ -37,7 +42,11 @@ EXE_HEADER = 2048
 LOAD_ADDRESS = 0x80010000
 DISC_SHA256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
 EXE_SHA256 = "0213f5292fa1d995ebe61f42d5dbdb6614e481cb3840ac5f1521c2dfdccc0a4d"
-PATCH_BASE = "https://codeberg.org/hueponik/wip3out-patches/raw/branch/master"
+# Pinned: upstream master moved on and, from ac46a5dc ("Collapse number of
+# patches"), no longer carries the 8 MB builds. This is the last commit with
+# all six xdeltas and the one the committed 1.1.0 assets reproduce from.
+PATCH_COMMIT = "1a630b055c415f62019f5bf3da2a3a0b2a846470"
+PATCH_BASE = f"https://codeberg.org/hueponik/wip3out-patches/raw/commit/{PATCH_COMMIT}"
 # (hueponik build, xdelta, region, extras). The build name survives only as the
 # asset directory, so the payload files keep the names they had in 1.0.14.
 VARIANTS = (
@@ -54,9 +63,14 @@ REGIONS = (
 )
 EXTRAS = (
     ("none", "None (stock 2 MB)"),
-    ("enhanced", "Enhanced (needs 8 MB Main RAM)"),
-    ("full", "Full (needs 8 MB Main RAM)"),
+    ("enhanced", "Enhanced (uses 8 MB RAM)"),
+    ("full", "Full (uses 8 MB RAM)"),
 )
+# Extras values that are hueponik's 8 MB builds, and the framework feature
+# they require (mods/builtin/packages/psx.enhancement.8mb-ram).
+EXTRAS_8MB = ("enhanced", "full")
+RAM_8MB_PACKAGE = "psx.enhancement.8mb-ram"
+RAM_8MB_FEATURE = "8mb-ram"
 PKG_VERSION = "1.1.0"
 EXE_GAP = 64
 # hueponik unlocks every-vblank sim (2→1 skip + dt). Real PSX/DuckStation stay
@@ -219,7 +233,7 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
     assets.mkdir(parents=True)
 
     lines: list[str] = [
-        "format_version = 5",
+        "format_version = 7",
         f'id = "{PKG_60}"',
         f'version = "{PKG_VERSION}"',
         'name = "WipEout 3 NTSC / PAL Mode"',
@@ -228,8 +242,8 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
         "NTSC runs the game in the 60 Hz NTSC video mode with hueponik's "
         "50-to-60 Hz timing scales, racing at about 30 frames per second as on "
         "an NTSC console; PAL keeps the 50 Hz mode at about 25. Extras Enhanced "
-        "and Full are hueponik's 8 MB builds: they need 8 MB Main RAM, and "
-        "8 MB Main RAM should stay off with Extras None.\"",
+        "and Full are hueponik's 8 MB builds and switch on 8 MB main RAM "
+        "automatically; Extras None is the stock 2 MB game.\"",
         'license = "See upstream patch author. Conversion is a sparse native overlay of that work."',
         'source_name = "hueponik/wip3out-patches"',
         'source_url = "https://codeberg.org/hueponik/wip3out-patches"',
@@ -250,9 +264,8 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
         'name = "NTSC / PAL Mode"',
         'description = """hueponik\'s region conversion: NTSC (60 Hz video, '
         'about 30 frames per second in a race) or PAL (50 Hz, about 25). '
-        'Extras Enhanced and Full need 8 MB Main RAM; leave 8 MB Main RAM off '
-        'with Extras None. Pairs with Frame Blending to present those frames at '
-        'your display rate."""',
+        'Extras Enhanced and Full use 8 MB RAM, switched on automatically. Pairs '
+        'with Frame Blending to present those frames at your display rate."""',
         'group = "Gameplay"',
         "default_enabled = false",
         "",
@@ -285,14 +298,27 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
         'feature = "framerate"',
         'id = "extras"',
         'label = "Extras"',
-        'description = "hueponik\'s 8 MB builds. Enhanced and Full need 8 MB Main '
-        'RAM; None is the stock 2 MB game and should run with 8 MB Main RAM off."',
+        'description = "hueponik\'s 8 MB builds. Enhanced and Full use 8 MB main '
+        'RAM, which switches on automatically; None is the stock 2 MB game."',
         'group = "Gameplay"',
         'type = "choice"',
         'default = "none"',
         "",
     ]
     emit_choices(lines, EXTRAS)
+    # The 8 MB builds need the framework's 8 MB map. A [[requirement]] (not a
+    # package [[dependency]], which would apply with Extras None too) activates
+    # the hidden feature only while one of these values is selected, and fails
+    # the launch loudly if a build ever lacks the package.
+    for extras in EXTRAS_8MB:
+        lines += [
+            "[[requirement]]",
+            'feature = "framerate"',
+            f'package = "{RAM_8MB_PACKAGE}"',
+            f'requires_feature = "{RAM_8MB_FEATURE}"',
+            f'when = {{ extras = "{extras}" }}',
+            "",
+        ]
 
     for build, _patch_name, region, extras in VARIANTS:
         emit_variant_ops(lines, out_dir, assets, "framerate", build, region,
@@ -313,7 +339,9 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
         "backup so the race keeps hueponik's every-other-vblank cadence. "
         f"{PKG_VERSION} splits the six builds into Region (NTSC/PAL) and Extras "
         "(None/Enhanced/Full) and stops encoding the EXE edits a second time as "
-        "main_exe patches.\n",
+        "main_exe patches. Enhanced and Full declare [[requirement]]s on "
+        f"{RAM_8MB_PACKAGE}, so the 8 MB main-RAM map is active exactly while "
+        "one of them is selected.\n",
         encoding="utf-8",
         newline="\n",
     )

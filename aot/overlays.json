@@ -9,7 +9,7 @@
     {
       "name": "framerate-ntscfull8",
       "manifest": "mods/preloaded/packages/wipeout3.enhancement.framerate/1.1.0/manifest.toml",
-      "manifest_sha256": "1b1f2cd053a99f64f08b9e69e51b7d9d73e57e5fd6f7796487a0ca3bd37ed806",
+      "manifest_sha256": "caf391938771f245f3b613812620f0e7b71a03c3d12aea1579f1fce89815275e",
       "id": "wipeout3.enhancement.framerate",
       "version": "1.1.0",
       "features": {
@@ -22,6 +22,9 @@
         "wipeout3.framerate.skip2",
         "wipeout3.framerate.skip2-entry",
         "wipeout3.framerate.skip2-on"
+      ],
+      "requirements": [
+        "psx.enhancement.8mb-ram/8mb-ram"
       ]
     }
   ],

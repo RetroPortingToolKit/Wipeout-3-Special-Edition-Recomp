@@ -20,8 +20,10 @@ converted from [hueponik/wip3out-patches](https://codeberg.org/hueponik/wip3out-
 a **plain** hueponik overlay plus AOT cadence (**SimVblankGate** entry and VBlank
 plugins force **gSimVblankSkip=2**). Two options pick one of hueponik's six
 builds: **Region** (NTSC 60 Hz, about 30 fps in a race / PAL 50 Hz, about 25)
-and **Extras** (None = stock 2 MB, Enhanced / Full = hueponik's 8 MB builds,
-which need 8 MB Main RAM). Every edit, including the boot EXE's, is one disc
+and **Extras** (None = stock 2 MB, Enhanced / Full = hueponik's 8 MB builds).
+Enhanced and Full switch the framework's hidden 8 MB Main RAM feature on
+implicitly (a `[[requirement]]`, package format 7); None runs retail 2 MB and
+the player never toggles 8 MB RAM. Every edit, including the boot EXE's, is one disc
 overlay; 1.0.14 also re-encoded the EXE edits as `main_exe` patches, which made
 every plan fail its guards at boot (`mod plan ... rejected at 0x80010098`).
 

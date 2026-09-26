@@ -1,9 +1,9 @@
-format_version = 5
+format_version = 7
 id = "wipeout3.enhancement.framerate"
 version = "1.1.0"
 name = "WipEout 3 NTSC / PAL Mode"
 author = "hueponik"
-description = "Converted from hueponik's SCES-02845 xdelta patches. NTSC runs the game in the 60 Hz NTSC video mode with hueponik's 50-to-60 Hz timing scales, racing at about 30 frames per second as on an NTSC console; PAL keeps the 50 Hz mode at about 25. Extras Enhanced and Full are hueponik's 8 MB builds: they need 8 MB Main RAM, and 8 MB Main RAM should stay off with Extras None."
+description = "Converted from hueponik's SCES-02845 xdelta patches. NTSC runs the game in the 60 Hz NTSC video mode with hueponik's 50-to-60 Hz timing scales, racing at about 30 frames per second as on an NTSC console; PAL keeps the 50 Hz mode at about 25. Extras Enhanced and Full are hueponik's 8 MB builds and switch on 8 MB main RAM automatically; Extras None is the stock 2 MB game."
 license = "See upstream patch author. Conversion is a sparse native overlay of that work."
 source_name = "hueponik/wip3out-patches"
 source_url = "https://codeberg.org/hueponik/wip3out-patches"
@@ -22,7 +22,7 @@ exe_sha256 = "0213f5292fa1d995ebe61f42d5dbdb6614e481cb3840ac5f1521c2dfdccc0a4d"
 [[feature]]
 id = "framerate"
 name = "NTSC / PAL Mode"
-description = """hueponik's region conversion: NTSC (60 Hz video, about 30 frames per second in a race) or PAL (50 Hz, about 25). Extras Enhanced and Full need 8 MB Main RAM; leave 8 MB Main RAM off with Extras None. Pairs with Frame Blending to present those frames at your display rate."""
+description = """hueponik's region conversion: NTSC (60 Hz video, about 30 frames per second in a race) or PAL (50 Hz, about 25). Extras Enhanced and Full use 8 MB RAM, switched on automatically. Pairs with Frame Blending to present those frames at your display rate."""
 group = "Gameplay"
 default_enabled = false
 
@@ -59,7 +59,7 @@ label = "PAL (50 Hz)"
 feature = "framerate"
 id = "extras"
 label = "Extras"
-description = "hueponik's 8 MB builds. Enhanced and Full need 8 MB Main RAM; None is the stock 2 MB game and should run with 8 MB Main RAM off."
+description = "hueponik's 8 MB builds. Enhanced and Full use 8 MB main RAM, which switches on automatically; None is the stock 2 MB game."
 group = "Gameplay"
 type = "choice"
 default = "none"
@@ -70,11 +70,23 @@ label = "None (stock 2 MB)"
 
 [[option.choice]]
 value = "enhanced"
-label = "Enhanced (needs 8 MB Main RAM)"
+label = "Enhanced (uses 8 MB RAM)"
 
 [[option.choice]]
 value = "full"
-label = "Full (needs 8 MB Main RAM)"
+label = "Full (uses 8 MB RAM)"
+
+[[requirement]]
+feature = "framerate"
+package = "psx.enhancement.8mb-ram"
+requires_feature = "8mb-ram"
+when = { extras = "enhanced" }
+
+[[requirement]]
+feature = "framerate"
+package = "psx.enhancement.8mb-ram"
+requires_feature = "8mb-ram"
+when = { extras = "full" }
 
 [[overlay]]
 feature = "framerate"
