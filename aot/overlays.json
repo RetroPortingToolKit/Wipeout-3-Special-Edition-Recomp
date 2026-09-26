@@ -1,0 +1,73 @@
+{
+  "schema": "psxrecomp AOT methods v1",
+  "game_id": "SCES-02845",
+  "disc_hashes": {
+    "sha256": "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
+  },
+  "mod_packages": [
+    {
+      "name": "framerate-ntscfull8",
+      "manifest": "mods/preloaded/packages/wipeout3.enhancement.framerate/1.0.14/manifest.toml",
+      "manifest_sha256": "2d125a975f571c2e6b169660ae4bc104a16c698049ddf4d97bda42d84bc81601",
+      "id": "wipeout3.enhancement.framerate",
+      "version": "1.0.14",
+      "features": {
+        "framerate": {
+          "build": "ntscfull8"
+        }
+      },
+      "plugins": [
+        "wipeout3.framerate.skip2",
+        "wipeout3.framerate.skip2-entry",
+        "wipeout3.framerate.skip2-on"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "method": "words",
+      "mod_package": "framerate-ntscfull8",
+      "file": "SCES_028.45",
+      "file_offset": "0x800",
+      "base": "0x80010000",
+      "reason": "Patched boot entry jumps to a loop copying 0x790 words from 0x800D03B8 to 0x80780000, then zeroes the source and resumes the original entry.",
+      "values": {
+        "0x80162474": "0x0805D521",
+        "0x80175484": "0x3C048078",
+        "0x80175488": "0x3C05800D",
+        "0x8017548C": "0x34A503B8",
+        "0x80175490": "0x34060790",
+        "0x80175494": "0x8CA20000",
+        "0x80175498": "0x24A50004",
+        "0x8017549C": "0xAC820000",
+        "0x801754A0": "0x24840004",
+        "0x801754A4": "0x24C6FFFF",
+        "0x801754A8": "0x14C0FFFA"
+      }
+    }
+  ],
+  "images": [
+    {
+      "method": "fixed_address_extents",
+      "mod_package": "framerate-ntscfull8",
+      "allow_missing": true,
+      "extents": [
+        {
+          "file": "SCES_028.45",
+          "file_offset": "0x800",
+          "base": "0x80010000",
+          "address": "0x800D03B8",
+          "size": "0x1E40",
+          "load_addr": "0x80780000",
+          "sha256": "d0c18fa9122ec14143d031cabdfe785fbd3be8ea5404bef062ffd228fb84c2dc",
+          "transfer_entries": {
+            "from": "mod_package_writes",
+            "count": 46
+          }
+        }
+      ]
+    }
+  ],
+  "expected_records": 1,
+  "strict_bounds": true
+}
