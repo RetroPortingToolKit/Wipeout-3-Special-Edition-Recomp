@@ -1,9 +1,9 @@
 format_version = 5
 id = "wipeout3.enhancement.frame-interpolation"
 version = "1.0.0"
-name = "WipEout 3 Frame Rate"
+name = "WipEout 3 Frame Blending"
 author = "mstan"
-description = "Presentation-only frame blending up to your display's refresh rate. Game logic, timers, and audio stay at their stock cadence."
+description = "Presentation-only frame blending: blends the game's own frames (about 30 or 25 per second) up to your display's refresh rate. Game logic, timers, and audio are never changed. Works together with NTSC / PAL Mode."
 resolver = "declarative"
 save_compatibility = "shared"
 
@@ -13,8 +13,8 @@ disc_sha256 = "003bdc41068252e791ea7dd99ba1b94814dc48b967e57a7cdc4bf6e1cf4cb1e9"
 
 [[feature]]
 id = "frame-interpolation"
-name = "High Frame Rate (Frame Blending)"
-description = "Disabled by default. Blends completed game frames at the selected presentation rate, using motion-adaptive blending to limit ghosting at speed. Does not speed up the race, timers, or audio. This is not motion-vector frame generation. Requires the OpenGL renderer."
+name = "Frame Blending"
+description = "Disabled by default. Presentation only: blends the game's completed frames (about 30 per second with NTSC / PAL Mode set to NTSC, about 25 on PAL) up to the selected presentation rate, using motion-adaptive blending to limit ghosting at speed. Works together with NTSC / PAL Mode. Does not change or speed up the race, timers, or audio. This is not motion-vector frame generation. Requires the OpenGL renderer."
 group = "Frame Rate"
 default_enabled = false
 
