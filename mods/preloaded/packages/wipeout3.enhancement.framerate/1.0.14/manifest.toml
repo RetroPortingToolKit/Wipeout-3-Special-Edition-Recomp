@@ -3,13 +3,12 @@ id = "wipeout3.enhancement.framerate"
 version = "1.0.14"
 name = "WipEout 3 NTSC / Framerate"
 author = "hueponik"
-description = "Converted from hueponik SCES-02845 xdelta patches (plain unlock + AOT skip=2). NTSC keeps SetVideoMode(NTSC) / 60 Hz CRTC and hueponik's 50→60 timing scales. Gate entry + VBlank plugins force gSimVblankSkip=2 (~30 fps sim; title Game 60 fps is CRTC). PAL ~25 fps. Mutually exclusive with the NTSC x2 120 Hz package. Enhanced/Full need 8 MB Main RAM (do not enable 8 MB with stock 2 MB builds)."
+description = "Converted from hueponik SCES-02845 xdelta patches (plain unlock + AOT skip=2). NTSC keeps SetVideoMode(NTSC) / 60 Hz CRTC and hueponik's 50→60 timing scales. Gate entry + VBlank plugins force gSimVblankSkip=2 (~30 fps sim; title Game 60 fps is CRTC). PAL ~25 fps. Enhanced/Full need 8 MB Main RAM (do not enable 8 MB with stock 2 MB builds)."
 license = "See upstream patch author. Conversion is a sparse native overlay of that work."
 source_name = "hueponik/wip3out-patches"
 source_url = "https://codeberg.org/hueponik/wip3out-patches"
 resolver = "declarative"
 save_compatibility = "isolated"
-conflicts = ["wipeout3.enhancement.framerate-120"]
 
 [[author_link]]
 name = "hueponik"
@@ -23,7 +22,7 @@ exe_sha256 = "0213f5292fa1d995ebe61f42d5dbdb6614e481cb3840ac5f1521c2dfdccc0a4d"
 [[feature]]
 id = "framerate"
 name = "NTSC / Framerate"
-description = """Plain hueponik NTSC/PAL plus AOT skip=2 at SimVblankGate (~30/25 fps). Enable 8 MB Main RAM before Enhanced or Full. Conflicts with NTSC x2 120 Hz."""
+description = """Plain hueponik NTSC/PAL plus AOT skip=2 at SimVblankGate (~30/25 fps). Enable 8 MB Main RAM before Enhanced or Full."""
 group = "Gameplay"
 default_enabled = false
 

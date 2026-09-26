@@ -43,6 +43,10 @@ psxrecomp_add_game_runtime(psx-runtime
     APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/psxrecomp.ico"
     GEN_MARKER "generated/SCES_028.45_dispatch.c"
     GEN_FULL_GLOB "generated/SCES_028.45_full_*.c"
+    # WipEout 3's trusted, game-owned mod catalog. The framework stages it into
+    # <exe-dir>/mods/bundled; every feature stays disabled until selected on
+    # the launcher's Mods page.
+    PRELOADED_MODS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/mods/preloaded"
     CODEGEN_SETUP_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/codegen_setup.c"
         ${WIPEOUT3_MOD_PLUGIN_SOURCES}
@@ -61,17 +65,6 @@ foreach(_PSX_RUNTIME_CONFIG game.toml game_options.toml)
     endif()
 endforeach()
 
-# Ship WipEout 3's trusted, game-owned mod catalog beside the runtime. Every
-# feature remains disabled until selected on the launcher's Mods page.
-set(WIPEOUT3_PRELOADED_MODS "${CMAKE_CURRENT_SOURCE_DIR}/mods/preloaded")
-if(EXISTS "${WIPEOUT3_PRELOADED_MODS}/packages")
-    add_custom_command(TARGET psx-runtime POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${WIPEOUT3_PRELOADED_MODS}"
-            "$<TARGET_FILE_DIR:psx-runtime>/mods"
-        COMMENT "Preloading the WipEout 3 mod catalog"
-        VERBATIM)
-
 # Bezel artwork (margin wallpapers; toolboxio's team marks). The runtime loads
 # from <exe dir>/bezels, so it must be staged like the mod catalog -- it was
 # hand-copied after every build before this, and forgotten more than once.
@@ -82,5 +75,4 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/bezels")
             "$<TARGET_FILE_DIR:psx-runtime>/bezels"
         COMMENT "Staging bezel artwork"
         VERBATIM)
-endif()
 endif()
