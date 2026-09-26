@@ -56,9 +56,9 @@ psxrecomp_add_game_runtime(psx-runtime
         psx.presentation.bezel
     # Build-time native code for verified images no static EXE function covers:
     # aot/overlays.json names the front-end menu overlay that MenuControl
-    # decodes from NFE.PB to 0x800BF800 (stock disc and NTSC / PAL Mode
-    # disc), and NTSC / PAL Mode's NTSC + Full engine, which its patched
-    # boot EXE copies to 0x80780000. The profile's static_output names this
+    # decodes from NFE.PB to 0x800BF800, once from the stock disc and once
+    # from NTSC Mode's patched disc (hueponik's ntsc build patches that
+    # menu). The profile's static_output names this
     # file, so `psxrecomp_cli.py generate` builds it from the player's disc
     # (runtime.cmake refuses a mismatch and warns at configure when it is
     # absent; that code then runs on the dirty-RAM interpreter).

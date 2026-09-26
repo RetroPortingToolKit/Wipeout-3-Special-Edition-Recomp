@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert hueponik WipEout 3 SE xdelta patches into the "NTSC / PAL Mode" package.
+"""Convert hueponik's WipEout 3 SE NTSC xdelta into the "NTSC Mode" package.
 
 derived_disc VCDIFF is conversion scaffolding only. Every changed Track 01
 sector becomes one guarded disc_user overlay. That includes the boot EXE's own
@@ -12,24 +12,19 @@ runtime checked the guards after the BIOS load, so every plan was rejected at
 0x80010098 ("expected-byte guard failed; booting unmodified") and the patches
 never applied -- the overlay was doing all the work (bead beads-btt8.6).
 
-hueponik publishes six builds (ntsc/pal x stock/8/full8). The package ships
-only the two FULL builds, one per Region option:
-  region = ntsc -> ntscfull8   (60 Hz NTSC conversion)
-  region = pal  -> palfull8    (50 Hz PAL)
-The stock-2 MB and "8" builds are not packaged (1.2.0 dropped the Extras
-option that picked them).
+hueponik publishes six builds (ntsc/pal x stock/8/full8). Since 1.3.0 the
+package ships ONE: the plain `ntsc` build (60 Hz, stock 2 MB RAM), which
+hueponik's README recommends for real PSX / non-overclocked emulators ("30fps
+instead of 25fps"). It is a single hidden, default-on feature ("NTSC Mode")
+with no options and no [[requirement]].
 
-Both full builds need the framework's 8 MB main-RAM feature. The manifest says
-so with one unconditional [[requirement]] (package format 7): enabling NTSC /
-PAL Mode switches that hidden feature on for the session -- the player never
-toggles, or sees, 8 MB Main RAM.
-
-Measured 2026-09-26 (GP1 display-flip ring, guest time, 175 s races): stock 25.0
-fps; ntscfull8 18.9 / palfull8 19.3 fps (12-25 by scene, CPU-bound at stock
-clock: flips every 3-4 vblanks). Removing the skip2 plugins changes nothing
-(19.0 / 19.5). NTSC game speed ~= fps/30 (80% at 24 fps) because the runtime
-keeps 50 Hz VBlanks for this PAL disc; PAL speed is correct. The descriptions
-below say so instead of promising 30/25 fps (beads-btt8.6).
+1.2.0 shipped the two FULL builds (ntscfull8 / palfull8) behind a Region option
+with an unconditional 8 MB [[requirement]]. hueponik targets >=500% overclock
+for those; measured 2026-09-26 at stock clock (GP1 display-flip ring, guest
+time, 175 s races): stock 25.0 fps, ntscfull8 18.9 / palfull8 19.3 fps (12-25
+by scene, flips every 3-4 vblanks), so they were dropped (beads-btt8.6). The
+"8" builds also need 8 MB + overclock and are not packaged; plain `pal` is
+not packaged either.
 
 Source: https://codeberg.org/hueponik/wip3out-patches
 """
@@ -57,21 +52,16 @@ EXE_SHA256 = "0213f5292fa1d995ebe61f42d5dbdb6614e481cb3840ac5f1521c2dfdccc0a4d"
 # all six xdeltas; the committed assets reproduce from it.
 PATCH_COMMIT = "1a630b055c415f62019f5bf3da2a3a0b2a846470"
 PATCH_BASE = f"https://codeberg.org/hueponik/wip3out-patches/raw/commit/{PATCH_COMMIT}"
-# (hueponik build, xdelta, region). The build name survives only as the asset
-# directory.
-VARIANTS = (
-    ("ntscfull8", "ntscfull8_track01.xdelta3", "ntsc"),
-    ("palfull8", "palfull8_track01.xdelta3", "pal"),
-)
-REGIONS = (
-    ("ntsc", "NTSC"),
-    ("pal", "PAL"),
-)
-# The framework feature both full builds require
-# (mods/builtin/packages/psx.enhancement.8mb-ram).
-RAM_8MB_PACKAGE = "psx.enhancement.8mb-ram"
-RAM_8MB_FEATURE = "8mb-ram"
-PKG_VERSION = "1.2.0"
+# The one hueponik build packaged: (build, xdelta). The build name survives
+# only as the asset directory.
+BUILD = "ntsc"
+BUILD_PATCH = "ntsc_track01.xdelta3"
+# Feature id. Deliberately NOT 1.2.0's "framerate": that feature was visible
+# and opt-in, so a state.toml written then can hold `enabled = false`, which
+# would override default_enabled forever -- and a hidden feature is not shown
+# while disabled, so the player could never switch it back on.
+FEATURE_ID = "ntsc"
+PKG_VERSION = "1.3.0"
 EXE_GAP = 64
 # hueponik unlocks every-vblank sim (2→1 skip + dt). Real PSX/DuckStation stay
 # GPU-bound near 25/30 fps; recomp's GPU is instant so that unlock chipmunks
@@ -183,17 +173,12 @@ def apply_xdelta(stock: Path, patch: Path, dest: Path) -> None:
     subprocess.check_call(cmd)
 
 
-def toml_escape(text: str) -> str:
-    return text.replace("\\", "\\\\").replace('"', '\\"')
-
-
 def emit_variant_ops(
     lines: list[str],
     out_dir: Path,
     assets: Path,
     feature: str,
     build: str,
-    region: str,
     meta: dict,
 ) -> None:
     variant_dir = assets / build
@@ -210,22 +195,11 @@ def emit_variant_ops(
             f'file = "{rel}"',
             f'sha256 = "{digest}"',
             f'expected_sha256 = "{expected_digest}"',
-            f'when = {{ region = "{region}" }}',
             "",
         ]
 
 
-def emit_choices(lines: list[str], choices) -> None:
-    for value, label in choices:
-        lines += [
-            "[[option.choice]]",
-            f'value = "{value}"',
-            f'label = "{toml_escape(label)}"',
-            "",
-        ]
-
-
-def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
+def emit_package_60(out_dir: Path, meta: dict) -> None:
     if out_dir.exists():
         shutil.rmtree(out_dir)
     assets = out_dir / "assets"
@@ -235,15 +209,12 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
         "format_version = 7",
         f'id = "{PKG_60}"',
         f'version = "{PKG_VERSION}"',
-        'name = "WipEout 3 NTSC / PAL Mode"',
+        'name = "WipEout 3 NTSC Mode"',
         'author = "hueponik"',
         "description = \"Converted from hueponik's SCES-02845 xdelta patches: "
-        "his full 8 MB builds (8 MB main RAM switches on automatically). NTSC "
-        "puts the game in the NTSC video mode with hueponik's 60 Hz timing; PAL "
-        "keeps the 50 Hz mode. hueponik targets a heavily overclocked CPU, which "
-        "this build does not have: measured races run at 12 to 25 frames per "
-        "second (the stock game holds 25), and in NTSC the race also runs slower "
-        "than real time whenever the frame rate drops.\"",
+        "his plain NTSC build (60 Hz, stock 2 MB RAM), which he recommends for "
+        "an unmodified PlayStation (30 fps instead of 25). Measured here: "
+        "races hold 30 fps (stock 25) at normal game speed.\"",
         'license = "See upstream patch author. Conversion is a sparse native overlay of that work."',
         'source_name = "hueponik/wip3out-patches"',
         'source_url = "https://codeberg.org/hueponik/wip3out-patches"',
@@ -260,55 +231,30 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
         f'exe_sha256 = "{EXE_SHA256}"',
         "",
         "[[feature]]",
-        'id = "framerate"',
-        'name = "NTSC / PAL Mode"',
-        'description = """hueponik\'s full build in NTSC or PAL mode. Uses 8 MB '
-        'RAM, switched on automatically. Races run at 12 to 25 frames per '
-        'second here, never faster than the stock game; in NTSC the race also '
-        'runs below real-time speed when frames drop (about 80% at 24 frames '
-        'per second). PAL keeps correct game speed."""',
+        f'id = "{FEATURE_ID}"',
+        'name = "NTSC Mode"',
+        'description = "Runs the game in NTSC mode (60 Hz) using hueponik\'s '
+        'NTSC patch: races hold 30 frames per second instead of the stock 25, '
+        'at normal game speed."',
         'group = "Gameplay"',
-        "default_enabled = false",
+        "hidden = true",
+        "default_enabled = true",
         "",
         "[[plugin]]",
-        'feature = "framerate"',
+        f'feature = "{FEATURE_ID}"',
         'id = "wipeout3.framerate.skip2-on"',
         "",
         "[[plugin]]",
-        'feature = "framerate"',
+        f'feature = "{FEATURE_ID}"',
         'id = "wipeout3.framerate.skip2"',
         "",
         "[[plugin]]",
-        'feature = "framerate"',
+        f'feature = "{FEATURE_ID}"',
         'id = "wipeout3.framerate.skip2-entry"',
-        "",
-        "[[option]]",
-        'feature = "framerate"',
-        'id = "region"',
-        'label = "Region"',
-        'description = "NTSC: NTSC video mode with hueponik\'s 60 Hz timing; the '
-        'race runs slow when frames drop. PAL: 50 Hz, correct game speed."',
-        'group = "Gameplay"',
-        'type = "choice"',
-        'default = "ntsc"',
-        "",
-    ]
-    emit_choices(lines, REGIONS)
-    # Both full builds need the framework's 8 MB map. The [[requirement]]
-    # activates that hidden feature whenever NTSC / PAL Mode is on (a package
-    # [[dependency]] would enable it even with the feature off), and fails the
-    # launch loudly if a build ever lacks the package.
-    lines += [
-        "[[requirement]]",
-        'feature = "framerate"',
-        f'package = "{RAM_8MB_PACKAGE}"',
-        f'requires_feature = "{RAM_8MB_FEATURE}"',
         "",
     ]
 
-    for build, _patch_name, region in VARIANTS:
-        emit_variant_ops(lines, out_dir, assets, "framerate", build, region,
-                         variants[build])
+    emit_variant_ops(lines, out_dir, assets, FEATURE_ID, BUILD, meta)
 
     # Generated output: LF on every host, so the manifest hash (which the AOT
     # profile pins) does not depend on where the generator ran.
@@ -322,12 +268,9 @@ def emit_package_60(out_dir: Path, variants: dict[str, dict]) -> None:
         "SCES-02845 Track 01 dump; the boot EXE's edits arrive through the same "
         "overlays when the BIOS loads it. The wipeout3.framerate.skip2* plugins "
         "force gSimVblankSkip=2 from SimVblankGate entry (pre-CPS) plus a VBlank "
-        "backup (measured: the full builds already hold gSimVblankSkip at 2 "
-        "without them, and real frame rate is the same either way). "
-        f"{PKG_VERSION} ships only hueponik's two full builds (ntscfull8, "
-        "palfull8), picked by Region, and declares one unconditional "
-        f"[[requirement]] on {RAM_8MB_PACKAGE}, so the 8 MB main-RAM map is "
-        "active whenever NTSC / PAL Mode is on.\n",
+        f"backup. {PKG_VERSION} ships only hueponik's plain NTSC build "
+        f"({BUILD}: 60 Hz, stock 2 MB RAM) as one hidden, default-on feature; "
+        "the 8 MB full builds and the Region option of 1.2.0 are gone.\n",
         encoding="utf-8",
         newline="\n",
     )
@@ -469,34 +412,28 @@ def main() -> int:
     exe = args.exe.read_bytes()
     args.cache.mkdir(parents=True, exist_ok=True)
 
-    # Ensure every NTSC/PAL xdelta is applied once.
-    patched_paths: dict[str, Path] = {}
-    for value, patch_name, _region in VARIANTS:
-        patch = args.cache / patch_name
-        if not patch.is_file():
-            download(f"{PATCH_BASE}/{patch_name}", patch)
-        patched = args.cache / f"{value}_track01.bin"
-        if not patched.is_file():
-            apply_xdelta(args.stock, patch, patched)
-        patched_paths[value] = patched
+    # Apply the NTSC xdelta once.
+    patch = args.cache / BUILD_PATCH
+    if not patch.is_file():
+        download(f"{PATCH_BASE}/{BUILD_PATCH}", patch)
+    patched = args.cache / f"{BUILD}_track01.bin"
+    if not patched.is_file():
+        apply_xdelta(args.stock, patch, patched)
 
-    converted_60 = {}
-    for value, _patch_name, region in VARIANTS:
-        converted_60[value] = convert_variant_60(
-            stock_raw,
-            stock_user,
-            exe,
-            patched_paths[value].read_bytes(),
-            force_ntsc_video=value.startswith("ntsc"),
-        )
-        print(
-            f"{value} (region={region}): "
-            f"overlays={len(converted_60[value]['overlays'])} "
-            f"boot-EXE edit runs carried by those overlays="
-            f"{converted_60[value]['exe_edit_runs']}",
-            file=sys.stderr,
-        )
-    emit_package_60(args.out_60, converted_60)
+    converted = convert_variant_60(
+        stock_raw,
+        stock_user,
+        exe,
+        patched.read_bytes(),
+        force_ntsc_video=True,
+    )
+    print(
+        f"{BUILD}: overlays={len(converted['overlays'])} "
+        f"boot-EXE edit runs carried by those overlays="
+        f"{converted['exe_edit_runs']}",
+        file=sys.stderr,
+    )
+    emit_package_60(args.out_60, converted)
     print(args.out_60)
 
     return 0
