@@ -48,30 +48,6 @@ memcard_dir = "saves"
 # so none of it matches the AOT image built from the stock SCES_028.45 and
 # it would otherwise interpret forever. See docs/COMPILING_OVERLAYS.md.
 overlay_cache = true
-# Background autocompile (gcc tier). Configuring this ALSO enables autocapture
-# on interp pressure — required to capture the ntscfull8 enhancement code the
-# game writes into the high 8 MB banks (0x781000+) and the runtime-dispatched
-# interior PCs in mod-patched text; neither is seen by the passive CD-DMA
-# capture path. The spawn itself runs on Windows only — on Linux/macOS run the
-# same command by hand after a play session (docs/COMPILING_OVERLAYS.md §1).
-# {TOKENS} instead of paths: the runtime resolves each to an absolute path,
-# searching the install directory before the project root (autocompile.h). The
-# old repo-relative form only worked when the game was launched with the repo
-# root as its working directory — in a shipped bundle every compile failed with
-# "can't open file .../compile_overlays.py" and all mod-patched code stayed on
-# the interpreter (measured: 29.3M interpreted dispatches over 12.9k frames).
-#
-# --captures / --out-dir are deliberately absent: the runtime injects the
-# canonical pair via PSX_OVERLAY_CACHE_DIR / PSX_OVERLAY_CAPTURES so the write
-# cache can never drift from where the loader reads.
-#
-# --flavor 2 is REQUIRED: this title builds PGXP-mandatory (top-level
-# CMakeLists), so the runtime is PSX_OVERLAY_FLAVOR=2 and the loader rejects
-# any shard whose flavor tag differs. The tool defaults to 0, so omitting this
-# silently fills a .._f0 dir this build can never load. (The runtime's own
-# spawn also pins the flavor by env; this keeps hand-runs of the same command
-# honest.)
-overlay_autocompile_cmd = "python3 {COMPILE_OVERLAYS} --game-toml {GAME_TOML} --recompiler {RECOMPILER} --runtime-include {RUNTIME_INCLUDE} --gcc gcc --cps --jobs 8 --flavor 2"
 
 # SIO1 serial link. WipEout 3 SE's 2/3/4P mode is its own libcomb "sio" driver
 # on SIO1 (4P = 2 consoles x 2 splitscreen), so the link needs an actual peer on

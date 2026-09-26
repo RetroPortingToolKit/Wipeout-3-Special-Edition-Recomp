@@ -47,6 +47,15 @@ psxrecomp_add_game_runtime(psx-runtime
     # <exe-dir>/mods/bundled; every feature stays disabled until selected on
     # the launcher's Mods page.
     PRELOADED_MODS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/mods/preloaded"
+    # Build-time native code for verified images no static EXE function covers:
+    # aot/overlays.json names the front-end menu overlay that MenuControl
+    # decodes from NFE.PB to 0x800BF800 (stock disc and framerate-package
+    # disc), and the framerate package's ntscfull8 engine, which its patched
+    # boot EXE copies to 0x80780000. The profile's static_output names this
+    # file, so `psxrecomp_cli.py generate` builds it from the player's disc
+    # (runtime.cmake refuses a mismatch and warns at configure when it is
+    # absent; that code then runs on the dirty-RAM interpreter).
+    GAME_OVERLAY_STATIC_C "${CMAKE_CURRENT_SOURCE_DIR}/generated/overlays_static.c"
     CODEGEN_SETUP_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/codegen_setup.c"
         ${WIPEOUT3_MOD_PLUGIN_SOURCES}
